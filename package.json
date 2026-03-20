@@ -1,0 +1,19 @@
+{
+  "name": "jobseek",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev -w @jobseek/server",
+    "build:server": "npm run build -w @jobseek/server",
+    "start:server": "npm run start -w @jobseek/server",
+    "db:generate": "npm run db:generate -w @jobseek/server",
+    "db:push": "npm run db:push -w @jobseek/server",
+    "db:migrate": "npm run db:migrate -w @jobseek/server"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
