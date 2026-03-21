@@ -29,6 +29,10 @@ export class CompanyService {
     return this.companyRepository.findByCareersUrl(careersUrl);
   }
 
+  async findByName(name: string): Promise<Company | null> {
+    return this.companyRepository.findByName(name);
+  }
+
   async findByAtsBoardToken(
     atsBoardToken: string,
   ): Promise<Company | null> {

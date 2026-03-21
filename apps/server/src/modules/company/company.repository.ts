@@ -26,6 +26,14 @@ export function createCompanyRepository(prisma: PrismaClient) {
       return prisma.company.findFirst({ where: { careersUrl } });
     },
 
+    async findByName(name: string): Promise<Company | null> {
+      return prisma.company.findFirst({
+        where: {
+          name: { equals: name, mode: "insensitive" },
+        },
+      });
+    },
+
     async findByAtsBoardToken(atsBoardToken: string): Promise<Company | null> {
       return prisma.company.findFirst({ where: { atsBoardToken } });
     },
