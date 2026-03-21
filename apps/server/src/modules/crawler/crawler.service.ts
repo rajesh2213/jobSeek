@@ -8,8 +8,8 @@ import {
 } from "./crawler.types.js";
 import { logger } from "../../utils/logger.js";
 import {
+  CRAWLABLE_ATS_TYPES,
   isSupportedAtsType,
-  SUPPORTED_ATS_TYPES,
   type AtsType,
 } from "../ats/ats.interface.js";
 
@@ -33,7 +33,7 @@ export class CrawlerService {
     now = new Date(),
   ): Promise<SchedulerRunStats> {
     const companiesByAts = await Promise.all(
-      SUPPORTED_ATS_TYPES.map((atsType) =>
+      CRAWLABLE_ATS_TYPES.map((atsType) =>
         this.companyService
           .listCrawlableByAtsType(atsType)
           .then((companies) => companies.slice(0, MAX_COMPANIES_PER_RUN_PER_ATS)),
@@ -78,7 +78,6 @@ export class CrawlerService {
             ? (company.atsType as AtsType)
             : undefined,
           atsBoardToken: boardToken,
-          // backward compatibility for existing worker payload shape
           greenhouseBoardToken: boardToken,
         };
 
@@ -88,8 +87,6 @@ export class CrawlerService {
           await this.companyService.markCrawled(company.id, now);
           stats.jobsEnqueued += 1;
         } catch (err) {
-          // If a crawl job is already queued/active with the same deterministic jobId,
-          // we treat it as an idempotent no-op for this polling run.
           if (
             err instanceof Error &&
             err.message.toLowerCase().includes("job") &&

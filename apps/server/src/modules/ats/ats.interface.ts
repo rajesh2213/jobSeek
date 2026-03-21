@@ -1,7 +1,28 @@
 import type { NormalizedJob } from "../crawler/crawler.types.js";
 
-export const SUPPORTED_ATS_TYPES = ["greenhouse", "lever", "ashby"] as const;
+export const SUPPORTED_ATS_TYPES = [
+  "greenhouse",
+  "lever",
+  "ashby",
+  "workable",
+  "smartrecruiters",
+  "bamboohr",
+  "teamtailor",
+  "rippling",
+  "workday",
+] as const;
 export type AtsType = (typeof SUPPORTED_ATS_TYPES)[number];
+export const CRAWLABLE_ATS_TYPES: AtsType[] = [
+  "greenhouse",
+  "lever",
+  "ashby",
+  "workable",
+  "smartrecruiters",
+  "bamboohr",
+  "teamtailor",
+  "rippling",
+  "workday",
+];
 
 export interface AtsCrawler<TRawJob> {
   readonly atsType: AtsType;
@@ -13,6 +34,12 @@ const ATS_RATE_LIMIT_MS: Record<AtsType, number> = {
   greenhouse: 200,
   lever: 300,
   ashby: 300,
+  workable: 300,
+  smartrecruiters: 300,
+  bamboohr: 400,
+  teamtailor: 400,
+  rippling: 400,
+  workday: 400,
 };
 
 function delay(ms: number): Promise<void> {
@@ -72,6 +99,6 @@ export function sanitizeHtml(value: string | undefined): string | undefined {
 }
 
 export function isSupportedAtsType(value: string): value is AtsType {
-  return value === "greenhouse" || value === "lever" || value === "ashby";
+  return (SUPPORTED_ATS_TYPES as readonly string[]).includes(value);
 }
 
