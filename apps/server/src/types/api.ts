@@ -21,4 +21,6 @@ export interface PaginatedResult<T> {
   page: number;
   limit: number;
   totalPages: number;
+  /** When set: more rows exist after this page (`skip + items.length < total`). */
+  hasMore?: boolean;
 }

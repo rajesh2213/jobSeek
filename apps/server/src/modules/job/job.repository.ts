@@ -1,78 +1,754 @@
 import { PrismaClient, Prisma } from "@prisma/client";
 import type { Job } from "@prisma/client";
 
-import type { NormalizedJob } from "../crawler/crawler.types.js";
+import { enrichJob } from "../enrichment/enrichment.service.js";
+import type { DedupJobInput } from "../crawler/crawler.types.js";
+import { computeStoredScores } from "../../services/jobRanking.service.js";
+import { isValidJobUrl } from "../../utils/url.js";
+import { logger } from "../../utils/logger.js";
+import { expandLocationFilter, getRegions } from "../../utils/locationResolver.js";
+import {
+  LISTING_EXCLUDED_ROLE_SLUGS,
+  ROLE_SUGGEST_EXTRA_EXCLUDED,
+} from "./jobListing.constants.js";
 
-export interface JobListFilters {
-  location?: string;
-  isRemote?: boolean;
-  companyId?: string;
+function safeApplyUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  return isValidJobUrl(url) ? url : null;
 }
 
-export interface JobListOptions {
-  page: number;
-  limit: number;
-  filters?: JobListFilters;
+/** Filter-first discovery (taxonomy slugs + ISO country). */
+export interface JobDiscoveryFilters {
+  role?: string;
+  roles?: string[];
+  roleTerms?: string[];
+  /** Match if job has any of these skill slugs. */
+  skills?: string[];
+  /** ISO 3166-1 alpha-2 (preferred) or resolved from slug via API. */
+  country?: string;
+  countries?: string[];
+  locationTerms?: string[];
+  category?: string;
+  /** Legacy: when true and `workType` unset, treated as remote. */
+  isRemote?: boolean;
+  workType?: "remote" | "onsite" | "hybrid";
+  workTypes?: Array<"remote" | "onsite" | "hybrid">;
+  experienceLevel?: "junior" | "mid" | "senior";
+  postedWithin?: "24h" | "3d" | "1w" | "1m";
+  minSalary?: number;
+  companyId?: string;
+  /**
+   * Region name (e.g. Asia), ISO country code, or city text — resolved server-side
+   * via `locationRegion`, `expandLocationFilter`, or `locationCity` contains.
+   */
+  location?: string;
 }
 
 export interface JobWithCompany extends Job {
-  company: { id: string; name: string };
+  company: {
+    id: string;
+    name: string;
+    slug: string;
+    logoUrl: string | null;
+    domain: string | null;
+    careersUrl: string | null;
+    _count?: { jobs: number };
+  };
+}
+
+/** Match stored country when legacy `country` was populated before `locationCountry`. */
+function whereResolvedCountryIn(codes: string[]): Prisma.JobWhereInput {
+  return {
+    OR: [
+      { locationCountry: { in: codes } },
+      {
+        AND: [{ locationCountry: "UNKNOWN" }, { country: { in: codes } }],
+      },
+    ],
+  };
+}
+
+function postedSince(key: "24h" | "3d" | "1w" | "1m"): Date {
+  const now = Date.now();
+  const ms = {
+    "24h": 24 * 60 * 60 * 1000,
+    "3d": 3 * 24 * 60 * 60 * 1000,
+    "1w": 7 * 24 * 60 * 60 * 1000,
+    "1m": 30 * 24 * 60 * 60 * 1000,
+  }[key];
+  return new Date(now - ms);
+}
+
+function roleLabelFromSlug(slug: string): string {
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function buildDiscoveryWhere(
+  filters?: JobDiscoveryFilters,
+): Prisma.JobWhereInput {
+  const and: Prisma.JobWhereInput[] = [
+    { canonicalJobId: null },
+    { role: { notIn: [...LISTING_EXCLUDED_ROLE_SLUGS] } },
+  ];
+
+  if (!filters) return { AND: and };
+
+  if (filters.roleTerms !== undefined && filters.roleTerms.length > 0) {
+    and.push({
+      OR: filters.roleTerms.map((term) => ({
+        title: { contains: term, mode: "insensitive" },
+      })),
+    });
+  } else if (filters.roles !== undefined && filters.roles.length > 0) {
+    and.push({
+      OR: filters.roles.map((term) => ({
+        title: { contains: term, mode: "insensitive" },
+      })),
+    });
+  } else if (filters.role !== undefined && filters.role !== "") {
+    and.push({ title: { contains: filters.role, mode: "insensitive" } });
+  }
+  const locQ = filters.location?.trim();
+  if (locQ) {
+    const regionsList = getRegions();
+    const regionHit = regionsList.find((r) => r.toLowerCase() === locQ.toLowerCase());
+    if (regionHit) {
+      const regionCodes = expandLocationFilter(regionHit);
+      and.push({
+        OR: [
+          { locationRegion: regionHit },
+          {
+            AND: [
+              { OR: [{ locationRegion: null }, { locationRegion: "" }] },
+              whereResolvedCountryIn(regionCodes),
+            ],
+          },
+        ],
+      });
+    } else {
+      const codes = expandLocationFilter(locQ);
+      if (codes.length === 1) {
+        and.push(whereResolvedCountryIn([codes[0]!]));
+      } else if (codes.length > 1) {
+        and.push(whereResolvedCountryIn(codes));
+      } else {
+        and.push({
+          locationCity: { contains: locQ, mode: "insensitive" },
+        });
+      }
+    }
+  }
+
+  const locationFilterValues = filters.countries?.length
+    ? filters.countries
+    : filters.country
+      ? [filters.country]
+      : [];
+  if (locationFilterValues.length > 0) {
+    and.push(whereResolvedCountryIn(locationFilterValues));
+  } else if (filters.locationTerms !== undefined && filters.locationTerms.length > 0) {
+    and.push({
+      OR: filters.locationTerms.map((loc) => ({
+        OR: [
+          { country: { contains: loc, mode: "insensitive" } },
+          { locationCity: { contains: loc, mode: "insensitive" } },
+        ],
+      })),
+    });
+  }
+  if (filters.category !== undefined && filters.category !== "") {
+    and.push({ category: filters.category });
+  }
+  if (filters.workTypes !== undefined && filters.workTypes.length > 0) {
+    and.push({ workType: { in: filters.workTypes } });
+  } else if (filters.workType !== undefined) {
+    and.push({ workType: filters.workType });
+  } else if (filters.isRemote === true) {
+    and.push({ workType: "remote" });
+  }
+  if (filters.experienceLevel !== undefined) {
+    and.push({ experienceLevel: filters.experienceLevel });
+  }
+  if (filters.postedWithin !== undefined) {
+    const since = postedSince(filters.postedWithin);
+    and.push({
+      OR: [
+        { postedAt: { gte: since } },
+        { AND: [{ postedAt: null }, { createdAt: { gte: since } }] },
+      ],
+    });
+  }
+  if (filters.companyId !== undefined && filters.companyId !== "") {
+    and.push({ companyId: filters.companyId });
+  }
+  if (filters.skills !== undefined && filters.skills.length > 0) {
+    and.push({ skills: { hasSome: filters.skills } });
+  }
+  if (filters.minSalary !== undefined) {
+    and.push({ salaryMin: { gte: filters.minSalary } });
+  }
+
+  return { AND: and };
+}
+
+/** `WHERE` fragment for table alias `j` — keep in sync with `buildDiscoveryWhere`. */
+function sqlResolvedCountryIn(codes: string[]): Prisma.Sql {
+  const list = Prisma.join(codes.map((c) => Prisma.sql`${c}`));
+  return Prisma.sql`(
+    j."locationCountry" IN (${list})
+    OR (j."locationCountry" = 'UNKNOWN' AND j.country IN (${list}))
+  )`;
+}
+
+function buildDiscoveryWhereSql(filters?: JobDiscoveryFilters): Prisma.Sql {
+  const excluded = Prisma.join(
+    LISTING_EXCLUDED_ROLE_SLUGS.map((s) => Prisma.sql`${s}`),
+  );
+  const parts: Prisma.Sql[] = [
+    Prisma.sql`j."canonicalJobId" IS NULL`,
+    Prisma.sql`j.role NOT IN (${excluded})`,
+  ];
+
+  if (!filters) {
+    return Prisma.join(parts, " AND ");
+  }
+
+  if (filters.roleTerms !== undefined && filters.roleTerms.length > 0) {
+    parts.push(
+      Prisma.sql`(${Prisma.join(
+        filters.roleTerms.map(
+          (term) => Prisma.sql`j.title ILIKE ${`%${term}%`}`,
+        ),
+        " OR ",
+      )})`,
+    );
+  } else if (filters.roles !== undefined && filters.roles.length > 0) {
+    parts.push(
+      Prisma.sql`(${Prisma.join(
+        filters.roles.map((term) => Prisma.sql`j.title ILIKE ${`%${term}%`}`),
+        " OR ",
+      )})`,
+    );
+  } else if (filters.role !== undefined && filters.role !== "") {
+    parts.push(Prisma.sql`j.title ILIKE ${`%${filters.role}%`}`);
+  }
+
+  const locQ = filters.location?.trim();
+  if (locQ) {
+    const regionsList = getRegions();
+    const regionHit = regionsList.find((r) => r.toLowerCase() === locQ.toLowerCase());
+    if (regionHit) {
+      const regionCodes = expandLocationFilter(regionHit);
+      parts.push(
+        Prisma.sql`(
+          j."locationRegion" = ${regionHit}
+          OR (
+            (j."locationRegion" IS NULL OR j."locationRegion" = '')
+            AND (${sqlResolvedCountryIn(regionCodes)})
+          )
+        )`,
+      );
+    } else {
+      const codes = expandLocationFilter(locQ);
+      if (codes.length === 1) {
+        parts.push(sqlResolvedCountryIn([codes[0]!]));
+      } else if (codes.length > 1) {
+        parts.push(sqlResolvedCountryIn(codes));
+      } else {
+        parts.push(Prisma.sql`j."locationCity" ILIKE ${`%${locQ}%`}`);
+      }
+    }
+  }
+
+  const locationFilterValues = filters.countries?.length
+    ? filters.countries
+    : filters.country
+      ? [filters.country]
+      : [];
+  if (locationFilterValues.length > 0) {
+    parts.push(sqlResolvedCountryIn(locationFilterValues));
+  } else if (filters.locationTerms !== undefined && filters.locationTerms.length > 0) {
+    parts.push(
+      Prisma.sql`(${Prisma.join(
+        filters.locationTerms.map(
+          (loc) =>
+            Prisma.sql`(j.country ILIKE ${`%${loc}%`} OR j."locationCity" ILIKE ${`%${loc}%`})`,
+        ),
+        " OR ",
+      )})`,
+    );
+  }
+  if (filters.category !== undefined && filters.category !== "") {
+    parts.push(Prisma.sql`j.category = ${filters.category}`);
+  }
+  if (filters.workTypes !== undefined && filters.workTypes.length > 0) {
+    parts.push(
+      Prisma.sql`j."workType" IN (${Prisma.join(
+        filters.workTypes.map((w) => Prisma.sql`${w}`),
+      )})`,
+    );
+  } else if (filters.workType !== undefined) {
+    parts.push(Prisma.sql`j."workType" = ${filters.workType}`);
+  } else if (filters.isRemote === true) {
+    parts.push(Prisma.sql`j."workType" = 'remote'`);
+  }
+  if (filters.experienceLevel !== undefined) {
+    parts.push(Prisma.sql`j."experienceLevel" = ${filters.experienceLevel}`);
+  }
+  if (filters.postedWithin !== undefined) {
+    const since = postedSince(filters.postedWithin);
+    parts.push(
+      Prisma.sql`(j."postedAt" >= ${since} OR (j."postedAt" IS NULL AND j."createdAt" >= ${since}))`,
+    );
+  }
+  if (filters.companyId !== undefined && filters.companyId !== "") {
+    parts.push(Prisma.sql`j."companyId" = ${filters.companyId}`);
+  }
+  if (filters.skills !== undefined && filters.skills.length > 0) {
+    parts.push(
+      Prisma.sql`j.skills && ARRAY[${Prisma.join(
+        filters.skills.map((s) => Prisma.sql`${s}`),
+      )}]::text[]`,
+    );
+  }
+  if (filters.minSalary !== undefined) {
+    parts.push(Prisma.sql`j."salaryMin" >= ${filters.minSalary}`);
+  }
+
+  return Prisma.join(parts, " AND ");
+}
+
+function buildSalaryOrderBy(): Prisma.JobOrderByWithRelationInput[] {
+  return [
+    { salaryMin: { sort: "desc", nulls: "last" } },
+    { createdAt: "desc" },
+  ];
 }
 
 export function createJobRepository(prisma: PrismaClient) {
+  function buildBaseJobData(input: DedupJobInput) {
+    const now = new Date();
+    /** Ingest-time proxy for DB `createdAt`; `computeStoredScores` ages from COALESCE(postedAt, createdAt). */
+    const scores = computeStoredScores(input.source, input.postedAt ?? null, now);
+    const workType =
+      input.workType ??
+      (input.isRemote ? "remote" : "onsite");
+    return {
+      title: input.title,
+      companyId: input.companyId,
+      country: input.country,
+      locationCity: input.locationCity ?? null,
+      locationState: input.locationState ?? null,
+      locationCountry: input.locationCountry ?? input.country,
+      locationRegion: input.locationRegion ?? null,
+      category: input.category,
+      isRemote: input.isRemote,
+      workType,
+      experienceLevel: input.experienceLevel ?? null,
+      description: input.description ?? null,
+      source: input.source,
+      sourceUrl: input.sourceUrl,
+      applyUrl: safeApplyUrl(input.applyUrl),
+      postedAt: input.postedAt ?? null,
+      lastSeenAt: now,
+      freshnessScore: scores.freshnessScore,
+      sourceWeight: scores.sourceWeight,
+      atsJobId: input.atsJobId ?? null,
+      role: input.role,
+      skills: input.skills,
+      salaryMin: input.salaryMin,
+    };
+  }
+
   return {
-    async findById(id: string): Promise<JobWithCompany | null> {
-      return prisma.job.findUnique({
-        where: { id },
-        include: { company: { select: { id: true, name: true } } },
+    async findBySourceUrl(sourceUrl: string): Promise<Job | null> {
+      return prisma.job.findUnique({ where: { sourceUrl } });
+    },
+
+    async findByIdRaw(id: string): Promise<Job | null> {
+      return prisma.job.findUnique({ where: { id } });
+    },
+
+    async resolveCanonicalJob(job: Job): Promise<Job> {
+      if (!job.canonicalJobId) return job;
+      const c = await prisma.job.findUnique({ where: { id: job.canonicalJobId } });
+      if (!c) {
+        throw new Error(`Missing canonical job for duplicate ${job.id}`);
+      }
+      return c;
+    },
+
+    async findCanonicalsByFingerprint(fingerprint: string): Promise<Job[]> {
+      return prisma.job.findMany({
+        where: { fingerprint, canonicalJobId: null },
       });
     },
 
-    async findMany(options: JobListOptions): Promise<{
-      items: JobWithCompany[];
-      total: number;
-    }> {
-      const { page, limit, filters = {} } = options;
-      const where: Prisma.JobWhereInput = {};
-
-      if (filters.location !== undefined && filters.location !== "") {
-        where.location = { contains: filters.location, mode: "insensitive" };
-      }
-      if (filters.isRemote !== undefined) {
-        where.isRemote = filters.isRemote;
-      }
-      if (filters.companyId !== undefined && filters.companyId !== "") {
-        where.companyId = filters.companyId;
-      }
-
-      const [items, total] = await Promise.all([
-        prisma.job.findMany({
-          where,
-          include: { company: { select: { id: true, name: true } } },
-          orderBy: { postedAt: "desc" },
-          skip: (page - 1) * limit,
-          take: limit,
-        }),
-        prisma.job.count({ where }),
-      ]);
-
-      return { items, total };
+    async findDuplicatesByCanonicalId(canonicalId: string): Promise<Job[]> {
+      return prisma.job.findMany({
+        where: { canonicalJobId: canonicalId },
+      });
     },
 
-    async create(input: NormalizedJob): Promise<Job> {
-      return prisma.job.create({
-        data: {
-          title: input.title,
-          companyId: input.companyId,
-          location: input.location ?? null,
-          isRemote: input.isRemote,
-          description: input.description ?? null,
-          source: input.source,
-          sourceUrl: input.sourceUrl,
-          postedAt: input.postedAt ?? null,
-          lastSeenAt: new Date(),
+    async countCanonicalFiltered(filters?: JobDiscoveryFilters): Promise<number> {
+      return prisma.job.count({ where: buildDiscoveryWhere(filters) });
+    },
+
+    async listRoleSuggestions(): Promise<
+      Array<{ slug: string; label: string; count: number }>
+    > {
+      const excluded = [...LISTING_EXCLUDED_ROLE_SLUGS, ...ROLE_SUGGEST_EXTRA_EXCLUDED];
+      const rows = await prisma.$queryRaw<{ role: string; count: bigint }[]>`
+        SELECT j.role, COUNT(*)::bigint AS count
+        FROM "Job" j
+        WHERE j."canonicalJobId" IS NULL
+          AND j.role NOT IN (${Prisma.join(
+            excluded.map((e) => Prisma.sql`${e}`),
+          )})
+          AND LENGTH(j.role) > 3
+          AND j.role NOT ILIKE '%career%'
+          AND j.role NOT ILIKE '%benefit%'
+          AND j.role NOT ILIKE '%location%'
+        GROUP BY j.role
+        ORDER BY count DESC
+        LIMIT 200
+      `;
+      return rows.map((r) => ({
+        slug: r.role,
+        label: roleLabelFromSlug(r.role),
+        count: Number(r.count),
+      }));
+    },
+
+    async listCategoryAggregates(): Promise<
+      Array<{ category: string; count: number }>
+    > {
+      const rows = await prisma.$queryRaw<{ category: string; count: bigint }[]>`
+        SELECT j.category, COUNT(*)::bigint AS count
+        FROM "Job" j
+        WHERE j."canonicalJobId" IS NULL
+          AND j.role NOT IN (${Prisma.join(
+            LISTING_EXCLUDED_ROLE_SLUGS.map((e) => Prisma.sql`${e}`),
+          )})
+          AND j.category <> 'other'
+        GROUP BY j.category
+        ORDER BY count DESC
+      `;
+      return rows.map((r) => ({
+        category: r.category,
+        count: Number(r.count),
+      }));
+    },
+
+    async listSkillAggregates(): Promise<Array<{ slug: string; count: number }>> {
+      const rows = await prisma.$queryRaw<{ skill: string; count: bigint }[]>`
+        SELECT LOWER(TRIM(s.skill)) AS skill, COUNT(*)::bigint AS count
+        FROM "Job" j
+        CROSS JOIN LATERAL unnest(j.skills) AS s(skill)
+        WHERE j."canonicalJobId" IS NULL
+          AND j.role NOT IN (${Prisma.join(
+            LISTING_EXCLUDED_ROLE_SLUGS.map((e) => Prisma.sql`${e}`),
+          )})
+          AND array_length(j.skills, 1) IS NOT NULL
+          AND array_length(j.skills, 1) > 0
+        GROUP BY LOWER(TRIM(s.skill))
+        ORDER BY count DESC
+        LIMIT 400
+      `;
+      return rows.map((r) => ({
+        slug: r.skill,
+        count: Number(r.count),
+      }));
+    },
+
+    /**
+     * Canonical jobs only; filter-first.
+     * Latest: `ORDER BY COALESCE("postedAt","createdAt") DESC` (listing age, not crawl-only).
+     * Salary: salary floor desc, then `createdAt` desc.
+     */
+    async findManyCanonicalFiltered(options: {
+      filters?: JobDiscoveryFilters;
+      limit: number;
+      offset: number;
+      sort?: "latest" | "salary_desc";
+    }): Promise<JobWithCompany[]> {
+      const sort = options.sort ?? "latest";
+      const companyInclude = {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logoUrl: true,
+          domain: true,
+          careersUrl: true,
+          _count: { select: { jobs: true } },
+        },
+      };
+
+      if (sort === "latest") {
+        const whereSql = buildDiscoveryWhereSql(options.filters);
+        const idRows = await prisma.$queryRaw<{ id: string }[]>`
+          SELECT j.id FROM "Job" j
+          WHERE ${whereSql}
+          ORDER BY COALESCE(j."postedAt", j."createdAt") DESC
+          LIMIT ${options.limit} OFFSET ${options.offset}
+        `;
+        const ids = idRows.map((r) => r.id);
+        if (ids.length === 0) return [];
+        const jobs = await prisma.job.findMany({
+          where: { id: { in: ids } },
+          include: { company: companyInclude },
+        });
+        const order = new Map(ids.map((id, i) => [id, i]));
+        jobs.sort((a, b) => (order.get(a.id)! - order.get(b.id)!));
+        return jobs as JobWithCompany[];
+      }
+
+      const rows = await prisma.job.findMany({
+        where: buildDiscoveryWhere(options.filters),
+        include: { company: companyInclude },
+        orderBy: buildSalaryOrderBy(),
+        take: options.limit,
+        skip: options.offset,
+      });
+      return rows as JobWithCompany[];
+    },
+
+    async findById(id: string): Promise<JobWithCompany | null> {
+      const job = await prisma.job.findUnique({
+        where: { id },
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              logoUrl: true,
+              domain: true,
+              careersUrl: true,
+              _count: { select: { jobs: true } },
+            },
+          },
         },
       });
+      if (!job) return null;
+      const targetId = job.canonicalJobId ?? job.id;
+      if (targetId === job.id) {
+        return job as JobWithCompany;
+      }
+      return prisma.job.findUnique({
+        where: { id: targetId },
+        include: {
+          company: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              logoUrl: true,
+              domain: true,
+              careersUrl: true,
+              _count: { select: { jobs: true } },
+            },
+          },
+        },
+      });
+    },
+
+    async create(input: DedupJobInput): Promise<Job> {
+      return prisma.job.upsert({
+        where: { sourceUrl: input.sourceUrl },
+        update: {
+          updatedAt: new Date(),
+          lastSeenAt: new Date(),
+        },
+        create: {
+          ...buildBaseJobData(input),
+          fingerprintVersion: "v2",
+        },
+      });
+    },
+
+    async createCanonicalJob(
+      input: DedupJobInput & { fingerprint: string; fingerprintVersion: "v2" },
+    ): Promise<Job> {
+      const existing = await prisma.job.findUnique({
+        where: { sourceUrl: input.sourceUrl },
+      });
+      if (existing) {
+        logger.info(
+          { event: "job_duplicate_sourceUrl", sourceUrl: input.sourceUrl },
+          "job_duplicate_sourceUrl",
+        );
+        return existing;
+      }
+      try {
+        return await prisma.job.create({
+          data: {
+            ...buildBaseJobData(input),
+            fingerprint: input.fingerprint,
+            fingerprintVersion: input.fingerprintVersion,
+            canonicalJobId: null,
+          },
+        });
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2002"
+        ) {
+          logger.info(
+            { event: "job_duplicate_sourceUrl", sourceUrl: input.sourceUrl },
+            "job_duplicate_sourceUrl",
+          );
+          const existing = await prisma.job.findUnique({
+            where: { sourceUrl: input.sourceUrl },
+          });
+          if (existing) return existing;
+        }
+        throw err;
+      }
+    },
+
+    async createDuplicateJob(
+      input: DedupJobInput & {
+        fingerprint: string;
+        fingerprintVersion: "v2";
+        canonicalJobId: string;
+      },
+    ): Promise<Job> {
+      const existing = await prisma.job.findUnique({
+        where: { sourceUrl: input.sourceUrl },
+      });
+      if (existing) {
+        logger.info(
+          { event: "job_duplicate_sourceUrl", sourceUrl: input.sourceUrl },
+          "job_duplicate_sourceUrl",
+        );
+        return existing;
+      }
+      try {
+        return await prisma.job.create({
+          data: {
+            ...buildBaseJobData(input),
+            fingerprint: input.fingerprint,
+            fingerprintVersion: input.fingerprintVersion,
+            canonicalJobId: input.canonicalJobId,
+          },
+        });
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2002"
+        ) {
+          logger.info(
+            { event: "job_duplicate_sourceUrl", sourceUrl: input.sourceUrl },
+            "job_duplicate_sourceUrl",
+          );
+          const existing = await prisma.job.findUnique({
+            where: { sourceUrl: input.sourceUrl },
+          });
+          if (existing) return existing;
+        }
+        throw err;
+      }
+    },
+
+    async updateCanonicalById(
+      id: string,
+      data: {
+        title: string;
+        description: string | null;
+        country: string | null;
+        category: string | null;
+        isRemote: boolean;
+        postedAt: Date | null;
+      },
+    ): Promise<void> {
+      await prisma.job.update({
+        where: { id },
+        data: {
+          title: data.title,
+          description: data.description,
+          country: data.country ?? "UNKNOWN",
+          category: data.category ?? "other",
+          isRemote: data.isRemote,
+          postedAt: data.postedAt,
+        },
+      });
+    },
+
+    async updateCanonicalAggregation(
+      id: string,
+      data: {
+        title: string;
+        description: string | null;
+        country: string | null;
+        category: string | null;
+        isRemote: boolean;
+        workType: string;
+        experienceLevel: string | null;
+        postedAt: Date | null;
+        applyUrl: string | null;
+        freshnessScore: number;
+        sourceWeight: number;
+        source: string;
+        role: string;
+        skills: string[];
+        salaryMin: number | null;
+      },
+    ): Promise<void> {
+      const row = await prisma.job.findUnique({ where: { id } });
+      if (!row) return;
+      await prisma.job.update({
+        where: { id },
+        data: {
+          title: data.title,
+          description: data.description,
+          country: data.country ?? "UNKNOWN",
+          category: data.category ?? "other",
+          isRemote: data.isRemote,
+          workType: data.workType,
+          experienceLevel: data.experienceLevel,
+          postedAt: data.postedAt,
+          applyUrl: data.applyUrl,
+          freshnessScore: data.freshnessScore,
+          sourceWeight: data.sourceWeight,
+          source: data.source,
+          role: data.role,
+          skills: data.skills,
+          salaryMin: data.salaryMin,
+        },
+      });
+    },
+
+    async updateLastSeenById(id: string, lastSeenAt: Date): Promise<void> {
+      await prisma.job.update({
+        where: { id },
+        data: { lastSeenAt },
+      });
+    },
+
+    /**
+     * When re-ingesting an existing `sourceUrl`, backfill or correct `postedAt` from the ATS
+     * (keeps the earlier date when both exist — publication proxy).
+     */
+    async mergePostedAtIfEarlier(id: string, candidate: Date | undefined): Promise<boolean> {
+      if (!candidate || Number.isNaN(candidate.getTime())) return false;
+      const row = await prisma.job.findUnique({
+        where: { id },
+        select: { postedAt: true },
+      });
+      if (!row) return false;
+      const cur = row.postedAt;
+      if (cur && candidate.getTime() >= cur.getTime()) return false;
+      await prisma.job.update({
+        where: { id },
+        data: { postedAt: candidate },
+      });
+      return true;
     },
 
     async updateLastSeenBySourceUrl(sourceUrl: string, lastSeenAt: Date): Promise<void> {
@@ -92,6 +768,20 @@ export function createJobRepository(prisma: PrismaClient) {
         data: { lastSeenAt },
       });
       return result.count;
+    },
+
+    async updateParsedDescription(
+      id: string,
+      parsed: Prisma.InputJsonValue,
+    ): Promise<void> {
+      const enriched = enrichJob(parsed);
+      await prisma.job.update({
+        where: { id },
+        data: {
+          parsedDescription: parsed,
+          enriched: enriched as unknown as Prisma.InputJsonValue,
+        },
+      });
     },
   };
 }

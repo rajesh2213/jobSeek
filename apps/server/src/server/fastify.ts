@@ -1,10 +1,34 @@
 import Fastify, { type FastifyError } from "fastify";
 import prismaPlugin from "./plugins/prisma.plugin.js";
 import { registerRoutes } from "./routes/index.js";
+import cors from "@fastify/cors";
+import fastifyRawBody from "fastify-raw-body";
 
 export async function buildServer() {
   const server = Fastify({
     logger: { level: process.env.LOG_LEVEL ?? "info" },
+  });
+
+  await server.register(fastifyRawBody, {
+    field: "rawBody",
+    global: false,
+    encoding: false,
+    runFirst: true,
+  });
+
+  // Enable CORS for the Next.js client running on a different port.
+  // Without this, browsers block `fetch()` even if the API returns 200.
+  await server.register(cors as never, {
+    // `origin: true` reflects the request `Origin` header in
+    // `Access-Control-Allow-Origin`.
+    origin: true,
+    credentials: false,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Authorization",
+      "Content-Type",
+      "x-jobseek-view-cap-bypass",
+    ],
   });
 
   server.setErrorHandler((error: FastifyError, _request, reply) => {

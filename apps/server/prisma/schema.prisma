@@ -8,35 +8,190 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Company {
-  id         String   @id @default(uuid())
-  name       String
-  careersUrl String?
-  atsBoardToken String?
-  atsType    String?
-  lastCrawledAt DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+enum CompanyStatus {
+  raw
+  enriching
+  ready
+  failed
+}
 
-  jobs Job[]
+model Company {
+  id                  String         @id @default(uuid())
+  name                String
+  slug                String         @unique
+  domain              String?        @unique
+  logoUrl             String?
+  careersUrl          String?
+  atsBoardToken       String?
+  atsType             String?
+  status              CompanyStatus  @default(raw)
+  discoverySource     String?
+  enrichmentAttempts  Int            @default(0)
+  lastCrawledAt         DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  jobs                  Job[]
+  atsEndpoints          AtsEndpoint[]
+}
+
+model AtsEndpoint {
+  id             String    @id @default(uuid())
+  type           String
+  slug           String
+  baseUrl        String
+  companyName    String?
+  companyId      String?
+  isActive       Boolean   @default(true)
+  lastCheckedAt  DateTime?
+  lastSuccessAt  DateTime?
+  lastFailureAt  DateTime?
+  /// Last time ingest worker completed a crawl + ingest cycle for this endpoint.
+  lastCrawledAt  DateTime?
+  failureCount   Int       @default(0)
+  successCount   Int       @default(0)
+  metadata       Json?
+  /// Last time endpoint discovery (SERP/jobs) observed this row.
+  lastSeenAt     DateTime?
+  /// Discovery provenance: "serp" | "job" | "unknown" (e.g. enrichment).
+  source         String    @default("unknown")
+  score          Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@unique([type, slug])
+  @@index([companyId])
+  @@index([type, isActive])
+  @@index([source, score])
 }
 
 model Job {
-  id          String    @id @default(uuid())
-  title       String
-  companyId   String
-  location    String?
-  isRemote    Boolean   @default(false)
-  description String?   @db.Text
-  source      String
-  sourceUrl   String    @unique
-  postedAt    DateTime?
-  lastSeenAt  DateTime  @default(now())
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                 String    @id @default(uuid())
+  title              String
+  companyId          String
+  /// @deprecated Prefer `locationCountry` after migration; kept for backward compatibility.
+  country            String    @default("UNKNOWN")
+  locationCity       String?
+  locationState      String?
+  locationCountry    String    @default("UNKNOWN")
+  locationRegion     String?
+  isRemote           Boolean   @default(false)
+  workType           String    @default("onsite")
+  experienceLevel    String?
+  category           String    @default("other")
+  description        String?   @db.Text
+  /// AI / ML structured parse of description (line buckets). Null until worker or backfill runs.
+  parsedDescription  Json?
+  /// Rule-based signals from parsedDescription (tech stack, salary text, remote hints).
+  enriched           Json?
+  source             String
+  sourceUrl          String    @unique
+  applyUrl           String?
+  postedAt           DateTime?
+  lastSeenAt         DateTime  @default(now())
+  fingerprint        String?
+  canonicalJobId     String?
+  fingerprintVersion String?
+  atsJobId           String?
+  freshnessScore     Float     @default(0)
+  sourceWeight       Float     @default(0.7)
+  role               String    @default("other")
+  skills             String[]  @default([])
+  salaryMin          Int?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company    Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  canonical  Job?    @relation("JobDuplicates", fields: [canonicalJobId], references: [id], onDelete: Cascade)
+  duplicates Job[]   @relation("JobDuplicates")
 
   @@index([title])
   @@index([companyId])
+  @@index([fingerprint])
+  @@index([canonicalJobId])
+  @@index([freshnessScore])
+  @@index([sourceWeight])
+  @@index([role])
+  @@index([country])
+  @@index([locationCountry])
+  @@index([locationRegion])
+  @@index([category])
+  @@index([isRemote])
+  @@index([workType])
+  @@index([experienceLevel])
+  @@index([skills], type: Gin)
+}
+
+model SerpBatch {
+  id        String      @id @default(uuid())
+  query     String
+  source    String
+  status    String
+  createdAt DateTime    @default(now())
+
+  results   SerpResult[]
+}
+
+model SerpResult {
+  id       String   @id @default(uuid())
+  batchId  String
+  url      String
+  domain   String   @default("")
+  atsType  String?
+  slug     String?
+  score    Int      @default(0)
+  title    String?
+  snippet  String?
+  rank     Int?
+  createdAt DateTime @default(now())
+  discoveredAt DateTime?
+
+  batch    SerpBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([url])
+  @@index([domain])
+  @@index([atsType])
+  @@index([score])
+  @@index([atsType, score])
+  @@index([discoveredAt])
+}
+
+model User {
+  id                 String         @id @default(uuid())
+  clerkId            String         @unique
+  email              String         @unique
+  plan               String         @default("free") // "free" | "pro"
+  stripeCustomerId   String?        @unique
+  jobViewsToday      Int            @default(0)
+  jobViewsResetAt    DateTime       @default(now())
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  subscription       Subscription?
+  savedSearches      SavedSearch[]
+}
+
+model Subscription {
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String   @unique
+  stripePriceId        String
+  stripeSubscriptionId String   @unique
+  status               String // "active" | "canceled" | "past_due"
+  currentPeriodEnd     DateTime
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model SavedSearch {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  filters     Json
+  lastAlertAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
 }
