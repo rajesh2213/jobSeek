@@ -55,3 +55,7 @@ scripts/debugJobParser.ts
 
 # Clerk dev cache / keyless (never commit)
 apps/client/.clerk/
+
+# GitHub rejects files >100MB — keep locally or use Git LFS / object storage
+**/*.safetensors
+apps/server/src/modules/seeding/data/Wellfound_Final.csv
