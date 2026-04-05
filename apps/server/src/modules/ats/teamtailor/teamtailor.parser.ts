@@ -32,7 +32,10 @@ export function parseTeamtailorJobs(
       isRemote: inferRemote(location),
       source: "teamtailor",
       sourceUrl,
-      postedAt: parseDate(attrs?.created_at),
+      applyUrl: sourceUrl,
+      postedAt: parseDate(
+        attrs?.published_at ?? attrs?.start_date ?? attrs?.created_at,
+      ),
       companyId,
     });
   }

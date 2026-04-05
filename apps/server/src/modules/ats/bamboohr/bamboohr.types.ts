@@ -10,9 +10,11 @@ export interface BambooHrApiResponse {
 }
 
 export interface BambooHrRawJob {
+  id?: number | string;
   title?: string;
   sourceUrl?: string;
   location?: string;
   description?: string;
+  postedAt?: string;
 }
 

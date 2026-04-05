@@ -3,6 +3,7 @@ import { prisma } from "../src/infrastructure/db/prisma.js";
 import { logger } from "../src/utils/logger.js";
 import { createCompanyRepository } from "../src/modules/company/company.repository.js";
 import { CompanyService } from "../src/modules/company/company.service.js";
+import { createJobRepository } from "../src/modules/job/job.repository.js";
 import { SeedingService } from "../src/modules/seeding/seeding.service.js";
 import type { SeedCompany } from "../src/modules/seeding/seeding.types.js";
 import { getYcDataset } from "../src/modules/seeding/datasets/yc.dataset.js";
@@ -118,7 +119,10 @@ async function main(): Promise<void> {
     "Company seeding started",
   );
 
-  const companyService = new CompanyService(createCompanyRepository(prisma));
+  const companyService = new CompanyService(
+    createCompanyRepository(prisma),
+    createJobRepository(prisma),
+  );
   const seedingService = new SeedingService(companyService);
 
   const result = await seedingService.seedCompanies(companies);

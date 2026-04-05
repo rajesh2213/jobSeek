@@ -11,9 +11,15 @@ export interface SmartRecruitersJob {
   location?: SmartRecruitersJobLocation;
   ref?: string;
   applyUrl?: string;
+  description?: string;
+  postedAt?: string;
+  companyToken?: string;
 }
 
 export interface SmartRecruitersJobsResponse {
   content?: SmartRecruitersJob[];
+  totalFound?: number;
+  limit?: number;
+  offset?: number;
 }
 

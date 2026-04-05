@@ -1,12 +1,6 @@
-import type { AtsType } from "../ats/ats.interface.js";
 import { CompanyService } from "../company/company.service.js";
 import { logger } from "../../utils/logger.js";
-import {
-  delay,
-  getDomainFromUrl,
-  normalizeDomain,
-  randomIntInclusive,
-} from "../../utils/common.js";
+import { normalizeDomain } from "../../utils/common.js";
 import type {
   DiscoverySourceCompany,
   DiscoverySourceType,
@@ -17,12 +11,6 @@ import { fortune500Source } from "./sources/fortune500.source.js";
 import { weworkremotelySource } from "./sources/weworkremotely.source.js";
 import { remoteokSource } from "./sources/remoteok.source.js";
 import type { CompanySource } from "./sources/source.interface.js";
-import { detectCareersPage } from "./detectors/careers.detector.js";
-import { detectAtsType } from "./detectors/ats.detector.js";
-import { extractGreenhouseToken } from "./extractors/greenhouse.extractor.js";
-import { extractLeverToken } from "./extractors/lever.extractor.js";
-import { extractAshbyToken } from "./extractors/ashby.extractor.js";
-import { extractWorkdayToken } from "./extractors/workday.extractor.js";
 
 export const discoverySources: CompanySource[] = [
   ycSource,
@@ -36,18 +24,6 @@ const sourceByName = new Map<DiscoverySourceType, CompanySource>(
   discoverySources.map((source) => [source.source, source]),
 );
 
-function extractAtsBoardToken(
-  atsType: AtsType,
-  html: string | null,
-  careersUrl: string | null,
-): string | null {
-  if (atsType === "greenhouse") return extractGreenhouseToken(html, careersUrl);
-  if (atsType === "lever") return extractLeverToken(html, careersUrl);
-  if (atsType === "ashby") return extractAshbyToken(html, careersUrl);
-  if (atsType === "workday") return extractWorkdayToken(html, careersUrl);
-  return null;
-}
-
 export class DiscoveryService {
   constructor(private readonly companyService: CompanyService) {}
 
@@ -59,7 +35,6 @@ export class DiscoveryService {
 
     logger.info({ event: "source_fetch_start", source }, "Source fetch started");
     try {
-      await delay(randomIntInclusive(100, 300));
       const companies = await sourceImpl.fetchCompanies();
       logger.info(
         {
@@ -79,96 +54,42 @@ export class DiscoveryService {
     }
   }
 
+  /**
+   * Add a discovery candidate as a raw company and enqueue enrichment (domain optional).
+   */
   async processCompanyCandidate(
-    input: DiscoverySourceCompany,
+    input: DiscoverySourceCompany & { source: DiscoverySourceType },
   ): Promise<"added" | "skipped"> {
     const name = input.name.trim();
-    const domain = normalizeDomain(input.domain);
-
-    const byName = await this.companyService.findByName(name);
-    if (byName) {
-      logger.info({ event: "company_skipped", reason: "name_exists", name, domain }, "Company exists by name");
+    if (!name) {
       return "skipped";
     }
 
-    const existing = await this.companyService.list();
-    const domainExists =
-      !!domain &&
-      existing.some((company) => {
-        const existingDomain = getDomainFromUrl(company.careersUrl);
-        return existingDomain === domain;
-      });
-
-    if (domainExists) {
-      logger.info({ event: "company_skipped", reason: "domain_exists", name, domain }, "Company exists by domain");
-      return "skipped";
-    }
-
-    if (!domain) {
+    const existing = await this.companyService.findByName(name);
+    if (existing) {
       logger.info(
-        { event: "company_skipped", reason: "domain_missing", name },
-        "Company skipped because domain is missing",
+        { event: "company_skipped", reason: "name_exists", name },
+        "Company exists by name",
       );
       return "skipped";
     }
 
-    const careers = await detectCareersPage(domain);
-    logger.info(
-      {
-        event: "careers_detected",
-        name,
-        domain,
-        careersUrl: careers.careersUrl,
-      },
-      "Careers detection completed",
-    );
-
-    if (!careers.careersUrl || !careers.html) {
-      return "skipped";
-    }
-
-    const byCareersUrl = await this.companyService.findByCareersUrl(
-      careers.careersUrl,
-    );
-    if (byCareersUrl) {
-      logger.info(
-        {
-          event: "company_skipped",
-          reason: "careers_url_exists",
-          name,
-          careersUrl: careers.careersUrl,
-        },
-        "Company exists by careers url",
-      );
-      return "skipped";
-    }
-
-    const atsType = detectAtsType(careers.html);
-    logger.info({ event: "ats_detected", name, domain, atsType }, "ATS detection completed");
-    if (!atsType) return "skipped";
-
-    const atsBoardToken = extractAtsBoardToken(atsType, careers.html, careers.careersUrl);
-    if (!atsBoardToken) {
-      logger.info({ event: "company_skipped", reason: "token_not_found", name, domain, atsType }, "ATS token not found");
-      return "skipped";
-    }
-
-    await this.companyService.create({
+    const domainNorm = normalizeDomain(input.domain);
+    await this.companyService.createRawFromDiscovery({
       name,
-      careersUrl: careers.careersUrl,
-      atsType,
-      atsBoardToken,
+      domain: domainNorm ?? null,
+      discoverySource: input.source,
     });
 
     logger.info(
       {
         event: "company_added",
         name,
-        domain,
-        atsType,
-        atsBoardToken,
+        domain: domainNorm ?? null,
+        source: input.source,
+        flow: "raw_then_enrich",
       },
-      "Discovered company added",
+      "Discovered company queued for enrichment",
     );
     return "added";
   }

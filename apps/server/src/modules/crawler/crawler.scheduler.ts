@@ -1,17 +1,23 @@
 import { loadRootEnv } from "../../infrastructure/env/loadEnv.js";
 import { prisma } from "../../infrastructure/db/prisma.js";
 import { logger } from "../../utils/logger.js";
+import { assertWorkerProcessEnv } from "../../infrastructure/env/validateWorkerEnv.js";
+import { registerSchedulerShutdown } from "../../utils/schedulerShutdown.js";
 import { createCompanyRepository } from "../company/company.repository.js";
 import { CompanyService } from "../company/company.service.js";
-import { getJobQueue } from "../../queues/job.queue.js";
+import { createJobRepository } from "../job/job.repository.js";
+import { getJobQueue, closeJobQueue } from "../../queues/job.queue.js";
 import { CrawlerService } from "./crawler.service.js";
 
-const FIVE_MINUTES_MS = 5 * 60 * 1000;
+const TEN_MINUTES_MS = 10 * 60 * 1000;
 
 async function runOnce(): Promise<void> {
   const jobQueue = getJobQueue();
   const companyRepository = createCompanyRepository(prisma);
-  const companyService = new CompanyService(companyRepository);
+  const companyService = new CompanyService(
+    companyRepository,
+    createJobRepository(prisma),
+  );
 
   const crawlerService = new CrawlerService(companyService, jobQueue);
 
@@ -40,6 +46,7 @@ async function runOnce(): Promise<void> {
 
 async function main(): Promise<void> {
   loadRootEnv();
+  assertWorkerProcessEnv();
 
   logger.info({ event: "crawl_scheduler_start" }, "Crawler scheduler starting");
 
@@ -49,12 +56,21 @@ async function main(): Promise<void> {
     logger.error(err, "Crawler scheduler initial run failed");
   }
 
-  setInterval(() => {
+  const interval = setInterval(() => {
     void runOnce().catch((err) => {
       logger.error({ event: "crawl_scheduler_run_failed", err }, "Crawler scheduler run failed");
     });
-  }, FIVE_MINUTES_MS);
+  }, TEN_MINUTES_MS);
+
+  registerSchedulerShutdown({
+    intervalIds: [interval],
+    closeQueues: [closeJobQueue],
+    prismaDisconnect: () => prisma.$disconnect(),
+  });
 }
 
-void main();
+void main().catch((err) => {
+  logger.error({ event: "crawl_scheduler_boot_failed", err }, "crawl_scheduler_boot_failed");
+  process.exitCode = 1;
+});
 

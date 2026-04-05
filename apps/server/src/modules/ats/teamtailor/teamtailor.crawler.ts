@@ -6,6 +6,35 @@ import {
 } from "../ats.interface.js";
 import { parseTeamtailorJobs } from "./teamtailor.parser.js";
 import type { TeamtailorApiResponse, TeamtailorJob } from "./teamtailor.types.js";
+import { asyncPool } from "../../../utils/asyncPool.js";
+import { extractJobDescriptionFromHtml } from "../../../utils/jobDetailHtml.js";
+
+function extractPostedAtFromJsonLd(html: string): string | undefined {
+  const scriptRe = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  for (const match of html.matchAll(scriptRe)) {
+    const raw = match[1]?.trim();
+    if (!raw) continue;
+    try {
+      const data = JSON.parse(raw) as unknown;
+      const items = Array.isArray(data) ? data : [data];
+      for (const item of items) {
+        if (!item || typeof item !== "object") continue;
+        const obj = item as Record<string, unknown>;
+        const type = obj["@type"];
+        const types = Array.isArray(type) ? type : [type];
+        const isJP = types.some((t) =>
+          String(t ?? "").toLowerCase().includes("jobposting"),
+        );
+        if (!isJP) continue;
+        const dp = obj["datePosted"] ?? obj["postedAt"] ?? obj["validFrom"];
+        if (typeof dp === "string" && dp.trim()) return dp.trim();
+      }
+    } catch {
+      continue;
+    }
+  }
+  return undefined;
+}
 
 function parseFallbackHtml(token: string, html: string): TeamtailorJob[] {
   const jobs: TeamtailorJob[] = [];
@@ -51,7 +80,45 @@ class TeamtailorCrawlerImpl implements AtsCrawler<TeamtailorJob> {
         throw new Error(`Teamtailor request failed (${res.status} ${res.statusText})`);
       }
       const html = await res.text();
-      return parseFallbackHtml(token, html);
+      const fallbackJobs = parseFallbackHtml(token, html);
+
+      const needsDetail = fallbackJobs
+        .filter((j) => !j.attributes?.body && j.attributes?.external_application_url)
+        .slice(0, 12);
+
+      if (needsDetail.length === 0) return fallbackJobs;
+
+      const enriched = await asyncPool(needsDetail, 3, async (job) => {
+        const url = job.attributes?.external_application_url;
+        if (!url) return job;
+        try {
+          const r = await fetch(url, { signal: AbortSignal.timeout(7000) });
+          if (!r.ok) return job;
+          const detailHtml = await r.text();
+          const extracted = extractJobDescriptionFromHtml(detailHtml);
+          const postedAt = extractPostedAtFromJsonLd(detailHtml);
+
+          return {
+            ...job,
+            attributes: {
+              ...job.attributes,
+              body: extracted.text || job.attributes?.body,
+              created_at: postedAt || job.attributes?.created_at,
+            },
+          };
+        } catch {
+          return job;
+        }
+      });
+
+      const byId = new Map<string, TeamtailorJob>();
+      for (const j of enriched) {
+        if (j.id) byId.set(j.id, j);
+      }
+      return fallbackJobs.map((j) => {
+        const key = j.id;
+        return key && byId.has(key) ? (byId.get(key) as TeamtailorJob) : j;
+      });
     }
   }
 

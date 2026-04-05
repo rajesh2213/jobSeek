@@ -26,6 +26,7 @@ export function parseRipplingJobs(
       isRemote: inferRemote(location),
       source: "rippling",
       sourceUrl,
+      applyUrl: sourceUrl,
       postedAt: parseDate(job.postedAt),
       companyId,
     });

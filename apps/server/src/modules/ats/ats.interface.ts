@@ -1,21 +1,32 @@
 import type { NormalizedJob } from "../crawler/crawler.types.js";
+import {
+  DEFAULT_ATS_FETCH_RETRY,
+  fetchWithRetry,
+} from "../../utils/fetchWithRetry.js";
 
 export const SUPPORTED_ATS_TYPES = [
   "greenhouse",
   "lever",
   "ashby",
+  "jobvite",
   "workable",
   "smartrecruiters",
   "bamboohr",
   "teamtailor",
   "rippling",
   "workday",
+  /** Aggregator / fallback ingestion (not a crawlable ATS board). */
+  "remoteok",
+  "wellfound",
+  /** Company careers HTML: shallow link crawl from enrichment-discovered URL. */
+  "careers_page",
 ] as const;
 export type AtsType = (typeof SUPPORTED_ATS_TYPES)[number];
 export const CRAWLABLE_ATS_TYPES: AtsType[] = [
   "greenhouse",
   "lever",
   "ashby",
+  "jobvite",
   "workable",
   "smartrecruiters",
   "bamboohr",
@@ -34,12 +45,16 @@ const ATS_RATE_LIMIT_MS: Record<AtsType, number> = {
   greenhouse: 200,
   lever: 300,
   ashby: 300,
+  jobvite: 400,
   workable: 300,
   smartrecruiters: 300,
   bamboohr: 400,
   teamtailor: 400,
   rippling: 400,
   workday: 400,
+  remoteok: 500,
+  wellfound: 500,
+  careers_page: 400,
 };
 
 function delay(ms: number): Promise<void> {
@@ -55,10 +70,11 @@ export async function fetchJsonWithTimeout<T>(
   url: string,
   timeoutMs = 5000,
 ): Promise<T> {
-  const res = await fetch(url, {
-    signal: AbortSignal.timeout(timeoutMs),
-    headers: { accept: "application/json" },
-  });
+  const res = await fetchWithRetry(
+    url,
+    { headers: { accept: "application/json" } },
+    { ...DEFAULT_ATS_FETCH_RETRY, timeoutMs },
+  );
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");

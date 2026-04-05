@@ -1,8 +1,10 @@
 import { logger } from "../../../utils/logger.js";
 import { delay, randomIntInclusive } from "../../../utils/common.js";
+import { asyncPool } from "../../../utils/asyncPool.js";
 import type { AtsCrawler } from "../ats.interface.js";
 import { throttleByAts } from "../ats.interface.js";
-import { parseWorkdayJobs } from "./workday.parser.js";
+import { enrichWorkdayRawJobWithDetail } from "./workday.detail.js";
+import { parseWorkdayJobs, resolveWorkdayListingUrl } from "./workday.parser.js";
 import type {
   WorkdayJobsResponse,
   WorkdayRawJob,
@@ -11,6 +13,12 @@ import type {
 
 const PAGE_LIMIT = 20;
 const SITE_FALLBACKS = ["Careers", "External", "Global"] as const;
+const WORKDAY_DETAIL_CONCURRENCY = 5;
+
+async function enrichWorkdayResults(jobs: WorkdayRawJob[]): Promise<WorkdayRawJob[]> {
+  if (jobs.length === 0) return jobs;
+  return asyncPool(jobs, WORKDAY_DETAIL_CONCURRENCY, (raw) => enrichWorkdayRawJobWithDetail(raw));
+}
 
 function parseTokenFromUrl(value: string): WorkdayToken | null {
   try {
@@ -18,9 +26,15 @@ function parseTokenFromUrl(value: string): WorkdayToken | null {
     const host = url.hostname.toLowerCase();
     if (!host.includes("myworkdayjobs.com")) return null;
     const tenant = host.split(".")[0];
+    if (!tenant) return null;
     const pathParts = url.pathname.split("/").filter(Boolean);
+    if (pathParts.length === 0) return null;
+    const firstSeg = pathParts[0]!.toLowerCase();
+    if (firstSeg === "job" && pathParts.length >= 3) {
+      return { host, tenant, site: "Careers" };
+    }
     const site = pathParts[pathParts.length - 1];
-    if (!tenant || !site) return null;
+    if (!site) return null;
     return { host, tenant, site };
   } catch {
     return null;
@@ -45,7 +59,7 @@ function parseToken(token: string): WorkdayToken | null {
       };
     }
   } catch {
-    // Not JSON; continue.
+    /* not JSON */
   }
 
   const asUrl = parseTokenFromUrl(trimmed);
@@ -92,13 +106,6 @@ function withHostFallbacks(host: string): string[] {
     if (!hosts.includes(candidate)) hosts.push(candidate);
   }
   return hosts;
-}
-
-function resolveSourceUrl(token: WorkdayToken, externalPath: string | undefined): string | null {
-  const trimmed = externalPath?.trim();
-  if (!trimmed) return null;
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
-  return `https://${token.host}${trimmed.startsWith("/") ? "" : "/"}${trimmed}`;
 }
 
 interface FetchAttemptResult {
@@ -228,8 +235,18 @@ class WorkdayCrawlerImpl implements AtsCrawler<WorkdayRawJob> {
         if (result.complete) {
           const deduped = new Map<string, WorkdayRawJob>();
           for (const raw of result.jobs) {
-            const sourceUrl = resolveSourceUrl(raw.token, raw.job.externalPath);
-            if (!sourceUrl) continue;
+            const sourceUrl = resolveWorkdayListingUrl(raw.token.host, raw.job);
+            if (!sourceUrl) {
+              logger.warn(
+                {
+                  event: "invalid_job_url",
+                  url: raw.job.externalPath ?? raw.job.jobPostingUrl ?? "(empty)",
+                  company: raw.token.tenant,
+                },
+                "invalid_job_url",
+              );
+              continue;
+            }
             if (!deduped.has(sourceUrl)) {
               deduped.set(sourceUrl, raw);
             }
@@ -247,7 +264,7 @@ class WorkdayCrawlerImpl implements AtsCrawler<WorkdayRawJob> {
             { event: "workday_fetch_success", jobs_fetched: finalJobs.length, companyId: null },
             "Workday fetch succeeded",
           );
-          return finalJobs;
+          return enrichWorkdayResults(finalJobs);
         }
 
         lastFailureReason = result.reason ?? lastFailureReason;
@@ -266,8 +283,18 @@ class WorkdayCrawlerImpl implements AtsCrawler<WorkdayRawJob> {
       );
       const deduped = new Map<string, WorkdayRawJob>();
       for (const raw of bestJobs) {
-        const sourceUrl = resolveSourceUrl(raw.token, raw.job.externalPath);
-        if (!sourceUrl) continue;
+        const sourceUrl = resolveWorkdayListingUrl(raw.token.host, raw.job);
+        if (!sourceUrl) {
+          logger.warn(
+            {
+              event: "invalid_job_url",
+              url: raw.job.externalPath ?? raw.job.jobPostingUrl ?? "(empty)",
+              company: raw.token.tenant,
+            },
+            "invalid_job_url",
+          );
+          continue;
+        }
         if (!deduped.has(sourceUrl)) {
           deduped.set(sourceUrl, raw);
         }
@@ -285,7 +312,7 @@ class WorkdayCrawlerImpl implements AtsCrawler<WorkdayRawJob> {
         { event: "workday_fetch_success", jobs_fetched: finalJobs.length, companyId: null },
         "Workday fetch succeeded with partial coverage",
       );
-      return finalJobs;
+      return enrichWorkdayResults(finalJobs);
     }
 
     logger.info(

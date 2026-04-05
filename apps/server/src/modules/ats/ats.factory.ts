@@ -8,6 +8,7 @@ import { smartrecruitersCrawler } from "./smartrecruiters/smartrecruiters.crawle
 import { teamtailorCrawler } from "./teamtailor/teamtailor.crawler.js";
 import { workableCrawler } from "./workable/workable.crawler.js";
 import { workdayCrawler } from "./workday/workday.crawler.js";
+import { jobviteCrawler } from "./jobvite/jobvite.crawler.js";
 
 export function getAtsCrawler(atsType: string): AtsCrawler<unknown> {
   switch (atsType) {
@@ -27,6 +28,8 @@ export function getAtsCrawler(atsType: string): AtsCrawler<unknown> {
       return teamtailorCrawler as AtsCrawler<unknown>;
     case "rippling":
       return ripplingCrawler as AtsCrawler<unknown>;
+    case "jobvite":
+      return jobviteCrawler as AtsCrawler<unknown>;
     case "workday":
       return workdayCrawler as AtsCrawler<unknown>;
     default:

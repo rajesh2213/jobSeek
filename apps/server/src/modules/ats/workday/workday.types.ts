@@ -12,11 +12,18 @@ export interface WorkdayLocation {
 
 export interface WorkdayJob {
   bulletFields?: string[];
+  /** Primary listing path from CXS API (may be relative). */
   externalPath?: string;
+  /** Full URL when API provides it (preferred). */
+  jobPostingUrl?: string;
+  /** Direct apply URL when different from listing. */
+  applyUrl?: string;
+  externalUrl?: string;
   locationsText?: string;
   postedOn?: string;
   title?: string;
   jobDescription?: string;
+  jobDescriptionHtml?: string;
   locations?: WorkdayLocation[];
 }
 
@@ -25,8 +32,22 @@ export interface WorkdayJobsResponse {
   total?: number;
 }
 
+/** CXS GET job detail JSON (`/wday/cxs/{tenant}/{site}{externalPath}`). */
+export interface WorkdayJobPostingInfo {
+  title?: string;
+  jobDescription?: string;
+  jobDescriptionHtml?: string;
+  location?: string;
+  locationsText?: string;
+  postedOn?: string;
+  externalUrl?: string;
+}
+
+export interface WorkdayJobDetailResponse {
+  jobPostingInfo?: WorkdayJobPostingInfo;
+}
+
 export interface WorkdayRawJob {
   token: WorkdayToken;
   job: WorkdayJob;
 }
-

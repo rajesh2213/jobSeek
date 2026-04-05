@@ -2,6 +2,7 @@ import type { AtsCrawler } from "../ats.interface.js";
 import { throttleByAts, trimWhitespace } from "../ats.interface.js";
 import { parseRipplingJobs } from "./rippling.parser.js";
 import type { RipplingRawJob } from "./rippling.types.js";
+import { asyncPool } from "../../../utils/asyncPool.js";
 
 function parseJsonEmbeddedJobs(html: string): RipplingRawJob[] {
   const jobs: RipplingRawJob[] = [];
@@ -51,6 +52,26 @@ function parseLinkBasedJobs(token: string, html: string): RipplingRawJob[] {
   return jobs;
 }
 
+async function enrichRipplingJobDetail(raw: RipplingRawJob): Promise<RipplingRawJob> {
+  if (!raw.sourceUrl) return raw;
+  try {
+    const res = await fetch(raw.sourceUrl, { signal: AbortSignal.timeout(7000) });
+    if (!res.ok) return raw;
+    const html = await res.text();
+    const jsonJobs = parseJsonEmbeddedJobs(html);
+    const found = jsonJobs.find((j) => j.sourceUrl === raw.sourceUrl) ?? jsonJobs[0];
+    if (!found) return raw;
+    return {
+      ...raw,
+      description: found.description ?? raw.description,
+      postedAt: found.postedAt ?? raw.postedAt,
+      location: found.location ?? raw.location,
+    };
+  } catch {
+    return raw;
+  }
+}
+
 class RipplingCrawlerImpl implements AtsCrawler<RipplingRawJob> {
   readonly atsType = "rippling" as const;
 
@@ -64,7 +85,13 @@ class RipplingCrawlerImpl implements AtsCrawler<RipplingRawJob> {
     const html = await res.text();
     const jsonJobs = parseJsonEmbeddedJobs(html).filter((job) => job.title && job.sourceUrl);
     if (jsonJobs.length > 0) return jsonJobs;
-    return parseLinkBasedJobs(token, html);
+    const linkJobs = parseLinkBasedJobs(token, html);
+    const needsDetail = linkJobs.filter((j) => !j.description || !j.postedAt).slice(0, 10);
+    if (needsDetail.length === 0) return linkJobs;
+
+    const enriched = await asyncPool(needsDetail, 3, (j) => enrichRipplingJobDetail(j));
+    const byUrl = new Map(enriched.filter((x) => x.sourceUrl).map((x) => [x.sourceUrl!, x]));
+    return linkJobs.map((j) => (j.sourceUrl && byUrl.has(j.sourceUrl) ? byUrl.get(j.sourceUrl)! : j));
   }
 
   parseJobs(rawJobs: RipplingRawJob[], companyId: string) {

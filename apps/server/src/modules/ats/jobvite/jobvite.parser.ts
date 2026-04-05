@@ -6,10 +6,10 @@ import {
   sanitizeHtml,
   trimWhitespace,
 } from "../ats.interface.js";
-import type { BambooHrRawJob } from "./bamboohr.types.js";
+import type { JobviteRawJob } from "./jobvite.types.js";
 
-export function parseBambooHrJobs(
-  jobs: BambooHrRawJob[],
+export function parseJobviteJobs(
+  jobs: JobviteRawJob[],
   companyId: string,
 ): NormalizedJob[] {
   const normalized: NormalizedJob[] = [];
@@ -24,7 +24,7 @@ export function parseBambooHrJobs(
       description: sanitizeHtml(job.description),
       location,
       isRemote: inferRemote(location),
-      source: "bamboohr",
+      source: "jobvite",
       sourceUrl,
       applyUrl: sourceUrl,
       postedAt: parseDate(job.postedAt),

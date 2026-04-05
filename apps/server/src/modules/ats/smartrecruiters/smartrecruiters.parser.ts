@@ -2,6 +2,7 @@ import type { NormalizedJob } from "../../crawler/crawler.types.js";
 import {
   inferRemote,
   normalizeLocation,
+  sanitizeHtml,
   parseDate,
   trimWhitespace,
 } from "../ats.interface.js";
@@ -15,10 +16,11 @@ export function parseSmartRecruitersJobs(
   const normalized: NormalizedJob[] = [];
   for (const job of jobs ?? []) {
     const title = trimWhitespace(job.name);
+    const companyTokenResolved = job.companyToken ?? companyToken;
     const sourceUrl =
       trimWhitespace(job.applyUrl) ??
-      (job.id && companyToken
-        ? `https://jobs.smartrecruiters.com/${companyToken}/${job.id}`
+      (job.id && companyTokenResolved
+        ? `https://jobs.smartrecruiters.com/${companyTokenResolved}/${job.id}`
         : undefined);
     if (!title || !sourceUrl) continue;
 
@@ -30,12 +32,13 @@ export function parseSmartRecruitersJobs(
 
     normalized.push({
       title,
-      description: undefined,
+      description: sanitizeHtml(job.description),
       location,
       isRemote: inferRemote(location),
       source: "smartrecruiters",
       sourceUrl,
-      postedAt: parseDate(job.releasedDate),
+      applyUrl: sourceUrl,
+      postedAt: parseDate(job.postedAt ?? job.releasedDate),
       companyId,
     });
   }

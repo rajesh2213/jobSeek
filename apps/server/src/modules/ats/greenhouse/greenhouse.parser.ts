@@ -22,6 +22,7 @@ export function parseGreenhouseJobList(
 
     const locationName = normalizeLocation(job.location?.name);
 
+    // Job Board API only documents `updated_at` (last change to the listing), not first-published.
     normalized.push({
       title,
       description: sanitizeHtml(job.content),
@@ -29,6 +30,7 @@ export function parseGreenhouseJobList(
       isRemote: inferRemote(locationName),
       source: "greenhouse",
       sourceUrl,
+      applyUrl: sourceUrl,
       postedAt: parseDate(job.updated_at),
       companyId,
     });

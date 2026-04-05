@@ -15,8 +15,12 @@ export class SeedingService {
     const existingDomainSet = new Set<string>();
 
     for (const company of existingCompanies) {
-      const existingDomain = getDomainFromUrl(company.careersUrl);
-      if (existingDomain) existingDomainSet.add(existingDomain);
+      if (company.domain) {
+        existingDomainSet.add(company.domain);
+      } else {
+        const d = getDomainFromUrl(company.careersUrl);
+        if (d) existingDomainSet.add(d);
+      }
     }
 
     let inserted = 0;
@@ -38,22 +42,35 @@ export class SeedingService {
         continue;
       }
 
-      if (domain && existingDomainSet.has(domain)) {
+      if (!domain) {
+        skipped += 1;
+        logger.info({ event: "company_skipped", reason: "domain_missing", name }, "Seed company skipped — no domain");
+        continue;
+      }
+
+      const byDomain = await this.companyService.findByDomain(domain);
+      if (byDomain) {
         skipped += 1;
         logger.info({ event: "company_skipped", reason: "domain_exists", name, domain }, "Seed company skipped by domain");
         continue;
       }
 
-      const careersUrl = domain ? `https://${domain}/careers` : undefined;
+      if (existingDomainSet.has(domain)) {
+        skipped += 1;
+        continue;
+      }
+
+      const careersUrl = `https://${domain}/careers`;
 
       await this.companyService.create({
         name,
+        domain,
         careersUrl,
         atsType: undefined,
         atsBoardToken: undefined,
       });
 
-      if (domain) existingDomainSet.add(domain);
+      existingDomainSet.add(domain);
       inserted += 1;
       logger.info({ event: "company_seeded", name, domain, careersUrl }, "Seed company inserted");
     }
