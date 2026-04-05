@@ -1,0 +1,354 @@
+import type { JobFilters } from "./slug-parser";
+
+export interface JobCompany {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl?: string | null;
+  domain?: string | null;
+  careerPage?: string | null;
+  openRoles?: number;
+}
+
+export interface CompanyListItem {
+  id: string;
+  name: string;
+  slug: string;
+  domain: string | null;
+  careersUrl: string | null;
+  createdAt: string;
+}
+
+export interface CompanyDetail extends CompanyListItem {
+  atsBoardToken: string | null;
+  atsType: string | null;
+  lastCrawledAt: string | null;
+  updatedAt: string;
+}
+
+export interface CountrySuggestion {
+  name: string;
+  code: string;
+  slug: string;
+}
+
+/** Structured parse from ML service (stored on Job.parsedDescription). */
+export interface ParsedJobDescription {
+  position: string[];
+  responsibility: string[];
+  requirement: string[];
+  experience: string[];
+  benefit: string[];
+  contact: string[];
+  other: string[];
+}
+
+/** Rule-based enrichment from parsed description (server `Job.enriched`). */
+export interface JobEnrichment {
+  techStack: string[];
+  salary: string | null;
+  remote: boolean;
+  remoteType: "remote" | "hybrid" | "onsite" | null;
+}
+
+export type JobPreviewLinesSource =
+  | "responsibility"
+  | "requirement"
+  | "benefit"
+  | "other"
+  | "fallback";
+
+export interface JobItem {
+  id: string;
+  title: string;
+  description: string | null;
+  /** Card/list preview derived from parsed buckets (server). */
+  previewLines?: string[];
+  previewLinesSource?: JobPreviewLinesSource;
+  parsedDescription?: ParsedJobDescription | null;
+  enriched?: JobEnrichment | null;
+  country: string;
+  locationCity?: string | null;
+  locationState?: string | null;
+  locationCountry?: string;
+  locationRegion?: string | null;
+  category: string;
+  isRemote: boolean;
+  workType?: string;
+  experienceLevel?: string | null;
+  role: string;
+  skills: string[];
+  salaryMin: number | null;
+  sourceUrl: string;
+  applyUrl?: string | null;
+  postedAt: string | null;
+  createdAt?: string;
+  companyId: string;
+  company: JobCompany;
+}
+
+export interface JobsApiResponse {
+  data: JobItem[];
+  meta?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalCount?: number;
+    totalPages: number;
+    offset?: number;
+    hasMore?: boolean;
+    capReached?: boolean;
+    remaining?: number | null;
+    resetAt?: string;
+    totalHidden?: number;
+    viewCapUnlimited?: boolean;
+    company?: {
+      id: string;
+      name: string;
+      slug: string;
+      domain: string;
+    };
+  };
+}
+
+interface CompaniesApiResponse {
+  data: CompanyListItem[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+interface CompanyApiResponse {
+  data: CompanyDetail;
+}
+
+interface JobApiResponse {
+  data: JobItem;
+}
+
+/**
+ * Fastify API origin. Must point at the jobseek server, not the Next.js dev server:
+ * same host/path as `/health` and `/locations/cities`. If Next runs on 3000, run
+ * the API on another `PORT` and set `NEXT_PUBLIC_API_BASE_URL` (and `API_BASE_URL`
+ * for SSR) to that origin, e.g. `http://127.0.0.1:3000`.
+ */
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? "http://localhost:3000";
+
+export interface AccountSummary {
+  plan: "free" | "pro";
+  jobViewsToday: number;
+  jobViewsLimit: number | null;
+  resetAt: string;
+}
+
+/** Response from `GET /api/user/me` (proxies Fastify `/account/summary`). */
+export type UserMeResponse = AccountSummary;
+
+/** Server or client: JobSeek usage stats (requires signed-in Clerk JWT). */
+export async function fetchAccountSummary(token: string): Promise<AccountSummary | null> {
+  const t = token.trim();
+  if (!t) return null;
+  const res = await fetch(`${API_BASE_URL}/account/summary`, {
+    headers: { Authorization: `Bearer ${t}` },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as AccountSummary;
+}
+
+export interface LocationCountryOption {
+  code: string;
+  name: string;
+  region: string;
+}
+
+export interface LocationsCatalogResponse {
+  regions: string[];
+  countries: LocationCountryOption[];
+}
+
+export async function fetchLocationsCatalog(): Promise<LocationsCatalogResponse> {
+  const res = await fetch(`${API_BASE_URL}/locations`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch locations: ${res.status}`);
+  }
+  return (await res.json()) as LocationsCatalogResponse;
+}
+
+export interface CitySuggestion {
+  city: string;
+  country: string;
+  region: string;
+  count: number;
+}
+
+export async function fetchCitySuggestions(q: string): Promise<CitySuggestion[]> {
+  const t = q.trim();
+  if (t.length < 2) return [];
+  const url = `${API_BASE_URL}/locations/cities?q=${encodeURIComponent(t)}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch city suggestions: ${res.status}`);
+  }
+  return (await res.json()) as CitySuggestion[];
+}
+
+export async function fetchJobs(
+  filters: JobFilters = {},
+  opts?: {
+    /** Clerk session JWT for per-user view caps. */
+    token?: string | null;
+    /** Server-only: must match API `JOB_LIST_VIEW_CAP_BYPASS_TOKEN` (e.g. sitemap). */
+    viewCapBypassSecret?: string | null;
+  },
+): Promise<JobsApiResponse> {
+  const params = new URLSearchParams();
+  if (filters.page) params.set("page", String(filters.page));
+  if (filters.limit) params.set("limit", String(filters.limit));
+  if (filters.offset !== undefined) params.set("offset", String(filters.offset));
+  if (filters.location?.trim()) params.set("location", filters.location.trim());
+  else if (filters.locations?.length) params.set("locations", filters.locations.join(","));
+  else if (filters.country?.trim()) params.set("country", filters.country.trim());
+  if (filters.category) params.set("category", filters.category);
+  if (filters.workTypes?.length) params.set("types", filters.workTypes.map((t) => t.toUpperCase()).join(","));
+  if (typeof filters.isRemote === "boolean") params.set("remote", String(filters.isRemote));
+  if (filters.companyId) params.set("companyId", filters.companyId);
+  if (filters.role) params.set("role", filters.role);
+  if (filters.roles?.length) params.set("roles", filters.roles.join(","));
+  if (filters.skills?.length) params.set("skills", filters.skills.join(","));
+  if (filters.experience) params.set("experience", filters.experience);
+  if (filters.posted) params.set("posted", filters.posted);
+  if (filters.minSalary !== undefined) params.set("minSalary", String(filters.minSalary));
+  if (filters.sort === "salary_desc") params.set("sort", "salary_desc");
+
+  const url = `${API_BASE_URL}/jobs${params.toString() ? `?${params}` : ""}`;
+  const headers = new Headers();
+  const t = opts?.token?.trim();
+  if (t) headers.set("Authorization", `Bearer ${t}`);
+  const bypass = opts?.viewCapBypassSecret?.trim();
+  if (bypass) headers.set("x-jobseek-view-cap-bypass", bypass);
+
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch jobs: ${res.status} ${res.statusText}`);
+  }
+  return (await res.json()) as JobsApiResponse;
+}
+
+export interface JobRoleSuggestion {
+  slug: string;
+  label: string;
+  count: number;
+}
+
+export interface JobCategoryAggregate {
+  slug: string;
+  label: string;
+  count: number;
+}
+
+export async function fetchRoles(): Promise<JobRoleSuggestion[]> {
+  const res = await fetch(`${API_BASE_URL}/jobs/roles`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch roles: ${res.status}`);
+  }
+  const body = (await res.json()) as { roles: JobRoleSuggestion[] };
+  return body.roles ?? [];
+}
+
+export async function fetchJobCategories(): Promise<JobCategoryAggregate[]> {
+  const res = await fetch(`${API_BASE_URL}/jobs/categories`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch job categories: ${res.status}`);
+  }
+  const body = (await res.json()) as { categories: JobCategoryAggregate[] };
+  return body.categories ?? [];
+}
+
+export interface JobSkillAggregate {
+  slug: string;
+  count: number;
+}
+
+export async function fetchJobSkills(): Promise<JobSkillAggregate[]> {
+  const res = await fetch(`${API_BASE_URL}/jobs/skills`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch job skills: ${res.status}`);
+  }
+  const body = (await res.json()) as { skills: JobSkillAggregate[] };
+  return body.skills ?? [];
+}
+
+export async function fetchCountrySuggestions(query: string): Promise<CountrySuggestion[]> {
+  const q = query.trim();
+  const url = `${API_BASE_URL}/locations/countries${q ? `?q=${encodeURIComponent(q)}` : ""}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch countries: ${res.status}`);
+  }
+  return (await res.json()) as CountrySuggestion[];
+}
+
+export async function fetchCompanies(options: {
+  page?: number;
+  limit?: number;
+  q?: string;
+} = {}): Promise<CompaniesApiResponse> {
+  const params = new URLSearchParams();
+  if (options.page) params.set("page", String(options.page));
+  if (options.limit) params.set("limit", String(options.limit));
+  if (options.q?.trim()) params.set("q", options.q.trim());
+  const qs = params.toString();
+  const url = `${API_BASE_URL}/companies${qs ? `?${qs}` : ""}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch companies: ${res.status}`);
+  }
+  return (await res.json()) as CompaniesApiResponse;
+}
+
+export async function fetchCompanyBySlug(slug: string): Promise<CompanyDetail | null> {
+  const res = await fetch(`${API_BASE_URL}/company/${encodeURIComponent(slug)}`);
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`Failed to fetch company: ${res.status}`);
+  }
+  const payload = (await res.json()) as CompanyApiResponse;
+  return payload.data;
+}
+
+export async function fetchCompanyJobs(
+  slug: string,
+  options: { page?: number; limit?: number } = {},
+): Promise<JobsApiResponse> {
+  const params = new URLSearchParams();
+  if (options.page) params.set("page", String(options.page ?? 1));
+  if (options.limit) params.set("limit", String(options.limit ?? 50));
+  const qs = params.toString();
+  const url = `${API_BASE_URL}/company/${encodeURIComponent(slug)}/jobs${qs ? `?${qs}` : ""}`;
+  const res = await fetch(url);
+  if (res.status === 404) {
+    return {
+      data: [],
+      meta: { page: 1, limit: 50, total: 0, totalPages: 1, hasMore: false },
+    };
+  }
+  if (!res.ok) {
+    throw new Error(`Failed to fetch company jobs: ${res.status}`);
+  }
+  return (await res.json()) as JobsApiResponse;
+}
+
+export async function fetchJobById(id: string): Promise<JobItem | null> {
+  const res = await fetch(`${API_BASE_URL}/jobs/${id}`);
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`Failed to fetch job ${id}: ${res.status} ${res.statusText}`);
+  }
+  const payload = (await res.json()) as JobApiResponse;
+  return payload.data;
+}
