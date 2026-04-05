@@ -1,9 +1,45 @@
+# Dependencies
 node_modules/
+
+# Build outputs
 dist/
+.next/
+out/
+build/
+
+# Environment & secrets (.env.example stays tracked)
 .env
-.env.local
+.env.*
+!.env.example
+
+# Logs & runtime
+logs/
 *.log
+.pnpm-debug.log*
+.turbo
+
+# Python (inference / tooling)
+**/__pycache__/
+**/*.py[cod]
+**/.venv/
+venv/
+*.egg-info/
+
+# OS / editors
 .DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+
+# Test / coverage
 coverage/
 .nyc_output/
 *.tsbuildinfo
+
+# Deploy / TLS misc
+*.pem
+.vercel
+
+# One-off local artifacts
+apps/server/review-output.txt

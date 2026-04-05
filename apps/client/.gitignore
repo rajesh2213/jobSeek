@@ -1,0 +1,16 @@
+# Dependencies
+/node_modules
+
+# Next.js
+/.next/
+/out/
+
+# Clerk (may contain secrets)
+/.clerk/
+
+# Env overrides (example stays at repo root)
+.env*.local
+
+# Misc
+.DS_Store
+*.pem
