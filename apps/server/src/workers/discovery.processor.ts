@@ -4,6 +4,7 @@ import { prisma } from "../infrastructure/db/prisma.js";
 import { logger } from "../utils/logger.js";
 import { createCompanyRepository } from "../modules/company/company.repository.js";
 import { CompanyService } from "../modules/company/company.service.js";
+import { createJobRepository } from "../modules/job/job.repository.js";
 import { DiscoveryService } from "../modules/discovery/discovery.service.js";
 import {
   DISCOVER_SOURCE,
@@ -12,9 +13,12 @@ import {
   type DiscoverySourceCompany,
   type ProcessCompanyPayload,
 } from "../modules/discovery/discovery.types.js";
-import { getDiscoveryQueue, DISCOVERY_QUEUE_NAME } from "../queues/discovery.queue.js";
+import { getDiscoveryQueue, DISCOVERY_QUEUE_NAME, closeDiscoveryQueue } from "../queues/discovery.queue.js";
 import { getRedisConnection } from "../queues/job.queue.js";
+import { assertWorkerProcessEnv } from "../infrastructure/env/validateWorkerEnv.js";
+import { registerWorkerShutdown } from "../utils/workerShutdown.js";
 import { delay, normalizeDomain, randomIntInclusive } from "../utils/common.js";
+import { slugifyCompanyName } from "../utils/slugify.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -81,8 +85,12 @@ async function throttleRequest(): Promise<void> {
 
 async function start(): Promise<void> {
   loadRootEnv();
+  assertWorkerProcessEnv();
 
-  const companyService = new CompanyService(createCompanyRepository(prisma));
+  const companyService = new CompanyService(
+    createCompanyRepository(prisma),
+    createJobRepository(prisma),
+  );
   const discoveryService = new DiscoveryService(companyService);
   const queue = getDiscoveryQueue();
 
@@ -114,8 +122,10 @@ async function start(): Promise<void> {
             name: company.name,
             domain: company.domain,
           };
+          const slug = slugifyCompanyName(company.name);
+          const domainKey = normalizeDomain(company.domain) ?? "nodomain";
           await queue.add(PROCESS_COMPANY, payload, {
-            jobId: `process-${payload.source}-${payload.domain}`,
+            jobId: `process-${payload.source}-${domainKey}-${slug}`.slice(0, 240),
           });
         }
 
@@ -131,7 +141,15 @@ async function start(): Promise<void> {
         try {
           await discoveryService.processCompanyCandidate(job.data);
         } catch (err) {
-          logger.error({ event: "discovery_company_failed", company: job.data, err }, "Discovery company processing failed");
+          logger.error(
+            {
+              event: "discovery_company_failed",
+              source: job.data.source,
+              companyName: job.data.name,
+              err,
+            },
+            "Discovery company processing failed",
+          );
         }
         return;
       }
@@ -148,12 +166,14 @@ async function start(): Promise<void> {
     logger.error({ event: "discovery_worker_failed", jobId: job?.id, name: job?.name, err }, "Discovery worker job failed");
   });
 
-  process.on("SIGINT", async () => {
-    await worker.close();
-    await queue.close();
-    await prisma.$disconnect();
-    process.exit(0);
+  registerWorkerShutdown({
+    worker,
+    closeQueues: [closeDiscoveryQueue],
+    prismaDisconnect: () => prisma.$disconnect(),
   });
 }
 
-void start();
+void start().catch((err) => {
+  logger.error({ event: "discovery_worker_boot_failed", err }, "discovery_worker_boot_failed");
+  process.exitCode = 1;
+});

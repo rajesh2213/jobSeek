@@ -2,19 +2,38 @@ import { Worker } from "bullmq";
 import { loadRootEnv } from "../infrastructure/env/loadEnv.js";
 import { prisma } from "../infrastructure/db/prisma.js";
 import { logger } from "../utils/logger.js";
-import { getJobQueue, getRedisConnection, JOB_QUEUE_NAME } from "../queues/job.queue.js";
+import { CompanyStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import {
+  getJobQueue,
+  getRedisConnection,
+  JOB_QUEUE_NAME,
+  closeJobQueue,
+} from "../queues/job.queue.js";
+import { assertWorkerProcessEnv } from "../infrastructure/env/validateWorkerEnv.js";
+import { registerWorkerShutdown } from "../utils/workerShutdown.js";
 import { CompanyService } from "../modules/company/company.service.js";
 import { createCompanyRepository } from "../modules/company/company.repository.js";
 import { createJobRepository } from "../modules/job/job.repository.js";
 import { JobService } from "../modules/job/job.service.js";
-import { getAtsCrawler } from "../modules/ats/ats.factory.js";
+import { extractCompanyDomain } from "../utils/jobFingerprint.js";
 import {
   CRAWL_COMPANY_JOBS,
+  INGEST_ATS_JOBS,
+  INGEST_JOBS_FROM_SOURCE,
+  INGEST_JOBS_FROM_SOURCE_URL,
   PROCESS_JOB,
   type CrawlCompanyJobsPayload,
+  type IngestJobsFromSourcePayload,
+  type IngestJobsFromSourceUrlPayload,
   type NormalizedJob,
 } from "../modules/crawler/crawler.types.js";
+import { processIngestJobsFromSource } from "../services/fallbackJobIngestion.service.js";
+import { processIngestJobsFromSourceUrl } from "../services/jobSourceUrlIngestion.service.js";
+import { ENRICH_PRIORITY_JOB_DISCOVERED } from "../queues/enrich-company.queue.js";
 import { isSupportedAtsType, type AtsType } from "../modules/ats/ats.interface.js";
+import { createAtsCrawlerStandard } from "../modules/ats/AtsCrawlerStandard.js";
+import { enrichCanonicalJobParsedDescription } from "../modules/ai/jobDescriptionEnrichment.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -109,6 +128,21 @@ function validateNormalizedJob(data: unknown): NormalizedJob | null {
     postedAt = Number.isNaN(d.getTime()) ? undefined : d;
   }
 
+  const atsJobId =
+    typeof data.atsJobId === "string" && data.atsJobId.trim() !== ""
+      ? data.atsJobId
+      : undefined;
+
+  const applyUrl =
+    typeof data.applyUrl === "string" && data.applyUrl.trim() !== ""
+      ? data.applyUrl.trim()
+      : undefined;
+
+  const companyName =
+    typeof data.companyName === "string" && data.companyName.trim() !== ""
+      ? data.companyName.trim()
+      : undefined;
+
   return {
     title,
     description,
@@ -116,8 +150,45 @@ function validateNormalizedJob(data: unknown): NormalizedJob | null {
     isRemote,
     source: source as AtsType,
     sourceUrl,
+    applyUrl,
     postedAt,
     companyId,
+    companyName,
+    atsJobId,
+  };
+}
+
+function validateIngestJobsFromSourcePayload(
+  data: unknown,
+): IngestJobsFromSourcePayload | null {
+  if (!isRecord(data)) return null;
+  if (typeof data.companyId !== "string" || typeof data.companyName !== "string") {
+    return null;
+  }
+  return {
+    companyId: data.companyId,
+    companyName: data.companyName,
+    domain: typeof data.domain === "string" ? data.domain : null,
+    wellfoundUrl: typeof data.wellfoundUrl === "string" ? data.wellfoundUrl : null,
+  };
+}
+
+function validateIngestJobsFromSourceUrlPayload(
+  data: unknown,
+): IngestJobsFromSourceUrlPayload | null {
+  if (!isRecord(data)) return null;
+  if (
+    typeof data.companyId !== "string" ||
+    typeof data.companyName !== "string" ||
+    typeof data.url !== "string" ||
+    !data.url.trim()
+  ) {
+    return null;
+  }
+  return {
+    companyId: data.companyId,
+    companyName: data.companyName,
+    url: data.url.trim(),
   };
 }
 
@@ -130,18 +201,21 @@ interface CrawlSummaryCounters {
 
 async function start(): Promise<void> {
   loadRootEnv();
+  assertWorkerProcessEnv();
 
+  const jobRepository = createJobRepository(prisma);
   const companyService = new CompanyService(
     createCompanyRepository(prisma),
+    jobRepository,
   );
-  const jobService = new JobService(createJobRepository(prisma));
+  const jobService = new JobService(jobRepository);
   const queue = getJobQueue();
   const crawlCounters = new Map<string, CrawlSummaryCounters>();
 
   const worker = new Worker(
     JOB_QUEUE_NAME,
     async (bullJob) => {
-      if (bullJob.name === CRAWL_COMPANY_JOBS) {
+      if (bullJob.name === CRAWL_COMPANY_JOBS || bullJob.name === INGEST_ATS_JOBS) {
         const payload = validateCrawlCompanyJobsPayload(bullJob.data);
         if (!payload) throw new Error("Invalid crawl-company-jobs payload");
 
@@ -183,7 +257,58 @@ async function start(): Promise<void> {
               `Unsupported ATS type on company ${resolvedCompanyId}: ${resolvedAtsType}`,
             );
           }
-          const crawler = getAtsCrawler(resolvedAtsType);
+          const atsAdapter = createAtsCrawlerStandard(resolvedAtsType);
+
+          // If an endpoint row exists for this company + ATS type, skip the legacy ATS crawl
+          // to prevent old/new pipeline duplication (when endpoint ingestion is enabled).
+          try {
+            const endpoint = await prisma.atsEndpoint.findFirst({
+              where: {
+                companyId: resolvedCompanyId,
+                type: resolvedAtsType,
+                isActive: true,
+              },
+              select: { id: true },
+            });
+            if (endpoint) {
+              logger.info(
+                {
+                  event: "skip_old_ats_ingestion_due_to_endpoint",
+                  companyId: resolvedCompanyId,
+                  atsType: resolvedAtsType,
+                  endpointId: endpoint.id,
+                },
+                "skip_old_ats_ingestion_due_to_endpoint",
+              );
+              return;
+            }
+          } catch (err) {
+            // If AtsEndpoint table is not present, proceed with legacy ingestion.
+            if (
+              err instanceof Prisma.PrismaClientKnownRequestError &&
+              err.code === "P2021"
+            ) {
+              logger.error(
+                {
+                  event: "skip_old_ats_ingestion_endpoint_table_missing",
+                  companyId: resolvedCompanyId,
+                  atsType: resolvedAtsType,
+                  err,
+                },
+                "skip_old_ats_ingestion_endpoint_table_missing",
+              );
+            } else {
+              logger.warn(
+                {
+                  event: "skip_old_ats_ingestion_endpoint_lookup_failed",
+                  companyId: resolvedCompanyId,
+                  atsType: resolvedAtsType,
+                  err,
+                },
+                "skip_old_ats_ingestion_endpoint_lookup_failed",
+              );
+            }
+          }
 
           logger.info(
             {
@@ -197,7 +322,17 @@ async function start(): Promise<void> {
 
           await throttleApiCall();
           const fetchStart = Date.now();
-          const rawJobs = await crawler.fetchJobs(resolvedToken);
+          const endpointForAdapter = {
+            type: resolvedAtsType,
+            slug: String(resolvedToken),
+            baseUrl: company?.careersUrl ?? "",
+            metadata: { crawlToken: resolvedToken },
+            companyId: resolvedCompanyId,
+            companyName: company.name,
+          };
+
+          const normalizedJobs = await atsAdapter.fetchJobs(endpointForAdapter as any);
+
           const fetchDurationMs = Date.now() - fetchStart;
           logger.info(
             {
@@ -208,7 +343,6 @@ async function start(): Promise<void> {
             },
             "ATS fetch latency",
           );
-          const normalizedJobs = crawler.parseJobs(rawJobs, resolvedCompanyId);
 
           logger.info(
             {
@@ -281,8 +415,22 @@ async function start(): Promise<void> {
             },
             "Per-company crawl failed; skipping",
           );
-          return;
+        throw err;
         }
+        return;
+      }
+
+      if (bullJob.name === INGEST_JOBS_FROM_SOURCE) {
+        const payload = validateIngestJobsFromSourcePayload(bullJob.data);
+        if (!payload) throw new Error("Invalid ingest-jobs-from-source payload");
+        await processIngestJobsFromSource(prisma, jobService, payload);
+        return;
+      }
+
+      if (bullJob.name === INGEST_JOBS_FROM_SOURCE_URL) {
+        const payload = validateIngestJobsFromSourceUrlPayload(bullJob.data);
+        if (!payload) throw new Error("Invalid ingest-jobs-from-source-url payload");
+        await processIngestJobsFromSourceUrl(prisma, jobService, payload);
         return;
       }
 
@@ -290,30 +438,74 @@ async function start(): Promise<void> {
         const payload = validateNormalizedJob(bullJob.data);
         if (!payload) throw new Error("Invalid process-job payload");
 
-        const result = await jobService.createNormalized(payload);
-        const counters = crawlCounters.get(payload.companyId);
-        if (result.created) {
+        let companyNameHint = payload.companyName;
+        if (!companyNameHint) {
+          const existingCo = await companyService.findById(payload.companyId);
+          companyNameHint = existingCo?.name;
+        }
+        const { companyId: resolvedCompanyId } =
+          await companyService.ensureCompanyFromJob({
+            preferredCompanyId: payload.companyId,
+            companyName: companyNameHint,
+          });
+
+        const company = await companyService.findById(resolvedCompanyId);
+        const companyDomain = extractCompanyDomain(
+          company?.careersUrl,
+          resolvedCompanyId,
+        );
+        let result: { canonical: { id: string }; inserted: boolean };
+        try {
+          result = await jobService.ingestDeduplicated({
+            ...payload,
+            companyId: resolvedCompanyId,
+            companyDomain,
+          });
+        } catch (err) {
+          if (
+            err instanceof Prisma.PrismaClientKnownRequestError &&
+            err.code === "P2002"
+          ) {
+            logger.info(
+              { event: "job_duplicate_sourceUrl", sourceUrl: payload.sourceUrl },
+              "job_duplicate_sourceUrl",
+            );
+            return;
+          }
+          throw err;
+        }
+
+        await enrichCanonicalJobParsedDescription(
+          prisma,
+          jobRepository,
+          result.canonical.id,
+          result.inserted,
+        );
+
+        const coAfter = await companyService.findById(resolvedCompanyId);
+        if (coAfter && coAfter.status !== CompanyStatus.ready) {
+          await companyService
+            .enqueueCompanyEnrichment(coAfter.id, coAfter.name, {
+              priority: ENRICH_PRIORITY_JOB_DISCOVERED,
+              jobId: `enrich-${coAfter.id}`,
+            })
+            .catch(() => {
+              /* duplicate job id */
+            });
+        }
+        const counters = crawlCounters.get(resolvedCompanyId);
+        if (result.inserted) {
           if (counters) counters.jobsInserted += 1;
           logger.info(
             {
               event: "job_inserted",
               jobTitle: payload.title,
               sourceUrl: payload.sourceUrl,
-              companyId: payload.companyId,
+              companyId: resolvedCompanyId,
               source: payload.source,
+              canonicalId: result.canonical.id,
             },
-            "Job processed and stored",
-          );
-        } else {
-          logger.debug(
-            {
-              event: "job_already_seen",
-              jobTitle: payload.title,
-              sourceUrl: payload.sourceUrl,
-              companyId: payload.companyId,
-              source: payload.source,
-            },
-            "Existing job already accounted for in batch seen update",
+            "Job processed and stored (dedup pipeline)",
           );
         }
 
@@ -324,7 +516,7 @@ async function start(): Promise<void> {
             logger.info(
               {
                 event: "crawl_summary",
-                companyId: payload.companyId,
+                companyId: resolvedCompanyId,
                 atsType: payload.source,
                 jobs_fetched: counters.jobsFetched,
                 jobs_inserted: counters.jobsInserted,
@@ -333,7 +525,7 @@ async function start(): Promise<void> {
               },
               "Company crawl completed",
             );
-            crawlCounters.delete(payload.companyId);
+            crawlCounters.delete(resolvedCompanyId);
           }
         }
         return;
@@ -389,21 +581,15 @@ async function start(): Promise<void> {
     );
   });
 
-  worker.on("completed", (job) => {
-    logger.debug(
-      { event: "worker_job_completed", jobId: job.id, name: job.name },
-      "Worker job completed",
-    );
-  });
-
-  process.on("SIGINT", async () => {
-    logger.info("Shutting down worker...");
-    await worker.close();
-    await queue.close();
-    await prisma.$disconnect();
-    process.exit(0);
+  registerWorkerShutdown({
+    worker,
+    closeQueues: [closeJobQueue],
+    prismaDisconnect: () => prisma.$disconnect(),
   });
 }
 
-void start();
+void start().catch((err) => {
+  logger.error({ event: "job_worker_boot_failed", err }, "job_worker_boot_failed");
+  process.exitCode = 1;
+});
 

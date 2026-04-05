@@ -19,3 +19,9 @@ export function getDiscoveryQueue(): Queue {
   });
   return discoveryQueueSingleton;
 }
+
+export async function closeDiscoveryQueue(): Promise<void> {
+  if (!discoveryQueueSingleton) return;
+  await discoveryQueueSingleton.close();
+  discoveryQueueSingleton = null;
+}

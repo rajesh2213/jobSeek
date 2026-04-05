@@ -11,7 +11,7 @@ export interface JobQueue {
 }
 
 let queueSingleton: Queue | null = null;
-let redisSingleton: ConnectionOptions | null = null;
+let redisClient: RedisClient | null = null;
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -19,11 +19,37 @@ function requireEnv(name: string): string {
   return value;
 }
 
+/** BullMQ connection: underlying ioredis (quit on graceful shutdown). */
 export function getRedisConnection(): ConnectionOptions {
-  if (redisSingleton) return redisSingleton;
+  if (redisClient) return redisClient as unknown as ConnectionOptions;
   const redisUrl = requireEnv("REDIS_URL");
-  redisSingleton = new RedisClient(redisUrl, { maxRetriesPerRequest: null }) as unknown as ConnectionOptions;
-  return redisSingleton;
+  redisClient = new RedisClient(redisUrl, { maxRetriesPerRequest: null });
+  return redisClient as unknown as ConnectionOptions;
+}
+
+/** Direct ioredis client for key-value (e.g. daily view cap); shares URL with BullMQ. */
+export function getIoredis(): RedisClient {
+  getRedisConnection();
+  if (!redisClient) {
+    throw new Error("Redis client not initialized");
+  }
+  return redisClient;
+}
+
+export async function closeRedisConnection(): Promise<void> {
+  if (!redisClient) return;
+  try {
+    await redisClient.quit();
+  } catch {
+    redisClient.disconnect();
+  }
+  redisClient = null;
+}
+
+export async function closeJobQueue(): Promise<void> {
+  if (!queueSingleton) return;
+  await queueSingleton.close();
+  queueSingleton = null;
 }
 
 export function getJobQueue(): Queue {
@@ -41,4 +67,3 @@ export function getJobQueue(): Queue {
 
   return queueSingleton;
 }
-
