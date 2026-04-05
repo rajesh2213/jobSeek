@@ -1,0 +1,20 @@
+{
+  "id2label": {
+    "0": "responsibility",
+    "1": "requirement",
+    "2": "experience",
+    "3": "benefit",
+    "4": "contact",
+    "5": "position",
+    "6": "other"
+  },
+  "label2id": {
+    "responsibility": 0,
+    "requirement": 1,
+    "experience": 2,
+    "benefit": 3,
+    "contact": 4,
+    "position": 5,
+    "other": 6
+  }
+}
