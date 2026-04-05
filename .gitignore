@@ -43,3 +43,9 @@ coverage/
 
 # One-off local artifacts
 apps/server/review-output.txt
+
+# Inference app markdown (keep locally; not part of code commits)
+apps/inference/**/README.md
+
+# Prompt pack markdown
+komposo-prompts-*/**/*.md

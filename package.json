@@ -11,7 +11,9 @@
     "start:server": "npm run start -w @jobseek/server",
     "db:generate": "npm run db:generate -w @jobseek/server",
     "db:push": "npm run db:push -w @jobseek/server",
-    "db:migrate": "npm run db:migrate -w @jobseek/server"
+    "db:migrate": "npm run db:migrate -w @jobseek/server",
+    "worker:enrich": "npm run worker:enrich -w @jobseek/server",
+    "debug:job-parser": "npm run debug:job-parser -w @jobseek/server --"
   },
   "engines": {
     "node": ">=20"
