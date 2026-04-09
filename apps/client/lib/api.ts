@@ -148,6 +148,35 @@ export interface AccountSummary {
 /** Response from `GET /api/user/me` (proxies Fastify `/account/summary`). */
 export type UserMeResponse = AccountSummary;
 
+export interface SavedSearchItem {
+  id: string;
+  name: string | null;
+  query: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SavedSearchCreateResponse {
+  data: SavedSearchItem;
+}
+
+export interface SavedSearchListResponse {
+  data: SavedSearchItem[];
+  meta: { count: number; limit: number };
+}
+
+export class ApiRequestError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 /** Server or client: JobSeek usage stats (requires signed-in Clerk JWT). */
 export async function fetchAccountSummary(token: string): Promise<AccountSummary | null> {
   const t = token.trim();
@@ -158,6 +187,99 @@ export async function fetchAccountSummary(token: string): Promise<AccountSummary
   });
   if (!res.ok) return null;
   return (await res.json()) as AccountSummary;
+}
+
+export async function createSavedSearch(
+  token: string,
+  payload: { query: string; name?: string },
+): Promise<SavedSearchItem> {
+  const t = token.trim();
+  if (!t) throw new ApiRequestError("Unauthorized", 401, "UNAUTHORIZED");
+
+  const res = await fetch(`${API_BASE_URL}/saved-searches`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${t}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ApiRequestError(
+      body.error ?? "Failed to create saved search",
+      res.status,
+      body.code,
+    );
+  }
+  const body = (await res.json()) as SavedSearchCreateResponse;
+  return body.data;
+}
+
+export async function fetchSavedSearches(token: string): Promise<SavedSearchListResponse> {
+  const t = token.trim();
+  if (!t) throw new ApiRequestError("Unauthorized", 401, "UNAUTHORIZED");
+
+  const res = await fetch(`${API_BASE_URL}/saved-searches`, {
+    headers: { Authorization: `Bearer ${t}` },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ApiRequestError(
+      body.error ?? "Failed to fetch saved searches",
+      res.status,
+      body.code,
+    );
+  }
+  return (await res.json()) as SavedSearchListResponse;
+}
+
+export async function deleteSavedSearch(token: string, id: string): Promise<void> {
+  const t = token.trim();
+  if (!t) throw new ApiRequestError("Unauthorized", 401, "UNAUTHORIZED");
+
+  const res = await fetch(`${API_BASE_URL}/saved-searches/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${t}` },
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ApiRequestError(
+      body.error ?? "Failed to delete saved search",
+      res.status,
+      body.code,
+    );
+  }
+}
+
+export async function renameSavedSearch(
+  token: string,
+  id: string,
+  name: string | null,
+): Promise<SavedSearchItem> {
+  const t = token.trim();
+  if (!t) throw new ApiRequestError("Unauthorized", 401, "UNAUTHORIZED");
+
+  const res = await fetch(`${API_BASE_URL}/saved-searches/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${t}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ApiRequestError(
+      body.error ?? "Failed to rename saved search",
+      res.status,
+      body.code,
+    );
+  }
+  const body = (await res.json()) as SavedSearchCreateResponse;
+  return body.data;
 }
 
 export interface LocationCountryOption {
@@ -172,7 +294,9 @@ export interface LocationsCatalogResponse {
 }
 
 export async function fetchLocationsCatalog(): Promise<LocationsCatalogResponse> {
-  const res = await fetch(`${API_BASE_URL}/locations`);
+  const res = await fetch(`${API_BASE_URL}/locations`, {
+    next: { revalidate: 300 },
+  });
   if (!res.ok) {
     throw new Error(`Failed to fetch locations: ${res.status}`);
   }
@@ -232,7 +356,7 @@ export async function fetchJobs(
   const bypass = opts?.viewCapBypassSecret?.trim();
   if (bypass) headers.set("x-jobseek-view-cap-bypass", bypass);
 
-  const res = await fetch(url, { headers });
+  const res = await fetch(url, { headers, next: { revalidate: 30 } });
   if (!res.ok) {
     throw new Error(`Failed to fetch jobs: ${res.status} ${res.statusText}`);
   }
@@ -252,7 +376,9 @@ export interface JobCategoryAggregate {
 }
 
 export async function fetchRoles(): Promise<JobRoleSuggestion[]> {
-  const res = await fetch(`${API_BASE_URL}/jobs/roles`);
+  const res = await fetch(`${API_BASE_URL}/jobs/roles`, {
+    next: { revalidate: 300 },
+  });
   if (!res.ok) {
     throw new Error(`Failed to fetch roles: ${res.status}`);
   }
@@ -261,7 +387,9 @@ export async function fetchRoles(): Promise<JobRoleSuggestion[]> {
 }
 
 export async function fetchJobCategories(): Promise<JobCategoryAggregate[]> {
-  const res = await fetch(`${API_BASE_URL}/jobs/categories`);
+  const res = await fetch(`${API_BASE_URL}/jobs/categories`, {
+    next: { revalidate: 300 },
+  });
   if (!res.ok) {
     throw new Error(`Failed to fetch job categories: ${res.status}`);
   }
@@ -275,7 +403,9 @@ export interface JobSkillAggregate {
 }
 
 export async function fetchJobSkills(): Promise<JobSkillAggregate[]> {
-  const res = await fetch(`${API_BASE_URL}/jobs/skills`);
+  const res = await fetch(`${API_BASE_URL}/jobs/skills`, {
+    next: { revalidate: 300 },
+  });
   if (!res.ok) {
     throw new Error(`Failed to fetch job skills: ${res.status}`);
   }
@@ -286,7 +416,7 @@ export async function fetchJobSkills(): Promise<JobSkillAggregate[]> {
 export async function fetchCountrySuggestions(query: string): Promise<CountrySuggestion[]> {
   const q = query.trim();
   const url = `${API_BASE_URL}/locations/countries${q ? `?q=${encodeURIComponent(q)}` : ""}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { next: { revalidate: 300 } });
   if (!res.ok) {
     throw new Error(`Failed to fetch countries: ${res.status}`);
   }
@@ -304,7 +434,7 @@ export async function fetchCompanies(options: {
   if (options.q?.trim()) params.set("q", options.q.trim());
   const qs = params.toString();
   const url = `${API_BASE_URL}/companies${qs ? `?${qs}` : ""}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { next: { revalidate: 60 } });
   if (!res.ok) {
     throw new Error(`Failed to fetch companies: ${res.status}`);
   }
@@ -312,7 +442,9 @@ export async function fetchCompanies(options: {
 }
 
 export async function fetchCompanyBySlug(slug: string): Promise<CompanyDetail | null> {
-  const res = await fetch(`${API_BASE_URL}/company/${encodeURIComponent(slug)}`);
+  const res = await fetch(`${API_BASE_URL}/company/${encodeURIComponent(slug)}`, {
+    next: { revalidate: 120 },
+  });
   if (res.status === 404) return null;
   if (!res.ok) {
     throw new Error(`Failed to fetch company: ${res.status}`);
@@ -330,7 +462,7 @@ export async function fetchCompanyJobs(
   if (options.limit) params.set("limit", String(options.limit ?? 50));
   const qs = params.toString();
   const url = `${API_BASE_URL}/company/${encodeURIComponent(slug)}/jobs${qs ? `?${qs}` : ""}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { next: { revalidate: 60 } });
   if (res.status === 404) {
     return {
       data: [],
@@ -344,7 +476,9 @@ export async function fetchCompanyJobs(
 }
 
 export async function fetchJobById(id: string): Promise<JobItem | null> {
-  const res = await fetch(`${API_BASE_URL}/jobs/${id}`);
+  const res = await fetch(`${API_BASE_URL}/jobs/${id}`, {
+    next: { revalidate: 60 },
+  });
   if (res.status === 404) return null;
   if (!res.ok) {
     throw new Error(`Failed to fetch job ${id}: ${res.status} ${res.statusText}`);

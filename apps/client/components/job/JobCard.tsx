@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import type { JobItem } from "../../lib/api";
 import { accentFromId } from "../../lib/accent";
