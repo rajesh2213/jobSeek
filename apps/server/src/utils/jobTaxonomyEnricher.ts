@@ -35,5 +35,6 @@ export function enrichDedupInput(
     locationCountry: attrs.country,
     locationRegion: attrs.region,
     salaryMin,
+    ...(attrs.hasMultipleLocations ? { hasMultipleLocations: true } : {}),
   };
 }

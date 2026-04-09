@@ -66,4 +66,6 @@ export interface DedupJobInput extends Omit<NormalizedJob, "location"> {
   /** When set, overrides remote/onsite derivation from `isRemote`. */
   workType?: "remote" | "onsite" | "hybrid";
   experienceLevel?: string | null;
+  /** True when raw ATS location listed multiple distinct countries (e.g. Berlin | Paris). */
+  hasMultipleLocations?: boolean;
 }

@@ -117,6 +117,45 @@ export function extractSalaryMinUsd(description: string): number | null {
   return null;
 }
 
+/** True when there is no usable ISO country (null, empty, whitespace, or UNKNOWN). */
+function isMissingLocation(value?: string | null): boolean {
+  const t = value?.trim();
+  return !t || t === "UNKNOWN";
+}
+
+function isMultiLocation(text?: string): boolean {
+  if (!text) return false;
+  return /[;|]/.test(text);
+}
+
+export function splitLocations(text: string): string[] {
+  return text
+    .split(/[;|]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** Remote job ads often restrict hiring to a region; do not label those as worldwide. */
+function hasRegionRestriction(text: string): boolean {
+  const t = text.toLowerCase();
+  if (/\b(us|usa|uk)\b/i.test(t)) return true;
+  if (/\b(united states|united kingdom)\b/i.test(t)) return true;
+  if (/\b(europe|emea|india|canada)\b/i.test(t)) return true;
+  return false;
+}
+
+/** Multi-office lines (e.g. Ashby primary + secondary joined with "; ") — resolve structured fields from the first site only. */
+function primaryLocationLineForResolution(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "";
+  const first = t.split(";")[0]?.trim() ?? t;
+  return first;
+}
+
+function locationInputWithRemoteHint(part: string, isRemote: boolean): string {
+  return `${part} ${isRemote ? "remote" : ""}`.trim();
+}
+
 export function normalizeJobAttributes(job: {
   title: string;
   description?: string;
@@ -131,15 +170,68 @@ export function normalizeJobAttributes(job: {
   city: string | null;
   state: string | null;
   region: string | null;
+  hasMultipleLocations?: boolean;
 } {
   const blob = `${job.title}\n${job.description ?? ""}`;
-  const loc = normalizeLocation(`${job.location ?? ""} ${job.isRemote ? "remote" : ""}`);
+
+  if (isMultiLocation(job.location) && job.location?.trim()) {
+    const parts = splitLocations(job.location!);
+    if (parts.length === 0) {
+      // e.g. only separators — fall through to single-line resolution
+    } else {
+    const orderedDistinct: string[] = [];
+    const seen = new Set<string>();
+    let mergedRemote = job.isRemote;
+    for (const part of parts) {
+      const locPart = normalizeLocation(locationInputWithRemoteHint(part, job.isRemote));
+      mergedRemote = mergedRemote || locPart.isRemote;
+      if (!isMissingLocation(locPart.country) && !seen.has(locPart.country)) {
+        seen.add(locPart.country);
+        orderedDistinct.push(locPart.country);
+      }
+    }
+    const primary = normalizeLocation(
+      locationInputWithRemoteHint(parts[0] ?? "", job.isRemote),
+    );
+    const country = orderedDistinct[0] ?? "UNKNOWN";
+    const hasMultipleLocations = orderedDistinct.length > 1;
+    return {
+      category: normalizeCategory(job.title),
+      role: normalizeRole(job.title),
+      skills: normalizeSkills(blob),
+      country,
+      isRemote: mergedRemote,
+      city: primary.city,
+      state: primary.state,
+      region: primary.region,
+      ...(hasMultipleLocations ? { hasMultipleLocations: true } : {}),
+    };
+    }
+  }
+
+  const loc = normalizeLocation(
+    `${primaryLocationLineForResolution(job.location ?? "")} ${job.isRemote ? "remote" : ""}`,
+  );
+  const mergedRemote = loc.isRemote || job.isRemote;
+  const combinedText = [job.title, job.description ?? "", job.location ?? ""].join(" ").toLowerCase();
+
+  let country = loc.country;
+  if (!isMissingLocation(loc.country)) {
+    // keep resolver output
+  } else if (
+    mergedRemote &&
+    !isMultiLocation(job.location) &&
+    !hasRegionRestriction(combinedText)
+  ) {
+    country = "GLOBAL";
+  }
+
   return {
     category: normalizeCategory(job.title),
     role: normalizeRole(job.title),
     skills: normalizeSkills(blob),
-    country: loc.country,
-    isRemote: loc.isRemote || job.isRemote,
+    country,
+    isRemote: mergedRemote,
     city: loc.city,
     state: loc.state,
     region: loc.region,
