@@ -7,6 +7,7 @@ import { computeStoredScores } from "../../services/jobRanking.service.js";
 import { isValidJobUrl } from "../../utils/url.js";
 import { logger } from "../../utils/logger.js";
 import { expandLocationFilter, getRegions } from "../../utils/locationResolver.js";
+import { computeLocationPatchFromReingest } from "../../services/jobCanonical.service.js";
 import {
   LISTING_EXCLUDED_ROLE_SLUGS,
   ROLE_SUGGEST_EXTRA_EXCLUDED,
@@ -15,6 +16,93 @@ import {
 function safeApplyUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   return isValidJobUrl(url) ? url : null;
+}
+
+const PARSED_DESCRIPTION_SCORE_KEYS = [
+  "position",
+  "responsibility",
+  "responsibilities",
+  "requirement",
+  "requirements",
+  "experience",
+  "benefit",
+  "benefits",
+  "contact",
+  "other",
+] as const;
+
+const BOILERPLATE_LINE_RE = /^(apply|click|learn more)$/i;
+
+/**
+ * Weighted score: line count + section coverage. Capped for stability.
+ * Exported for unit tests.
+ */
+export function scoreParsedDescription(parsed: unknown): number {
+  if (!parsed || typeof parsed !== "object") return 0;
+  const o = parsed as Record<string, unknown>;
+
+  let totalLines = 0;
+  let sectionCount = 0;
+
+  for (const key of PARSED_DESCRIPTION_SCORE_KEYS) {
+    const arr = o[key];
+    if (Array.isArray(arr) && arr.length > 0) {
+      sectionCount++;
+      const lineWeight = key === "other" ? 0.5 : 1;
+      for (const line of arr) {
+        if (
+          typeof line === "string" &&
+          line.length > 12 &&
+          !BOILERPLATE_LINE_RE.test(line.trim())
+        ) {
+          totalLines += lineWeight;
+        }
+      }
+    }
+  }
+
+  const score = totalLines + sectionCount * 2;
+  return Math.min(score, 100);
+}
+
+/** Non-empty section buckets (same keys as scoring). Tie-breaker for equal scores. */
+export function countPopulatedSections(parsed: unknown): number {
+  if (!parsed || typeof parsed !== "object") return 0;
+  const o = parsed as Record<string, unknown>;
+  let n = 0;
+  for (const key of PARSED_DESCRIPTION_SCORE_KEYS) {
+    const arr = o[key];
+    if (Array.isArray(arr) && arr.length > 0) n++;
+  }
+  return n;
+}
+
+/** True when incoming parse should replace stored parse (never downgrade). */
+export function shouldReplaceParsedDescription(
+  existingScore: number,
+  newScore: number,
+  existingSectionCount = 0,
+  newSectionCount = 0,
+): boolean {
+  return (
+    newScore > existingScore ||
+    (existingScore === 0 && newScore > 0) ||
+    (newScore === existingScore && newSectionCount > existingSectionCount)
+  );
+}
+
+function jsonObjectOrEmpty(
+  value: Prisma.JsonValue | null | undefined,
+): Record<string, unknown> {
+  if (
+    value !== null &&
+    value !== undefined &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+  ) {
+    return { ...(value as Record<string, unknown>) };
+  }
+  return {};
 }
 
 /** Filter-first discovery (taxonomy slugs + ISO country). */
@@ -361,6 +449,11 @@ export function createJobRepository(prisma: PrismaClient) {
       role: input.role,
       skills: input.skills,
       salaryMin: input.salaryMin,
+      ...(input.hasMultipleLocations
+        ? {
+            enriched: { hasMultipleLocations: true } as Prisma.InputJsonValue,
+          }
+        : {}),
     };
   }
 
@@ -686,6 +779,10 @@ export function createJobRepository(prisma: PrismaClient) {
         title: string;
         description: string | null;
         country: string | null;
+        locationCountry: string;
+        locationCity: string | null;
+        locationState: string | null;
+        locationRegion: string | null;
         category: string | null;
         isRemote: boolean;
         workType: string;
@@ -708,6 +805,10 @@ export function createJobRepository(prisma: PrismaClient) {
           title: data.title,
           description: data.description,
           country: data.country ?? "UNKNOWN",
+          locationCountry: data.locationCountry,
+          locationCity: data.locationCity,
+          locationState: data.locationState,
+          locationRegion: data.locationRegion,
           category: data.category ?? "other",
           isRemote: data.isRemote,
           workType: data.workType,
@@ -722,6 +823,60 @@ export function createJobRepository(prisma: PrismaClient) {
           salaryMin: data.salaryMin,
         },
       });
+    },
+
+    /**
+     * Backfill structured location when re-ingesting an existing `sourceUrl` row with richer
+     * normalized location than the DB (e.g. ATS path was fixed or older rows predate fields).
+     */
+    async mergeStructuredLocationFromReingest(
+      id: string,
+      incoming: Pick<
+        DedupJobInput,
+        | "country"
+        | "locationCountry"
+        | "locationCity"
+        | "locationState"
+        | "locationRegion"
+      >,
+    ): Promise<boolean> {
+      const row = await prisma.job.findUnique({ where: { id } });
+      if (!row) return false;
+      const patch = computeLocationPatchFromReingest(row, incoming);
+      logger.info(
+        {
+          event: "location_merge",
+          jobId: id,
+          existing: {
+            country: row.country,
+            locationCountry: row.locationCountry,
+            locationCity: row.locationCity,
+            locationState: row.locationState,
+            locationRegion: row.locationRegion,
+          },
+          incoming: {
+            country: incoming.country,
+            locationCountry: incoming.locationCountry,
+            locationCity: incoming.locationCity,
+            locationState: incoming.locationState,
+            locationRegion: incoming.locationRegion,
+          },
+          applied: patch !== null,
+        },
+        "location_merge",
+      );
+      if (!patch) return false;
+      await prisma.job.update({
+        where: { id },
+        data: {
+          country: patch.country,
+          locationCountry: patch.locationCountry,
+          locationCity: patch.locationCity,
+          locationState: patch.locationState,
+          locationRegion: patch.locationRegion,
+        },
+      });
+      return true;
     },
 
     async updateLastSeenById(id: string, lastSeenAt: Date): Promise<void> {
@@ -774,12 +929,46 @@ export function createJobRepository(prisma: PrismaClient) {
       id: string,
       parsed: Prisma.InputJsonValue,
     ): Promise<void> {
-      const enriched = enrichJob(parsed);
+      const existing = await prisma.job.findUnique({
+        where: { id },
+        select: { parsedDescription: true, enriched: true },
+      });
+      if (!existing) {
+        logger.warn(
+          { event: "updateParsedDescription_missing_job", id },
+          "updateParsedDescription: job not found",
+        );
+        return;
+      }
+
+      const existingParsed = existing.parsedDescription;
+      const newParsed = parsed;
+      const existingScore = scoreParsedDescription(existingParsed);
+      const newScore = scoreParsedDescription(newParsed);
+      const existingSectionCount = countPopulatedSections(existingParsed);
+      const newSectionCount = countPopulatedSections(newParsed);
+
+      const shouldUpdateParsed = shouldReplaceParsedDescription(
+        existingScore,
+        newScore,
+        existingSectionCount,
+        newSectionCount,
+      );
+
+      const finalParsed = shouldUpdateParsed ? newParsed : existingParsed;
+
+      const existingEnriched = jsonObjectOrEmpty(existing.enriched);
+      const computedEnriched = enrichJob(finalParsed) as unknown as Record<string, unknown>;
+      const mergedEnriched: Record<string, unknown> = {
+        ...existingEnriched,
+        ...computedEnriched,
+      };
+
       await prisma.job.update({
         where: { id },
         data: {
-          parsedDescription: parsed,
-          enriched: enriched as unknown as Prisma.InputJsonValue,
+          parsedDescription: finalParsed as Prisma.InputJsonValue,
+          enriched: mergedEnriched as Prisma.InputJsonValue,
         },
       });
     },
