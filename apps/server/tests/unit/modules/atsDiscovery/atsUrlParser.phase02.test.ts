@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { normalizeAtsUrl } from "../../utils/normalizeAtsUrl.js";
+import { normalizeAtsUrl } from "../../../../src/utils/normalizeAtsUrl.js";
 import {
   asciiSafeLower,
   buildWorkdaySlug,
   parseAtsUrlToEndpoint,
   parseWorkdayBoardToken,
   parseWorkdaySlug,
-} from "./atsUrlParser.js";
-import { dedupeRegistrationsByTypeSlug } from "../atsEndpoint/atsEndpoint.service.js";
+} from "../../../../src/modules/atsDiscovery/atsUrlParser.js";
+import { dedupeRegistrationsByTypeSlug } from "../../../../src/modules/atsEndpoint/atsEndpoint.service.js";
 
 describe("normalizeAtsUrl", () => {
   it("is idempotent", () => {
