@@ -11,6 +11,7 @@ export function filterSkillPillsForDisplay(skills: string[]): string[] {
 
 export function countryLabelForDisplay(code: string): string {
   if (!code || code === "UNKNOWN") return "";
+  if (code === "GLOBAL") return "Global";
   try {
     const dn = new Intl.DisplayNames(["en"], { type: "region" });
     return dn.of(code) ?? code;

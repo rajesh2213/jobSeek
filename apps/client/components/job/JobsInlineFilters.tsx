@@ -54,6 +54,23 @@ function SkillPresetShimmerRow() {
   );
 }
 
+function regionFilterChipLabel(r: string): string {
+  return r === "Global" ? "🌍 Global" : r;
+}
+
+/** Global sits next to All; remaining regions keep API order. */
+function regionsOrderedForFilterChips(regions: string[]): string[] {
+  const global = regions.filter((r) => r === "Global");
+  const rest = regions.filter((r) => r !== "Global");
+  return [...global, ...rest];
+}
+
+function locationFilterTriggerLabel(location: string): string {
+  const t = location.trim();
+  if (t === "Global" || t.toUpperCase() === "GLOBAL") return "🌍 Global";
+  return t;
+}
+
 /** Pinned category shortcuts inside the Role dropdown (?category=…). Order matches product spec. */
 const BROWSE_BY_CATEGORY = [
   { slug: "engineering", label: "Engineering" },
@@ -88,6 +105,8 @@ interface Props {
   onApply: () => void;
   onRemoveChip: Parameters<typeof FilterChips>[0]["onRemoveChip"];
   onSortNavigate: (sort: JobFilters["sort"]) => void;
+  showSort?: boolean;
+  showChips?: boolean;
   totalRoles?: number;
   selectedCategory?: string;
   onCategoryNavigate: (category: string | undefined) => void;
@@ -102,6 +121,8 @@ export function JobsInlineFilters({
   onApply,
   onRemoveChip,
   onSortNavigate,
+  showSort = true,
+  showChips = true,
   totalRoles,
   selectedCategory,
   onCategoryNavigate,
@@ -708,7 +729,9 @@ export function JobsInlineFilters({
             onClick={() => setOpenMenu((v) => (v === "locations" ? null : "locations"))}
           >
             <span className="block truncate whitespace-nowrap">
-              {uiFilters.location?.trim() ? uiFilters.location : "Locations"}
+              {uiFilters.location?.trim()
+                ? locationFilterTriggerLabel(uiFilters.location)
+                : "Locations"}
             </span>
           </button>
           <AnimatePresence>
@@ -733,7 +756,7 @@ export function JobsInlineFilters({
                 >
                   All
                 </button>
-                {(locCatalog?.regions ?? []).map((r) => (
+                {regionsOrderedForFilterChips(locCatalog?.regions ?? []).map((r) => (
                   <button
                     key={r}
                     type="button"
@@ -743,16 +766,16 @@ export function JobsInlineFilters({
                       setUiFilters((prev) => ({ ...prev, location: r }));
                     }}
                   >
-                    {r}
+                    {regionFilterChipLabel(r)}
                   </button>
                 ))}
               </div>
               {locCatalogLoading ? (
                 <p className="py-2 text-sm text-ink/50">Loading regions…</p>
-              ) : locRegionTab !== "all" && locCatalog ? (
+              ) : locRegionTab !== "all" && locCatalog && locRegionTab !== "Global" ? (
                 <>
                   <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-ink/45">Country</p>
-                  <ul className="mb-3 max-h-40 overflow-y-auto">
+                  <ul className="mb-3 max-h-56 overflow-y-auto">
                     {locCatalog.countries
                       .filter((c) => c.region === locRegionTab)
                       .map((c) => (
@@ -915,17 +938,19 @@ export function JobsInlineFilters({
         </div>
       </div>
 
-      <div className="mt-4">
-        <SortSegmented
-          value={sortValue}
-          onChange={(v) =>
-            onSortNavigate(v === "salary_desc" ? "salary_desc" : undefined)
-          }
-          totalRoles={totalRoles}
-        />
-      </div>
+      {showSort ? (
+        <div className="mt-4">
+          <SortSegmented
+            value={sortValue}
+            onChange={(v) =>
+              onSortNavigate(v === "salary_desc" ? "salary_desc" : undefined)
+            }
+            totalRoles={totalRoles}
+          />
+        </div>
+      ) : null}
 
-      <FilterChips filters={appliedFilters} onRemoveChip={onRemoveChip} />
+      {showChips ? <FilterChips filters={appliedFilters} onRemoveChip={onRemoveChip} /> : null}
     </div>
   );
 }

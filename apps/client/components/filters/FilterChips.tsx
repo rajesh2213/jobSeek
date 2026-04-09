@@ -16,6 +16,12 @@ interface Props {
   }) => void;
 }
 
+function globalLocationLabel(raw: string): string {
+  const t = raw.trim();
+  if (t === "Global" || t.toUpperCase() === "GLOBAL") return "🌍 Global";
+  return t;
+}
+
 function buildChips(filters: JobFilters, onRemove: Props["onRemoveChip"]): FilterChipModel[] {
   const out: FilterChipModel[] = [];
   const push = (items: FilterChipModel[]) => {
@@ -41,7 +47,7 @@ function buildChips(filters: JobFilters, onRemove: Props["onRemoveChip"]): Filte
   if (filters.location?.trim()) {
     out.push({
       id: "location",
-      label: `Location: ${filters.location}`,
+      label: `Location: ${globalLocationLabel(filters.location)}`,
       onRemove: () => onRemove({ type: "location" }),
     });
   } else {
@@ -53,7 +59,7 @@ function buildChips(filters: JobFilters, onRemove: Props["onRemoveChip"]): Filte
     push(
       locations.map((country) => ({
         id: `country-${country}`,
-        label: `Country: ${country}`,
+        label: `Country: ${globalLocationLabel(country)}`,
         onRemove: () => onRemove({ type: "country", value: country }),
       })),
     );
