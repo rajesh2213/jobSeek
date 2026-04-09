@@ -6,6 +6,7 @@ import { registerDebugRoutes } from "../../modules/debug/debug.controller.js";
 import { registerLocationRoutes } from "../../modules/locations/locations.controller.js";
 import { registerInternalMetricsRoutes } from "../../modules/internal/internal.metrics.routes.js";
 import { registerBillingRoutes } from "../../modules/billing/billing.controller.js";
+import { registerSavedSearchRoutes } from "../../modules/saved-search/savedSearch.routes.js";
 
 export async function registerRoutes(server: FastifyInstance): Promise<void> {
   server.get("/health", async (_request, reply) => {
@@ -16,6 +17,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   // No global prefix — full paths are as listed (same port as `PORT`, default 3000).
   registerLocationRoutes(server);
   registerAccountRoutes(server);
+  registerSavedSearchRoutes(server);
   registerBillingRoutes(server);
   createJobController(server);
   createCompanyController(server);

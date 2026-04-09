@@ -8,11 +8,7 @@ import {
 
 export function registerAccountRoutes(server: FastifyInstance): void {
   server.get("/account/summary", async (request, reply) => {
-    const authz =
-      typeof request.headers.authorization === "string"
-        ? request.headers.authorization
-        : undefined;
-    const ctx = await resolveClerkUser(server.prisma, authz);
+    const ctx = await resolveClerkUser(server.prisma, request.headers.authorization);
     if (!ctx) {
       return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
     }
