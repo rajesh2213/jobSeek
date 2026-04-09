@@ -21,8 +21,8 @@ const SAFETY_MAX_MS = 8000;
 export function RouteLoader() {
   const pathname = usePathname();
   const [active, setActive] = useState(false);
-  const showTimer = useRef<ReturnType<typeof setTimeout>>();
-  const safetyTimer = useRef<ReturnType<typeof setTimeout>>();
+  const showTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const safetyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const stop = () => {
     clearTimeout(showTimer.current);
