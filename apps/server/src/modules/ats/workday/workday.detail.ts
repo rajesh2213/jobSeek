@@ -26,6 +26,7 @@ function hasSubstantiveDescription(job: WorkdayJob): boolean {
 
 /**
  * Fetches CXS job detail for one listing (list POST does not include full JD HTML).
+ * Merges `locationsText` / `location` from detail when the list response omitted them (see merged job below).
  */
 export async function enrichWorkdayRawJobWithDetail(raw: WorkdayRawJob): Promise<WorkdayRawJob> {
   const { token, job } = raw;

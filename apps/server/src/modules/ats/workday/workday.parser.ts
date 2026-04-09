@@ -1,7 +1,11 @@
 import { logger } from "../../../utils/logger.js";
 import { isValidJobUrl } from "../../../utils/url.js";
 import type { NormalizedJob } from "../../crawler/crawler.types.js";
-import { IN_STATES, US_STATES } from "../../../utils/locationResolver.js";
+import {
+  COUNTRY_NAME_TO_CODE,
+  IN_STATES,
+  US_STATES,
+} from "../../../utils/locationResolver.js";
 import {
   inferRemote,
   normalizeLocation as trimAtsLocation,
@@ -108,6 +112,8 @@ export interface WorkdayLocationParts {
   city: string | null;
   state: string | null;
   rawLocation: string | undefined;
+  /** From `Country---City` style URL segments; passed to `formatSlugLocationHint`. */
+  slugDisplayLine?: string;
 }
 
 function titleCaseLocationPart(s: string): string {
@@ -127,10 +133,27 @@ function inStateFullToCode(full: string): string | undefined {
   return e?.[0];
 }
 
+/** Parsed `/job/{segment}` slug: city/state when structured, else a free-text hint for `resolveLocation`. */
+export interface WorkdayListingSlugParsed {
+  city: string | null;
+  state: string | null;
+  /** e.g. `Dublin, Ireland` when segment is `Ireland---Dublin` (Country---City). */
+  displayLine?: string;
+}
+
+function titleCaseSegmentWords(s: string): string {
+  return s
+    .split(/[-\s]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
 /**
- * Parse Workday listing URL path segment after `/job/` (e.g. `Itasca-IL`, `India---Hyderabad`).
+ * Parse Workday listing URL path segment after `/job/`
+ * (e.g. `Itasca-IL`, `India---Hyderabad`, `Ireland---Dublin`, `Washington---Seattle`).
  */
-export function parseWorkdayListingSlug(listingUrl: string): { city: string | null; state: string | null } {
+export function parseWorkdayListingSlug(listingUrl: string): WorkdayListingSlugParsed {
   try {
     const u = new URL(listingUrl);
     const idx = u.pathname.toLowerCase().indexOf("/job/");
@@ -142,10 +165,38 @@ export function parseWorkdayListingSlug(listingUrl: string): { city: string | nu
 
     if (decoded.includes("---")) {
       const [left, right] = decoded.split("---", 2).map((x) => x.trim());
-      if (left && right && left.toLowerCase() === "india") {
+      if (left && right) {
+        const leftNorm = left.toLowerCase().replace(/-/g, " ");
+        const cityPart = titleCaseLocationPart(right.replace(/-/g, " "));
+
+        if (leftNorm === "india") {
+          return {
+            city: cityPart,
+            state: null,
+          };
+        }
+
+        for (const [, fullName] of Object.entries(US_STATES)) {
+          if (fullName.toLowerCase() === leftNorm) {
+            return { city: cityPart, state: fullName };
+          }
+        }
+
+        const iso = COUNTRY_NAME_TO_CODE[leftNorm];
+        if (iso) {
+          const countryLabel = titleCaseSegmentWords(left.replace(/-/g, " "));
+          return {
+            city: cityPart,
+            state: null,
+            displayLine: `${cityPart}, ${countryLabel}`,
+          };
+        }
+
+        const fallbackLabel = titleCaseSegmentWords(left.replace(/-/g, " "));
         return {
-          city: titleCaseLocationPart(right.replace(/-/g, " ")),
+          city: cityPart,
           state: null,
+          displayLine: `${cityPart}, ${fallbackLabel}`,
         };
       }
     }
@@ -167,7 +218,12 @@ export function parseWorkdayListingSlug(listingUrl: string): { city: string | nu
   }
 }
 
-function formatSlugLocationHint(city: string | null, state: string | null): string | undefined {
+function formatSlugLocationHint(
+  city: string | null,
+  state: string | null,
+  displayLine?: string | null,
+): string | undefined {
+  if (displayLine?.trim()) return displayLine.trim();
   if (!city) return undefined;
   if (state) {
     const usAbbr = usStateFullToAbbr(state);
@@ -196,18 +252,24 @@ export function buildWorkdayLocationParts(
       return parts.length ? parts.join(", ") : undefined;
     })();
 
-  const slug = listingUrl ? parseWorkdayListingSlug(listingUrl) : { city: null, state: null };
+  const slug: WorkdayListingSlugParsed = listingUrl
+    ? parseWorkdayListingSlug(listingUrl)
+    : { city: null, state: null };
 
   return {
     city: slug.city,
     state: slug.state,
     rawLocation: fromApi,
+    slugDisplayLine: slug.displayLine,
   };
 }
 
 function buildWorkdayLocationLine(job: WorkdayRawJob["job"], listingUrl: string | null): string | undefined {
-  const { city, state, rawLocation } = buildWorkdayLocationParts(job, listingUrl);
-  const slugHint = formatSlugLocationHint(city, state);
+  const { city, state, rawLocation, slugDisplayLine } = buildWorkdayLocationParts(
+    job,
+    listingUrl,
+  );
+  const slugHint = formatSlugLocationHint(city, state, slugDisplayLine);
   const parts = [rawLocation, slugHint].filter((x): x is string => Boolean(x && x.trim()));
   return parts.length ? parts.join(" | ") : undefined;
 }

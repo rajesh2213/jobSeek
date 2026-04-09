@@ -4,6 +4,15 @@ import {
   fetchWithRetry,
 } from "../../utils/fetchWithRetry.js";
 
+/**
+ * Location on `NormalizedJob`:
+ * - Most ATS parsers set a single free-text `location` line; structured ISO + city/state come from
+ *   `resolveLocation` in `utils/locationResolver.ts` during dedup enrichment.
+ * - Ashby: primary + `secondaryLocations` merged in `ashby.parser.ts`.
+ * - Workday: API `locationsText` / `locations[]`, URL slug hints in `workday.parser.ts`, optional detail
+ *   merge in `workday.detail.ts` (`locationsText` / `location` from CXS detail).
+ */
+
 export const SUPPORTED_ATS_TYPES = [
   "greenhouse",
   "lever",
