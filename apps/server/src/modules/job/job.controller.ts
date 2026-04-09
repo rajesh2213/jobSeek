@@ -67,12 +67,7 @@ export function registerJobRoutes(
         bypassHeader === bypassToken;
 
       const redis = getIoredis();
-      const clerk = await resolveClerkUser(
-        server.prisma,
-        typeof request.headers.authorization === "string"
-          ? request.headers.authorization
-          : undefined,
-      );
+      const clerk = await resolveClerkUser(server.prisma, request.headers.authorization);
       const ip = clientIp(request);
       const capCtx = {
         internalUserId: clerk?.internalUserId ?? null,

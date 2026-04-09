@@ -270,9 +270,7 @@ export function registerBillingRoutes(server: FastifyInstance): void {
   );
 
   server.post<{ Body: { variantId?: string } }>("/billing/create-checkout", async (request, reply) => {
-    const authz =
-      typeof request.headers.authorization === "string" ? request.headers.authorization : undefined;
-    const ctx = await resolveClerkUser(server.prisma, authz);
+    const ctx = await resolveClerkUser(server.prisma, request.headers.authorization);
     if (!ctx) {
       return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
     }
