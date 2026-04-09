@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
-import { fetchJobs } from "../../../lib/api";
-import { JobsSearchPage } from "../../../components/job/JobsSearchPage";
-import { parseSlug, parseJobFiltersFromSearch } from "../../../lib/slug-parser";
-import { jobsMetadata } from "../../../lib/seo";
+import { fetchJobs } from "../../../../lib/api";
+import { JobsSearchPage } from "../../../../components/job/JobsSearchPage";
+import { parseSlug, parseJobFiltersFromSearch } from "../../../../lib/slug-parser";
+import { jobsMetadata } from "../../../../lib/seo";
 
 interface Props {
   params: Promise<{ slug: string[] }>;

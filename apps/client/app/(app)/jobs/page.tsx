@@ -1,8 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
-import { fetchJobs } from "../../lib/api";
-import { jobsMetadata } from "../../lib/seo";
-import { JobsSearchPage } from "../../components/job/JobsSearchPage";
-import { parseJobFiltersFromSearch } from "../../lib/slug-parser";
+import { fetchJobs } from "../../../lib/api";
+import { jobsMetadata } from "../../../lib/seo";
+import { JobsSearchPage } from "../../../components/job/JobsSearchPage";
+import { parseJobFiltersFromSearch } from "../../../lib/slug-parser";
 
 export const metadata = jobsMetadata({});
 

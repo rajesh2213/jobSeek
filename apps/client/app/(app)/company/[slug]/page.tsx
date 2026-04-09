@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { fetchCompanyBySlug, fetchCompanyJobs } from "../../../lib/api";
-import { JobList } from "../../../components/job/JobList";
-import { Container } from "../../../components/ui/Container";
+import { fetchCompanyBySlug, fetchCompanyJobs } from "../../../../lib/api";
+import { JobList } from "../../../../components/job/JobList";
+import { Container } from "../../../../components/ui/Container";
 
 interface Props {
   params: Promise<{ slug: string }>;

@@ -1,25 +1,25 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
-import { fetchCompanyJobs, fetchJobById, fetchJobs } from "../../../lib/api";
+import { fetchCompanyJobs, fetchJobById, fetchJobs } from "../../../../lib/api";
 import {
   refineSectionsForDisplay,
   resolveJobDetailSections,
   sectionsPlainTextForSeo,
-} from "../../../lib/resolveJobDetailSections";
-import { rankSimilarJobs } from "../../../lib/similarJobsRank";
-import { filterSkillPillsForDisplay } from "../../../lib/jobDisplay";
-import { mergeBrowseSkillQueries, tokensFromRequirementLines } from "../../../lib/seoSkillTokens";
-import { Container } from "../../../components/ui/Container";
-import { Card } from "../../../components/ui/Card";
-import { JobHeader } from "../../../components/job/JobHeader";
-import { EnrichmentPills } from "../../../components/job/EnrichmentPills";
-import { JobDetailSeoPills } from "../../../components/job/JobDetailSeoPills";
-import { JobParsedContent } from "../../../components/job/JobParsedContent";
-import { CompanyCard } from "../../../components/company/CompanyCard";
-import { CompanyJobsPreview } from "../../../components/company/CompanyJobsPreview";
-import { SimilarJobsSection } from "../../../components/job/SimilarJobsSection";
-import { SeoFooterLinks } from "../../../components/seo/SeoFooterLinks";
+} from "../../../../lib/resolveJobDetailSections";
+import { rankSimilarJobs } from "../../../../lib/similarJobsRank";
+import { filterSkillPillsForDisplay } from "../../../../lib/jobDisplay";
+import { mergeBrowseSkillQueries, tokensFromRequirementLines } from "../../../../lib/seoSkillTokens";
+import { Container } from "../../../../components/ui/Container";
+import { Card } from "../../../../components/ui/Card";
+import { JobHeader } from "../../../../components/job/JobHeader";
+import { EnrichmentPills } from "../../../../components/job/EnrichmentPills";
+import { JobDetailSeoPills } from "../../../../components/job/JobDetailSeoPills";
+import { JobParsedContent } from "../../../../components/job/JobParsedContent";
+import { CompanyCard } from "../../../../components/company/CompanyCard";
+import { CompanyJobsPreview } from "../../../../components/company/CompanyJobsPreview";
+import { SimilarJobsSection } from "../../../../components/job/SimilarJobsSection";
+import { SeoFooterLinks } from "../../../../components/seo/SeoFooterLinks";
 
 interface Props {
   params: Promise<{ id: string }>;

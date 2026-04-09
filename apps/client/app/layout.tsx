@@ -2,9 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { ClerkProvider } from "@clerk/nextjs";
 import { DM_Sans, Instrument_Serif } from "next/font/google";
-import { FixedAccountAvatar } from "../components/layout/FixedAccountAvatar";
-import { SiteHeader } from "../components/layout/SiteHeader";
-import { SiteSideRail } from "../components/layout/SiteSideRail";
+import { RouteLoader } from "../components/layout/RouteLoader";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -32,10 +30,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className={`${dmSans.variable} ${instrumentSerif.variable}`}>
       <body className="min-h-screen font-sans">
         <ClerkProvider afterSignOutUrl="/jobs">
-          <SiteHeader />
-          <SiteSideRail />
-          <FixedAccountAvatar />
-          <div className="relative pb-20 lg:pl-[172px]">{children}</div>
+          <RouteLoader />
+          <div className="relative min-h-screen">
+            {children}
+          </div>
         </ClerkProvider>
       </body>
     </html>

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { fetchCompanies } from "../../lib/api";
-import { Container } from "../../components/ui/Container";
-import { Button } from "../../components/ui/Button";
-import { Input } from "../../components/ui/Input";
+import { fetchCompanies } from "../../../lib/api";
+import { Container } from "../../../components/ui/Container";
+import { Button } from "../../../components/ui/Button";
+import { Input } from "../../../components/ui/Input";
 
 export const metadata: Metadata = {
   title: "Companies | JobSeek",

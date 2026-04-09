@@ -3,7 +3,7 @@
 import { SignInButton, useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { useCallback, useState } from "react";
-import { API_BASE_URL } from "../../lib/api";
+import { API_BASE_URL } from "../../../lib/api";
 
 const CORAL = "#E8533A";
 const CREAM_TINT = "linear-gradient(180deg, rgba(232, 122, 93, 0.08) 0%, rgba(244, 239, 230, 0.5) 100%)";
@@ -141,7 +141,6 @@ export default function PricingPage() {
         ) : null}
 
         <div className="mx-auto mt-12 grid max-w-4xl gap-6 md:grid-cols-2 md:gap-8">
-          {/* Annual */}
           <div
             className="relative flex flex-col rounded-2xl border-2 border-brand bg-surface p-8 shadow-card ring-1 ring-brand/15"
             style={{ backgroundImage: CREAM_TINT }}
@@ -186,7 +185,6 @@ export default function PricingPage() {
             </div>
           </div>
 
-          {/* Monthly */}
           <div className="flex flex-col rounded-2xl border border-line bg-surface p-8 shadow-card ring-1 ring-ink/5">
             <h2 className="font-sans text-lg font-bold text-ink">Pro Monthly</h2>
             <p className="mt-1 text-sm text-ink-muted">Flexible month-to-month</p>
