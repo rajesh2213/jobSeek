@@ -13,7 +13,13 @@
     "db:push": "npm run db:push -w @jobseek/server",
     "db:migrate": "npm run db:migrate -w @jobseek/server",
     "worker:enrich": "npm run worker:enrich -w @jobseek/server",
-    "debug:job-parser": "npm run debug:job-parser -w @jobseek/server --"
+    "debug:job-parser": "npm run debug:job-parser -w @jobseek/server --",
+    "test": "npm run test -w @jobseek/server",
+    "test:unit": "npm run test:unit -w @jobseek/server",
+    "test:functional": "npm run test:functional -w @jobseek/server",
+    "test:all": "npm run test:all -w @jobseek/server",
+    "test:ci": "npm run test:ci -w @jobseek/server",
+    "debug:location-failures": "npm run debug:location-failures -w @jobseek/server"
   },
   "engines": {
     "node": ">=20"

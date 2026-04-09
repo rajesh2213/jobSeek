@@ -50,9 +50,6 @@ apps/inference/**/README.md
 # Local prompt / design pack (not part of the app)
 komposo-prompts-*/
 
-# One-off root debug script (keep locally if needed)
-scripts/debugJobParser.ts
-
 # Clerk dev cache / keyless (never commit)
 apps/client/.clerk/
 
