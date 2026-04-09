@@ -10,10 +10,10 @@ export function SiteHeader() {
       className="pointer-events-none sticky top-0 z-[70] isolate border-none shadow-none"
       id="header-topbar"
     >
-      <div className="flex h-16 items-center justify-between bg-canvas px-4 sm:px-6">
+      <div className="flex h-16 items-center bg-canvas px-4 sm:px-6">
         <div className="pointer-events-auto flex min-w-0 items-center gap-3 sm:gap-4">
           <Link
-            href="/jobs"
+            href="/"
             className="group relative z-[80] flex shrink-0 items-baseline gap-1 no-underline transition-transform duration-200 hover:scale-[1.02]"
           >
             <span className="font-display text-2xl italic text-ink transition-colors group-hover:text-brand sm:text-3xl">
@@ -33,8 +33,6 @@ export function SiteHeader() {
             </Link>
           </nav>
         </div>
-        {/* Space reserved for `FixedAccountAvatar` in root layout (same visual slot) */}
-        <div className="h-11 w-11 shrink-0" aria-hidden />
       </div>
     </header>
   );

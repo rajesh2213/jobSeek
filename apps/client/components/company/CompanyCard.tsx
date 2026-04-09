@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import type { JobCompany } from "../../lib/api";
 import { companyLogoSrcForDisplay } from "../../lib/logoDisplay";

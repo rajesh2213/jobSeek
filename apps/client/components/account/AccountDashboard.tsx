@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { UserProfile, useUser } from "@clerk/nextjs";
+import { UserProfile, useClerk, useUser } from "@clerk/nextjs";
+import { createPortal } from "react-dom";
 import type { Appearance } from "@clerk/types";
 import type { UserMeResponse } from "../../lib/api";
 
@@ -31,8 +32,12 @@ const clerkAppearance = {
 } satisfies Appearance;
 
 export function AccountDashboard() {
+  const { signOut } = useClerk();
   const { user, isLoaded } = useUser();
   const [me, setMe] = useState<UserMeResponse | null>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,6 +80,19 @@ export function AccountDashboard() {
       </div>
     );
   }
+
+  const handleConfirmSignOut = async () => {
+    if (isSigningOut) return;
+    setSignOutError(null);
+    setIsSigningOut(true);
+    try {
+      await signOut({ redirectUrl: "/jobs" });
+    } catch {
+      setSignOutError("Could not sign out right now. Please try again.");
+      setIsSigningOut(false);
+      setIsConfirmOpen(false);
+    }
+  };
 
   return (
     <div className="box-border mx-auto grid w-[90%] max-w-jobs grid-cols-1 gap-8 px-4 py-8 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -157,6 +175,24 @@ export function AccountDashboard() {
             Refreshes daily at midnight UTC
           </p>
         </div>
+
+        <hr className="my-6 border-ink/10" />
+
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setIsConfirmOpen(true)}
+            disabled={isSigningOut}
+            className="w-full rounded-xl border border-ink/15 bg-white px-3 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand/40 hover:text-brand disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSigningOut ? "Signing out..." : "Sign out"}
+          </button>
+          {signOutError ? (
+            <p className="text-center text-xs text-red-600" role="alert">
+              {signOutError}
+            </p>
+          ) : null}
+        </div>
       </aside>
 
       <div
@@ -165,6 +201,53 @@ export function AccountDashboard() {
       >
         <UserProfile routing="hash" appearance={clerkAppearance} />
       </div>
+
+      {isConfirmOpen && typeof document !== "undefined"
+        ? createPortal(
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-ink/45 px-4 backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-signout-title"
+          aria-describedby="confirm-signout-description"
+          onClick={() => {
+            if (!isSigningOut) setIsConfirmOpen(false);
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-ink/10 bg-surface p-5 shadow-[0_18px_60px_rgba(0,0,0,0.25)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="confirm-signout-title" className="text-lg font-semibold text-ink">
+              Sign out of JobSeek?
+            </h3>
+            <p id="confirm-signout-description" className="mt-2 text-sm text-ink/70">
+              You will be signed out on this device and redirected to jobs.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsConfirmOpen(false)}
+                disabled={isSigningOut}
+                className="rounded-lg border border-ink/15 bg-white px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-ink/30 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmSignOut()}
+                disabled={isSigningOut}
+                className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSigningOut ? "Signing out..." : "Sign out"}
+              </button>
+            </div>
+          </div>
+        </div>
+          ,
+          document.body,
+        )
+        : null}
     </div>
   );
 }

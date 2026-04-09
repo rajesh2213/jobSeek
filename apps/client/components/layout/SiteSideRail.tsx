@@ -9,11 +9,11 @@ const W_COLLAPSED = "w-[136px]";
 const W_EXPANDED = "w-[186px]";
 
 const railTab =
-  "group relative flex items-center gap-2.5 overflow-hidden rounded-r-xl py-5 pl-4 shadow-sm transition-[width,padding,gap,box-shadow] duration-300 ease-out";
+  "group relative flex items-center gap-2.5 overflow-hidden rounded-r-xl py-5 pl-4 pr-5 shadow-sm transition-[width,box-shadow,background-color] duration-300 ease-out";
 
 export function SiteSideRail() {
   const pathname = usePathname();
-  const jobs = pathname.startsWith("/jobs") || pathname === "/";
+  const jobs = pathname.startsWith("/jobs");
   const companies = pathname.startsWith("/companies") || pathname.startsWith("/company");
 
   return (
@@ -27,16 +27,19 @@ export function SiteSideRail() {
         title="Jobs"
         className={cn(
           railTab,
-          jobs ? `${W_EXPANDED} pr-7 shadow-md` : `${W_COLLAPSED} pr-5 hover:w-[186px] hover:gap-3 hover:pr-7 hover:shadow-md`,
+          jobs ? `${W_EXPANDED} shadow-md` : `${W_COLLAPSED} hover:w-[186px] hover:shadow-md`,
           jobs
-            ? "bg-teal font-bold tracking-wide text-white"
-            : "bg-teal/85 font-bold tracking-wide text-white/85 hover:bg-teal hover:text-white",
+            ? "bg-teal font-bold tracking-wide !text-white"
+            : "bg-teal/85 font-bold tracking-wide !text-white hover:bg-teal hover:!text-white active:!text-white visited:!text-white",
         )}
       >
+        <span className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white/15 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
         <span className="shrink-0 text-sm opacity-90" aria-hidden>
           ◆
         </span>
-        <span className="min-w-0 truncate text-sm tracking-wide">Jobs</span>
+        <span className="min-w-0 truncate text-sm tracking-[0.08em] transition-[letter-spacing,text-shadow] duration-300 group-hover:tracking-[0.12em] group-hover:[text-shadow:0_0_10px_rgba(255,255,255,0.28)]">
+          Jobs
+        </span>
         {jobs ? (
           <span className="absolute right-2 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-white/60" />
         ) : null}
@@ -46,16 +49,19 @@ export function SiteSideRail() {
         title="Companies"
         className={cn(
           railTab,
-          companies ? `${W_EXPANDED} pr-7 shadow-md` : `${W_COLLAPSED} pr-5 hover:w-[186px] hover:gap-3 hover:pr-7 hover:shadow-md`,
+          companies ? `${W_EXPANDED} shadow-md` : `${W_COLLAPSED} hover:w-[186px] hover:shadow-md`,
           companies
-            ? "bg-rose font-bold tracking-wide text-white shadow-md"
-            : "bg-rose/85 font-bold tracking-wide text-white/85 hover:bg-rose hover:text-white",
+            ? "bg-rose font-bold tracking-wide !text-white shadow-md"
+            : "bg-rose/85 font-bold tracking-wide !text-white hover:bg-rose hover:!text-white active:!text-white visited:!text-white",
         )}
       >
+        <span className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white/15 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
         <span className="shrink-0 text-sm opacity-90" aria-hidden>
           ◇
         </span>
-        <span className="min-w-0 truncate text-sm tracking-wide">Companies</span>
+        <span className="min-w-0 truncate text-sm tracking-[0.08em] transition-[letter-spacing,text-shadow] duration-300 group-hover:tracking-[0.12em] group-hover:[text-shadow:0_0_10px_rgba(255,255,255,0.28)]">
+          Companies
+        </span>
         {companies ? (
           <span className="absolute right-2 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-white/60" />
         ) : null}

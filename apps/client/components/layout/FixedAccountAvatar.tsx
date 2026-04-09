@@ -11,7 +11,7 @@ const shellClass =
 
 const fixedFrame: CSSProperties = {
   position: "fixed",
-  top: 20,
+  top: 10,
   right: 24,
   left: "auto",
   bottom: "auto",
