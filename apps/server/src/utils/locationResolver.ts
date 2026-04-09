@@ -591,6 +591,129 @@ function tryIsoCodeToken(t: string): string | undefined {
   return undefined;
 }
 
+/** US state full name (lowercase) → official full name string (same as US_STATES values). */
+const US_STATE_FULL_NAME_BY_LOWER: Map<string, string> = new Map(
+  Object.values(US_STATES).map((name) => [name.toLowerCase(), name]),
+);
+
+const CA_PROVINCE_FULL_NAMES = [
+  "Alberta",
+  "British Columbia",
+  "Manitoba",
+  "New Brunswick",
+  "Newfoundland and Labrador",
+  "Nova Scotia",
+  "Ontario",
+  "Prince Edward Island",
+  "Quebec",
+  "Saskatchewan",
+  "Northwest Territories",
+  "Nunavut",
+  "Yukon",
+] as const;
+
+const CA_PROVINCE_BY_LOWER = new Map<string, string>(
+  CA_PROVINCE_FULL_NAMES.map((n) => [n.toLowerCase(), n]),
+);
+
+const AU_STATE_FULL_NAMES = [
+  "New South Wales",
+  "Queensland",
+  "South Australia",
+  "Tasmania",
+  "Victoria",
+  "Western Australia",
+  "Australian Capital Territory",
+  "Northern Territory",
+] as const;
+
+const AU_STATE_BY_LOWER = new Map<string, string>(
+  AU_STATE_FULL_NAMES.map((n) => [n.toLowerCase(), n]),
+);
+
+const UK_CONSTITUENT_BY_LOWER = new Map<string, string>([
+  ["england", "England"],
+  ["scotland", "Scotland"],
+  ["wales", "Wales"],
+  ["northern ireland", "Northern Ireland"],
+]);
+
+/** Minimal DE Land names (second segment) for EU postings. Keys: NFKD-normalized lowercase ASCII. */
+const DE_REGION_BY_LOWER = new Map<string, string>([
+  ["bavaria", "Bavaria"],
+  ["baden-wurttemberg", "Baden-Württemberg"],
+  ["baden-wuerttemberg", "Baden-Württemberg"],
+  ["north rhine-westphalia", "North Rhine-Westphalia"],
+  ["north rhine westphalia", "North Rhine-Westphalia"],
+  ["lower saxony", "Lower Saxony"],
+  ["rhineland-palatinate", "Rhineland-Palatinate"],
+  ["rhineland palatinate", "Rhineland-Palatinate"],
+  ["schleswig-holstein", "Schleswig-Holstein"],
+  ["mecklenburg-vorpommern", "Mecklenburg-Vorpommern"],
+  ["saxony-anhalt", "Saxony-Anhalt"],
+  ["hesse", "Hesse"],
+  ["thuringia", "Thuringia"],
+  ["brandenburg", "Brandenburg"],
+  ["berlin", "Berlin"],
+  ["hamburg", "Hamburg"],
+  ["bremen", "Bremen"],
+  ["saarland", "Saarland"],
+  ["saxony", "Saxony"],
+]);
+
+function normalizeSubnationalToken(s: string): string {
+  return s
+    .trim()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+/**
+ * "City, FullRegionName" when the second segment is a known subnational area (not only 2-letter codes).
+ */
+function tryResolveCityCommaSubnationalRegion(
+  seg1: string,
+  seg2: string,
+): { city: string; state: string | null; country: string } | null {
+  const city = titleCaseWords(seg1.replace(/-/g, " "));
+  const r = normalizeSubnationalToken(seg2);
+
+  const usState = US_STATE_FULL_NAME_BY_LOWER.get(r);
+  if (usState) {
+    return { city, state: usState, country: "US" };
+  }
+
+  const caProv = CA_PROVINCE_BY_LOWER.get(r);
+  if (caProv) {
+    return { city, state: caProv, country: "CA" };
+  }
+
+  const auSt = AU_STATE_BY_LOWER.get(r);
+  if (auSt) {
+    return { city, state: auSt, country: "AU" };
+  }
+
+  const inSt = IN_STATE_BY_LOWER.get(r);
+  if (inSt) {
+    return { city, state: inSt, country: "IN" };
+  }
+
+  const uk = UK_CONSTITUENT_BY_LOWER.get(r);
+  if (uk) {
+    return { city, state: uk, country: "GB" };
+  }
+
+  const de = DE_REGION_BY_LOWER.get(r);
+  if (de) {
+    return { city, state: de, country: "DE" };
+  }
+
+  return null;
+}
+
 /**
  * Parse free-text / ATS location lines into structured fields + ISO country.
  */
@@ -628,6 +751,19 @@ export function resolveLocation(raw: string): ResolvedLocation {
     .split(/[,;/|]+/)
     .map((s) => s.trim())
     .filter(Boolean);
+
+  if (segments.length === 2) {
+    const subEarly = tryResolveCityCommaSubnationalRegion(segments[0]!, segments[1]!);
+    if (subEarly) {
+      return {
+        city: subEarly.city,
+        state: subEarly.state,
+        country: subEarly.country,
+        region: regionForCountry(subEarly.country),
+        isRemote,
+      };
+    }
+  }
 
   const trail = text.match(/^(.+),\s*([A-Za-z]{2})\s*$/);
   if (trail) {
@@ -758,17 +894,27 @@ export function resolveLocation(raw: string): ResolvedLocation {
     }
   }
 
-  const region = regionForCountry(country);
-
   if (isRemote && lowerFull.includes("europe") && country === "UNKNOWN") {
     return { city, state, country: "UNKNOWN", region: "Europe", isRemote: true };
   }
 
+  const region = regionForCountry(country);
+
   return { city, state, country, region, isRemote };
 }
 
+/** Synthetic region for jobs with `locationCountry === "GLOBAL"` (worldwide remote). */
+export const GLOBAL_REGION_LABEL = "Global";
+
 export function getRegions(): string[] {
-  return Array.from(new Set(Object.values(REGION_MAP))).sort((a, b) => a.localeCompare(b));
+  const base = Array.from(new Set(Object.values(REGION_MAP))).sort((a, b) =>
+    a.localeCompare(b),
+  );
+  if (!base.includes(GLOBAL_REGION_LABEL)) {
+    base.push(GLOBAL_REGION_LABEL);
+    base.sort((a, b) => a.localeCompare(b));
+  }
+  return base;
 }
 
 /** Expand a user filter string to ISO country codes for OR queries. */
@@ -779,6 +925,7 @@ export function expandLocationFilter(query: string): string[] {
   const regions = getRegions();
   const rMatch = regions.find((r) => r.toLowerCase() === q);
   if (rMatch) {
+    if (rMatch === GLOBAL_REGION_LABEL) return ["GLOBAL"];
     return ALL_ISO_CODES.filter((c) => REGION_MAP[c] === rMatch);
   }
 
@@ -884,9 +1031,15 @@ export function testLocationResolver(): void {
     },
   ];
 
+  let failures = 0;
   for (const c of cases) {
-    const ok = c.fn();
-    console.log(ok ? `PASS: ${c.name}` : `FAIL: ${c.name}`);
+    if (!c.fn()) failures++;
+  }
+  if (failures > 0) {
+    console.error(
+      `locationResolver self-check: ${failures}/${cases.length} case(s) failed`,
+    );
+    process.exit(1);
   }
 }
 
