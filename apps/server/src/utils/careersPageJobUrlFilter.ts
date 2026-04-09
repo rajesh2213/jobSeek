@@ -46,6 +46,14 @@ export function shouldFetchCareersJobDetail(link: string): boolean {
 
   if (/\/search\b/i.test(lowPath)) return false;
 
+  if (
+    /(life-at|life_at|culture|blog|news|developer-platform)/i.test(lowPath) ||
+    /\/team\//i.test(lowPath) ||
+    /\/about\//i.test(lowPath)
+  ) {
+    return false;
+  }
+
   if (hostIsGoogleSites(u.hostname) && /signin|accounts\.google/i.test(u.href)) {
     return false;
   }
@@ -58,7 +66,7 @@ export function shouldFetchCareersJobDetail(link: string): boolean {
   if (/\/career-area\/.+\/jobs\/?$/i.test(lowPath)) return false;
 
   if (
-    /\/careers\/(engineering|sales|marketing|operations|product|design|finance|legal|people|hr|human-resources|support|customer-success|research|internships?|students?|university|early-career|teams?|departments?)(\/|$)/i.test(
+    /\/careers\/(engineering|sales|marketing|operations|product|design|finance|legal|people|hr|human-resources|support|customer-success|research|internships?|students?|university|early-career|early-talent|teams?|departments?)(\/|$)/i.test(
       lowPath,
     )
   ) {
@@ -89,4 +97,21 @@ export function shouldFetchCareersJobDetail(link: string): boolean {
 
 function hostIsGoogleSites(host: string): boolean {
   return host.toLowerCase().includes("sites.google.com");
+}
+
+/**
+ * Paths that are very unlikely to be job postings (align with validation URL penalties).
+ * Used to skip self-heal retry on obvious non-job URLs.
+ */
+export function isStrongDenylistUrl(link: string): boolean {
+  try {
+    const u = new URL(link);
+    const lowPath = u.pathname.toLowerCase();
+    if (/(life-at|life_at|culture|blog|news|developer-platform)/i.test(lowPath)) return true;
+    if (/\/team\//i.test(lowPath)) return true;
+    if (/\/about\//i.test(lowPath)) return true;
+    return false;
+  } catch {
+    return /(life-at|culture|blog|news|team|about|developer-platform)/i.test(link);
+  }
 }

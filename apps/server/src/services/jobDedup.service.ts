@@ -70,9 +70,16 @@ export async function deduplicateAndInsert(
       existingByUrl.id,
       input.postedAt,
     );
-    const canonical = await repo.resolveCanonicalJob(existingByUrl);
-    if (postedMerged) {
+    /** True when DB row was updated; triggers canonical recompute so aggregated location stays fresh. */
+    const locationMerged = await repo.mergeStructuredLocationFromReingest(
+      existingByUrl.id,
+      input,
+    );
+    let canonical = await repo.resolveCanonicalJob(existingByUrl);
+    if (postedMerged || locationMerged) {
       await recomputeCanonical(repo, canonical.id);
+      const fresh = await repo.findByIdRaw(canonical.id);
+      if (fresh) canonical = fresh;
     }
     recordIngestionOutcome("idempotent");
     logDedupMetrics();
@@ -161,7 +168,22 @@ export async function deduplicateAndInsert(
       );
       const existing = await repo.findBySourceUrl(input.sourceUrl);
       if (existing) {
-        const canonicalExisting = await repo.resolveCanonicalJob(existing);
+        await repo.updateLastSeenById(existing.id, new Date());
+        const postedMerged = await repo.mergePostedAtIfEarlier(
+          existing.id,
+          input.postedAt,
+        );
+        /** True when DB row was updated; triggers canonical recompute so aggregated location stays fresh. */
+        const locationMerged = await repo.mergeStructuredLocationFromReingest(
+          existing.id,
+          input,
+        );
+        let canonicalExisting = await repo.resolveCanonicalJob(existing);
+        if (postedMerged || locationMerged) {
+          await recomputeCanonical(repo, canonicalExisting.id);
+          const fresh = await repo.findByIdRaw(canonicalExisting.id);
+          if (fresh) canonicalExisting = fresh;
+        }
         recordIngestionOutcome("idempotent");
         logDedupMetrics();
         return { canonical: canonicalExisting, inserted: false };

@@ -6,13 +6,26 @@ import type { IngestJobsFromSourceUrlPayload } from "../modules/crawler/crawler.
 import { extractLinks } from "../modules/discovery/detectors/ats.detector.js";
 import { fetchCareersHtml, fetchCareersHtmlWithMeta } from "../utils/fetchCareersHtml.js";
 import { extractCompanyDomain } from "../utils/jobFingerprint.js";
-import { extractJobDescriptionFromHtml } from "../utils/jobDetailHtml.js";
+import {
+  extractJobDescriptionFromHtml,
+  extractJobLocationFromHtml,
+  extractJobTitleFromHtml,
+  extractJsonLdJobPostingFlags,
+  extractJsonLdJobPostingStrict,
+} from "../utils/jobDetailHtml.js";
 import {
   isGarbageCareersHostPath,
+  isStrongDenylistUrl,
   shouldFetchCareersJobDetail,
 } from "../utils/careersPageJobUrlFilter.js";
 import { asyncPool } from "../utils/asyncPool.js";
 import { logger } from "../utils/logger.js";
+import {
+  isCareersJobSelfHealEnabled,
+  isCareersJobValidationEnabled,
+  validateJob,
+} from "../utils/jobValidation.js";
+import { applyRetryStrategies } from "../utils/jobRetryStrategies.js";
 
 const MAX_JOB_HUBS = 10;
 const MAX_CANDIDATES = 50;
@@ -24,17 +37,24 @@ function isJobHub(link: string): boolean {
   return /job|career|position|opening|opportunit|hiring|join|work/i.test(link);
 }
 
-function extractTitleFromUrl(url: string): string {
+/** Slug-based fallback: keep alphanumeric words; trim trailing IDs only (no blanket digit strip). */
+function extractTitleFromUrlSlug(url: string): string {
   try {
     const parts = new URL(url).pathname.split("/").filter(Boolean);
     const last = parts[parts.length - 1] || "";
     const decoded = decodeURIComponent(last.replace(/\.[a-z0-9]+$/i, ""));
-    return (
-      decoded.replace(/[-_%23]+/g, " ").replace(/\d+/g, "").trim() || "Job Role"
-    );
+    let s = decoded.replace(/[-_%23]+/g, " ").trim();
+    s = s.replace(/[_-]?(?:jr|req)[_-]?\d+/gi, " ").replace(/\s+/g, " ").trim();
+    s = s.replace(/\s+\d+$/g, "").trim();
+    return s || "Job Role";
   } catch {
     return "Job Role";
   }
+}
+
+function inferRemoteFromCareersText(title: string, description: string, location: string | undefined): boolean {
+  const blob = `${title}\n${description}\n${location ?? ""}`;
+  return /\bremote\b/i.test(blob);
 }
 
 /**
@@ -182,7 +202,11 @@ export async function processIngestJobsFromSourceUrl(
           "Careers job detail HTML fetched",
         );
 
-        const { text: description, source: extractionSource } = extractJobDescriptionFromHtml(meta.html);
+        const jsonLd = extractJsonLdJobPostingFlags(meta.html);
+        const strictDesc = process.env.CAREERS_PAGE_STRICT_DESCRIPTION === "1";
+        const { text: description, source: extractionSource } = extractJobDescriptionFromHtml(meta.html, {
+          careersPageStrict: strictDesc,
+        });
         logger.info(
           {
             event: "description_extracted_length",
@@ -190,11 +214,13 @@ export async function processIngestJobsFromSourceUrl(
             sourceUrl: link,
             length: description.length,
             extractionSource,
+            careersPageStrict: strictDesc,
           },
           "Careers description extraction",
         );
 
-        if (description.length < MIN_DESCRIPTION_CHARS) {
+        const validationEnabled = isCareersJobValidationEnabled();
+        if (!validationEnabled && description.length < MIN_DESCRIPTION_CHARS) {
           logger.info(
             {
               event: "job_detail_skipped_reason",
@@ -209,11 +235,180 @@ export async function processIngestJobsFromSourceUrl(
           return false;
         }
 
-        const title = extractTitleFromUrl(link);
+        const titleFromHtml = extractJobTitleFromHtml(meta.html, jsonLd);
+        let title = titleFromHtml ?? extractTitleFromUrlSlug(link);
+        let locationLine = extractJobLocationFromHtml(meta.html, jsonLd) ?? undefined;
+        let descriptionText = description;
+
+        if (validationEnabled) {
+          const validation = validateJob({
+            title,
+            description: descriptionText,
+            location: locationLine,
+            sourceUrl: link,
+            hasJsonLdJobPosting: jsonLd.hasJobPosting,
+          });
+
+          logger.info(
+            {
+              event: "job_validation_result",
+              companyId,
+              sourceUrl: link,
+              score: validation.score,
+              isValid: validation.isValid,
+              reasonCount: validation.reasons.length,
+              reasons: validation.reasons,
+            },
+            "job_validation_result",
+          );
+
+          let acceptScore = validation.score;
+          let acceptReasonCount = validation.reasons.length;
+
+          if (!validation.isValid) {
+            let recovered: {
+              title: string;
+              description: string;
+              location: string | undefined;
+              strategy: string;
+              retryScore: number;
+              retryReasonCount: number;
+            } | null = null;
+
+            if (
+              isCareersJobSelfHealEnabled() &&
+              validation.score >= 20 &&
+              !isStrongDenylistUrl(link)
+            ) {
+              const retry = applyRetryStrategies({
+                html: meta.html,
+                sourceUrl: link,
+                previousReasons: validation.reasons,
+                initialScore: validation.score,
+                primary: {
+                  title,
+                  description: descriptionText,
+                  location: locationLine,
+                },
+              });
+
+              if (retry) {
+                const strictJp =
+                  retry.strategyUsed === "jsonld_only" ? extractJsonLdJobPostingStrict(meta.html) : null;
+                const retryValidation = validateJob({
+                  title: retry.title,
+                  description: retry.description,
+                  location: retry.location,
+                  sourceUrl: link,
+                  hasJsonLdJobPosting:
+                    retry.strategyUsed === "jsonld_only"
+                      ? Boolean(strictJp?.hasJobPosting)
+                      : jsonLd.hasJobPosting,
+                });
+
+                logger.info(
+                  {
+                    event: "job_retry_attempt",
+                    companyId,
+                    sourceUrl: link,
+                    strategy: retry.strategyUsed,
+                    retryScore: retryValidation.score,
+                    retryValid: retryValidation.isValid,
+                  },
+                  "job_retry_attempt",
+                );
+
+                if (
+                  retryValidation.isValid &&
+                  (retry.description?.length ?? 0) >= MIN_DESCRIPTION_CHARS
+                ) {
+                  recovered = {
+                    title: retry.title ?? title,
+                    description: retry.description ?? descriptionText,
+                    location: retry.location ?? locationLine,
+                    strategy: retry.strategyUsed,
+                    retryScore: retryValidation.score,
+                    retryReasonCount: retryValidation.reasons.length,
+                  };
+                } else {
+                  logger.warn(
+                    {
+                      event: "job_retry_failed",
+                      companyId,
+                      sourceUrl: link,
+                      strategy: retry.strategyUsed,
+                      retryScore: retryValidation.score,
+                    },
+                    "job_retry_failed",
+                  );
+                }
+              }
+            }
+
+            if (!recovered) {
+              logger.warn(
+                {
+                  event: "job_rejected",
+                  companyId,
+                  sourceUrl: link,
+                  score: validation.score,
+                  reasonCount: validation.reasons.length,
+                  reasons: validation.reasons,
+                },
+                "job_rejected",
+              );
+              return false;
+            }
+
+            title = recovered.title;
+            descriptionText = recovered.description;
+            locationLine = recovered.location;
+            acceptScore = recovered.retryScore;
+            acceptReasonCount = recovered.retryReasonCount;
+            logger.info(
+              {
+                event: "job_recovered",
+                companyId,
+                sourceUrl: link,
+                strategy: recovered.strategy,
+                retryScore: recovered.retryScore,
+              },
+              "job_recovered",
+            );
+          }
+
+          if (descriptionText.length < MIN_DESCRIPTION_CHARS) {
+            logger.info(
+              {
+                event: "job_detail_skipped_reason",
+                companyId,
+                sourceUrl: link,
+                reason: "description_too_short",
+                description_extracted_length: descriptionText.length,
+                extractionSource,
+              },
+              "Careers job detail below minimum description length after validation",
+            );
+            return false;
+          }
+
+          logger.info(
+            {
+              event: "job_accepted",
+              companyId,
+              sourceUrl: link,
+              score: acceptScore,
+              reasonCount: acceptReasonCount,
+            },
+            "job_accepted",
+          );
+        }
+
         const result = await jobService.ingestDeduplicated({
           title,
-          description,
-          isRemote: false,
+          description: descriptionText,
+          location: locationLine,
+          isRemote: inferRemoteFromCareersText(title, descriptionText, locationLine),
           source: "careers_page",
           sourceUrl: link,
           applyUrl: link,

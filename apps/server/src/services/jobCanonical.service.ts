@@ -1,4 +1,5 @@
 import type { Job } from "@prisma/client";
+import type { DedupJobInput } from "../modules/crawler/crawler.types.js";
 import type { JobRepository } from "../modules/job/job.repository.js";
 import {
   freshnessScore,
@@ -61,6 +62,155 @@ export function mergeCountryCode(jobs: Job[]): string {
   return jobs[0]?.country ?? "UNKNOWN";
 }
 
+/**
+ * Merge structured location from canonical + duplicate rows (source-quality order).
+ * Prefer `locationCountry` over legacy `country` when resolving ISO code.
+ */
+export function mergeStructuredLocationFromSources(jobs: Job[]): {
+  country: string;
+  locationCountry: string;
+  locationCity: string | null;
+  locationState: string | null;
+  locationRegion: string | null;
+} {
+  const sorted = [...jobs].sort(
+    (a, b) => getSourceQualityWeight(b.source) - getSourceQualityWeight(a.source),
+  );
+
+  let locationCountry = "UNKNOWN";
+  for (const j of sorted) {
+    const lc = j.locationCountry?.trim();
+    if (lc && lc !== "UNKNOWN") {
+      locationCountry = j.locationCountry;
+      break;
+    }
+  }
+  if (locationCountry === "UNKNOWN") {
+    for (const j of sorted) {
+      const c = j.country?.trim();
+      if (c && c !== "UNKNOWN") {
+        locationCountry = c;
+        break;
+      }
+    }
+  }
+
+  let country = "UNKNOWN";
+  for (const j of sorted) {
+    const c = j.country?.trim();
+    if (c && c !== "UNKNOWN") {
+      country = j.country;
+      break;
+    }
+  }
+  if (country === "UNKNOWN" && locationCountry !== "UNKNOWN") {
+    country = locationCountry;
+  }
+
+  let locationCity: string | null = null;
+  for (const j of sorted) {
+    const v = j.locationCity?.trim();
+    if (v) {
+      locationCity = j.locationCity;
+      break;
+    }
+  }
+
+  let locationState: string | null = null;
+  for (const j of sorted) {
+    const v = j.locationState?.trim();
+    if (v) {
+      locationState = j.locationState;
+      break;
+    }
+  }
+
+  let locationRegion: string | null = null;
+  for (const j of sorted) {
+    const v = j.locationRegion?.trim();
+    if (v) {
+      locationRegion = j.locationRegion;
+      break;
+    }
+  }
+
+  return {
+    country,
+    locationCountry,
+    locationCity,
+    locationState,
+    locationRegion,
+  };
+}
+
+/** True when DB has no usable value (null, empty, whitespace, or UNKNOWN). */
+export function isMissingLocation(value?: string | null): boolean {
+  const t = value?.trim();
+  return !t || t === "UNKNOWN";
+}
+
+/**
+ * Compute DB patch when re-ingesting the same sourceUrl with richer location than stored.
+ * Returns null if nothing to change.
+ */
+export function computeLocationPatchFromReingest(
+  row: Pick<
+    Job,
+    "country" | "locationCountry" | "locationCity" | "locationState" | "locationRegion"
+  >,
+  incoming: Pick<
+    DedupJobInput,
+    "country" | "locationCountry" | "locationCity" | "locationState" | "locationRegion"
+  >,
+): {
+  country: string;
+  locationCountry: string;
+  locationCity: string | null;
+  locationState: string | null;
+  locationRegion: string | null;
+} | null {
+  let locationCountry = row.locationCountry;
+  let country = row.country;
+  let locationCity = row.locationCity;
+  let locationState = row.locationState;
+  let locationRegion = row.locationRegion;
+
+  if (!isMissingLocation(incoming.locationCountry) && isMissingLocation(locationCountry)) {
+    locationCountry = incoming.locationCountry;
+  }
+  if (!isMissingLocation(incoming.country) && isMissingLocation(country)) {
+    country = incoming.country;
+  }
+  if (locationCountry !== row.locationCountry && !isMissingLocation(locationCountry)) {
+    if (isMissingLocation(country)) {
+      country = !isMissingLocation(incoming.country) ? incoming.country : locationCountry;
+    }
+  }
+
+  const incCity = incoming.locationCity?.trim();
+  if (incCity && isMissingLocation(locationCity)) {
+    locationCity = incoming.locationCity ?? null;
+  }
+  const incState = incoming.locationState?.trim();
+  if (incState && isMissingLocation(locationState)) {
+    locationState = incoming.locationState ?? null;
+  }
+  const incRegion = incoming.locationRegion?.trim();
+  if (incRegion && isMissingLocation(locationRegion)) {
+    locationRegion = incoming.locationRegion ?? null;
+  }
+
+  const changed =
+    locationCountry !== row.locationCountry ||
+    country !== row.country ||
+    locationCity !== row.locationCity ||
+    locationState !== row.locationState ||
+    locationRegion !== row.locationRegion;
+
+  if (!changed) return null;
+  return { country, locationCountry, locationCity, locationState, locationRegion };
+}
+
 /** Prefer category from highest-quality source; ignore `other` when possible. */
 export function mergeCategorySlug(jobs: Job[]): string {
   const sorted = [...jobs].sort(
@@ -103,6 +253,10 @@ export function aggregateCanonicalFromSources(jobs: Job[]): {
   title: string;
   description: string | null;
   country: string;
+  locationCountry: string;
+  locationCity: string | null;
+  locationState: string | null;
+  locationRegion: string | null;
   category: string;
   isRemote: boolean;
   workType: string;
@@ -146,7 +300,8 @@ export function aggregateCanonicalFromSources(jobs: Job[]): {
     description = selectBestDescription(description, ordered[i].description ?? undefined);
   }
 
-  const country = mergeCountryCode(ordered);
+  const locMerged = mergeStructuredLocationFromSources(ordered);
+  const country = locMerged.country;
   const category = mergeCategorySlug(ordered);
   const skills = mergeSkillsUnion(ordered);
 
@@ -196,6 +351,10 @@ export function aggregateCanonicalFromSources(jobs: Job[]): {
     title,
     description,
     country,
+    locationCountry: locMerged.locationCountry,
+    locationCity: locMerged.locationCity,
+    locationState: locMerged.locationState,
+    locationRegion: locMerged.locationRegion,
     category,
     isRemote,
     workType,
