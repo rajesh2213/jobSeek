@@ -185,13 +185,14 @@ model Subscription {
 }
 
 model SavedSearch {
-  id          String    @id @default(uuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name        String
-  filters     Json
-  lastAlertAt DateTime?
-  createdAt   DateTime  @default(now())
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String?
+  query     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
+  @@unique([userId, query])
 }
