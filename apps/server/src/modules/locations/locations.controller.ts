@@ -1,7 +1,12 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import countries from "i18n-iso-countries";
-import { searchCountries } from "../../config/countries.js";
-import { CITY_TO_COUNTRY, getRegions, REGION_MAP } from "../../utils/locationResolver.js";
+import { COUNTRY_LIST, searchCountries } from "../../config/countries.js";
+import {
+  CITY_TO_COUNTRY,
+  getRegions,
+  GLOBAL_REGION_LABEL,
+  REGION_MAP,
+} from "../../utils/locationResolver.js";
 import {
   getCitiesQuerySchema,
   getCountriesQuerySchema,
@@ -9,6 +14,34 @@ import {
 } from "../job/job.schema.js";
 
 const CITIES_SUGGEST_LIMIT = 10;
+
+/**
+ * Full ISO country list grouped by resolver region (not only countries that
+ * already have jobs), so region → country pickers stay usable on sparse data.
+ */
+function buildCountriesCatalogForFilters(): Array<{
+  code: string;
+  name: string;
+  region: string;
+}> {
+  const out: Array<{ code: string; name: string; region: string }> = [];
+  for (const { code, name } of COUNTRY_LIST) {
+    const region = REGION_MAP[code];
+    if (!region) continue;
+    out.push({ code, name, region });
+  }
+  out.push({
+    code: "GLOBAL",
+    name: GLOBAL_REGION_LABEL,
+    region: GLOBAL_REGION_LABEL,
+  });
+  out.sort((a, b) => {
+    const rg = a.region.localeCompare(b.region);
+    if (rg !== 0) return rg;
+    return a.name.localeCompare(b.name);
+  });
+  return out;
+}
 
 /**
  * When `locationCity` is mostly empty in the DB, still return useful matches by
@@ -83,26 +116,7 @@ export function registerLocationRoutes(server: FastifyInstance): void {
     "/locations",
     { schema: getLocationsSchema },
     async (_request: FastifyRequest, reply: FastifyReply) => {
-      const rows = await server.prisma.job.groupBy({
-        by: ["locationCountry"],
-        where: { canonicalJobId: null },
-      });
-
-      const codes = rows
-        .map((r) => r.locationCountry)
-        .filter((c): c is string => typeof c === "string" && c.length > 0 && c !== "UNKNOWN");
-
-      const countryObjs = codes.map((code) => ({
-        code,
-        name: countries.getName(code, "en") ?? code,
-        region: REGION_MAP[code] ?? "Unknown",
-      }));
-
-      countryObjs.sort((a, b) => {
-        const rg = a.region.localeCompare(b.region);
-        if (rg !== 0) return rg;
-        return a.name.localeCompare(b.name);
-      });
+      const countryObjs = buildCountriesCatalogForFilters();
 
       const regions = [...getRegions()].sort((a, b) => a.localeCompare(b));
 
