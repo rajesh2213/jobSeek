@@ -1,4 +1,5 @@
 import Fastify, { type FastifyError } from "fastify";
+import multipart from "@fastify/multipart";
 import prismaPlugin from "./plugins/prisma.plugin.js";
 import { registerRoutes } from "./routes/index.js";
 import cors from "@fastify/cors";
@@ -14,6 +15,10 @@ export async function buildServer() {
     global: false,
     encoding: false,
     runFirst: true,
+  });
+
+  await server.register(multipart, {
+    limits: { fileSize: 5 * 1024 * 1024 },
   });
 
   // Enable CORS for the Next.js client running on a different port.

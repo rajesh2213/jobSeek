@@ -165,6 +165,12 @@ model User {
   stripeCustomerId   String?        @unique
   jobViewsToday      Int            @default(0)
   jobViewsResetAt    DateTime       @default(now())
+  resumeText           String?      // parsed plain text
+  resumeFileName       String?      // original filename
+  resumeFileData       Bytes?       // raw file bytes for download
+  resumeUpdatedAt      DateTime?
+  resumeBullets        Json?        // String[] of extracted bullet points
+  resumeBulletEmbeddings Json?      // number[][] parallel array of embeddings
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
   subscription       Subscription?

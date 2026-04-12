@@ -45,6 +45,7 @@
     "@clerk/backend": "^1.34.0",
     "@clerk/nextjs": "^6.39.1",
     "@fastify/cors": "^8.5.0",
+    "@fastify/multipart": "^8.3.0",
     "@lemonsqueezy/lemonsqueezy.js": "^4.0.0",
     "@prisma/client": "^5.22.0",
     "axios": "^1.14.0",
@@ -56,11 +57,14 @@
     "he": "^1.2.0",
     "i18n-iso-countries": "^7.14.0",
     "ioredis": "^5.10.0",
+    "mammoth": "^1.9.0",
+    "pdf-parse": "^1.1.1",
     "pino": "^9.5.0",
     "pino-pretty": "^11.3.0",
     "rotating-file-stream": "^3.2.9"
   },
   "devDependencies": {
+    "@types/pdf-parse": "^1.1.4",
     "@types/node": "^22.9.0",
     "prisma": "^5.22.0",
     "tsx": "^4.19.2",
