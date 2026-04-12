@@ -4,11 +4,16 @@ Loads a HuggingFace sequence-classification model once at startup; runs batched 
 """
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
+from typing import List, Optional
 
+import numpy as np
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Default: apps/inference/models/job-parser-model
 _DEFAULT_MODEL_DIR = Path(__file__).resolve().parent / "models" / "job-parser-model"
@@ -30,6 +35,11 @@ model = None
 label_names: list[str] = []
 device = None
 
+EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "all-MiniLM-L6-v2")
+embedding_model: SentenceTransformer | None = None
+
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="JobSeek Inference", version="1.0.0")
 
 
@@ -45,6 +55,26 @@ class ParseResponse(BaseModel):
     benefit: list[str]
     contact: list[str]
     other: list[str]
+
+
+class EmbedRequest(BaseModel):
+    sentences: List[str]
+
+
+class EmbedResponse(BaseModel):
+    embeddings: List[List[float]]
+
+
+class MatchRequest(BaseModel):
+    keyword: str
+    bullets: List[str]  # resume bullet points to compare against
+
+
+class MatchResponse(BaseModel):
+    best_match: Optional[str]
+    best_match_index: int
+    similarity: float
+    all_similarities: List[float]
 
 
 def _resolve_label_names() -> list[str]:
@@ -71,7 +101,7 @@ def _empty_buckets() -> dict[str, list[str]]:
 
 @app.on_event("startup")
 def load_model() -> None:
-    global tokenizer, model, label_names, device
+    global tokenizer, model, label_names, device, embedding_model
     import torch
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
@@ -88,6 +118,9 @@ def load_model() -> None:
     model.to(device)
     label_names.clear()
     label_names.extend(_resolve_label_names())
+
+    embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+    logger.info("Embedding model loaded: %s", EMBEDDING_MODEL_NAME)
 
 
 @app.get("/health")
@@ -159,4 +192,37 @@ def parse(req: ParseRequest) -> ParseResponse:
         benefit=buckets["benefit"],
         contact=buckets["contact"],
         other=buckets["other"],
+    )
+
+
+@app.post("/resume/embed", response_model=EmbedResponse)
+def embed_sentences(req: EmbedRequest) -> EmbedResponse:
+    """Embed a list of sentences using all-MiniLM-L6-v2"""
+    if embedding_model is None:
+        raise HTTPException(status_code=503, detail="Embedding model not loaded")
+    if not req.sentences:
+        return EmbedResponse(embeddings=[])
+    embeddings = embedding_model.encode(req.sentences, convert_to_numpy=True)
+    return EmbedResponse(embeddings=embeddings.tolist())
+
+
+@app.post("/resume/match", response_model=MatchResponse)
+def match_keyword_to_bullets(req: MatchRequest) -> MatchResponse:
+    """Find which resume bullet is semantically closest to a missing keyword"""
+    if embedding_model is None:
+        raise HTTPException(status_code=503, detail="Embedding model not loaded")
+    if not req.bullets:
+        return MatchResponse(best_match=None, best_match_index=-1, similarity=0.0, all_similarities=[])
+
+    keyword_emb = embedding_model.encode([req.keyword], convert_to_numpy=True)
+    bullet_embs = embedding_model.encode(req.bullets, convert_to_numpy=True)
+
+    sims = cosine_similarity(keyword_emb, bullet_embs)[0]
+    best_idx = int(np.argmax(sims))
+
+    return MatchResponse(
+        best_match=req.bullets[best_idx],
+        best_match_index=best_idx,
+        similarity=float(sims[best_idx]),
+        all_similarities=sims.tolist(),
     )
