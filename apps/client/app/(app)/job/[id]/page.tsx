@@ -19,6 +19,7 @@ import { JobParsedContent } from "../../../../components/job/JobParsedContent";
 import { CompanyCard } from "../../../../components/company/CompanyCard";
 import { CompanyJobsPreview } from "../../../../components/company/CompanyJobsPreview";
 import { SimilarJobsSection } from "../../../../components/job/SimilarJobsSection";
+import { ResumeMatchSection } from "../../../../components/resume/ResumeMatchSection";
 import { SeoFooterLinks } from "../../../../components/seo/SeoFooterLinks";
 
 interface Props {
@@ -104,6 +105,7 @@ export default async function JobDetailPage({ params }: Props) {
           <div className="min-w-0 space-y-6 lg:col-span-2">
             <Card accent="brand" as="article" className="space-y-6 px-6 py-8 text-left sm:px-8">
               <JobHeader job={job} applyHref={applyHref} />
+              <ResumeMatchSection job={job} />
               <div className="w-full min-w-0 max-w-full space-y-0">
                 <EnrichmentPills job={job} />
                 <JobDetailSeoPills job={job} />

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ClerkProvider } from "@clerk/nextjs";
 import { DM_Sans, Instrument_Serif } from "next/font/google";
 import { RouteLoader } from "../components/layout/RouteLoader";
+import { ResumeProvider } from "../lib/resumeContext";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -30,10 +31,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className={`${dmSans.variable} ${instrumentSerif.variable}`}>
       <body className="min-h-screen font-sans">
         <ClerkProvider afterSignOutUrl="/jobs">
-          <RouteLoader />
-          <div className="relative min-h-screen">
-            {children}
-          </div>
+          <ResumeProvider>
+            <RouteLoader />
+            <div className="relative min-h-screen">
+              {children}
+            </div>
+          </ResumeProvider>
         </ClerkProvider>
       </body>
     </html>
