@@ -1,0 +1,558 @@
+"use client";
+
+import { useInView } from "framer-motion";
+import Link from "next/link";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  fetchCompanyJobs,
+  type CompanyDetail,
+  type CompanyListItem,
+  type JobItem,
+  type JobsApiResponse,
+} from "../../lib/api";
+import { accentFromId } from "../../lib/accent";
+import { cn } from "../../lib/cn";
+import {
+  filtersToCompanyHubSearchParams,
+  filtersToSearchParams,
+  hasActiveJobFilters,
+  parseJobFiltersFromSearch,
+  type JobFilters,
+} from "../../lib/slug-parser";
+import { companyLogoSrcForDisplay } from "../../lib/logoDisplay";
+import { Badge } from "../ui/Badge";
+import { Button, buttonClassName } from "../ui/Button";
+import { JobCard } from "../job/JobCard";
+
+const HubJobCard = memo(JobCard);
+HubJobCard.displayName = "HubJobCard";
+
+const DEFAULT_LIMIT = 20;
+
+function websiteUrlFromDomain(domain: string): string {
+  const d = domain.trim();
+  if (!d) return "#";
+  const lower = d.toLowerCase();
+  if (lower.startsWith("http://") || lower.startsWith("https://")) return d;
+  return `https://${d}`;
+}
+
+function clearbitFromDomain(domain: string | null): string | null {
+  const d = domain?.trim();
+  if (!d) return null;
+  return `https://logo.clearbit.com/${encodeURIComponent(d)}`;
+}
+
+function hubFiltersFromSearchParams(sp: URLSearchParams): Omit<JobFilters, "companyId"> {
+  const raw: Record<string, string> = {};
+  sp.forEach((v, k) => {
+    raw[k] = v;
+  });
+  const f = parseJobFiltersFromSearch(raw);
+  const { companyId: _c, ...rest } = f;
+  return rest;
+}
+
+function buildCompanyHubPath(
+  slug: string,
+  filters: Omit<JobFilters, "companyId">,
+): string {
+  const p = filtersToCompanyHubSearchParams({
+    ...filters,
+    page: undefined,
+    limit: undefined,
+    offset: undefined,
+  });
+  const qs = p.toString();
+  return qs ? `/company/${slug}?${qs}` : `/company/${slug}`;
+}
+
+interface Props {
+  company: CompanyDetail;
+  slug: string;
+  initialJobs: JobItem[];
+  initialMeta: NonNullable<JobsApiResponse["meta"]>;
+  relatedCompanies: CompanyListItem[];
+}
+
+export function CompanyHubClient({
+  company,
+  slug,
+  initialJobs,
+  initialMeta,
+  relatedCompanies,
+}: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlFilters = useMemo(
+    () => hubFiltersFromSearchParams(searchParams),
+    [searchParams],
+  );
+
+  const [listJobs, setListJobs] = useState<JobItem[]>(initialJobs);
+  const [listMeta, setListMeta] = useState(initialMeta);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    setListJobs(initialJobs);
+    setListMeta(initialMeta);
+  }, [initialJobs, initialMeta]);
+
+  const navigateHub = useCallback(
+    (next: Omit<JobFilters, "companyId">) => {
+      router.push(buildCompanyHubPath(slug, next));
+    },
+    [router, slug],
+  );
+
+  const totalRoles = listMeta.total ?? 0;
+  const canLoadMore =
+    listMeta.hasMore === true ||
+    (listMeta.totalPages != null && listMeta.page < listMeta.totalPages);
+
+  const filterBase = useMemo(() => {
+    const { page: _p, limit: _l, offset: _o, ...rest } = urlFilters;
+    return rest;
+  }, [urlFilters]);
+
+  const onLoadMore = useCallback(async () => {
+    if (!canLoadMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = listMeta.page + 1;
+      const res = await fetchCompanyJobs(slug, {
+        page: nextPage,
+        limit: listMeta.limit || DEFAULT_LIMIT,
+        filters: {
+          ...filterBase,
+          page: undefined,
+          limit: undefined,
+          offset: undefined,
+        },
+      });
+      setListJobs((prev) => {
+        const seen = new Set(prev.map((j) => j.id));
+        const merged = [...prev];
+        for (const j of res.data) {
+          if (!seen.has(j.id)) {
+            seen.add(j.id);
+            merged.push(j);
+          }
+        }
+        return merged;
+      });
+      if (res.meta) setListMeta(res.meta);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [canLoadMore, loadingMore, listMeta, slug, filterBase]);
+
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const inView = useInView(sentinelRef, { amount: 0, margin: "200px" });
+  useEffect(() => {
+    if (inView && canLoadMore && !loadingMore) void onLoadMore();
+  }, [inView, canLoadMore, loadingMore, onLoadMore]);
+
+  const sortValue = urlFilters.sort === "salary_desc" ? "salary_desc" : "latest";
+
+  const toggleWorkType = (w: "remote" | "onsite" | "hybrid") => {
+    const cur = { ...urlFilters };
+    if (cur.workTypes?.length === 1 && cur.workTypes[0] === w) {
+      const { workTypes, isRemote, workType, ...rest } = cur;
+      navigateHub(rest);
+      return;
+    }
+    navigateHub({
+      ...cur,
+      workTypes: [w],
+      isRemote: w === "remote" ? true : undefined,
+      workType: w === "remote" ? "remote" : undefined,
+    });
+  };
+
+  const activeWorkType =
+    urlFilters.workTypes?.length === 1 ? urlFilters.workTypes[0] : null;
+
+  const filtersActive = hasActiveJobFilters({
+    ...urlFilters,
+    companyId: undefined,
+    page: undefined,
+    limit: undefined,
+    offset: undefined,
+  });
+
+  const emptyFiltered =
+    listJobs.length === 0 && totalRoles === 0 && filtersActive;
+
+  const emptyNoRoles =
+    listJobs.length === 0 && totalRoles === 0 && !filtersActive;
+
+  const jobsLinkAll = useMemo(() => {
+    const p = filtersToSearchParams({ companyId: company.id });
+    const qs = p.toString();
+    return qs ? `/jobs?${qs}` : "/jobs";
+  }, [company.id]);
+
+  const jobsLinkEngineering = `/jobs?${filtersToSearchParams({
+    companyId: company.id,
+    role: "engineering",
+  }).toString()}`;
+  const jobsLinkReact = `/jobs?${filtersToSearchParams({
+    companyId: company.id,
+    skills: ["react"],
+  }).toString()}`;
+
+  return (
+    <main className="min-h-screen">
+      <div className="sticky top-0 z-30 border-b border-ink/10 bg-canvas/95 px-4 py-2 backdrop-blur-md sm:px-6 lg:hidden">
+        <div className="mx-auto flex max-w-[1100px] items-center gap-3">
+          <CompanyHubLogo
+            companyId={company.id}
+            domain={company.domain}
+            logoUrl={company.logoUrl}
+            name={company.name}
+            size="sm"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-ink">{company.name}</p>
+            <p className="text-xs text-ink/50">{totalRoles} open roles</p>
+          </div>
+          <Link
+            href="#company-jobs"
+            className="shrink-0 text-xs font-semibold text-brand no-underline"
+          >
+            Roles
+          </Link>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-[1100px] px-6 py-8">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <CompanyHubLogo
+            companyId={company.id}
+            domain={company.domain}
+            logoUrl={company.logoUrl}
+            name={company.name}
+            size="lg"
+          />
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-semibold text-ink">{company.name}</h1>
+            <div className="mt-1 text-sm">
+              {company.domain?.trim() ? (
+                <a
+                  href={websiteUrlFromDomain(company.domain)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-brand no-underline hover:underline"
+                >
+                  {company.domain}
+                </a>
+              ) : (
+                <span className="text-ink/50">Domain pending</span>
+              )}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Badge tone="teal" caps={false}>
+                {totalRoles} open roles
+              </Badge>
+              {totalRoles > 0 ? (
+                <Badge tone="brand" caps={false}>
+                  Hiring now
+                </Badge>
+              ) : null}
+            </div>
+          </div>
+        </header>
+
+        <p className="mt-3 text-ink/60">
+          Explore all open roles from {company.name}.
+        </p>
+
+        <div
+          id="company-jobs"
+          className={cn(
+            "mt-6 flex flex-col gap-3 rounded-2xl border border-ink/10 bg-surface/80 p-4 shadow-card",
+            "md:flex-row md:flex-wrap md:items-end md:gap-3",
+          )}
+        >
+          <label className="flex flex-col gap-1.5 text-sm md:w-44 md:shrink-0">
+            <span className="font-semibold leading-none text-ink">Sort</span>
+            <select
+              className={cn(
+                "w-full rounded-2xl border-0 bg-surface px-3.5 py-2.5 text-sm text-ink shadow-sm ring-1 ring-ink/5",
+                "h-10 !py-0 leading-snug focus:outline-none focus:ring-2 focus:ring-brand/30",
+              )}
+              value={sortValue}
+              onChange={(e) => {
+                const v = e.target.value;
+                navigateHub({
+                  ...urlFilters,
+                  sort: v === "salary_desc" ? "salary_desc" : undefined,
+                });
+              }}
+              aria-label="Sort jobs"
+            >
+              <option value="latest">Latest</option>
+              <option value="salary_desc">Highest salary</option>
+            </select>
+          </label>
+
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <span className="text-sm font-semibold leading-none text-ink">Filters</span>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["remote", "Remote"],
+                  ["onsite", "On-site"],
+                  ["hybrid", "Hybrid"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => toggleWorkType(key)}
+                  className={cn(
+                    "inline-flex h-9 items-center rounded-full border px-3 text-xs font-semibold transition-colors",
+                    activeWorkType === key
+                      ? "border-brand bg-brand/10 text-brand"
+                      : "border-ink/15 bg-surface text-ink/75 ring-1 ring-ink/5 hover:border-ink/25",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {emptyFiltered ? (
+          <div
+            className="mt-8 rounded-2xl border border-dashed border-ink/15 bg-surface px-6 py-12 text-center"
+            role="status"
+          >
+            <p className="font-medium text-ink">No roles match your filters</p>
+            <p className="mt-2 text-sm text-ink-muted">
+              Try removing filters or explore other companies.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => navigateHub({})}
+              >
+                Clear filters
+              </Button>
+              <Link
+                href="/companies"
+                className={buttonClassName({ variant: "primary", size: "sm" })}
+              >
+                Browse companies
+              </Link>
+            </div>
+          </div>
+        ) : emptyNoRoles ? (
+          <p
+            className="mt-8 rounded-2xl border border-dashed border-ink/15 bg-surface px-6 py-12 text-center text-sm text-ink-muted"
+            role="status"
+          >
+            No open roles listed for this company yet. Check back soon or browse all jobs.
+          </p>
+        ) : (
+          <>
+            <section className="mt-8 flex flex-col gap-5" aria-label="Open roles">
+              {listJobs.map((job) => (
+                <div
+                  key={job.id}
+                  className="transition-transform duration-200 hover:-translate-y-0.5"
+                >
+                  <HubJobCard job={job} />
+                </div>
+              ))}
+            </section>
+
+            {canLoadMore ? (
+              <div ref={sentinelRef} className="mt-8 flex justify-center pb-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="md"
+                  className="w-full max-w-md"
+                  disabled={loadingMore}
+                  onClick={() => void onLoadMore()}
+                >
+                  {loadingMore ? "Loading…" : "Load more roles"}
+                </Button>
+              </div>
+            ) : null}
+          </>
+        )}
+
+        {relatedCompanies.length > 0 ? (
+          <section className="mt-12 border-t border-ink/10 pt-10">
+            <h3 className="text-lg font-semibold text-ink">More companies hiring</h3>
+            <p className="mt-1 text-sm text-ink/55">
+              Other employers with active listings (by open role count).
+            </p>
+            <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {relatedCompanies.map((c) => (
+                <li key={c.id}>
+                  <Link
+                    href={`/company/${c.slug}`}
+                    className="flex items-center gap-3 rounded-xl border border-ink/10 bg-surface p-3 no-underline transition-colors hover:border-brand/30"
+                  >
+                    <RelatedCompanyAvatar company={c} />
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-ink">{c.name}</p>
+                      <p className="truncate text-xs text-ink/50">
+                        {c.jobCount ?? 0} open roles
+                      </p>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        <section className="mt-12 border-t border-ink/10 pt-10">
+          <h2 className="font-display text-xl font-normal italic text-ink">
+            Jobs at {company.name}
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink/80">
+            Explore verified job openings at {company.name}. Browse roles across
+            engineering, product, and more. Apply early to increase your chances. See all
+            listings in one place:{" "}
+            <Link href={jobsLinkAll} className="font-medium text-brand no-underline hover:underline">
+              jobs at this company
+            </Link>
+            , narrow to{" "}
+            <Link
+              href={jobsLinkEngineering}
+              className="font-medium text-brand no-underline hover:underline"
+            >
+              engineering
+            </Link>{" "}
+            or{" "}
+            <Link
+              href={jobsLinkReact}
+              className="font-medium text-brand no-underline hover:underline"
+            >
+              React skills
+            </Link>
+            .
+          </p>
+        </section>
+
+        <p className="mt-8 text-sm">
+          <Link href="/jobs" className="font-medium text-brand no-underline hover:underline">
+            ← Back to all jobs
+          </Link>
+        </p>
+      </div>
+    </main>
+  );
+}
+
+const LOGO_GRADIENT: Record<ReturnType<typeof accentFromId>, string> = {
+  teal: "from-teal/80 to-teal/50",
+  rose: "from-rose/80 to-rose/50",
+  amber: "from-amber/80 to-amber/50",
+  brand: "from-brand/90 to-brand/60",
+};
+
+function CompanyHubLogo({
+  companyId,
+  logoUrl,
+  domain,
+  name,
+  size,
+}: {
+  companyId: string;
+  logoUrl?: string | null;
+  domain: string | null;
+  name: string;
+  size: "sm" | "lg";
+}) {
+  const [failed, setFailed] = useState(false);
+  const src = useMemo(() => {
+    const s = logoUrl?.trim();
+    if (s) return companyLogoSrcForDisplay(s);
+    return clearbitFromDomain(domain) ?? "";
+  }, [logoUrl, domain]);
+  const letter = name.trim().charAt(0).toUpperCase() || "?";
+  const accent = accentFromId(companyId);
+  const box = size === "lg" ? "h-16 w-16 p-2" : "h-10 w-10 p-1";
+
+  return (
+    <div
+      className={cn(
+        "relative shrink-0 overflow-hidden rounded-xl border border-ink/10 bg-white",
+        box,
+      )}
+    >
+      {!failed && src ? (
+        <img
+          src={src}
+          alt=""
+          width={size === "lg" ? 56 : 32}
+          height={size === "lg" ? 56 : 32}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          className="h-full w-full object-contain"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <div
+          className={cn(
+            "flex h-full w-full items-center justify-center rounded-lg bg-gradient-to-br text-sm font-bold text-white",
+            size === "lg" ? "text-lg" : "text-xs",
+            LOGO_GRADIENT[accent],
+          )}
+          aria-hidden
+        >
+          {letter}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RelatedCompanyAvatar({ company }: { company: CompanyListItem }) {
+  const [failed, setFailed] = useState(false);
+  const src = useMemo(() => {
+    const s = company.logoUrl?.trim();
+    if (s) return companyLogoSrcForDisplay(s);
+    return clearbitFromDomain(company.domain) ?? "";
+  }, [company.logoUrl, company.domain]);
+  const letter = company.name.trim().charAt(0).toUpperCase() || "?";
+  const accent = accentFromId(company.id);
+
+  return (
+    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-ink/10 bg-white p-0.5">
+      {!failed && src ? (
+        <img
+          src={src}
+          alt=""
+          width={36}
+          height={36}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          className="h-full w-full object-contain"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <div
+          className={cn(
+            "flex h-full w-full items-center justify-center rounded-md bg-gradient-to-br text-xs font-bold text-white",
+            LOGO_GRADIENT[accent],
+          )}
+          aria-hidden
+        >
+          {letter}
+        </div>
+      )}
+    </div>
+  );
+}

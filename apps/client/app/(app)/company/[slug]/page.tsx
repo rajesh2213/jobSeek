@@ -1,12 +1,18 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { fetchCompanyBySlug, fetchCompanyJobs } from "../../../../lib/api";
-import { JobList } from "../../../../components/job/JobList";
-import { Container } from "../../../../components/ui/Container";
+import {
+  fetchCompanies,
+  fetchCompanyBySlug,
+  fetchCompanyJobs,
+} from "../../../../lib/api";
+import { CompanyHubPage } from "../../../../components/company/CompanyHubPage";
+import { parseJobFiltersFromSearch } from "../../../../lib/slug-parser";
+
+const HUB_LIMIT = 20;
 
 interface Props {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -15,60 +21,68 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!company) {
     return { title: "Company not found | JobSeek" };
   }
-  const title = `${company.name} Jobs | JobSeek`;
-  const description = `Explore jobs at ${company.name}. Browse canonical listings and apply via the original posting.`;
+  const title = `${company.name} Jobs & Careers | JobSeek`;
+  const description = `Explore open roles at ${company.name}. Browse engineering, product, and remote jobs—verified listings with early apply links.`;
   return { title, description, openGraph: { title, description } };
 }
 
-export default async function CompanyDetailPage({ params }: Props) {
+function searchRecord(
+  sp: Record<string, string | string[] | undefined>,
+): Record<string, string> {
+  const raw: Record<string, string> = {};
+  for (const [k, v] of Object.entries(sp)) {
+    if (typeof v === "string") raw[k] = v;
+    else if (Array.isArray(v) && typeof v[0] === "string") raw[k] = v[0];
+  }
+  return raw;
+}
+
+export default async function CompanyDetailPage({ params, searchParams }: Props) {
   const { slug } = await params;
+  const sp = await searchParams;
   const company = await fetchCompanyBySlug(slug);
   if (!company) notFound();
 
-  const jobsResponse = await fetchCompanyJobs(slug, { page: 1, limit: 50 });
+  const parsed = parseJobFiltersFromSearch(searchRecord(sp));
+  const { companyId: _cid, ...hubFilters } = parsed;
+
+  const page = Math.max(1, hubFilters.page ?? 1);
+  const limit =
+    hubFilters.limit && hubFilters.limit >= 1 && hubFilters.limit <= 100
+      ? hubFilters.limit
+      : HUB_LIMIT;
+
+  const jobsResponse = await fetchCompanyJobs(slug, {
+    page,
+    limit,
+    filters: {
+      ...hubFilters,
+      page: undefined,
+      limit: undefined,
+      offset: undefined,
+    },
+  });
+
+  const meta = jobsResponse.meta ?? {
+    page: 1,
+    limit,
+    total: 0,
+    totalPages: 1,
+    hasMore: false,
+  };
+
+  const companiesRes = await fetchCompanies({ limit: 12, sort: "jobs" });
+  const relatedCompanies = companiesRes.data
+    .filter((c) => c.slug !== slug)
+    .slice(0, 6);
 
   return (
-    <main className="min-h-screen">
-      <Container width="wide" className="py-8">
-        <header className="mb-8">
-          <h1 className="font-display text-3xl font-normal italic text-ink">{company.name}</h1>
-          <p className="mt-2 text-sm text-ink-muted">
-            <span>Domain: {company.domain ?? "Pending enrichment"}</span>
-            {company.careersUrl && (
-              <>
-                {" · "}
-                <a
-                  href={company.careersUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-medium text-brand no-underline hover:text-brand-hover"
-                >
-                  Careers site
-                </a>
-              </>
-            )}
-          </p>
-        </header>
-
-        <section>
-          <h2 className="text-lg font-semibold text-ink">Open roles</h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            Showing canonical jobs only
-            {jobsResponse.meta
-              ? ` (${jobsResponse.meta.total} total${jobsResponse.meta.totalPages > 1 ? "; first page shown" : ""})`
-              : ""}
-            .
-          </p>
-          <div className="mt-4">
-            <JobList jobs={jobsResponse.data} />
-          </div>
-          <p className="mt-6 text-sm">
-            <Link href="/jobs" className="font-medium text-brand no-underline hover:text-brand-hover">
-              ← Back to all jobs
-            </Link>
-          </p>
-        </section>
-      </Container>
-    </main>
+    <CompanyHubPage
+      company={company}
+      slug={slug}
+      initialJobs={jobsResponse.data}
+      initialMeta={meta}
+      relatedCompanies={relatedCompanies}
+    />
   );
 }

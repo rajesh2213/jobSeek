@@ -191,6 +191,13 @@ export function filtersToSearchParams(filters: JobFilters): URLSearchParams {
   return p;
 }
 
+/** Query string for `/company/[slug]` (no `companyId`; company is implied by the path). */
+export function filtersToCompanyHubSearchParams(
+  filters: Omit<JobFilters, "companyId">,
+): URLSearchParams {
+  return filtersToSearchParams({ ...filters, companyId: undefined });
+}
+
 /** True when URL would carry any filter besides pagination (`page` / `limit` / `offset`). */
 export function hasActiveJobFilters(f: JobFilters): boolean {
   const p = filtersToSearchParams({

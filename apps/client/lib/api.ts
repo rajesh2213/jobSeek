@@ -10,19 +10,25 @@ export interface JobCompany {
   openRoles?: number;
 }
 
+export type CompaniesSort = "jobs" | "recent" | "name";
+
 export interface CompanyListItem {
   id: string;
   name: string;
   slug: string;
   domain: string | null;
+  logoUrl?: string | null;
   careersUrl: string | null;
   createdAt: string;
+  /** Canonical open roles (listing API only). */
+  jobCount?: number;
+  hasRemoteJobs?: boolean;
+  lastCrawledAt?: string | null;
 }
 
 export interface CompanyDetail extends CompanyListItem {
   atsBoardToken: string | null;
   atsType: string | null;
-  lastCrawledAt: string | null;
   updatedAt: string;
 }
 
@@ -118,6 +124,11 @@ interface CompaniesApiResponse {
     limit: number;
     total: number;
     totalPages: number;
+    hasMore?: boolean;
+    stats?: {
+      totalTracked: number;
+      hiringThisWeek: number;
+    };
   };
 }
 
@@ -387,15 +398,11 @@ export async function fetchCitySuggestions(q: string): Promise<CitySuggestion[]>
   return (await res.json()) as CitySuggestion[];
 }
 
-export async function fetchJobs(
-  filters: JobFilters = {},
-  opts?: {
-    /** Clerk session JWT for per-user view caps. */
-    token?: string | null;
-    /** Server-only: must match API `JOB_LIST_VIEW_CAP_BYPASS_TOKEN` (e.g. sitemap). */
-    viewCapBypassSecret?: string | null;
-  },
-): Promise<JobsApiResponse> {
+/** Shared with `GET /jobs` and `GET /company/:slug/jobs` (omit `companyId` for the latter). */
+function buildJobDiscoverySearchParams(
+  filters: JobFilters,
+  opts?: { includeCompanyId?: boolean },
+): URLSearchParams {
   const params = new URLSearchParams();
   if (filters.page) params.set("page", String(filters.page));
   if (filters.limit) params.set("limit", String(filters.limit));
@@ -408,9 +415,13 @@ export async function fetchJobs(
     params.set("country", filters.country.trim());
   }
   if (filters.category) params.set("category", filters.category);
-  if (filters.workTypes?.length) params.set("types", filters.workTypes.map((t) => t.toUpperCase()).join(","));
+  if (filters.workTypes?.length) {
+    params.set("types", filters.workTypes.map((t) => t.toUpperCase()).join(","));
+  }
   if (typeof filters.isRemote === "boolean") params.set("remote", String(filters.isRemote));
-  if (filters.companyId) params.set("companyId", filters.companyId);
+  if (filters.companyId && opts?.includeCompanyId !== false) {
+    params.set("companyId", filters.companyId);
+  }
   if (filters.role) params.set("role", filters.role);
   if (filters.roles?.length) params.set("roles", filters.roles.join(","));
   if (filters.skills?.length) params.set("skills", filters.skills.join(","));
@@ -418,6 +429,19 @@ export async function fetchJobs(
   if (filters.posted) params.set("posted", filters.posted);
   if (filters.minSalary !== undefined) params.set("minSalary", String(filters.minSalary));
   if (filters.sort === "salary_desc") params.set("sort", "salary_desc");
+  return params;
+}
+
+export async function fetchJobs(
+  filters: JobFilters = {},
+  opts?: {
+    /** Clerk session JWT for per-user view caps. */
+    token?: string | null;
+    /** Server-only: must match API `JOB_LIST_VIEW_CAP_BYPASS_TOKEN` (e.g. sitemap). */
+    viewCapBypassSecret?: string | null;
+  },
+): Promise<JobsApiResponse> {
+  const params = buildJobDiscoverySearchParams(filters, { includeCompanyId: true });
 
   const url = `${API_BASE_URL}/jobs${params.toString() ? `?${params}` : ""}`;
   const headers = new Headers();
@@ -497,14 +521,25 @@ export async function fetchCompanies(options: {
   page?: number;
   limit?: number;
   q?: string;
+  sort?: CompaniesSort;
+  hiring?: boolean;
+  remote?: boolean;
 } = {}): Promise<CompaniesApiResponse> {
   const params = new URLSearchParams();
   if (options.page) params.set("page", String(options.page));
   if (options.limit) params.set("limit", String(options.limit));
   if (options.q?.trim()) params.set("q", options.q.trim());
+  if (options.sort && options.sort !== "jobs") params.set("sort", options.sort);
+  if (options.hiring) params.set("hiring", "true");
+  if (options.remote) params.set("remote", "true");
   const qs = params.toString();
   const url = `${API_BASE_URL}/companies${qs ? `?${qs}` : ""}`;
-  const res = await fetch(url, { next: { revalidate: 60 } });
+  const res = await fetch(
+    url,
+    typeof window === "undefined"
+      ? { next: { revalidate: 60 } }
+      : { cache: "no-store" },
+  );
   if (!res.ok) {
     throw new Error(`Failed to fetch companies: ${res.status}`);
   }
@@ -525,18 +560,34 @@ export async function fetchCompanyBySlug(slug: string): Promise<CompanyDetail | 
 
 export async function fetchCompanyJobs(
   slug: string,
-  options: { page?: number; limit?: number } = {},
+  options: {
+    page?: number;
+    limit?: number;
+    /** Same discovery filters as `/jobs`; `companyId` is ignored (route scopes by slug). */
+    filters?: Omit<JobFilters, "companyId">;
+  } = {},
 ): Promise<JobsApiResponse> {
-  const params = new URLSearchParams();
-  if (options.page) params.set("page", String(options.page ?? 1));
-  if (options.limit) params.set("limit", String(options.limit ?? 50));
+  const page = options.page ?? 1;
+  const limit = options.limit ?? 20;
+  const merged: JobFilters = {
+    ...(options.filters ?? {}),
+    page,
+    limit,
+    companyId: undefined,
+  };
+  const params = buildJobDiscoverySearchParams(merged, { includeCompanyId: false });
   const qs = params.toString();
   const url = `${API_BASE_URL}/company/${encodeURIComponent(slug)}/jobs${qs ? `?${qs}` : ""}`;
-  const res = await fetch(url, { next: { revalidate: 60 } });
+  const res = await fetch(
+    url,
+    typeof window === "undefined"
+      ? { next: { revalidate: 60 } }
+      : { cache: "no-store" },
+  );
   if (res.status === 404) {
     return {
       data: [],
-      meta: { page: 1, limit: 50, total: 0, totalPages: 1, hasMore: false },
+      meta: { page: 1, limit, total: 0, totalPages: 1, hasMore: false },
     };
   }
   if (!res.ok) {
