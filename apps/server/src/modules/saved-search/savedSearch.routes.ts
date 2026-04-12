@@ -4,6 +4,7 @@ import {
   getUserSavedSearchCount,
   isValidQuery,
   normalizeQuery,
+  resolveDefaultSavedSearchName,
 } from "./savedSearch.service.js";
 
 export function registerSavedSearchRoutes(server: FastifyInstance): void {
@@ -51,10 +52,14 @@ export function registerSavedSearchRoutes(server: FastifyInstance): void {
         .send({ error: "Saved search limit reached", code: "SAVED_SEARCH_LIMIT_REACHED" });
     }
 
+    const name =
+      rawName ||
+      (await resolveDefaultSavedSearchName(server.prisma, ctx.internalUserId));
+
     const created = await server.prisma.savedSearch.create({
       data: {
         userId: ctx.internalUserId,
-        name: rawName || null,
+        name,
         query,
       },
     });

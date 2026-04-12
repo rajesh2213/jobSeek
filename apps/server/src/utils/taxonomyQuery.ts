@@ -54,44 +54,44 @@ export function parseJobDiscoveryQuery(query: Record<string, unknown>): JobDisco
     }
   }
 
+  const locationsParam = query.locations;
+  if (typeof locationsParam === "string" && locationsParam.trim().length > 0) {
+    const seen = new Set<string>();
+    const tokens: string[] = [];
+    for (const s of locationsParam.split(",")) {
+      const t = s.trim();
+      if (!t) continue;
+      const k = t.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      tokens.push(t);
+    }
+    if (tokens.length > 0) {
+      filters.locationTokens = tokens;
+    }
+  }
+
   const location = query.location;
-  if (typeof location === "string" && location.trim().length > 0) {
+  if (
+    typeof location === "string" &&
+    location.trim().length > 0 &&
+    !filters.locationTokens?.length
+  ) {
     filters.location = location.trim();
   }
 
   const country = query.country;
-  if (typeof country === "string" && country.trim().length > 0) {
+  if (
+    typeof country === "string" &&
+    country.trim().length > 0 &&
+    !filters.locationTokens?.length
+  ) {
     const t = country.trim();
     if (t.toUpperCase() === "UNKNOWN") {
       filters.country = "UNKNOWN";
     } else {
       const code = tryResolveCountryInput(t);
       if (code) filters.country = code;
-    }
-  }
-  const locations = query.locations;
-  if (typeof locations === "string" && locations.trim().length > 0) {
-    const parsed = locations
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const resolvedCountries: string[] = [];
-    const unresolvedTerms: string[] = [];
-    for (const token of parsed) {
-      if (token.toUpperCase() === "UNKNOWN") {
-        resolvedCountries.push("UNKNOWN");
-        continue;
-      }
-      const resolved = tryResolveCountryInput(token);
-      if (resolved) resolvedCountries.push(resolved);
-      else unresolvedTerms.push(token.toLowerCase());
-    }
-    if (resolvedCountries.length > 0) {
-      filters.countries = Array.from(new Set(resolvedCountries));
-      if (!filters.country) filters.country = filters.countries[0];
-    }
-    if (unresolvedTerms.length > 0) {
-      filters.locationTerms = Array.from(new Set(unresolvedTerms));
     }
   }
 

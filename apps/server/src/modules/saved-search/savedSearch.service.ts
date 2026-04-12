@@ -84,3 +84,23 @@ export function isValidQuery(normalizedQuery: string): boolean {
 export async function getUserSavedSearchCount(prisma: PrismaClient, userId: string): Promise<number> {
   return prisma.savedSearch.count({ where: { userId } });
 }
+
+/** Next default label for a new saved search: lowest free `Saved search 1` … `3` (max 3 rows per user). */
+export async function resolveDefaultSavedSearchName(
+  prisma: PrismaClient,
+  userId: string,
+): Promise<string> {
+  const rows = await prisma.savedSearch.findMany({
+    where: { userId },
+    select: { name: true },
+  });
+  const used = new Set<number>();
+  for (const row of rows) {
+    const m = row.name?.trim().match(/^Saved search (\d+)$/i);
+    if (m) used.add(Number(m[1]));
+  }
+  for (let i = 1; i <= 3; i += 1) {
+    if (!used.has(i)) return `Saved search ${i}`;
+  }
+  return `Saved search ${rows.length + 1}`;
+}
