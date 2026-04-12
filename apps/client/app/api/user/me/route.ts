@@ -21,7 +21,6 @@ export async function GET() {
       cache: "no-store",
     });
     if (!res.ok) {
-      // TODO: remove fallback when API is always reachable in dev/prod
       const fallback: UserMeResponse = {
         plan: "free",
         jobViewsToday: 0,

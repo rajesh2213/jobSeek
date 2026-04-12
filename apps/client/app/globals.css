@@ -24,6 +24,12 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 /* Hide Clerk onboarding / “Configure your application” promos.
    Do not use `iframe[src*="clerk"]` alone — it breaks SignIn/SignUp embeds. */
 [data-clerk-onboarding],
@@ -66,6 +72,97 @@ iframe[src*="clerk"][src*="onboarding"] {
       0 1px 4px rgba(0, 0, 0, 0.06),
       0 0 0 1px rgba(232, 83, 58, 0.12),
       0 0 36px rgba(232, 83, 58, 0.22);
+  }
+}
+
+/* Stats strip — diagonal sheen; visible on light pills + over text (blend in component) */
+@keyframes jobseek-stat-shimmer {
+  0% {
+    background-position: 200% 50%;
+  }
+  100% {
+    background-position: -120% 50%;
+  }
+}
+
+.jobseek-stat-shimmer {
+  background-image: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 32%,
+    rgba(232, 83, 58, 0.2) 42%,
+    rgba(255, 255, 255, 0.92) 50%,
+    rgba(232, 83, 58, 0.18) 58%,
+    transparent 68%,
+    transparent 100%
+  );
+  background-size: 260% 100%;
+  animation: jobseek-stat-shimmer 1.85s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jobseek-stat-shimmer {
+    animation: none;
+  }
+}
+
+/* Jobs hero — slow gradient blob drift + headline glint */
+@keyframes jobseek-hero-gradient-drift {
+  0%,
+  100% {
+    transform: translate(0%, 0%) scale(1);
+  }
+  33% {
+    transform: translate(1.5%, -2%) scale(1.04);
+  }
+  66% {
+    transform: translate(-1%, 1.5%) scale(1.02);
+  }
+}
+
+.jobseek-hero-gradient-blob {
+  animation: jobseek-hero-gradient-drift 20s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jobseek-hero-gradient-blob {
+    animation: none;
+  }
+}
+
+@keyframes jobseek-hero-headline-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+.jobseek-hero-headline-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    rgb(26 26 26 / 0.92) 0%,
+    rgb(26 26 26 / 0.92) 38%,
+    rgb(232 83 58 / 0.95) 50%,
+    rgb(26 26 26 / 0.92) 62%,
+    rgb(26 26 26 / 0.92) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: jobseek-hero-headline-shimmer 14s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jobseek-hero-headline-shimmer {
+    animation: none;
+    background: none;
+    color: inherit;
+    -webkit-background-clip: unset;
+    background-clip: unset;
   }
 }
 

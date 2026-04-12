@@ -19,7 +19,7 @@ export function SiteSideRail() {
   return (
     <nav
       id="sidebar-tabs"
-      className="fixed left-0 top-0 z-50 hidden h-screen flex-col justify-center gap-1.5 py-10 lg:flex"
+      className="fixed left-0 top-0 z-[65] hidden h-screen flex-col justify-center gap-1.5 py-10 lg:flex"
       aria-label="Sections"
     >
       <Link

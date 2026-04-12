@@ -417,12 +417,12 @@ function SocialProofSection() {
     {
       quote:
         "I kept missing assessment emails buried in threads. The tracking view isn't fancy, but it stopped me from missing deadlines.",
-      name: "Amelia J., Product Manager · 0 missed assessments this month",
+      name: "Amelia J., Product Manager",
     },
     {
       quote:
         "I used to jump across five tabs and still apply to duplicates. The deduped feed cut the noise and saved me time every week.",
-      name: "Noah P., Frontend Engineer · 16 unique roles/week",
+      name: "Noah P., Frontend Engineer",
     },
     {
       quote:

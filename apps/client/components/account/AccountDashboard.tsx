@@ -6,6 +6,21 @@ import { UserProfile, useClerk, useUser } from "@clerk/nextjs";
 import { createPortal } from "react-dom";
 import type { Appearance } from "@clerk/types";
 import type { UserMeResponse } from "../../lib/api";
+import { useResume } from "../../lib/resumeContext";
+import { ResumeUploadModal } from "../resume/ResumeUploadModal";
+
+function formatRelativeTime(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "";
+  const diff = Date.now() - t;
+  const day = 86_400_000;
+  if (diff < day) return "today";
+  if (diff < 2 * day) return "yesterday";
+  const days = Math.floor(diff / day);
+  if (days < 14) return `${days} days ago`;
+  const weeks = Math.floor(days / 7);
+  return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
+}
 
 const clerkAppearance = {
   variables: { colorPrimary: "#E8533A" },
@@ -34,6 +49,9 @@ const clerkAppearance = {
 export function AccountDashboard() {
   const { signOut } = useClerk();
   const { user, isLoaded } = useUser();
+  const { hasResume, fileName, wordCount, resumeUpdatedAt, deleteResume, refreshStatus } =
+    useResume();
+  const [resumeModalOpen, setResumeModalOpen] = useState(false);
   const [me, setMe] = useState<UserMeResponse | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
@@ -48,7 +66,7 @@ export function AccountDashboard() {
         const data = (await res.json()) as UserMeResponse;
         if (!cancelled) setMe(data);
       } catch {
-        /* TODO: surface error; until then plan stays null → free fallback in render */
+        /* Ignore fetch errors; plan stays null and render uses free-tier defaults. */
       }
     })();
     return () => {
@@ -56,7 +74,7 @@ export function AccountDashboard() {
     };
   }, []);
 
-  // TODO: derive solely from GET /api/user/me once API is guaranteed; until then default matches backend free tier
+  // Prefer plan from /api/user/me; default matches backend free tier when absent.
   const plan = me?.plan ?? "free";
   const isPro = plan === "pro";
   const limit = me?.jobViewsLimit ?? 10;
@@ -175,6 +193,54 @@ export function AccountDashboard() {
             Refreshes daily at midnight UTC
           </p>
         </div>
+
+        <hr className="my-6 border-ink/10" />
+
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-ink/45">
+            Resume
+          </p>
+          {!hasResume ? (
+            <>
+              <p className="mt-2 text-sm text-ink-muted">No resume uploaded</p>
+              <button
+                type="button"
+                onClick={() => setResumeModalOpen(true)}
+                className="mt-3 w-full rounded-xl border border-ink/15 bg-white px-3 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand/40 hover:text-brand"
+              >
+                📄 Upload resume →
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="mt-2 break-all text-sm font-semibold text-ink">📄 {fileName ?? "Resume"}</p>
+              <p className="mt-1 text-xs text-ink-muted">
+                {wordCount} words
+                {resumeUpdatedAt
+                  ? ` · Updated ${formatRelativeTime(resumeUpdatedAt)}`
+                  : null}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setResumeModalOpen(true)}
+                  className="rounded-lg border border-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-ink hover:border-brand/40 hover:text-brand"
+                >
+                  Replace
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void deleteResume().then(() => refreshStatus())}
+                  className="rounded-lg border border-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:border-red-300"
+                >
+                  Delete
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        <ResumeUploadModal open={resumeModalOpen} onClose={() => setResumeModalOpen(false)} />
 
         <hr className="my-6 border-ink/10" />
 
