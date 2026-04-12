@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import type { Redis } from "ioredis";
+import { resolveProPlan } from "../../utils/userPlan.js";
 
 export const FREE_DAILY_JOB_VIEWS = 10;
 
@@ -33,15 +34,10 @@ function anonRedisKey(ip: string): string {
 async function isProUser(
   prisma: PrismaClient,
   userId: string,
+  emailHint?: string | null,
 ): Promise<{ pro: boolean; plan: string }> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { subscription: true },
-  });
-  if (!user) return { pro: false, plan: "free" };
-  const subActive = user.subscription?.status === "active";
-  const pro = user.plan === "pro" || subActive;
-  return { pro, plan: user.plan };
+  const resolved = await resolveProPlan(prisma, userId, emailHint);
+  return { pro: resolved.pro, plan: resolved.plan };
 }
 
 /** Reset DB counter when `jobViewsResetAt` is before today's UTC midnight. */
@@ -69,13 +65,13 @@ export async function ensureUserJobViewsDayReset(
 export async function getJobViewCapState(
   prisma: PrismaClient,
   redis: Redis,
-  opts: { internalUserId?: string | null; ip?: string | null },
+  opts: { internalUserId?: string | null; ip?: string | null; userEmail?: string | null },
 ): Promise<{ unlimited: boolean; remaining: number; resetAt: Date }> {
   const resetAt = nextUtcMidnight();
 
   if (opts.internalUserId) {
     await ensureUserJobViewsDayReset(prisma, opts.internalUserId);
-    const { pro } = await isProUser(prisma, opts.internalUserId);
+    const { pro } = await isProUser(prisma, opts.internalUserId, opts.userEmail);
     if (pro) {
       return { unlimited: true, remaining: Number.MAX_SAFE_INTEGER, resetAt };
     }
@@ -103,7 +99,7 @@ export async function getJobViewCapState(
 export async function checkAndIncrementViewCap(
   prisma: PrismaClient,
   redis: Redis,
-  opts: { internalUserId?: string | null; ip?: string | null },
+  opts: { internalUserId?: string | null; ip?: string | null; userEmail?: string | null },
   delta: number,
 ): Promise<{ allowed: boolean; remaining: number; resetAt: Date; unlimited?: boolean }> {
   const resetAt = nextUtcMidnight();
@@ -119,7 +115,7 @@ export async function checkAndIncrementViewCap(
 
   if (opts.internalUserId) {
     await ensureUserJobViewsDayReset(prisma, opts.internalUserId);
-    const { pro } = await isProUser(prisma, opts.internalUserId);
+    const { pro } = await isProUser(prisma, opts.internalUserId, opts.userEmail);
     if (pro) {
       return { allowed: true, remaining: FREE_DAILY_JOB_VIEWS, resetAt, unlimited: true };
     }

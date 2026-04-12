@@ -72,6 +72,7 @@ export function registerJobRoutes(
       const capCtx = {
         internalUserId: clerk?.internalUserId ?? null,
         ip,
+        userEmail: clerk?.email ?? null,
       };
 
       if (bypassCap) {
