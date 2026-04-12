@@ -2,6 +2,7 @@ import type { Company } from "@prisma/client";
 import { CompanyStatus } from "@prisma/client";
 import type { CompanyRepository } from "./company.repository.js";
 import type { CreateCompanyInput } from "./company.repository.js";
+import type { CompaniesListingSort, CompanyListingRow } from "./companyListing.types.js";
 import type { JobRepository, JobDiscoveryFilters, JobWithCompany } from "../job/job.repository.js";
 import type { PaginatedResult } from "../../types/api.js";
 import { logger } from "../../utils/logger.js";
@@ -150,6 +151,52 @@ export class CompanyService {
       page: input.page,
       limit: input.limit,
       totalPages: Math.ceil(total / input.limit) || 1,
+    };
+  }
+
+  /**
+   * Public /companies listing: aggregates canonical job counts, sort, light filters, stats.
+   */
+  async listCompaniesDiscovery(input: {
+    q: string;
+    sort: CompaniesListingSort;
+    hiring: boolean;
+    remote: boolean;
+    page: number;
+    limit: number;
+  }): Promise<{
+    items: CompanyListingRow[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasMore: boolean;
+    stats: { totalTracked: number; hiringThisWeek: number };
+  }> {
+    const offset = (input.page - 1) * input.limit;
+    const filter = {
+      q: input.q,
+      sort: input.sort,
+      hiring: input.hiring,
+      remote: input.remote,
+      limit: input.limit,
+      offset,
+    };
+    const [items, total, stats] = await Promise.all([
+      this.companyRepository.listCompaniesDiscovery(filter),
+      this.companyRepository.countCompaniesListing(filter),
+      this.companyRepository.getCompaniesListingStats(),
+    ]);
+    const totalPages = Math.ceil(total / input.limit) || 1;
+    const hasMore = offset + items.length < total;
+    return {
+      items,
+      total,
+      page: input.page,
+      limit: input.limit,
+      totalPages,
+      hasMore,
+      stats,
     };
   }
 

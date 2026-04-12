@@ -8,6 +8,32 @@ import {
   getCompaniesQuerySchema,
   getCompanyJobsQuerySchema,
 } from "./company.schema.js";
+import type { CompaniesListingSort, CompanyListingRow } from "./companyListing.types.js";
+
+function parseCompaniesSort(raw: unknown): CompaniesListingSort {
+  const s = typeof raw === "string" ? raw : "jobs";
+  if (s === "recent" || s === "name") return s;
+  return "jobs";
+}
+
+function parseQueryBool(raw: unknown): boolean {
+  return raw === true || raw === "true" || raw === "1";
+}
+
+function toCompanyListingPublicJson(row: CompanyListingRow) {
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    domain: row.domain,
+    logoUrl: row.logoUrl,
+    careersUrl: row.careersUrl,
+    createdAt: row.createdAt.toISOString(),
+    lastCrawledAt: row.lastCrawledAt?.toISOString() ?? null,
+    jobCount: row.jobCount,
+    hasRemoteJobs: row.hasRemoteJobs,
+  };
+}
 
 interface CompanySlugParams {
   slug: string;
@@ -52,18 +78,28 @@ export function registerCompanyRoutes(
       const q = request.query as Record<string, unknown>;
       const { page, limit } = parsePageLimit(q, { defaultLimit: 20, maxLimit: 100 });
       const search = typeof q.q === "string" ? q.q : "";
+      const sort = parseCompaniesSort(q.sort);
+      const hiring = parseQueryBool(q.hiring);
+      const remote = parseQueryBool(q.remote);
 
-      const result = search.trim()
-        ? await companyService.searchCompanies({ query: search, page, limit })
-        : await companyService.getAllCompanies({ page, limit });
+      const result = await companyService.listCompaniesDiscovery({
+        q: search,
+        sort,
+        hiring,
+        remote,
+        page,
+        limit,
+      });
 
       return reply.send({
-        data: result.items,
+        data: result.items.map(toCompanyListingPublicJson),
         meta: {
           page: result.page,
           limit: result.limit,
           total: result.total,
           totalPages: result.totalPages,
+          hasMore: result.hasMore,
+          stats: result.stats,
         },
       });
     },

@@ -1,5 +1,10 @@
 import type { PrismaClient, Company } from "@prisma/client";
-import { CompanyStatus } from "@prisma/client";
+import { CompanyStatus, Prisma } from "@prisma/client";
+import type {
+  CompaniesListingInput,
+  CompaniesListingSort,
+  CompanyListingRow,
+} from "./companyListing.types.js";
 import { slugifyCompanyName } from "../../utils/slugify.js";
 import { getDomainFromUrl, normalizeDomain } from "../../utils/common.js";
 import type { JobWithCompany } from "../job/job.repository.js";
@@ -14,6 +19,36 @@ export interface CreateCompanyInput {
   /** Optional explicit slug base; otherwise derived from name. */
   slug?: string;
   discoverySource?: string;
+}
+
+function nameSearchCondition(q: string): Prisma.Sql {
+  const trimmed = q.trim();
+  if (!trimmed) return Prisma.empty;
+  return Prisma.sql`AND c.name ILIKE ${"%" + trimmed + "%"}`;
+}
+
+function listingHavingClause(hiring: boolean, remote: boolean): Prisma.Sql {
+  const parts: Prisma.Sql[] = [];
+  if (hiring) parts.push(Prisma.sql`COUNT(j.id) >= 1`);
+  if (remote) {
+    parts.push(
+      Prisma.sql`COALESCE(BOOL_OR(j."isRemote" OR j."workType" = 'remote'), false) = true`,
+    );
+  }
+  if (parts.length === 0) return Prisma.empty;
+  return Prisma.sql`HAVING ${Prisma.join(parts, " AND ")}`;
+}
+
+function listingOrderBy(sort: CompaniesListingSort): Prisma.Sql {
+  switch (sort) {
+    case "recent":
+      return Prisma.sql`sub."lastCrawledAt" DESC NULLS LAST, sub."updatedAt" DESC`;
+    case "name":
+      return Prisma.sql`sub.name ASC`;
+    case "jobs":
+    default:
+      return Prisma.sql`sub."jobCount" DESC, sub.name ASC`;
+  }
 }
 
 export function createCompanyRepository(prisma: PrismaClient) {
@@ -269,6 +304,79 @@ export function createCompanyRepository(prisma: PrismaClient) {
         where: { id: companyId },
         data,
       });
+    },
+
+    async countCompaniesListing(input: CompaniesListingInput): Promise<number> {
+      const nameCond = nameSearchCondition(input.q);
+      const havingSql = listingHavingClause(input.hiring, input.remote);
+      const rows = await prisma.$queryRaw<[{ count: bigint }]>`
+        SELECT COUNT(*)::bigint AS count
+        FROM (
+          SELECT c.id
+          FROM "Company" c
+          LEFT JOIN "Job" j ON j."companyId" = c.id AND j."canonicalJobId" IS NULL
+          WHERE 1 = 1
+          ${nameCond}
+          GROUP BY c.id
+          ${havingSql}
+        ) AS t
+      `;
+      return Number(rows[0]?.count ?? 0);
+    },
+
+    async listCompaniesDiscovery(input: CompaniesListingInput): Promise<CompanyListingRow[]> {
+      const nameCond = nameSearchCondition(input.q);
+      const havingSql = listingHavingClause(input.hiring, input.remote);
+      const orderSql = listingOrderBy(input.sort);
+      const limit = input.limit;
+      const offset = input.offset;
+      return prisma.$queryRaw<CompanyListingRow[]>`
+        SELECT * FROM (
+          SELECT
+            c.id,
+            c.name,
+            c.slug,
+            c.domain,
+            c."logoUrl",
+            c."careersUrl",
+            c."createdAt",
+            c."lastCrawledAt",
+            c."updatedAt",
+            COUNT(j.id)::int AS "jobCount",
+            COALESCE(BOOL_OR(j."isRemote" OR j."workType" = 'remote'), false) AS "hasRemoteJobs"
+          FROM "Company" c
+          LEFT JOIN "Job" j ON j."companyId" = c.id AND j."canonicalJobId" IS NULL
+          WHERE 1 = 1
+          ${nameCond}
+          GROUP BY c.id
+          ${havingSql}
+        ) AS sub
+        ORDER BY ${orderSql}
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `;
+    },
+
+    async getCompaniesListingStats(): Promise<{
+      totalTracked: number;
+      hiringThisWeek: number;
+    }> {
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const [totalTracked, distinctCompanies] = await Promise.all([
+        prisma.company.count(),
+        prisma.job.findMany({
+          where: {
+            canonicalJobId: null,
+            lastSeenAt: { gte: weekAgo },
+          },
+          distinct: ["companyId"],
+          select: { companyId: true },
+        }),
+      ]);
+      return {
+        totalTracked,
+        hiringThisWeek: distinctCompanies.length,
+      };
     },
   };
 }
