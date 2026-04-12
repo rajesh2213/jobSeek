@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
-import { motion, useScroll, useTransform } from "framer-motion";
 import {
   ApiRequestError,
   createSavedSearch,
@@ -27,7 +26,8 @@ import { SortSegmented } from "../ui/SortSegmented";
 import { FilterChips } from "../filters/FilterChips";
 import { JobsInlineFilters } from "./JobsInlineFilters";
 import { JobList } from "./JobList";
-import { DailyCapWall } from "./DailyCapWall";
+import { TimeAdvantageSimulator } from "./TimeAdvantageSimulator";
+import { LimitWallEnhanced } from "./LimitWallEnhanced";
 import { EmptyState } from "../ui/EmptyState";
 
 function listQueryBase(f: JobFilters): JobFilters {
@@ -44,16 +44,9 @@ interface Props {
 interface UiFiltersState {
   roles: string[];
   types: Array<"remote" | "onsite" | "hybrid">;
-  /** Region name, ISO code, or city text for `?location=`. */
-  location?: string;
+  /** Region names, ISO codes, or city strings for `?locations=`. */
+  locations: string[];
   skills: string[];
-}
-
-const HERO_LEAD = "Discover your next ";
-const HERO_ACCENT = "chapter.";
-
-function splitCharacters(text: string): string[] {
-  return Array.from(text);
 }
 
 function toTitleCaseSlug(slug: string): string {
@@ -64,25 +57,66 @@ function toTitleCaseSlug(slug: string): string {
     .join(" ");
 }
 
-function buildSavedSearchDetails(query: string): Array<{ label: string; value: string }> {
+function buildSavedSearchDetails(
+  query: string,
+): Array<{ label: string; value: string }> {
   const [, raw = ""] = query.split("?");
-  const filters = parseJobFiltersFromSearch(Object.fromEntries(new URLSearchParams(raw).entries()));
+  const filters = parseJobFiltersFromSearch(
+    Object.fromEntries(new URLSearchParams(raw).entries()),
+  );
   const details: Array<{ label: string; value: string }> = [];
-  const role = filters.roles?.length ? filters.roles : filters.role ? [filters.role] : [];
-  if (role.length > 0) details.push({ label: "Role", value: role.map(toTitleCaseSlug).join(", ") });
-  if (filters.category) details.push({ label: "Category", value: toTitleCaseSlug(filters.category) });
-  const work = filters.workTypes?.length ? filters.workTypes : filters.workType ? [filters.workType] : [];
-  if (work.length > 0) details.push({ label: "Work type", value: work.map(toTitleCaseSlug).join(", ") });
+  const role = filters.roles?.length
+    ? filters.roles
+    : filters.role
+      ? [filters.role]
+      : [];
+  if (role.length > 0)
+    details.push({
+      label: "Role",
+      value: role.map(toTitleCaseSlug).join(", "),
+    });
+  if (filters.category)
+    details.push({
+      label: "Category",
+      value: toTitleCaseSlug(filters.category),
+    });
+  const work = filters.workTypes?.length
+    ? filters.workTypes
+    : filters.workType
+      ? [filters.workType]
+      : [];
+  if (work.length > 0)
+    details.push({
+      label: "Work type",
+      value: work.map(toTitleCaseSlug).join(", "),
+    });
   if (filters.skills?.length) {
-    details.push({ label: "Skills", value: filters.skills.map(toTitleCaseSlug).join(", ") });
+    details.push({
+      label: "Skills",
+      value: filters.skills.map(toTitleCaseSlug).join(", "),
+    });
   }
-  if (filters.experience) details.push({ label: "Level", value: toTitleCaseSlug(filters.experience) });
+  if (filters.experience)
+    details.push({
+      label: "Level",
+      value: toTitleCaseSlug(filters.experience),
+    });
   if (filters.posted) {
-    const postedMap: Record<string, string> = { "24h": "Last 24h", "3d": "Last 3d", "1w": "Last week", "1m": "Last month" };
-    details.push({ label: "Posted", value: postedMap[filters.posted] ?? filters.posted });
+    const postedMap: Record<string, string> = {
+      "24h": "Last 24h",
+      "3d": "Last 3d",
+      "1w": "Last week",
+      "1m": "Last month",
+    };
+    details.push({
+      label: "Posted",
+      value: postedMap[filters.posted] ?? filters.posted,
+    });
   }
-  const location = filters.location ?? filters.locations?.join(", ") ?? filters.country;
-  if (location) details.push({ label: "Location", value: toTitleCaseSlug(location) });
+  const location =
+    filters.location ?? filters.locations?.join(", ") ?? filters.country;
+  if (location)
+    details.push({ label: "Location", value: toTitleCaseSlug(location) });
   return details;
 }
 
@@ -112,15 +146,15 @@ function normalizeQueryForMatch(query: string): string {
   return qs ? `${path}?${qs}` : path;
 }
 
-export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Props) {
+export function JobsSearchClient({
+  jobs,
+  meta: initialMeta,
+  relatedSlugs,
+}: Props) {
   const { getToken, isSignedIn } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlKey = searchParams.toString();
-  const { scrollY } = useScroll();
-  const heroOpacity = useTransform(scrollY, [0, 220], [1, 0]);
-  const heroY = useTransform(scrollY, [0, 220], [0, -40]);
-
   const urlFilters = useMemo(
     () => parseJobFiltersFromSearch(Object.fromEntries(searchParams.entries())),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync when URL string changes
@@ -130,11 +164,16 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
   const [draft, setDraft] = useState<JobFilters>(urlFilters);
   const [uiFilters, setUiFilters] = useState<UiFiltersState>(() => ({
     roles: urlFilters.roles ?? (urlFilters.role ? [urlFilters.role] : []),
-    types: urlFilters.workTypes ?? (urlFilters.workType ? [urlFilters.workType] : []),
-    location:
-      urlFilters.location ??
-      (urlFilters.locations?.length === 1 ? urlFilters.locations[0] : undefined) ??
-      urlFilters.country,
+    types:
+      urlFilters.workTypes ??
+      (urlFilters.workType ? [urlFilters.workType] : []),
+    locations: urlFilters.locations?.length
+      ? urlFilters.locations
+      : urlFilters.location
+        ? [urlFilters.location]
+        : urlFilters.country
+          ? [urlFilters.country]
+          : [],
     skills: urlFilters.skills ?? [],
   }));
   const [listJobs, setListJobs] = useState<JobItem[]>(jobs);
@@ -146,7 +185,9 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
   const [editingSavedId, setEditingSavedId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [renamingSavedId, setRenamingSavedId] = useState<string | null>(null);
-  const [savedSearchNotice, setSavedSearchNotice] = useState<string | null>(null);
+  const [savedSearchNotice, setSavedSearchNotice] = useState<string | null>(
+    null,
+  );
   const [hoveredSavedId, setHoveredSavedId] = useState<string | null>(null);
   const hoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -154,11 +195,16 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
     setDraft(urlFilters);
     setUiFilters({
       roles: urlFilters.roles ?? (urlFilters.role ? [urlFilters.role] : []),
-      types: urlFilters.workTypes ?? (urlFilters.workType ? [urlFilters.workType] : []),
-      location:
-        urlFilters.location ??
-        (urlFilters.locations?.length === 1 ? urlFilters.locations[0] : undefined) ??
-        urlFilters.country,
+      types:
+        urlFilters.workTypes ??
+        (urlFilters.workType ? [urlFilters.workType] : []),
+      locations: urlFilters.locations?.length
+        ? urlFilters.locations
+        : urlFilters.location
+          ? [urlFilters.location]
+          : urlFilters.country
+            ? [urlFilters.country]
+            : [],
       skills: urlFilters.skills ?? [],
     });
   }, [urlFilters]);
@@ -218,8 +264,8 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
       roles: uiFilters.roles.length ? uiFilters.roles : undefined,
       skills: uiFilters.skills.length ? uiFilters.skills : undefined,
       country: undefined,
-      locations: undefined,
-      location: uiFilters.location?.trim() || undefined,
+      locations: uiFilters.locations.length ? uiFilters.locations : undefined,
+      location: undefined,
       workType: undefined,
       workTypes: uiFilters.types.length ? uiFilters.types : undefined,
       page: undefined,
@@ -249,20 +295,29 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
       };
 
       if (payload.type === "location") {
-        updated.location = undefined;
+        updated.locations = [];
         nextFilters.location = undefined;
         nextFilters.locations = undefined;
         nextFilters.country = undefined;
       } else if (payload.type === "country" && payload.value) {
-        const nextLocs = (urlFilters.locations ?? []).filter((v) => v !== payload.value);
+        const baseLocs = urlFilters.locations?.length
+          ? urlFilters.locations
+          : urlFilters.location
+            ? [urlFilters.location]
+            : urlFilters.country
+              ? [urlFilters.country]
+              : [];
+        const nextLocs = baseLocs.filter((v) => v !== payload.value);
         nextFilters.locations = nextLocs.length ? nextLocs : undefined;
+        nextFilters.location = undefined;
         nextFilters.country = undefined;
-        nextFilters.location = nextLocs.length === 1 ? nextLocs[0] : undefined;
-        updated.location = nextLocs.length === 1 ? nextLocs[0] : undefined;
+        updated.locations = nextLocs;
       } else if (payload.type === "workType" && payload.value) {
         updated.types = uiFilters.types.filter((v) => v !== payload.value);
         nextFilters.workType = undefined;
-        nextFilters.workTypes = updated.types.length ? updated.types : undefined;
+        nextFilters.workTypes = updated.types.length
+          ? updated.types
+          : undefined;
       } else if (payload.type === "role" && payload.value) {
         updated.roles = uiFilters.roles.filter((v) => v !== payload.value);
         nextFilters.role = updated.roles[0];
@@ -273,7 +328,9 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
       } else if (payload.type === "isRemote") {
         updated.types = uiFilters.types.filter((v) => v !== "remote");
         nextFilters.workType = undefined;
-        nextFilters.workTypes = updated.types.length ? updated.types : undefined;
+        nextFilters.workTypes = updated.types.length
+          ? updated.types
+          : undefined;
         nextFilters.isRemote = undefined;
       } else if (payload.type === "experience") {
         nextFilters.experience = undefined;
@@ -289,14 +346,10 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
         nextFilters.category = undefined;
       }
 
-      // Keep URL aligned with central multi-select state.
       nextFilters.role = updated.roles[0];
       nextFilters.roles = updated.roles.length ? updated.roles : undefined;
       nextFilters.workType = undefined;
       nextFilters.workTypes = updated.types.length ? updated.types : undefined;
-      nextFilters.country = undefined;
-      nextFilters.locations = undefined;
-      nextFilters.location = updated.location?.trim() || undefined;
       nextFilters.skills = updated.skills.length ? updated.skills : undefined;
 
       setUiFilters(updated);
@@ -351,7 +404,11 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
 
   const savedMatch = useMemo(() => {
     const current = normalizeQueryForMatch(canonicalQuery);
-    return savedSearches.find((item) => normalizeQueryForMatch(item.query) === current) ?? null;
+    return (
+      savedSearches.find(
+        (item) => normalizeQueryForMatch(item.query) === current,
+      ) ?? null
+    );
   }, [savedSearches, canonicalQuery]);
 
   const canSaveAnother = savedSearches.length < 3;
@@ -384,12 +441,20 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
         return;
       }
       const autoName = getNextSavedSearchName(savedSearches);
-      const created = await createSavedSearch(token, { query: canonicalQuery, name: autoName });
+      const created = await createSavedSearch(token, {
+        query: canonicalQuery,
+        name: autoName,
+      });
       setSavedSearches((prev) =>
-        prev.some((item) => item.query === created.query) ? prev : [created, ...prev],
+        prev.some((item) => item.query === created.query)
+          ? prev
+          : [created, ...prev],
       );
     } catch (err) {
-      if (err instanceof ApiRequestError && err.code === "SAVED_SEARCH_LIMIT_REACHED") {
+      if (
+        err instanceof ApiRequestError &&
+        err.code === "SAVED_SEARCH_LIMIT_REACHED"
+      ) {
         // No toast needed; button/inline max state already reflects this.
       } else {
         setSavedSearchNotice("Could not save search");
@@ -397,7 +462,16 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
     } finally {
       setSavingSearch(false);
     }
-  }, [canSaveAnother, canSaveCurrentQuery, canonicalQuery, getToken, isSignedIn, router, savedMatch, savedSearches]);
+  }, [
+    canSaveAnother,
+    canSaveCurrentQuery,
+    canonicalQuery,
+    getToken,
+    isSignedIn,
+    router,
+    savedMatch,
+    savedSearches,
+  ]);
 
   const onDeleteSavedSearch = useCallback(
     async (id: string) => {
@@ -433,11 +507,15 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
       const prev = savedSearches;
       setRenamingSavedId(id);
       setSavedSearches((rows) =>
-        rows.map((row) => (row.id === id ? { ...row, name: nextName || null } : row)),
+        rows.map((row) =>
+          row.id === id ? { ...row, name: nextName || null } : row,
+        ),
       );
       try {
         const updated = await renameSavedSearch(token, id, nextName || null);
-        setSavedSearches((rows) => rows.map((row) => (row.id === id ? updated : row)));
+        setSavedSearches((rows) =>
+          rows.map((row) => (row.id === id ? updated : row)),
+        );
         setEditingSavedId(null);
         setEditingName("");
       } catch {
@@ -451,50 +529,19 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
   );
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <Container width="jobs" className="mb-10 mt-2">
-        <motion.header id="section-hero" className="text-center" style={{ opacity: heroOpacity, y: heroY }}>
-          <h1 className="mx-auto max-w-full whitespace-nowrap font-sans text-[clamp(1.85rem,4.8vw,3.35rem)] font-semibold leading-[1.15] tracking-tight text-ink">
-            <span className="font-bold text-ink">
-              {splitCharacters(HERO_LEAD).map((char, index) => (
-                <motion.span
-                  key={`hero-lead-${index}-${char}`}
-                  className="inline-block"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.015 }}
-                >
-                  {char === " " ? "\u00A0" : char}
-                </motion.span>
-              ))}
-            </span>
-            <span className="font-display italic text-transparent">
-              <span className="bg-gradient-to-r from-teal via-rose to-brand bg-clip-text">
-                {splitCharacters(HERO_ACCENT).map((char, index) => (
-                  <motion.span
-                    key={`hero-accent-${index}-${char}`}
-                    className="inline-block"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: 0.2 + index * 0.02 }}
-                  >
-                    {char === " " ? "\u00A0" : char}
-                  </motion.span>
-                ))}
-              </span>
-            </span>
-          </h1>
-          <p className="mx-auto mt-5 max-w-xl text-center text-base leading-relaxed text-ink/50 sm:text-lg">
-            Aggregated from real career pages. Deduplicated. No spam.
-          </p>
-        </motion.header>
-      </Container>
+    <div className="relative z-0 flex min-h-screen flex-col">
+      <div className="-mb-6 w-full sm:-mb-8">
+        <TimeAdvantageSimulator totalListings={listMeta?.total} />
+      </div>
 
       <div
         id="section-filters"
-        className="sticky top-12 z-[90] bg-canvas/95 py-3 backdrop-blur-sm sm:py-4"
+        className="sticky top-12 z-[50] bg-canvas/95 py-3 backdrop-blur-sm sm:py-4"
       >
-        <Container width="jobs" className="rounded-none bg-canvas pb-1 pt-1 shadow-sm">
+        <Container
+          width="jobs"
+          className="rounded-none bg-canvas pb-1 pt-1 shadow-sm"
+        >
           <JobsInlineFilters
             draft={draft}
             appliedFilters={urlFilters}
@@ -523,16 +570,27 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
                 variant={savedMatch ? "primary" : "outline"}
                 size="sm"
                 onClick={() => void onSaveSearch()}
-                disabled={savingSearch || savedMatch != null || !canSaveCurrentQuery}
-                title={!canSaveAnother ? "Only 3 saved searches allowed" : undefined}
+                disabled={
+                  savingSearch || savedMatch != null || !canSaveCurrentQuery
+                }
+                title={
+                  !canSaveAnother ? "Only 3 saved searches allowed" : undefined
+                }
               >
-                {savedMatch ? "Saved ✓" : savingSearch ? "Saving…" : "Save search"}
+                {savedMatch
+                  ? "Saved ✓"
+                  : savingSearch
+                    ? "Saving…"
+                    : "Save search"}
               </Button>
               {savedSearches.map((saved) => {
                 const details = buildSavedSearchDetails(saved.query);
-                const isActiveSaved = normalizeQueryForMatch(saved.query) === normalizeQueryForMatch(canonicalQuery);
+                const isActiveSaved =
+                  normalizeQueryForMatch(saved.query) ===
+                  normalizeQueryForMatch(canonicalQuery);
                 const displayName = saved.name?.trim() || "Saved search";
-                const isPopoverOpen = hoveredSavedId === saved.id || editingSavedId === saved.id;
+                const isPopoverOpen =
+                  hoveredSavedId === saved.id || editingSavedId === saved.id;
                 return (
                   <div
                     key={saved.id}
@@ -549,7 +607,9 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
                         clearTimeout(hoverCloseTimerRef.current);
                       }
                       hoverCloseTimerRef.current = setTimeout(() => {
-                        setHoveredSavedId((prev) => (prev === saved.id ? null : prev));
+                        setHoveredSavedId((prev) =>
+                          prev === saved.id ? null : prev,
+                        );
                       }, 180);
                     }}
                   >
@@ -574,7 +634,9 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <p className="line-clamp-1 font-semibold text-white/95">{displayName}</p>
+                        <p className="line-clamp-1 font-semibold text-white/95">
+                          {displayName}
+                        </p>
                         <div className="flex items-center gap-1">
                           <button
                             type="button"
@@ -631,8 +693,14 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
                       {details.length > 0 ? (
                         <div className="mt-2 max-h-40 space-y-1 overflow-y-auto pr-1">
                           {details.map((row) => (
-                            <p key={`${saved.id}-${row.label}`} className="text-white/85">
-                              <span className="font-semibold text-white">{row.label}:</span> {row.value}
+                            <p
+                              key={`${saved.id}-${row.label}`}
+                              className="text-white/85"
+                            >
+                              <span className="font-semibold text-white">
+                                {row.label}:
+                              </span>{" "}
+                              {row.value}
                             </p>
                           ))}
                         </div>
@@ -655,14 +723,17 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
                   Cancel rename
                 </button>
               ) : null}
-              <Link href="/saved-searches" className="text-sm font-medium text-brand hover:underline">
-                View saved searches
-              </Link>
             </div>
             <div className="min-w-[220px]">
               <SortSegmented
-                value={urlFilters.sort === "salary_desc" ? "salary_desc" : "latest"}
-                onChange={(v) => onSortNavigate(v === "salary_desc" ? "salary_desc" : undefined)}
+                value={
+                  urlFilters.sort === "salary_desc" ? "salary_desc" : "latest"
+                }
+                onChange={(v) =>
+                  onSortNavigate(
+                    v === "salary_desc" ? "salary_desc" : undefined,
+                  )
+                }
                 totalRoles={listMeta?.total}
               />
             </div>
@@ -697,9 +768,12 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
                   })
                 }
                 onClearCountry={
-                  uiFilters.location || urlFilters.location || (urlFilters.locations?.length ?? 0) > 0
+                  uiFilters.locations.length > 0 ||
+                  urlFilters.location ||
+                  (urlFilters.locations?.length ?? 0) > 0 ||
+                  urlFilters.country
                     ? () => {
-                        setUiFilters((prev) => ({ ...prev, location: undefined }));
+                        setUiFilters((prev) => ({ ...prev, locations: [] }));
                         navigate({
                           ...urlFilters,
                           country: undefined,
@@ -716,12 +790,14 @@ export function JobsSearchClient({ jobs, meta: initialMeta, relatedSlugs }: Prop
           }
           const capResetAt = listMeta?.resetAt;
           const jobsForList =
-            showCapWall && listJobs.length > 0 ? listJobs.slice(0, 10) : listJobs;
+            showCapWall && listJobs.length > 0
+              ? listJobs.slice(0, 10)
+              : listJobs;
           return (
             <>
               {listJobs.length > 0 ? <JobList jobs={jobsForList} /> : null}
               {showCapWall && capResetAt ? (
-                <DailyCapWall
+                <LimitWallEnhanced
                   resetAt={capResetAt}
                   count={Math.max(0, listMeta?.totalHidden ?? 0)}
                   previewJobs={listJobs}

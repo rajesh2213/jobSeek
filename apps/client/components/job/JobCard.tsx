@@ -1,6 +1,8 @@
 "use client";
 
+import { motion, useInView, useReducedMotion } from "framer-motion";
 import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { JobItem } from "../../lib/api";
 import { accentFromId } from "../../lib/accent";
 import { formatSalaryUsd, formatTimeAgo } from "../../lib/format";
@@ -11,6 +13,36 @@ import { Badge } from "../ui/Badge";
 import { Button, buttonClassName } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { WorkTypeOutlinePill } from "./WorkTypeOutlinePill";
+import { ResumeScorePill } from "../resume/ResumeScorePill";
+
+/** Roles first seen or posted within this window show the NEW badge. */
+const NEW_JOB_MAX_MS = 10 * 60 * 60 * 1000;
+/** Stronger “Just posted” pulse for very fresh listings. */
+const JUST_POSTED_MAX_MS = 90 * 60 * 1000;
+
+function isJustPosted(job: JobItem): boolean {
+  const raw = job.postedAt?.trim() || job.createdAt;
+  if (!raw || raw === "null") return false;
+  const t = new Date(raw).getTime();
+  if (Number.isNaN(t)) return false;
+  return Date.now() - t < JUST_POSTED_MAX_MS;
+}
+
+function isNewJob(job: JobItem): boolean {
+  const hasPosted =
+    job.postedAt != null && String(job.postedAt).trim() !== "" && job.postedAt !== "null";
+  const iso = hasPosted ? job.postedAt : job.createdAt;
+  if (!iso) return false;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return false;
+  return Date.now() - t < NEW_JOB_MAX_MS;
+}
+
+function postedMetaLine(job: JobItem): string {
+  const raw = formatTimeAgo(job.postedAt, job.createdAt).replace(/\*$/, "");
+  if (raw === "Recently posted") return raw;
+  return `Posted ${raw}`;
+}
 
 interface Props {
   job: JobItem;
@@ -19,11 +51,27 @@ interface Props {
 }
 
 export function JobCard({ job, compact }: Props) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inView = useInView(rootRef, { amount: 0.2, margin: "0px" });
+  const reduceMotion = useReducedMotion();
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!inView) return;
+    const id = window.setInterval(() => setTick((n) => n + 1), 60_000);
+    return () => window.clearInterval(id);
+  }, [inView]);
+
+  const postedLabel = useMemo(
+    () => postedMetaLine(job),
+    [job.postedAt, job.createdAt, tick],
+  );
+  const showNew = isNewJob(job);
+  const justPosted = isJustPosted(job);
+  const showNewBadge = showNew && !justPosted;
   const accent = accentFromId(job.id);
   const skillPool = filterSkillPillsForDisplay(job.skills);
   const tags = skillPool.slice(0, 4);
   const skillMore = skillPool.length - tags.length;
-  const posted = formatTimeAgo(job.postedAt, job.createdAt);
   const applyHref = job.applyUrl?.trim() || job.sourceUrl;
   const descFallback =
     job.description?.trim() ||
@@ -45,12 +93,53 @@ export function JobCard({ job, compact }: Props) {
           ? "group-hover:text-amber"
           : "group-hover:text-brand";
 
+  const cardHoverClass = cn(
+    "will-change-transform",
+    "hover:shadow-[0_14px_44px_-12px_rgba(0,0,0,0.14)]",
+  );
+
+  const justPostedBadge = justPosted ? (
+    <motion.span
+      className="rounded-full bg-emerald-500/14 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-900 ring-1 ring-emerald-500/25 dark:text-emerald-100"
+      animate={
+        inView && !reduceMotion ? { opacity: [0.75, 1, 0.75], scale: [1, 1.05, 1] } : { opacity: 1 }
+      }
+      transition={inView && !reduceMotion ? { duration: 2.4, repeat: Infinity, ease: "easeInOut" } : {}}
+    >
+      Just posted
+    </motion.span>
+  ) : null;
+
+  const newBadge = showNewBadge ? (
+    <motion.span
+      className="rounded-full bg-brand px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white shadow-md ring-2 ring-brand/90 ring-offset-2 ring-offset-surface"
+      animate={
+        inView && !reduceMotion ? { opacity: [0.72, 1, 0.72] } : { opacity: 1 }
+      }
+      transition={
+        inView && !reduceMotion
+          ? { duration: 2, repeat: Infinity, ease: "easeInOut" }
+          : { duration: 0.15 }
+      }
+    >
+      NEW
+    </motion.span>
+  ) : null;
+
   if (compact) {
     return (
+      <motion.div
+        ref={rootRef}
+        className="h-full"
+        whileHover={reduceMotion ? undefined : { scale: 1.015 }}
+        transition={{ type: "spring", stiffness: 420, damping: 32 }}
+        style={{ transformOrigin: "50% 50%" }}
+      >
       <Card
         accent={accent}
         className={cn(
-          "h-full !p-4 transition-shadow duration-200 hover:shadow-md",
+          "h-full !p-4 transition-all duration-300",
+          cardHoverClass,
         )}
       >
         <div className="flex h-full min-h-0 flex-col justify-between gap-3">
@@ -102,8 +191,10 @@ export function JobCard({ job, compact }: Props) {
               <div className="min-w-0 flex-1">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-ink/30">
-                    {posted}
+                    {postedLabel}
                   </span>
+                  {justPostedBadge}
+                  {showNewBadge ? newBadge : null}
                 </div>
                 <Link
                   href={`/job/${job.id}`}
@@ -122,11 +213,11 @@ export function JobCard({ job, compact }: Props) {
                     {job.company.name}
                   </Link>
                 </p>
-                <p className="mt-2 text-[13px] leading-snug text-black/50">
-                  📍 {jobCardPinLocationText(job)}
-                </p>
-                <div className="mt-2">
-                  <WorkTypeOutlinePill job={job} />
+                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-snug">
+                  <span className="min-w-0 text-black/50">
+                    📍 {jobCardPinLocationText(job)}
+                  </span>
+                  <WorkTypeOutlinePill job={job} className="shrink-0" />
                 </div>
                 {tags.length > 0 ? (
                   <ul className="mt-2 flex flex-wrap items-center gap-1" aria-label="Skills">
@@ -170,31 +261,45 @@ export function JobCard({ job, compact }: Props) {
           </div>
         </div>
       </Card>
+      </motion.div>
     );
   }
 
   return (
-    <Card accent={accent} className="h-full">
+    <motion.div
+      ref={rootRef}
+      className="h-full"
+      whileHover={reduceMotion ? undefined : { scale: 1.015 }}
+      transition={{ type: "spring", stiffness: 420, damping: 32 }}
+      style={{ transformOrigin: "50% 50%" }}
+    >
+    <Card accent={accent} className={cn("h-full", cardHoverClass)}>
       <div className="relative z-0 flex items-start gap-5">
-        <div className="absolute right-6 top-6 z-10 flex flex-wrap items-center gap-3">
-          <Button
-            variant="outline"
-            outlineTone={accent}
-            size="sm"
-            href={applyHref}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Apply ↗
-          </Button>
-          <Link
-            href={`/job/${job.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={buttonClassName({ variant: "primary", size: "sm" })}
-          >
-            View role
-          </Link>
+        <div className="absolute right-6 top-6 z-10 flex max-w-[min(100%,calc(100%-1rem))] min-w-0 flex-col gap-2">
+          <div className="flex flex-nowrap justify-end gap-2">
+            <Button
+              variant="outline"
+              outlineTone={accent}
+              size="sm"
+              href={applyHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0"
+            >
+              Apply ↗
+            </Button>
+            <Link
+              href={`/job/${job.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(buttonClassName({ variant: "primary", size: "sm" }), "shrink-0")}
+            >
+              View role →
+            </Link>
+          </div>
+          <div className="w-full min-w-0">
+            <ResumeScorePill job={job} />
+          </div>
         </div>
         {logo ? (
           <div className="relative h-12 w-12 shrink-0">
@@ -243,9 +348,13 @@ export function JobCard({ job, compact }: Props) {
             {initial}
           </div>
         )}
-        <div className="min-w-0 flex-1 pr-44 sm:pr-48">
-          <div className="mb-1.5 flex flex-wrap items-center gap-3">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-ink/30">{posted}</span>
+        <div className="relative min-w-0 flex-1 pr-[13.5rem] sm:pr-56">
+          <div className="mb-1.5 flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-ink/30">
+              {postedLabel}
+            </span>
+            {justPostedBadge}
+            {showNewBadge ? newBadge : null}
           </div>
 
           <h3 className="mb-2 text-lg font-extrabold leading-snug tracking-tight text-ink">
@@ -267,9 +376,11 @@ export function JobCard({ job, compact }: Props) {
               {job.company.name}
             </Link>
           </p>
-          <p className="mb-2 text-[13px] leading-snug text-black/50">📍 {jobCardPinLocationText(job)}</p>
-          <div className="mb-4">
-            <WorkTypeOutlinePill job={job} />
+          <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-snug">
+            <span className="min-w-0 text-black/50">
+              📍 {jobCardPinLocationText(job)}
+            </span>
+            <WorkTypeOutlinePill job={job} className="shrink-0" />
           </div>
 
           {hasSalary && (
@@ -298,7 +409,7 @@ export function JobCard({ job, compact }: Props) {
           ) : null}
 
           <p
-            className="mb-5 line-clamp-2 whitespace-pre-line text-[13px] leading-[1.5] text-black/45"
+            className="mb-3 line-clamp-2 whitespace-pre-line text-[13px] leading-[1.5] text-black/45"
             aria-label="Role preview"
           >
             {previewLines
@@ -306,9 +417,9 @@ export function JobCard({ job, compact }: Props) {
               .map((line) => (previewFromResponsibility ? `↳ ${line}` : line))
               .join("\n")}
           </p>
-
         </div>
       </div>
     </Card>
+    </motion.div>
   );
 }

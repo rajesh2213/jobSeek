@@ -71,6 +71,12 @@ function locationFilterTriggerLabel(location: string): string {
   return t;
 }
 
+function locationsTriggerLabel(locs: string[]): string {
+  if (locs.length === 0) return "Locations";
+  if (locs.length === 1) return locationFilterTriggerLabel(locs[0]!);
+  return `${locs.length} locations`;
+}
+
 /** Pinned category shortcuts inside the Role dropdown (?category=…). Order matches product spec. */
 const BROWSE_BY_CATEGORY = [
   { slug: "engineering", label: "Engineering" },
@@ -92,7 +98,8 @@ const BROWSE_BY_CATEGORY = [
 interface UiFiltersState {
   roles: string[];
   types: Array<"remote" | "onsite" | "hybrid">;
-  location?: string;
+  /** Region names, ISO codes, or city strings — sent as `?locations=`. */
+  locations: string[];
   skills: string[];
 }
 
@@ -306,24 +313,30 @@ export function JobsInlineFilters({
   }, [openMenu, locCatalog, locCatalogLoading]);
 
   useEffect(() => {
-    const L = uiFilters.location?.trim();
-    if (!L) {
+    if (!locCatalog?.regions.length) {
+      if (uiFilters.locations.length === 0) setLocRegionTab("all");
+      return;
+    }
+    if (uiFilters.locations.length === 0) {
       setLocRegionTab("all");
       return;
     }
-    if (!locCatalog?.regions.length) return;
-    const regionHit = locCatalog.regions.find((r) => r.toLowerCase() === L.toLowerCase());
-    if (regionHit) {
-      setLocRegionTab(regionHit);
-      return;
-    }
-    const countryHit = locCatalog.countries.find((c) => c.code.toLowerCase() === L.toLowerCase());
-    if (countryHit) {
-      setLocRegionTab(countryHit.region);
-      return;
+    for (let i = uiFilters.locations.length - 1; i >= 0; i -= 1) {
+      const L = uiFilters.locations[i]!.trim();
+      if (!L) continue;
+      const regionHit = locCatalog.regions.find((r) => r.toLowerCase() === L.toLowerCase());
+      if (regionHit) {
+        setLocRegionTab(regionHit);
+        return;
+      }
+      const countryHit = locCatalog.countries.find((c) => c.code.toLowerCase() === L.toLowerCase());
+      if (countryHit) {
+        setLocRegionTab(countryHit.region);
+        return;
+      }
     }
     setLocRegionTab("all");
-  }, [uiFilters.location, locCatalog]);
+  }, [uiFilters.locations, locCatalog]);
 
   useEffect(() => {
     setDraft((d) => ({
@@ -331,8 +344,8 @@ export function JobsInlineFilters({
       role: uiFilters.roles[0],
       roles: uiFilters.roles.length ? uiFilters.roles : undefined,
       country: undefined,
-      locations: undefined,
-      location: uiFilters.location?.trim() || undefined,
+      locations: uiFilters.locations.length ? uiFilters.locations : undefined,
+      location: undefined,
       workType: undefined,
       workTypes: uiFilters.types.length ? uiFilters.types : undefined,
       isRemote: uiFilters.types.includes("remote") ? true : undefined,
@@ -351,13 +364,25 @@ export function JobsInlineFilters({
     });
   }
 
-  function setLocationFilter(next: string) {
+  function toggleLocationToken(next: string) {
     const v = next.trim();
     if (!v) return;
-    setUiFilters((prev) => ({ ...prev, location: v }));
+    setUiFilters((prev) => {
+      const k = v.toLowerCase();
+      const idx = prev.locations.findIndex((x) => x.toLowerCase() === k);
+      if (idx >= 0) {
+        return { ...prev, locations: prev.locations.filter((_, i) => i !== idx) };
+      }
+      return { ...prev, locations: [...prev.locations, v] };
+    });
     setCityQuery("");
     setCitySuggestDismissed(true);
     setCityHighlightIndex(-1);
+  }
+
+  function isLocationTokenSelected(token: string): boolean {
+    const k = token.trim().toLowerCase();
+    return uiFilters.locations.some((x) => x.toLowerCase() === k);
   }
 
   function toggleRole(next: string) {
@@ -386,8 +411,8 @@ export function JobsInlineFilters({
     }));
   }
 
-  function clearLocation() {
-    setUiFilters((prev) => ({ ...prev, location: undefined }));
+  function clearLocations() {
+    setUiFilters((prev) => ({ ...prev, locations: [] }));
     setLocRegionTab("all");
   }
 
@@ -729,9 +754,7 @@ export function JobsInlineFilters({
             onClick={() => setOpenMenu((v) => (v === "locations" ? null : "locations"))}
           >
             <span className="block truncate whitespace-nowrap">
-              {uiFilters.location?.trim()
-                ? locationFilterTriggerLabel(uiFilters.location)
-                : "Locations"}
+              {locationsTriggerLabel(uiFilters.locations)}
             </span>
           </button>
           <AnimatePresence>
@@ -751,7 +774,7 @@ export function JobsInlineFilters({
                   className={`rounded-full px-2.5 py-1 text-xs font-semibold ${locRegionTab === "all" ? "bg-orange-500 text-white" : "bg-ink/5 text-ink/70 hover:bg-ink/10"}`}
                   onClick={() => {
                     setLocRegionTab("all");
-                    clearLocation();
+                    clearLocations();
                   }}
                 >
                   All
@@ -760,10 +783,12 @@ export function JobsInlineFilters({
                   <button
                     key={r}
                     type="button"
-                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${locRegionTab === r ? "bg-orange-500 text-white" : "bg-ink/5 text-ink/70 hover:bg-ink/10"}`}
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      isLocationTokenSelected(r) ? "bg-orange-500 text-white" : "bg-ink/5 text-ink/70 hover:bg-ink/10"
+                    }`}
                     onClick={() => {
                       setLocRegionTab(r);
-                      setUiFilters((prev) => ({ ...prev, location: r }));
+                      toggleLocationToken(r);
                     }}
                   >
                     {regionFilterChipLabel(r)}
@@ -783,7 +808,7 @@ export function JobsInlineFilters({
                           <button
                             type="button"
                             className="h-9 w-full rounded-lg px-2 text-left text-sm hover:bg-brand/5"
-                            onClick={() => setLocationFilter(c.code)}
+                            onClick={() => toggleLocationToken(c.code)}
                           >
                             {c.name}
                           </button>
@@ -833,12 +858,12 @@ export function JobsInlineFilters({
                         const q = cityQuery.trim();
                         if (n > 0 && cityHighlightIndex >= 0 && citySuggestions[cityHighlightIndex]) {
                           e.preventDefault();
-                          setLocationFilter(citySuggestions[cityHighlightIndex]!.city);
+                          toggleLocationToken(citySuggestions[cityHighlightIndex]!.city);
                           return;
                         }
                         if (q) {
                           e.preventDefault();
-                          setLocationFilter(q);
+                          toggleLocationToken(q);
                         }
                       }
                     }}
@@ -882,7 +907,7 @@ export function JobsInlineFilters({
                                 )}
                                 onMouseEnter={() => setCityHighlightIndex(i)}
                                 onMouseDown={(ev) => ev.preventDefault()}
-                                onClick={() => setLocationFilter(s.city)}
+                                onClick={() => toggleLocationToken(s.city)}
                               >
                                 <div className="min-w-0 flex-1 overflow-hidden">
                                   <div
@@ -909,16 +934,29 @@ export function JobsInlineFilters({
                   ) : null}
                 </AnimatePresence>
               </div>
-              {uiFilters.location?.trim() ? (
-                <div className="mt-3 flex items-center justify-between border-t border-ink/10 pt-2">
-                  <span className="truncate text-xs text-ink/60">Selected: {uiFilters.location}</span>
-                  <button
-                    type="button"
-                    className="text-xs font-semibold text-brand hover:underline"
-                    onClick={() => clearLocation()}
-                  >
-                    Clear
-                  </button>
+              {uiFilters.locations.length > 0 ? (
+                <div className="mt-3 border-t border-ink/10 pt-2">
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {uiFilters.locations.map((loc) => (
+                      <button
+                        key={loc}
+                        type="button"
+                        className="rounded-full bg-brand/10 px-2.5 py-1 text-xs font-medium text-brand hover:bg-brand/20"
+                        onClick={() => toggleLocationToken(loc)}
+                      >
+                        {locationFilterTriggerLabel(loc)} ×
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      className="text-xs font-semibold text-brand hover:underline"
+                      onClick={() => clearLocations()}
+                    >
+                      Clear all
+                    </button>
+                  </div>
                 </div>
               ) : null}
             </motion.div>

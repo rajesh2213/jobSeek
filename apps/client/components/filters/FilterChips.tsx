@@ -57,10 +57,10 @@ function buildChips(filters: JobFilters, onRemove: Props["onRemoveChip"]): Filte
         ? [filters.country]
         : [];
     push(
-      locations.map((country) => ({
-        id: `country-${country}`,
-        label: `Country: ${globalLocationLabel(country)}`,
-        onRemove: () => onRemove({ type: "country", value: country }),
+      locations.map((loc) => ({
+        id: `country-${loc}`,
+        label: `Location: ${globalLocationLabel(loc)}`,
+        onRemove: () => onRemove({ type: "country", value: loc }),
       })),
     );
   }
