@@ -589,6 +589,19 @@ export function JobsSearchClient({
     [alertUpdatingId, getToken, isPro, isSignedIn],
   );
 
+  const hasAnyJobAlert = useMemo(
+    () => savedSearches.some((s) => s.alertEnabled),
+    [savedSearches],
+  );
+
+  /** Pro users with no alert enabled on any saved search — nudge toward hover UI in popover. */
+  const proJobAlertHint =
+    isPro && isSignedIn && !hasAnyJobAlert
+      ? savedSearches.length === 0
+        ? "Save a search, then hover it to enable job alerts."
+        : "Hover a saved search to enable job alerts."
+      : null;
+
   return (
     <div className="relative z-0 flex min-h-screen flex-col">
       <div className="-mb-6 w-full sm:-mb-8">
@@ -646,6 +659,14 @@ export function JobsSearchClient({
                     ? "Saving…"
                     : "Save search"}
               </Button>
+              {proJobAlertHint ? (
+                <span
+                  className="max-w-[16rem] text-[11px] leading-snug text-ink/55"
+                  role="note"
+                >
+                  {proJobAlertHint}
+                </span>
+              ) : null}
               {savedSearches.map((saved) => {
                 const details = buildSavedSearchDetails(saved.query);
                 const isActiveSaved =
