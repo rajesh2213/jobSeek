@@ -53,7 +53,7 @@ export function ApplyJobButton({
             size,
             outlineTone,
             className: cn(
-              "border-emerald-500/40 bg-emerald-500/5 text-emerald-900 hover:bg-emerald-500/10 dark:border-emerald-400/35 dark:bg-emerald-500/10 dark:text-emerald-100",
+              "border-teal/55 bg-teal-soft text-ink shadow-sm ring-1 ring-teal/25 hover:border-teal hover:bg-teal/15 hover:text-ink dark:border-teal/50 dark:bg-teal/10 dark:text-ink dark:ring-teal/30 dark:hover:bg-teal/20",
               className,
             ),
           }),

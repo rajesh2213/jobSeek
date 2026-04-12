@@ -117,6 +117,8 @@ interface Props {
   totalRoles?: number;
   selectedCategory?: string;
   onCategoryNavigate: (category: string | undefined) => void;
+  onClearFilters?: () => void;
+  clearFiltersDisabled?: boolean;
 }
 
 export function JobsInlineFilters({
@@ -133,6 +135,8 @@ export function JobsInlineFilters({
   totalRoles,
   selectedCategory,
   onCategoryNavigate,
+  onClearFilters,
+  clearFiltersDisabled = false,
 }: Props) {
   const skillsPanelId = useId();
   const cityListId = useId();
@@ -965,14 +969,38 @@ export function JobsInlineFilters({
         </div>
 
         <div className="filter-chip min-w-[8rem] flex-1 transition-all duration-300 ease-chip hover:-translate-y-0.5 hover:scale-[1.03] sm:flex-none">
-          <Button
-            variant="primary"
-            size="md"
-            onClick={onApply}
-            className="h-[42px] w-full font-bold tracking-wide sm:w-auto"
-          >
-            Apply
-          </Button>
+          {onClearFilters ? (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                outlineTone="rose"
+                size="md"
+                type="button"
+                onClick={onClearFilters}
+                disabled={clearFiltersDisabled}
+                className="h-[42px] min-w-[5.5rem] font-semibold tracking-wide"
+              >
+                Clear
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                onClick={onApply}
+                className="h-[42px] min-w-[5.5rem] font-bold tracking-wide sm:w-auto"
+              >
+                Apply
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="primary"
+              size="md"
+              onClick={onApply}
+              className="h-[42px] w-full font-bold tracking-wide sm:w-auto"
+            >
+              Apply
+            </Button>
+          )}
         </div>
       </div>
 
