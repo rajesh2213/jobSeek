@@ -60,10 +60,16 @@ const config: Config = {
           "0%": { backgroundPosition: "200% 0" },
           "100%": { backgroundPosition: "-200% 0" },
         },
+        /** Sticky jobs filter bar — narrow capsule, left → right (uses `left` %) */
+        "jobs-filter-sweep": {
+          "0%": { left: "-40%" },
+          "100%": { left: "100%" },
+        },
       },
       animation: {
         "tab-pulse": "tab-pulse 0.4s ease-in-out",
         shimmer: "shimmer 1.35s ease-in-out infinite",
+        "jobs-filter-sweep": "jobs-filter-sweep 1.65s linear infinite",
       },
       transitionTimingFunction: {
         chip: "cubic-bezier(0.34, 1.56, 0.64, 1)",

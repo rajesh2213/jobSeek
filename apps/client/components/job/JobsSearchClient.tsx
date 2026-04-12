@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
@@ -20,6 +27,7 @@ import { useAccountPlan } from "../../lib/useAccountPlan";
 import {
   parseJobFiltersFromSearch,
   filtersToSearchParams,
+  hasActiveJobFilters,
   type JobFilters,
 } from "../../lib/slug-parser";
 import { Container } from "../ui/Container";
@@ -31,6 +39,7 @@ import { JobList } from "./JobList";
 import { TimeAdvantageSimulator } from "./TimeAdvantageSimulator";
 import { LimitWallEnhanced } from "./LimitWallEnhanced";
 import { EmptyState } from "../ui/EmptyState";
+import { cn } from "../../lib/cn";
 
 function listQueryBase(f: JobFilters): JobFilters {
   const { offset: _o, page: _p, ...rest } = f;
@@ -207,6 +216,7 @@ export function JobsSearchClient({
   const [hoveredSavedId, setHoveredSavedId] = useState<string | null>(null);
   const hoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [alertUpdatingId, setAlertUpdatingId] = useState<string | null>(null);
+  const [isFilterPending, startFilterTransition] = useTransition();
 
   useEffect(() => {
     setDraft(urlFilters);
@@ -268,9 +278,11 @@ export function JobsSearchClient({
   const navigate = useCallback(
     (f: JobFilters) => {
       const params = filtersToSearchParams(f).toString();
-      router.push(params ? `/jobs?${params}` : "/jobs");
+      startFilterTransition(() => {
+        router.push(params ? `/jobs?${params}` : "/jobs");
+      });
     },
-    [router],
+    [router, startFilterTransition],
   );
 
   const onApply = useCallback(() => {
@@ -289,6 +301,13 @@ export function JobsSearchClient({
       offset: undefined,
     });
   }, [draft, navigate, uiFilters]);
+
+  const onClearFilters = useCallback(() => {
+    setSavedSearchNotice(null);
+    startFilterTransition(() => {
+      router.push("/jobs");
+    });
+  }, [router, startFilterTransition]);
 
   const onSortNavigate = useCallback(
     (sort: JobFilters["sort"]) => {
@@ -578,7 +597,7 @@ export function JobsSearchClient({
 
       <div
         id="section-filters"
-        className="sticky top-12 z-[50] bg-canvas/95 py-3 backdrop-blur-sm sm:py-4"
+        className="relative sticky top-12 z-[50] bg-canvas/95 py-3 backdrop-blur-sm sm:py-4"
       >
         <Container
           width="jobs"
@@ -591,6 +610,8 @@ export function JobsSearchClient({
             uiFilters={uiFilters}
             setUiFilters={setUiFilters}
             onApply={onApply}
+            onClearFilters={onClearFilters}
+            clearFiltersDisabled={!hasActiveJobFilters(urlFilters)}
             onRemoveChip={onRemoveChip}
             onSortNavigate={onSortNavigate}
             showSort={false}
@@ -657,7 +678,9 @@ export function JobsSearchClient({
                   >
                     <button
                       type="button"
-                      onClick={() => router.push(saved.query)}
+                      onClick={() =>
+                        startFilterTransition(() => router.push(saved.query))
+                      }
                       aria-current={isActiveSaved ? "page" : undefined}
                       className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                         isActiveSaved
@@ -906,9 +929,33 @@ export function JobsSearchClient({
           ) : null}
           <FilterChips filters={urlFilters} onRemoveChip={onRemoveChip} />
         </Container>
+        {isFilterPending ? (
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-[4px] overflow-hidden"
+            aria-hidden
+          >
+            <div
+              className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-brand/45 to-transparent"
+              aria-hidden
+            />
+            <div className="absolute inset-0 overflow-hidden">
+              <div
+                className="absolute top-0 h-full w-[min(30%,10rem)] min-w-[4rem] rounded-full bg-gradient-to-r from-brand/25 via-brand to-brand/25 shadow-[0_0_14px_rgba(232,122,93,0.55),0_0_26px_rgba(232,122,93,0.22)] motion-reduce:animate-none motion-reduce:left-[35%] motion-reduce:opacity-90 animate-jobs-filter-sweep"
+                style={{ willChange: "left" }}
+              />
+            </div>
+          </div>
+        ) : null}
       </div>
 
-      <Container width="jobs" className="mt-8">
+      <Container
+        width="jobs"
+        className={cn(
+          "mt-8 transition-opacity duration-200",
+          isFilterPending && "pointer-events-none opacity-60",
+        )}
+        aria-busy={isFilterPending}
+      >
         {(() => {
           const totalMatches = listMeta?.total ?? 0;
           const noMatches = listJobs.length === 0 && totalMatches === 0;
