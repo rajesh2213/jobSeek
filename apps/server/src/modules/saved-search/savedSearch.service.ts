@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import type { JobDiscoveryFilters } from "../job/job.repository.js";
 import { parseJobDiscoveryQuery } from "../../utils/taxonomyQuery.js";
 
 const ALLOWED_QUERY_KEYS = new Set([
@@ -86,6 +87,23 @@ export async function getUserSavedSearchCount(prisma: PrismaClient, userId: stri
 }
 
 /** Next default label for a new saved search: lowest free `Saved search 1` … `3` (max 3 rows per user). */
+/**
+ * Parse a normalized `/jobs?…` saved search into discovery filters.
+ * Drops `posted` window so alerts use `postedAfter` from the alert worker instead.
+ */
+export function discoveryFiltersFromSavedSearchQuery(normalizedQuery: string): JobDiscoveryFilters {
+  const base = "https://jobseek.local";
+  const parsed = new URL(
+    normalizedQuery.startsWith("http")
+      ? normalizedQuery
+      : `${base}${normalizedQuery.startsWith("/") ? "" : "/"}${normalizedQuery}`,
+  );
+  const q = toObject(parsed.searchParams);
+  const filters = parseJobDiscoveryQuery(q);
+  delete filters.postedWithin;
+  return filters;
+}
+
 export async function resolveDefaultSavedSearchName(
   prisma: PrismaClient,
   userId: string,

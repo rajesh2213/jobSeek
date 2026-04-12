@@ -123,6 +123,8 @@ export interface JobDiscoveryFilters {
   workTypes?: Array<"remote" | "onsite" | "hybrid">;
   experienceLevel?: "junior" | "mid" | "senior";
   postedWithin?: "24h" | "3d" | "1w" | "1m";
+  /** Exclusive lower bound on listing age (COALESCE(postedAt, createdAt)). */
+  postedAfter?: Date;
   minSalary?: number;
   companyId?: string;
   /**
@@ -315,6 +317,15 @@ function buildDiscoveryWhere(
       ],
     });
   }
+  if (filters.postedAfter !== undefined) {
+    const since = filters.postedAfter;
+    and.push({
+      OR: [
+        { postedAt: { gt: since } },
+        { AND: [{ postedAt: null }, { createdAt: { gt: since } }] },
+      ],
+    });
+  }
   if (filters.companyId !== undefined && filters.companyId !== "") {
     and.push({ companyId: filters.companyId });
   }
@@ -431,6 +442,12 @@ function buildDiscoveryWhereSql(filters?: JobDiscoveryFilters): Prisma.Sql {
     const since = postedSince(filters.postedWithin);
     parts.push(
       Prisma.sql`(j."postedAt" >= ${since} OR (j."postedAt" IS NULL AND j."createdAt" >= ${since}))`,
+    );
+  }
+  if (filters.postedAfter !== undefined) {
+    const since = filters.postedAfter;
+    parts.push(
+      Prisma.sql`(j."postedAt" > ${since} OR (j."postedAt" IS NULL AND j."createdAt" > ${since}))`,
     );
   }
   if (filters.companyId !== undefined && filters.companyId !== "") {
