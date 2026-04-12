@@ -154,6 +154,18 @@ export interface SavedSearchItem {
   query: string;
   createdAt: string;
   updatedAt: string;
+  alertEnabled: boolean;
+  alertThreshold: number;
+  alertLastSentAt: string | null;
+  alertJobsSeen: number;
+}
+
+export interface SavedSearchAlertStatusItem {
+  id: string;
+  name: string | null;
+  alertEnabled: boolean;
+  alertThreshold: number;
+  alertLastSentAt: string | null;
 }
 
 export interface SavedSearchCreateResponse {
@@ -279,6 +291,60 @@ export async function renameSavedSearch(
     );
   }
   const body = (await res.json()) as SavedSearchCreateResponse;
+  return body.data;
+}
+
+export async function fetchSavedSearchAlertStatus(
+  token: string,
+): Promise<SavedSearchAlertStatusItem[]> {
+  const t = token.trim();
+  if (!t) throw new ApiRequestError("Unauthorized", 401, "UNAUTHORIZED");
+
+  const res = await fetch(`${API_BASE_URL}/saved-searches/alert-status`, {
+    headers: { Authorization: `Bearer ${t}` },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ApiRequestError(
+      body.error ?? "Failed to load alert status",
+      res.status,
+      body.code,
+    );
+  }
+  const body = (await res.json()) as { data: SavedSearchAlertStatusItem[] };
+  return body.data ?? [];
+}
+
+export async function patchSavedSearchAlert(
+  token: string,
+  id: string,
+  payload: { enabled: boolean; threshold?: 5 | 10 },
+): Promise<SavedSearchItem> {
+  const t = token.trim();
+  if (!t) throw new ApiRequestError("Unauthorized", 401, "UNAUTHORIZED");
+
+  const res = await fetch(`${API_BASE_URL}/saved-searches/${encodeURIComponent(id)}/alert`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${t}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      enabled: payload.enabled,
+      threshold: payload.threshold,
+    }),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ApiRequestError(
+      body.error ?? "Failed to update alert",
+      res.status,
+      body.code,
+    );
+  }
+  const body = (await res.json()) as { data: SavedSearchItem };
   return body.data;
 }
 
@@ -492,6 +558,169 @@ export async function fetchJobById(id: string): Promise<JobItem | null> {
 }
 
 export type SemanticMatchMap = Record<string, { bullet: string; similarity: number }>;
+
+export interface ApplicationJobSummary {
+  id: string;
+  title: string;
+  companyName: string;
+  companyLogo: string | null;
+  locationCountry: string;
+  workType: string;
+  applyUrl: string;
+}
+
+export interface ApplicationListItem {
+  id: string;
+  status: string;
+  appliedAt: string;
+  lastActivityAt: string;
+  archived: boolean;
+  notes: string | null;
+  job: ApplicationJobSummary;
+}
+
+export interface ApplicationCreateResponse {
+  id: string;
+  jobId: string;
+  status: string;
+  appliedAt: string;
+  alreadyExisted: boolean;
+}
+
+export interface ApplicationStatsResponse {
+  total: number;
+  byStatus: Record<string, number>;
+  needsAction: number;
+}
+
+export async function fetchApplications(
+  token: string,
+  query?: { status?: string; archived?: boolean | "true" | "false" },
+): Promise<ApplicationListItem[]> {
+  const t = token.trim();
+  if (!t) throw new ApiRequestError("Unauthorized", 401, "UNAUTHORIZED");
+
+  const params = new URLSearchParams();
+  if (query?.status) params.set("status", query.status);
+  if (query?.archived !== undefined) {
+    params.set("archived", String(query.archived));
+  }
+
+  const q = params.toString();
+  const res = await fetch(`${API_BASE_URL}/applications${q ? `?${q}` : ""}`, {
+    headers: { Authorization: `Bearer ${t}` },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ApiRequestError(body.error ?? "Failed to load applications", res.status, body.code);
+  }
+  return (await res.json()) as ApplicationListItem[];
+}
+
+export async function fetchApplicationStats(token: string): Promise<ApplicationStatsResponse> {
+  const t = token.trim();
+  if (!t) throw new ApiRequestError("Unauthorized", 401, "UNAUTHORIZED");
+
+  const res = await fetch(`${API_BASE_URL}/applications/stats`, {
+    headers: { Authorization: `Bearer ${t}` },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ApiRequestError(body.error ?? "Failed to load stats", res.status, body.code);
+  }
+  return (await res.json()) as ApplicationStatsResponse;
+}
+
+export async function createApplication(
+  token: string,
+  jobId: string,
+): Promise<ApplicationCreateResponse> {
+  const t = token.trim();
+  if (!t) throw new ApiRequestError("Unauthorized", 401, "UNAUTHORIZED");
+
+  const res = await fetch(`${API_BASE_URL}/applications`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${t}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ jobId }),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ApiRequestError(body.error ?? "Failed to create application", res.status, body.code);
+  }
+  return (await res.json()) as ApplicationCreateResponse;
+}
+
+export async function patchApplicationStatus(
+  token: string,
+  id: string,
+  status: string,
+): Promise<void> {
+  const t = token.trim();
+  if (!t) throw new ApiRequestError("Unauthorized", 401, "UNAUTHORIZED");
+
+  const res = await fetch(`${API_BASE_URL}/applications/${encodeURIComponent(id)}/status`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${t}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ status }),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ApiRequestError(body.error ?? "Failed to update status", res.status, body.code);
+  }
+}
+
+export async function patchApplicationNotes(
+  token: string,
+  id: string,
+  notes: string | null,
+): Promise<void> {
+  const t = token.trim();
+  if (!t) throw new ApiRequestError("Unauthorized", 401, "UNAUTHORIZED");
+
+  const res = await fetch(`${API_BASE_URL}/applications/${encodeURIComponent(id)}/notes`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${t}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ notes }),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ApiRequestError(body.error ?? "Failed to save notes", res.status, body.code);
+  }
+}
+
+export async function deleteApplication(token: string, id: string): Promise<void> {
+  const t = token.trim();
+  if (!t) throw new ApiRequestError("Unauthorized", 401, "UNAUTHORIZED");
+
+  const res = await fetch(`${API_BASE_URL}/applications/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${t}` },
+  });
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ApiRequestError(body.error ?? "Failed to delete", res.status, body.code);
+  }
+}
 
 /** Batched semantic similarity between job keywords and resume bullets (Clerk JWT). */
 export async function fetchResumeSemanticMatch(

@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { UserProfile, useClerk, useUser } from "@clerk/nextjs";
+import { UserProfile, useAuth, useClerk, useUser } from "@clerk/nextjs";
 import { createPortal } from "react-dom";
 import type { Appearance } from "@clerk/types";
-import type { UserMeResponse } from "../../lib/api";
+import { fetchSavedSearchAlertStatus, type UserMeResponse } from "../../lib/api";
 import { useResume } from "../../lib/resumeContext";
 import { ResumeUploadModal } from "../resume/ResumeUploadModal";
 
@@ -48,6 +48,7 @@ const clerkAppearance = {
 
 export function AccountDashboard() {
   const { signOut } = useClerk();
+  const { getToken } = useAuth();
   const { user, isLoaded } = useUser();
   const { hasResume, fileName, wordCount, resumeUpdatedAt, deleteResume, refreshStatus } =
     useResume();
@@ -56,6 +57,7 @@ export function AccountDashboard() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [activeAlertCount, setActiveAlertCount] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +75,27 @@ export function AccountDashboard() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const token = await getToken({ skipCache: true });
+        if (!token) {
+          if (!cancelled) setActiveAlertCount(null);
+          return;
+        }
+        const rows = await fetchSavedSearchAlertStatus(token);
+        const n = rows.filter((r) => r.alertEnabled).length;
+        if (!cancelled) setActiveAlertCount(n);
+      } catch {
+        if (!cancelled) setActiveAlertCount(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken]);
 
   // Prefer plan from /api/user/me; default matches backend free tier when absent.
   const plan = me?.plan ?? "free";
@@ -158,6 +181,31 @@ export function AccountDashboard() {
               </>
             ) : null}
           </div>
+        </div>
+
+        <hr className="my-6 border-ink/10" />
+
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-ink/45">
+            Active alerts
+          </p>
+          {activeAlertCount === null ? (
+            <p className="mt-2 text-sm text-ink-muted">—</p>
+          ) : activeAlertCount === 0 ? (
+            <>
+              <p className="mt-2 text-sm text-ink-muted">No job alerts active</p>
+              <Link
+                href="/saved-searches"
+                className="mt-2 inline-block text-sm font-semibold text-brand hover:underline"
+              >
+                Set up alerts →
+              </Link>
+            </>
+          ) : (
+            <p className="mt-2 text-sm font-medium text-ink">
+              {activeAlertCount} search{activeAlertCount === 1 ? "" : "es"} with alerts active
+            </p>
+          )}
         </div>
 
         <hr className="my-6 border-ink/10" />

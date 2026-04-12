@@ -10,7 +10,8 @@ import { filterSkillPillsForDisplay, jobCardPinLocationText } from "../../lib/jo
 import { cn } from "../../lib/cn";
 import { companyLogoSrcForDisplay } from "../../lib/logoDisplay";
 import { Badge } from "../ui/Badge";
-import { Button, buttonClassName } from "../ui/Button";
+import { buttonClassName } from "../ui/Button";
+import { ApplyJobButton } from "./ApplyJobButton";
 import { Card } from "../ui/Card";
 import { WorkTypeOutlinePill } from "./WorkTypeOutlinePill";
 import { ResumeScorePill } from "../resume/ResumeScorePill";
@@ -242,16 +243,13 @@ export function JobCard({ job, compact }: Props) {
             </div>
           </div>
           <div className="mt-auto flex flex-wrap justify-end gap-2 border-t border-ink/5 pt-3">
-            <Button
-              variant="outline"
+            <ApplyJobButton
+              jobId={job.id}
+              applyUrl={applyHref}
               outlineTone={accent}
               size="sm"
-              href={applyHref}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Apply ↗
-            </Button>
+              variant="outline"
+            />
             <Link
               href={`/job/${job.id}`}
               className={buttonClassName({ variant: "primary", size: "sm" })}
@@ -277,17 +275,14 @@ export function JobCard({ job, compact }: Props) {
       <div className="relative z-0 flex items-start gap-5">
         <div className="absolute right-6 top-6 z-10 flex max-w-[min(100%,calc(100%-1rem))] min-w-0 flex-col gap-2">
           <div className="flex flex-nowrap justify-end gap-2">
-            <Button
-              variant="outline"
+            <ApplyJobButton
+              jobId={job.id}
+              applyUrl={applyHref}
               outlineTone={accent}
               size="sm"
-              href={applyHref}
-              target="_blank"
-              rel="noopener noreferrer"
+              variant="outline"
               className="shrink-0"
-            >
-              Apply ↗
-            </Button>
+            />
             <Link
               href={`/job/${job.id}`}
               target="_blank"

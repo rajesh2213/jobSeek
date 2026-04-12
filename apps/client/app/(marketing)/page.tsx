@@ -250,7 +250,7 @@ const PAIN_POINTS = [
   {
     pain: "Your inbox is chaos.",
     sub: "You miss assessments and follow-ups.",
-    fix: "Email tracking + application pipeline",
+    fix: "Application pipeline (Pro) + email tracking (coming soon)",
     outcome: "Every update tracked. Every deadline visible.",
   },
 ];
@@ -416,7 +416,7 @@ function SocialProofSection() {
     },
     {
       quote:
-        "I kept missing assessment emails buried in threads. The tracking view isn't fancy, but it stopped me from missing deadlines.",
+        "I finally stopped losing track of where I applied. Having stages and notes in one place beats digging through threads.",
       name: "Amelia J., Product Manager",
     },
     {
@@ -563,7 +563,7 @@ function PricingSection() {
               <li>• Discover roles not listed on LinkedIn</li>
               <li className="text-ink/45">✕ No resume match insights</li>
               <li className="text-ink/45">✕ No auto-apply</li>
-              <li className="text-ink/45">✕ No email + application tracking</li>
+              <li className="text-ink/45">✕ No Pro application tracker</li>
             </ul>
             <p className="mt-3 text-xs font-medium text-ink/55">Only 5 roles/day - you may miss others</p>
           </motion.div>
@@ -607,7 +607,7 @@ function PricingSection() {
               <li>• Unlimited jobs</li>
               <li>• Resume match + missing keywords</li>
               <li>• Auto-apply to roles</li>
-              <li>• Email + application tracking</li>
+              <li>• Application tracker + email insights (coming soon)</li>
               <li>• Apply early, consistently</li>
             </ul>
             <p className="mt-3 text-xs font-semibold text-brand">Never miss a role. Never lose track.</p>

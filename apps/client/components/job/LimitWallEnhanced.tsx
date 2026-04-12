@@ -386,7 +386,11 @@ export function LimitWallEnhanced({ resetAt, count, previewJobs }: Props) {
               {[
                 { k: "auto", icon: "⚡", line: "Auto-apply → Apply within seconds" },
                 { k: "resume", icon: "🎯", line: "Resume match → Know before you apply" },
-                { k: "track", icon: "📩", line: "Tracking → Never miss Email follow-ups" },
+                {
+                  k: "track",
+                  icon: "📩",
+                  line: "Email tracking — Coming soon (application tracker included with Pro)",
+                },
               ].map((row) => (
                 <motion.li
                   key={row.k}

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { JobItem } from "../../lib/api";
 import { formatTimeAgo } from "../../lib/format";
 import { jobDetailPinLocationText, workTypeDisplayLabel } from "../../lib/jobDisplay";
-import { Button } from "../ui/Button";
+import { ApplyJobButton } from "./ApplyJobButton";
 
 interface Props {
   job: JobItem;
@@ -32,9 +32,7 @@ export function JobHeader({ job, applyHref }: Props) {
           </p>
         </div>
         <div className="shrink-0">
-          <Button variant="primary" size="md" href={applyHref} target="_blank" rel="noopener noreferrer">
-            Apply now
-          </Button>
+          <ApplyJobButton jobId={job.id} applyUrl={applyHref} variant="primary" size="md" />
         </div>
       </div>
     </header>

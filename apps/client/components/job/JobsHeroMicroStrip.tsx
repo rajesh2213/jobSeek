@@ -7,7 +7,7 @@ import { cn } from "../../lib/cn";
 const ITEMS = [
   "⚡ Applied in 2 minutes",
   "🎯 Resume match: 87%",
-  "📩 Tracking active",
+  "📩 Email tracking — coming soon",
 ] as const;
 
 const INTERVAL_MS = 2600;

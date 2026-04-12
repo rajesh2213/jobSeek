@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useMotionTemplate, useMotionValue, useReducedMotion, useSpring } from "framer-motion";
+import { ComingSoonPill } from "./ui/ComingSoonPill";
 
 /* ═══════════════════════ Config ═══════════════════════ */
 
@@ -482,17 +483,20 @@ function EmailTrackingCard() {
             4 unread updates
           </p>
         </div>
-        <motion.span
-          key={tag}
-          initial={{ opacity: 0, x: 6 }}
-          animate={{ opacity: 1, x: 0 }}
-          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${tagCls}`}
-        >
-          {tag}
-        </motion.span>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <ComingSoonPill />
+          <motion.span
+            key={tag}
+            initial={{ opacity: 0, x: 6 }}
+            animate={{ opacity: 1, x: 0 }}
+            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${tagCls}`}
+          >
+            {tag}
+          </motion.span>
+        </div>
       </div>
 
-      {/* Content area — inbox or pipeline */}
+      {/* Content area — inbox or pipeline (demo; live email sync coming soon) */}
       <div className="relative mt-4">
         <AnimatePresence mode="wait">
           {showInbox ? (

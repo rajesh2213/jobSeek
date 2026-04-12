@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "../../lib/cn";
+import { useApplications } from "../../lib/applicationsContext";
 
 /** Collapsed width; expands on hover (inactive) or when active. */
 const W_COLLAPSED = "w-[136px]";
@@ -15,6 +16,10 @@ export function SiteSideRail() {
   const pathname = usePathname();
   const jobs = pathname.startsWith("/jobs");
   const companies = pathname.startsWith("/companies") || pathname.startsWith("/company");
+  const applications = pathname.startsWith("/applications");
+  const { stats } = useApplications();
+
+  const actionCount = stats && stats.needsAction > 0 ? stats.needsAction : 0;
 
   return (
     <nav
@@ -66,16 +71,36 @@ export function SiteSideRail() {
           <span className="absolute right-2 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-white/60" />
         ) : null}
       </Link>
-      <span
-        className={cn(railTab, W_COLLAPSED, "cursor-not-allowed bg-amber/70 pr-5 font-bold tracking-wide text-white/70")}
-        aria-disabled="true"
-        title="Coming soon"
+      <Link
+        href="/applications"
+        title="Applications"
+        className={cn(
+          railTab,
+          applications ? `${W_EXPANDED} shadow-md` : `${W_COLLAPSED} hover:w-[186px] hover:shadow-md`,
+          applications
+            ? "bg-amber font-bold tracking-wide !text-white shadow-md"
+            : "bg-amber/85 font-bold tracking-wide !text-white hover:bg-amber hover:!text-white active:!text-white visited:!text-white",
+        )}
       >
+        <span className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white/15 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
         <span className="shrink-0 text-sm opacity-90" aria-hidden>
-          ♥
+          📋
         </span>
-        <span className="min-w-0 truncate text-sm tracking-wide">Applied</span>
-      </span>
+        <span className="min-w-0 flex-1 truncate text-sm tracking-[0.08em] transition-[letter-spacing,text-shadow] duration-300 group-hover:tracking-[0.12em] group-hover:[text-shadow:0_0_10px_rgba(255,255,255,0.28)]">
+          Applications
+        </span>
+        <span className="pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
+          {actionCount > 0 ? (
+            <span
+              className="rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-1 ring-white/40"
+              title={`${actionCount} need attention`}
+            >
+              ⚡{actionCount}
+            </span>
+          ) : null}
+          {applications ? <span className="h-1.5 w-1.5 rounded-full bg-white/60" /> : null}
+        </span>
+      </Link>
     </nav>
   );
 }

@@ -14,7 +14,7 @@ const MONTHLY_VARIANT_ID = process.env.NEXT_PUBLIC_LS_PRO_MONTHLY_VARIANT_ID?.tr
 const PRO_FEATURES = [
   "Unlimited jobs daily",
   "AI resume review",
-  "Job alerts",
+  "Job alerts — get emailed when new roles match your search (choose 5 or 10 job threshold · instant email delivery)",
   "Saved searches",
   "Early access",
 ] as const;

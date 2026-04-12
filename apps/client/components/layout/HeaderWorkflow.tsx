@@ -44,16 +44,16 @@ const CHECKPOINTS: readonly CheckpointDef[] = [
     id: 0,
     label: "Fresh roles",
     progress: 0.2,
-    demoTitle: "🌐 No daily hop across job sites",
+    demoTitle: "🌐 No daily hop across job sites + 📧  Email alerts",
     demoSubtitle:
       "See roles before most ATS & LinkedIn.",
   },
   {
     id: 1,
-    label: "Auto apply",
+    label: "Assisted apply",
     progress: 0.4,
     demoTitle: "⚡ Applied in 2 mins",
-    demoSubtitle: "Sent before most people saw it",
+    demoSubtitle: "Before most people read through it",
   },
   {
     id: 2,
@@ -65,10 +65,10 @@ const CHECKPOINTS: readonly CheckpointDef[] = [
   },
   {
     id: 3,
-    label: "Track Email Follow-ups",
+    label: "Track",
     progress: 0.88,
-    demoTitle: "📧 One pipeline",
-    demoSubtitle: "Every stage in a single view",
+    demoTitle: "📧 One Pipeline",
+    demoSubtitle: "Coming soon — Email tracking",
   },
 ];
 
@@ -341,7 +341,7 @@ export function HeaderWorkflow() {
               <motion.div
                 layout
                 transition={LAYOUT_TRANSITION}
-                className="inline-flex max-w-[min(220px,24vw)] origin-center justify-center"
+                className="inline-flex max-w-[min(320px,42vw)] origin-center justify-center"
               >
                 {isActive ? (
                   <motion.div
@@ -354,9 +354,9 @@ export function HeaderWorkflow() {
                     }
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ duration: 0.22, ease: EASE_OUT }}
-                    className="max-h-[48px] w-full overflow-hidden rounded-xl border border-ink/12 bg-white/95 px-3 py-2 shadow-[0_4px_16px_rgba(0,0,0,0.1)] backdrop-blur-md"
+                    className="max-h-[56px] w-full overflow-hidden rounded-xl border border-ink/12 bg-white/95 px-3 py-2 shadow-[0_4px_16px_rgba(0,0,0,0.1)] backdrop-blur-md"
                   >
-                    <p className="text-[11px] font-semibold leading-tight text-ink">
+                    <p className="text-[11px] font-semibold leading-tight text-ink sm:whitespace-nowrap">
                       {cp.demoTitle}
                     </p>
                     <p className="mt-0.5 text-[10px] leading-tight text-ink/60">
