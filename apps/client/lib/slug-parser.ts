@@ -9,8 +9,9 @@ export interface JobFilters {
   skills?: string[];
   /** Sent to API as `country` (free text or ISO code; server resolves). */
   country?: string;
-  /** Region name, ISO code, or city — sent as `?location=` (server uses locationCountry/Region/City). */
+  /** Single token — sent as `?location=` when `locations` is unset (legacy / short URLs). */
   location?: string;
+  /** Multiple tokens — sent as `?locations=` (comma-separated); OR semantics on the server. */
   locations?: string[];
   category?: string;
   /** Legacy SEO slug segment; prefer `workType`. */
@@ -52,27 +53,32 @@ export function parseJobFiltersFromSearch(
   const category = g("category");
   if (category) filters.category = category;
 
+  const locationsRaw = g("locations");
+  if (locationsRaw?.trim()) {
+    const seen = new Set<string>();
+    const locations: string[] = [];
+    for (const s of locationsRaw.split(",")) {
+      const t = s.trim();
+      if (!t) continue;
+      const k = t.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      locations.push(t);
+    }
+    if (locations.length > 0) {
+      filters.locations = locations;
+    }
+  }
+
   const locationParam = g("location");
-  if (locationParam?.trim()) {
+  if (locationParam?.trim() && !filters.locations?.length) {
     filters.location = locationParam.trim();
   }
 
   const country = g("country");
-  if (country?.trim()) {
+  if (country?.trim() && !filters.locations?.length && !filters.location) {
     const t = country.trim();
     filters.country = t.length === 2 ? t.toUpperCase() : t;
-  }
-  const locationsRaw = g("locations");
-  if (locationsRaw?.trim()) {
-    const locations = locationsRaw
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (locations.length > 0) {
-      filters.locations = locations;
-      if (!filters.country) filters.country = locations[0];
-      if (!filters.location && locations.length === 1) filters.location = locations[0];
-    }
   }
 
   const role = g("role");
@@ -166,9 +172,13 @@ export function filtersToSearchParams(filters: JobFilters): URLSearchParams {
   if (filters.role) p.set("role", filters.role);
   if (filters.roles?.length) p.set("roles", filters.roles.join(","));
   if (filters.skills?.length) p.set("skills", filters.skills.join(","));
-  if (filters.location?.trim()) p.set("location", filters.location.trim());
-  else if (filters.locations?.length) p.set("locations", filters.locations.join(","));
-  else if (filters.country?.trim()) p.set("country", filters.country.trim());
+  if (filters.locations?.length) {
+    p.set("locations", filters.locations.join(","));
+  } else if (filters.location?.trim()) {
+    p.set("location", filters.location.trim());
+  } else if (filters.country?.trim()) {
+    p.set("country", filters.country.trim());
+  }
   if (filters.workTypes?.length) p.set("types", filters.workTypes.map((t) => t.toUpperCase()).join(","));
   if (filters.isRemote === true && !filters.workTypes?.length) p.set("remote", "true");
   if (filters.experience) p.set("experience", filters.experience);

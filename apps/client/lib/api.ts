@@ -334,9 +334,13 @@ export async function fetchJobs(
   if (filters.page) params.set("page", String(filters.page));
   if (filters.limit) params.set("limit", String(filters.limit));
   if (filters.offset !== undefined) params.set("offset", String(filters.offset));
-  if (filters.location?.trim()) params.set("location", filters.location.trim());
-  else if (filters.locations?.length) params.set("locations", filters.locations.join(","));
-  else if (filters.country?.trim()) params.set("country", filters.country.trim());
+  if (filters.locations?.length) {
+    params.set("locations", filters.locations.join(","));
+  } else if (filters.location?.trim()) {
+    params.set("location", filters.location.trim());
+  } else if (filters.country?.trim()) {
+    params.set("country", filters.country.trim());
+  }
   if (filters.category) params.set("category", filters.category);
   if (filters.workTypes?.length) params.set("types", filters.workTypes.map((t) => t.toUpperCase()).join(","));
   if (typeof filters.isRemote === "boolean") params.set("remote", String(filters.isRemote));
@@ -485,4 +489,35 @@ export async function fetchJobById(id: string): Promise<JobItem | null> {
   }
   const payload = (await res.json()) as JobApiResponse;
   return payload.data;
+}
+
+export type SemanticMatchMap = Record<string, { bullet: string; similarity: number }>;
+
+/** Batched semantic similarity between job keywords and resume bullets (Clerk JWT). */
+export async function fetchResumeSemanticMatch(
+  token: string,
+  body: { keywords: string[]; bullets: string[] },
+): Promise<SemanticMatchMap> {
+  const t = token.trim();
+  if (!t) throw new ApiRequestError("Unauthorized", 401, "UNAUTHORIZED");
+
+  const res = await fetch(`${API_BASE_URL}/account/resume/semantic-match`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${t}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+    throw new ApiRequestError(
+      errBody.message ?? errBody.error ?? "Semantic match failed",
+      res.status,
+      "SEMANTIC_MATCH_FAILED",
+    );
+  }
+  return (await res.json()) as SemanticMatchMap;
 }
