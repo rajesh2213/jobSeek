@@ -191,6 +191,17 @@ export function filtersToSearchParams(filters: JobFilters): URLSearchParams {
   return p;
 }
 
+/** True when URL would carry any filter besides pagination (`page` / `limit` / `offset`). */
+export function hasActiveJobFilters(f: JobFilters): boolean {
+  const p = filtersToSearchParams({
+    ...f,
+    page: undefined,
+    limit: undefined,
+    offset: undefined,
+  });
+  return p.toString().length > 0;
+}
+
 export function parseSlug(slug: string[]): JobFilters {
   let joined = slug
     .flatMap((segment) => segment.split("-"))
