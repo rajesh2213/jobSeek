@@ -4,6 +4,8 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { SignInButton, useUser } from "@clerk/nextjs";
 import { cn } from "../../lib/cn";
+import { WORKFLOW_ACCOUNT_ENDPOINT_ID } from "../../lib/headerWorkflowGlow";
+import { useAccountPlan } from "../../lib/useAccountPlan";
 
 /** Do not add `position: relative` here — it overrides `fixed` when classes are concatenated (cn has no tailwind-merge). */
 const shellClass =
@@ -22,6 +24,7 @@ const fixedFrame: CSSProperties = {
  */
 export function FixedAccountAvatar() {
   const { user, isLoaded } = useUser();
+  const { isPro, isLoaded: planLoaded } = useAccountPlan();
 
   if (!isLoaded) {
     return (
@@ -42,8 +45,11 @@ export function FixedAccountAvatar() {
     const initial =
       (user.firstName?.[0] || user.primaryEmailAddress?.emailAddress?.[0] || "?").toUpperCase();
 
+    const proWorkflowTarget = planLoaded && isPro;
+
     return (
       <Link
+        id={proWorkflowTarget ? WORKFLOW_ACCOUNT_ENDPOINT_ID : undefined}
         href="/account"
         style={fixedFrame}
         className={shellClass}

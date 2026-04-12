@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { SignInButton, useUser } from "@clerk/nextjs";
+import { useAccountPlan } from "../../lib/useAccountPlan";
 
 export function MarketingHeader() {
   const { user, isLoaded } = useUser();
+  const { isPro, isLoaded: planLoaded } = useAccountPlan();
+  const showGetPro = !(planLoaded && isPro);
   const initial =
     (user?.firstName?.[0] || user?.primaryEmailAddress?.emailAddress?.[0] || "A").toUpperCase();
 
@@ -26,12 +29,14 @@ export function MarketingHeader() {
           />
         </Link>
         <div className="flex items-center gap-2">
-          <Link
-            href="/pricing"
-            className="rounded-full bg-brand px-4 py-2 text-sm font-bold !text-white no-underline transition-colors visited:!text-white hover:bg-brand-hover hover:!text-white active:!text-white"
-          >
-            Get Pro
-          </Link>
+          {showGetPro ? (
+            <Link
+              href="/pricing"
+              className="rounded-full bg-brand px-4 py-2 text-sm font-bold !text-white no-underline transition-colors visited:!text-white hover:bg-brand-hover hover:!text-white active:!text-white"
+            >
+              Get Pro
+            </Link>
+          ) : null}
           {!isLoaded ? (
             <div className="h-11 w-11 rounded-full border-2 border-ink/10 bg-surface/70" aria-hidden />
           ) : user ? (

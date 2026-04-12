@@ -10,7 +10,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { GET_PRO_GLOW_EVENT, GET_PRO_GLOW_MS } from "../../lib/headerWorkflowGlow";
+import {
+  GET_PRO_BUTTON_ID,
+  GET_PRO_GLOW_EVENT,
+  GET_PRO_GLOW_MS,
+  WORKFLOW_ACCOUNT_ENDPOINT_ID,
+} from "../../lib/headerWorkflowGlow";
+import { useAccountPlan } from "../../lib/useAccountPlan";
 import { siteLogoBrandDotRef } from "../../lib/siteLogoBrandDotRef";
 
 const HEADER_H = 64;
@@ -23,7 +29,7 @@ const BURST_DURATION = 0.6;
 const EASE_OUT = [0, 0, 0.2, 1] as const;
 const LAYOUT_TRANSITION = { duration: 0.25, ease: [0.22, 1, 0.36, 1] as const };
 
-/** Horizontal reference span for squiggle control points (scaled to dot → Get Pro). */
+/** Horizontal reference span for squiggle control points (scaled to dot → Get Pro or account). */
 const PATH_REF_W = 820;
 
 /** Inset stroke slightly past dot / before button so the path does not sit on element edges. */
@@ -113,6 +119,7 @@ function sleep(ms: number): Promise<void> {
 
 export function HeaderWorkflow() {
   const reduceMotion = useReducedMotion();
+  const { isPro, isLoaded: planLoaded } = useAccountPlan();
   const uid = useId().replace(/:/g, "");
   const gradId = `header-workflow-flow-${uid}`;
 
@@ -131,7 +138,9 @@ export function HeaderWorkflow() {
     const dotEl =
       siteLogoBrandDotRef.current ??
       document.getElementById("site-logo-brand-dot");
-    const cta = document.getElementById("get-pro-button");
+    const endpointId =
+      planLoaded && isPro ? WORKFLOW_ACCOUNT_ENDPOINT_ID : GET_PRO_BUTTON_ID;
+    const cta = document.getElementById(endpointId);
     if (!dotEl || !cta) return;
 
     const dot = dotEl.getBoundingClientRect();
@@ -156,7 +165,7 @@ export function HeaderWorkflow() {
       ex,
       ey,
     });
-  }, []);
+  }, [isPro, planLoaded]);
 
   useLayoutEffect(() => {
     measure();
@@ -222,14 +231,15 @@ export function HeaderWorkflow() {
           ease: EASE_OUT,
         });
         if (cancelled) return;
-        if (typeof window !== "undefined") {
+        const endpointIsAccount = planLoaded && isPro;
+        if (!endpointIsAccount && typeof window !== "undefined") {
           window.dispatchEvent(
             new CustomEvent(GET_PRO_GLOW_EVENT, {
               detail: { ms: GET_PRO_GLOW_MS },
             }),
           );
         }
-        await sleep(GET_PRO_GLOW_MS);
+        await sleep(endpointIsAccount ? 280 : GET_PRO_GLOW_MS);
         if (cancelled) return;
         await animate(progress, 0, { duration: 0.45, ease: "easeInOut" });
         if (cancelled) return;
@@ -241,7 +251,7 @@ export function HeaderWorkflow() {
     return () => {
       cancelled = true;
     };
-  }, [pathLen, reduceMotion]);
+  }, [pathLen, reduceMotion, isPro, planLoaded]);
 
   useEffect(() => {
     if (!reduceMotion || !pathLen) return;
@@ -250,7 +260,7 @@ export function HeaderWorkflow() {
     const id = window.setInterval(() => {
       const prev = i;
       i = (i + 1) % CHECKPOINTS.length;
-      if (prev === CHECKPOINTS.length - 1) {
+      if (prev === CHECKPOINTS.length - 1 && !(planLoaded && isPro)) {
         window.dispatchEvent(
           new CustomEvent(GET_PRO_GLOW_EVENT, {
             detail: { ms: GET_PRO_GLOW_MS },
@@ -260,7 +270,7 @@ export function HeaderWorkflow() {
       setActiveCheckpoint(CHECKPOINTS[i].id);
     }, EXPAND_MS);
     return () => window.clearInterval(id);
-  }, [reduceMotion, pathLen]);
+  }, [reduceMotion, pathLen, isPro, planLoaded]);
 
   const dashOffsetAnimated = useTransform(
     progress,
