@@ -2,6 +2,15 @@ import he from "he";
 import { lineMatchesCompanyBoilerplate } from "../ai/preprocessDescription.js";
 import { cleanJobDescription } from "../../utils/cleanJobDescription.js";
 
+/** Remove HTML tags/entities so card previews never show raw markup. */
+export function stripHtml(text: string): string {
+  return text
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&[a-z]+;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export type JobPreviewLinesSource =
   | "responsibility"
   | "requirement"
@@ -88,7 +97,8 @@ function isSkippablePreviewLine(
 function normalizePreviewLine(raw: string): string {
   const decoded = he.decode(raw);
   const stripped = stripParsedPrefixes(decoded).trim();
-  return truncateLine(stripped, 120);
+  const plain = stripHtml(stripped);
+  return truncateLine(plain, 120);
 }
 
 function takeFromParsed(
@@ -135,7 +145,7 @@ function fallbackFromDescription(
   const t = cleaned.trim().replace(/\s+/g, " ");
   const segments = t.includes(". ") ? t.split(/(?<=\.)\s+/) : [t];
   for (const seg of segments) {
-    const candidate = seg.trim();
+    const candidate = stripHtml(seg.trim());
     if (candidate.length < 30) continue;
     if (isSkippablePreviewLine(candidate, { bucket: "fallback", companyName: "" })) continue;
     return {
@@ -154,7 +164,7 @@ function fallbackFromDescription(
           return ls > 48 ? s.slice(0, ls) : s;
         })();
   return {
-    previewLines: [truncateLine(slice.trim(), 120)],
+    previewLines: [truncateLine(stripHtml(slice.trim()), 120)],
     previewLinesSource: "fallback",
   };
 }

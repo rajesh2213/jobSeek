@@ -130,6 +130,10 @@ export interface JobDiscoveryFilters {
    * via `locationRegion`, `expandLocationFilter`, or `locationCity` contains.
    */
   location?: string;
+  /**
+   * Multiple `?locations=` tokens — OR semantics; each token uses the same rules as `location`.
+   */
+  locationTokens?: string[];
 }
 
 export interface JobWithCompany extends Job {
@@ -175,6 +179,58 @@ function roleLabelFromSlug(slug: string): string {
     .join(" ");
 }
 
+function whereForLocationToken(locQ: string): Prisma.JobWhereInput {
+  const regionsList = getRegions();
+  const regionHit = regionsList.find((r) => r.toLowerCase() === locQ.toLowerCase());
+  if (regionHit) {
+    const regionCodes = expandLocationFilter(regionHit);
+    return {
+      OR: [
+        { locationRegion: regionHit },
+        {
+          AND: [
+            { OR: [{ locationRegion: null }, { locationRegion: "" }] },
+            whereResolvedCountryIn(regionCodes),
+          ],
+        },
+      ],
+    };
+  }
+  const codes = expandLocationFilter(locQ);
+  if (codes.length === 1) {
+    return whereResolvedCountryIn([codes[0]!]);
+  }
+  if (codes.length > 1) {
+    return whereResolvedCountryIn(codes);
+  }
+  return {
+    locationCity: { contains: locQ, mode: "insensitive" },
+  };
+}
+
+function sqlForLocationToken(locQ: string): Prisma.Sql {
+  const regionsList = getRegions();
+  const regionHit = regionsList.find((r) => r.toLowerCase() === locQ.toLowerCase());
+  if (regionHit) {
+    const regionCodes = expandLocationFilter(regionHit);
+    return Prisma.sql`(
+      j."locationRegion" = ${regionHit}
+      OR (
+        (j."locationRegion" IS NULL OR j."locationRegion" = '')
+        AND (${sqlResolvedCountryIn(regionCodes)})
+      )
+    )`;
+  }
+  const codes = expandLocationFilter(locQ);
+  if (codes.length === 1) {
+    return sqlResolvedCountryIn([codes[0]!]);
+  }
+  if (codes.length > 1) {
+    return sqlResolvedCountryIn(codes);
+  }
+  return Prisma.sql`j."locationCity" ILIKE ${`%${locQ}%`}`;
+}
+
 function buildDiscoveryWhere(
   filters?: JobDiscoveryFilters,
 ): Prisma.JobWhereInput {
@@ -200,45 +256,34 @@ function buildDiscoveryWhere(
   } else if (filters.role !== undefined && filters.role !== "") {
     and.push({ title: { contains: filters.role, mode: "insensitive" } });
   }
-  const locQ = filters.location?.trim();
-  if (locQ) {
-    const regionsList = getRegions();
-    const regionHit = regionsList.find((r) => r.toLowerCase() === locQ.toLowerCase());
-    if (regionHit) {
-      const regionCodes = expandLocationFilter(regionHit);
-      and.push({
-        OR: [
-          { locationRegion: regionHit },
-          {
-            AND: [
-              { OR: [{ locationRegion: null }, { locationRegion: "" }] },
-              whereResolvedCountryIn(regionCodes),
-            ],
-          },
-        ],
-      });
-    } else {
-      const codes = expandLocationFilter(locQ);
-      if (codes.length === 1) {
-        and.push(whereResolvedCountryIn([codes[0]!]));
-      } else if (codes.length > 1) {
-        and.push(whereResolvedCountryIn(codes));
-      } else {
-        and.push({
-          locationCity: { contains: locQ, mode: "insensitive" },
-        });
-      }
+
+  const locationTokens = filters.locationTokens?.filter((t) => t.trim().length > 0);
+  if (locationTokens !== undefined && locationTokens.length > 0) {
+    and.push({
+      OR: locationTokens.map((t) => whereForLocationToken(t.trim())),
+    });
+  } else {
+    const locQ = filters.location?.trim();
+    if (locQ) {
+      and.push(whereForLocationToken(locQ));
     }
   }
 
-  const locationFilterValues = filters.countries?.length
-    ? filters.countries
-    : filters.country
-      ? [filters.country]
-      : [];
+  const hasStructuredLocation =
+    (locationTokens?.length ?? 0) > 0 || Boolean(filters.location?.trim());
+  const locationFilterValues =
+    !hasStructuredLocation && filters.countries?.length
+      ? filters.countries
+      : !hasStructuredLocation && filters.country
+        ? [filters.country]
+        : [];
   if (locationFilterValues.length > 0) {
     and.push(whereResolvedCountryIn(locationFilterValues));
-  } else if (filters.locationTerms !== undefined && filters.locationTerms.length > 0) {
+  } else if (
+    !hasStructuredLocation &&
+    filters.locationTerms !== undefined &&
+    filters.locationTerms.length > 0
+  ) {
     and.push({
       OR: filters.locationTerms.map((loc) => ({
         OR: [
@@ -325,41 +370,36 @@ function buildDiscoveryWhereSql(filters?: JobDiscoveryFilters): Prisma.Sql {
     parts.push(Prisma.sql`j.title ILIKE ${`%${filters.role}%`}`);
   }
 
-  const locQ = filters.location?.trim();
-  if (locQ) {
-    const regionsList = getRegions();
-    const regionHit = regionsList.find((r) => r.toLowerCase() === locQ.toLowerCase());
-    if (regionHit) {
-      const regionCodes = expandLocationFilter(regionHit);
-      parts.push(
-        Prisma.sql`(
-          j."locationRegion" = ${regionHit}
-          OR (
-            (j."locationRegion" IS NULL OR j."locationRegion" = '')
-            AND (${sqlResolvedCountryIn(regionCodes)})
-          )
-        )`,
-      );
-    } else {
-      const codes = expandLocationFilter(locQ);
-      if (codes.length === 1) {
-        parts.push(sqlResolvedCountryIn([codes[0]!]));
-      } else if (codes.length > 1) {
-        parts.push(sqlResolvedCountryIn(codes));
-      } else {
-        parts.push(Prisma.sql`j."locationCity" ILIKE ${`%${locQ}%`}`);
-      }
+  const sqlLocationTokens = filters.locationTokens?.filter((t) => t.trim().length > 0);
+  if (sqlLocationTokens !== undefined && sqlLocationTokens.length > 0) {
+    parts.push(
+      Prisma.sql`(${Prisma.join(
+        sqlLocationTokens.map((t) => sqlForLocationToken(t.trim())),
+        " OR ",
+      )})`,
+    );
+  } else {
+    const locQ = filters.location?.trim();
+    if (locQ) {
+      parts.push(sqlForLocationToken(locQ));
     }
   }
 
-  const locationFilterValues = filters.countries?.length
-    ? filters.countries
-    : filters.country
-      ? [filters.country]
-      : [];
-  if (locationFilterValues.length > 0) {
-    parts.push(sqlResolvedCountryIn(locationFilterValues));
-  } else if (filters.locationTerms !== undefined && filters.locationTerms.length > 0) {
+  const hasStructuredLocationSql =
+    (sqlLocationTokens?.length ?? 0) > 0 || Boolean(filters.location?.trim());
+  const locationFilterValuesSql =
+    !hasStructuredLocationSql && filters.countries?.length
+      ? filters.countries
+      : !hasStructuredLocationSql && filters.country
+        ? [filters.country]
+        : [];
+  if (locationFilterValuesSql.length > 0) {
+    parts.push(sqlResolvedCountryIn(locationFilterValuesSql));
+  } else if (
+    !hasStructuredLocationSql &&
+    filters.locationTerms !== undefined &&
+    filters.locationTerms.length > 0
+  ) {
     parts.push(
       Prisma.sql`(${Prisma.join(
         filters.locationTerms.map(
