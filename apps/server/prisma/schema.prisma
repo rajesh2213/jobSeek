@@ -105,6 +105,7 @@ model Job {
   company    Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   canonical  Job?    @relation("JobDuplicates", fields: [canonicalJobId], references: [id], onDelete: Cascade)
   duplicates Job[]   @relation("JobDuplicates")
+  applications Application[]
 
   @@index([title])
   @@index([companyId])
@@ -175,6 +176,27 @@ model User {
   updatedAt          DateTime       @updatedAt
   subscription       Subscription?
   savedSearches      SavedSearch[]
+  applications       Application[]
+}
+
+model Application {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId          String
+  job            Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  status         String   @default("applied")
+  /// "applied" | "acknowledged" | "assessment" | "interview" | "offer" | "rejected" | "archived"
+  appliedAt      DateTime @default(now())
+  lastActivityAt DateTime @default(now())
+  notes          String?
+  archived       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, jobId])
+  @@index([userId])
+  @@index([userId, archived])
 }
 
 model Subscription {
@@ -191,14 +213,19 @@ model Subscription {
 }
 
 model SavedSearch {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name      String?
-  query     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String?
+  query           String
+  alertEnabled    Boolean   @default(false)
+  alertThreshold  Int       @default(5)
+  alertLastSentAt DateTime?
+  alertJobsSeen   Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([userId])
+  @@index([alertEnabled])
   @@unique([userId, query])
 }
