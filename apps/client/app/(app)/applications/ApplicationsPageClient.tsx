@@ -253,11 +253,6 @@ export function ApplicationsPageClient() {
         <section className="min-h-[480px] flex-1 rounded-2xl border border-ink/10 bg-surface/50 p-6 shadow-sm">
           {!selected ? (
             <div className="flex h-full min-h-[420px] flex-col items-center justify-center px-4 text-center">
-              <p className="text-4xl" aria-hidden>
-                📧
-              </p>
-              <h2 className="mt-4 font-display text-xl text-ink">Smart notifications</h2>
-              <ComingSoonPill className="mt-3" />
               <ul className="mt-6 max-w-md space-y-3 text-left text-sm leading-relaxed text-ink-muted">
                 <li className="flex gap-2">
                   <span className="text-ink/80" aria-hidden>
