@@ -7,6 +7,7 @@ import { registerLocationRoutes } from "../../modules/locations/locations.contro
 import { registerInternalMetricsRoutes } from "../../modules/internal/internal.metrics.routes.js";
 import { registerBillingRoutes } from "../../modules/billing/billing.controller.js";
 import { registerSavedSearchRoutes } from "../../modules/saved-search/savedSearch.routes.js";
+import { registerApplicationsRoutes } from "../../modules/applications/applications.routes.js";
 
 export async function registerRoutes(server: FastifyInstance): Promise<void> {
   server.get("/health", async (_request, reply) => {
@@ -18,6 +19,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   registerLocationRoutes(server);
   registerAccountRoutes(server);
   registerSavedSearchRoutes(server);
+  registerApplicationsRoutes(server);
   registerBillingRoutes(server);
   createJobController(server);
   createCompanyController(server);
