@@ -34,10 +34,13 @@ export interface StatsStripProps {
   /** Applied to the horizontal row of pills (e.g. `lg:justify-end` in the hero). */
   rowClassName?: string;
   /**
-   * `hero-split`: row 1 = `heroFirstRowLeading` only; row 2 = `heroSecondRowLeading` + both stat pills.
+   * `hero-split`: row 1 = `heroFirstRowLeading`; row 2 = `heroStatRowPrefix` + both stat pills (wrap),
+   * with `heroSecondRowLeading` beside the cluster on `sm+` (e.g. Stay early →).
    */
   variant?: "default" | "hero-split";
   heroFirstRowLeading?: ReactNode;
+  /** Rendered left of the stat pills on the second row (e.g. Smart Apply). */
+  heroStatRowPrefix?: ReactNode;
   heroSecondRowLeading?: ReactNode;
 }
 
@@ -47,6 +50,7 @@ export function StatsStrip({
   rowClassName,
   variant = "default",
   heroFirstRowLeading,
+  heroStatRowPrefix,
   heroSecondRowLeading,
 }: StatsStripProps) {
   const reduceMotion = useReducedMotion();
@@ -124,10 +128,6 @@ export function StatsStrip({
   const rowClass = cn("flex flex-wrap items-center gap-2 sm:gap-2.5", rowClassName);
 
   if (variant === "hero-split") {
-    const pillCluster = cn(
-      "flex flex-wrap items-center justify-end gap-2 sm:gap-2.5",
-      rowClassName,
-    );
     return (
       <motion.div
         className={cn("mb-6 mt-1", className)}
@@ -141,12 +141,13 @@ export function StatsStrip({
         }}
       >
         <div className="min-w-0 max-w-xl">{heroFirstRowLeading}</div>
-        <div className="mt-3 flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-x-6">
-          <div className="min-w-0 shrink-0">{heroSecondRowLeading}</div>
-          <div className={cn(pillCluster, "w-full sm:w-auto sm:shrink-0")}>
+        <div className="mt-3 flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-x-6">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-2.5">
+            {heroStatRowPrefix}
             {renderPill(0)}
             {renderPill(1)}
           </div>
+          <div className="min-w-0 shrink-0 sm:pt-0.5">{heroSecondRowLeading}</div>
         </div>
       </motion.div>
     );

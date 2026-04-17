@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import type { JobItem } from "../../lib/api";
 import { JobCard } from "./JobCard";
@@ -12,7 +12,24 @@ interface Props {
 
 function VirtualizedJobList({ jobs, flashAppliedJobId }: Props) {
   const listRef = useRef<HTMLElement | null>(null);
-  const scrollMargin = listRef.current?.offsetTop ?? 0;
+  const [scrollMargin, setScrollMargin] = useState(0);
+
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const measure = () => {
+      setScrollMargin(el.offsetTop);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
+
   const rowVirtualizer = useWindowVirtualizer({
     count: jobs.length,
     estimateSize: () => 420,

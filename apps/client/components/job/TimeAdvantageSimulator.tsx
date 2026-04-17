@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useReducedMotion } from "framer-motion";
 import { cn } from "../../lib/cn";
 import { Container } from "../ui/Container";
@@ -9,6 +10,8 @@ import { StatsStrip } from "./StatsStrip";
 export interface TimeAdvantageSimulatorProps {
   /** Passed through to stats pills (illustrative “this week” count). */
   totalListings?: number;
+  /** Shown to the left of the LinkedIn / jobs-this-week pills (e.g. Smart Apply). */
+  statRowPrefix?: ReactNode;
 }
 
 /**
@@ -16,6 +19,7 @@ export interface TimeAdvantageSimulatorProps {
  */
 export function TimeAdvantageSimulator({
   totalListings,
+  statRowPrefix,
 }: TimeAdvantageSimulatorProps) {
   const prefersReducedMotion = useReducedMotion();
 
@@ -47,6 +51,7 @@ export function TimeAdvantageSimulator({
           variant="hero-split"
           totalListings={totalListings}
           className="mb-0 mt-4"
+          heroStatRowPrefix={statRowPrefix}
           heroFirstRowLeading={
             <p className="min-w-0 max-w-2xl shrink-0 text-[15px] leading-snug text-ink/55 sm:max-w-none sm:text-base">
               That&apos;s the difference between browsing and getting interviews.

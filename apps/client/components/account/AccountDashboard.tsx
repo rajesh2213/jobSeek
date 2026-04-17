@@ -196,7 +196,7 @@ export function AccountDashboard() {
           </p>
           <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
             <span className="text-sm font-semibold text-ink">
-              {plan === "pro_plus" ? "PRO+" : plan === "pro" ? "PRO" : "FREE"}
+              {plan === "pro" ? "PRO" : "FREE"}
             </span>
             {plan === "free" ? (
               <>

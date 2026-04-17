@@ -8,6 +8,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
@@ -34,12 +35,29 @@ import { Container } from "../ui/Container";
 import { Button } from "../ui/Button";
 import { SortSegmented } from "../ui/SortSegmented";
 import { FilterChips } from "../filters/FilterChips";
-import { JobsInlineFilters } from "./JobsInlineFilters";
 import { JobList } from "./JobList";
-import { TimeAdvantageSimulator } from "./TimeAdvantageSimulator";
-import { LimitWallEnhanced } from "./LimitWallEnhanced";
 import { EmptyState } from "../ui/EmptyState";
 import { cn } from "../../lib/cn";
+import {
+  JobsHeroDynamicLoading,
+  JobsInlineFiltersDynamicLoading,
+  LimitWallDynamicLoading,
+} from "./jobsRouteDynamicFallbacks";
+
+const TimeAdvantageSimulator = dynamic(
+  () => import("./TimeAdvantageSimulator").then((m) => m.TimeAdvantageSimulator),
+  { loading: () => <JobsHeroDynamicLoading />, ssr: true },
+);
+
+const JobsInlineFilters = dynamic(
+  () => import("./JobsInlineFilters").then((m) => m.JobsInlineFilters),
+  { loading: () => <JobsInlineFiltersDynamicLoading />, ssr: true },
+);
+
+const LimitWallEnhanced = dynamic(
+  () => import("./LimitWallEnhanced").then((m) => m.LimitWallEnhanced),
+  { loading: () => <LimitWallDynamicLoading />, ssr: true },
+);
 
 function listQueryBase(f: JobFilters): JobFilters {
   const { offset: _o, page: _p, ...rest } = f;
@@ -131,13 +149,14 @@ function buildSavedSearchDetails(
   return details;
 }
 
-function getNextSavedSearchName(rows: SavedSearchItem[]): string {
+function getNextSavedSearchName(rows: SavedSearchItem[], maxSlots: number): string {
   const used = new Set<number>();
   for (const row of rows) {
     const m = row.name?.trim().match(/^Saved search (\d+)$/i);
     if (m) used.add(Number(m[1]));
   }
-  for (let i = 1; i <= 3; i += 1) {
+  const cap = Math.max(1, Math.min(99, maxSlots));
+  for (let i = 1; i <= cap; i += 1) {
     if (!used.has(i)) return `Saved search ${i}`;
   }
   return `Saved search ${rows.length + 1}`;
@@ -234,6 +253,7 @@ export function JobsSearchClient({
   const [listMeta, setListMeta] = useState(initialMeta);
   const [loadingMore, setLoadingMore] = useState(false);
   const [savedSearches, setSavedSearches] = useState<SavedSearchItem[]>([]);
+  const [savedSearchLimit, setSavedSearchLimit] = useState(3);
   const [savingSearch, setSavingSearch] = useState(false);
   const [deletingSavedId, setDeletingSavedId] = useState<string | null>(null);
   const [editingSavedId, setEditingSavedId] = useState<string | null>(null);
@@ -299,7 +319,10 @@ export function JobsSearchClient({
         const token = await getToken({ skipCache: true });
         if (!token) return;
         const res = await fetchSavedSearches(token);
-        if (!cancelled) setSavedSearches(res.data);
+        if (!cancelled) {
+          setSavedSearches(res.data);
+          setSavedSearchLimit(res.meta.limit);
+        }
       } catch {
         // Non-blocking: listing still works without saved-search metadata.
       }
@@ -546,7 +569,7 @@ export function JobsSearchClient({
     );
   }, [savedSearches, canonicalQuery]);
 
-  const canSaveAnother = savedSearches.length < 3;
+  const canSaveAnother = savedSearches.length < savedSearchLimit;
   const canSaveCurrentQuery = canonicalQuery !== "/jobs";
 
   const onSaveSearch = useCallback(async () => {
@@ -563,7 +586,7 @@ export function JobsSearchClient({
       return;
     }
     if (!canSaveAnother) {
-      setSavedSearchNotice("Max 3 saved searches reached");
+      setSavedSearchNotice(`Max ${savedSearchLimit} saved searches reached`);
       return;
     }
 
@@ -575,7 +598,7 @@ export function JobsSearchClient({
         setSavedSearchNotice("Sign in to save searches");
         return;
       }
-      const autoName = getNextSavedSearchName(savedSearches);
+      const autoName = getNextSavedSearchName(savedSearches, savedSearchLimit);
       const created = await createSavedSearch(token, {
         query: canonicalQuery,
         name: autoName,
@@ -606,6 +629,7 @@ export function JobsSearchClient({
     router,
     savedMatch,
     savedSearches,
+    savedSearchLimit,
   ]);
 
   const onDeleteSavedSearch = useCallback(
@@ -716,20 +740,22 @@ export function JobsSearchClient({
   return (
     <div className="relative z-0 flex min-h-screen flex-col">
       <div className="-mb-6 w-full sm:-mb-8">
-        <TimeAdvantageSimulator totalListings={listMeta?.total} />
+        <TimeAdvantageSimulator
+          totalListings={listMeta?.total}
+          statRowPrefix={
+            <button
+              type="button"
+              onClick={() => navigateProtected("/smart-apply")}
+              className="inline-flex items-center gap-1.5 rounded-full border border-brand/25 bg-white/90 px-3 py-1.5 text-sm font-semibold text-brand shadow-sm transition-colors hover:bg-brand/5"
+              title="Smart Apply fills job forms automatically using your profile. You review and submit - always in control."
+            >
+              Smart Apply ⚡
+            </button>
+          }
+        />
       </div>
 
       <Container width="jobs" className="pb-2 pt-0">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => navigateProtected("/smart-apply")}
-            className="inline-flex items-center gap-1.5 rounded-full border border-brand/25 bg-white/90 px-3 py-1.5 text-sm font-semibold text-brand shadow-sm transition-colors hover:bg-brand/5"
-            title="Smart Apply fills job forms automatically using your profile. You review and submit - always in control."
-          >
-            Smart Apply ⚡
-          </button>
-        </div>
         {showSmartApplyInstallBanner ? (
           <div
             className="mb-3 flex items-center gap-3 rounded-[10px] border border-[rgba(232,83,58,0.2)] px-4 py-3"
@@ -809,7 +835,7 @@ export function JobsSearchClient({
                   savingSearch || savedMatch != null || !canSaveCurrentQuery
                 }
                 title={
-                  !canSaveAnother ? "Only 3 saved searches allowed" : undefined
+                  !canSaveAnother ? `Only ${savedSearchLimit} saved searches allowed` : undefined
                 }
               >
                 {savedMatch
@@ -1131,7 +1157,7 @@ export function JobsSearchClient({
       <Container
         width="jobs"
         className={cn(
-          "mt-8 transition-opacity duration-200",
+          "mt-4 transition-opacity duration-200",
           isFilterPending && "pointer-events-none opacity-60",
         )}
         aria-busy={isFilterPending}

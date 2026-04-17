@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { memo, useMemo } from "react";
 import type { JobItem } from "../../lib/api";
@@ -15,7 +16,20 @@ import { ApplyJobButton } from "./ApplyJobButton";
 import { AppliedToggleButton } from "./AppliedToggleButton";
 import { Card } from "../ui/Card";
 import { WorkTypeOutlinePill } from "./WorkTypeOutlinePill";
-import { ResumeScorePill } from "../resume/ResumeScorePill";
+
+const ResumeScorePill = dynamic(
+  () =>
+    import("../resume/ResumeScorePill").then((m) => ({ default: m.ResumeScorePill })),
+  {
+    ssr: true,
+    loading: () => (
+      <div
+        className="h-9 w-full min-w-[10rem] shrink-0 animate-pulse rounded-lg bg-ink/10"
+        aria-hidden
+      />
+    ),
+  },
+);
 
 /** Roles first seen or posted within this window show the NEW badge. */
 const NEW_JOB_MAX_MS = 10 * 60 * 60 * 1000;
@@ -54,7 +68,8 @@ interface Props {
 }
 
 function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
-  const tick = useNowTicker(true);
+  /** Compact cards skip the global minute ticker to cut re-renders; relative time still correct on mount. */
+  const tick = useNowTicker(!compact);
 
   const postedLabel = useMemo(
     () => postedMetaLine(job),
