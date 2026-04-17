@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
 import { registerAccountResumeRoutes } from "./account.controller.js";
+import { registerAccountApplyProfileRoutes } from "./account.applyProfile.js";
 import {
   ensureUserJobViewsDayReset,
   FREE_DAILY_JOB_VIEWS,
@@ -10,6 +11,7 @@ import { resolveProPlan } from "../../utils/userPlan.js";
 
 export function registerAccountRoutes(server: FastifyInstance): void {
   registerAccountResumeRoutes(server);
+  registerAccountApplyProfileRoutes(server);
   server.get("/account/summary", async (request, reply) => {
     const ctx = await resolveClerkUser(server.prisma, request.headers.authorization);
     if (!ctx) {

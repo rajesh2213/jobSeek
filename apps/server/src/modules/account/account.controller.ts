@@ -1,8 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import { Prisma } from "@prisma/client";
 import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
-import { embedBullets, findClosestBullet } from "../../utils/resumeEmbedder.js";
-import { parseResumeFile } from "../../utils/resumeParser.js";
+import { embedBullets, matchKeywordsToBullets } from "../../utils/resumeEmbedder.js";
+import {
+  hashResumeText,
+  mimeTypeFromResumeFileName,
+  normalizeResumePlainText,
+  parseResumeFile,
+} from "../../utils/resumeParser.js";
+import { computeHasResumeFromParts, getResumeStatusRow } from "./resumePresence.js";
+import { extractProfileSummary } from "../../utils/resumeProfileExtractor.js";
+import { extractResumeStructured } from "../resume/extraction/pipeline.js";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME = new Set([
@@ -10,41 +18,6 @@ const ALLOWED_MIME = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "text/plain",
 ]);
-
-function mimeFromFileName(fileName: string | undefined): string {
-  const n = (fileName ?? "").toLowerCase();
-  if (n.endsWith(".docx")) {
-    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-  }
-  if (n.endsWith(".pdf")) {
-    return "application/pdf";
-  }
-  if (n.endsWith(".txt")) {
-    return "text/plain";
-  }
-  return "application/octet-stream";
-}
-
-async function runParallelLimit<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-
-  async function worker(): Promise<void> {
-    for (;;) {
-      const i = next++;
-      if (i >= items.length) return;
-      results[i] = await fn(items[i]);
-    }
-  }
-
-  const workers = Array.from({ length: Math.min(limit, items.length) }, () => worker());
-  await Promise.all(workers);
-  return results;
-}
 
 export function registerAccountResumeRoutes(server: FastifyInstance): void {
   server.post("/account/resume", async (request, reply) => {
@@ -61,7 +34,7 @@ export function registerAccountResumeRoutes(server: FastifyInstance): void {
     const buffer = await file.toBuffer();
     let mimeType = file.mimetype;
     if (!ALLOWED_MIME.has(mimeType)) {
-      const fromName = mimeFromFileName(file.filename);
+      const fromName = mimeTypeFromResumeFileName(file.filename);
       if (ALLOWED_MIME.has(fromName)) {
         mimeType = fromName;
       }
@@ -98,6 +71,9 @@ export function registerAccountResumeRoutes(server: FastifyInstance): void {
       });
     }
 
+    const applyProfileSummary = extractProfileSummary(parsed.text, parsed.bullets);
+    const resumeStructuredV1 = extractResumeStructured(parsed.text, { links: parsed.links });
+
     await server.prisma.user.update({
       where: { id: ctx.internalUserId },
       data: {
@@ -107,8 +83,22 @@ export function registerAccountResumeRoutes(server: FastifyInstance): void {
         resumeUpdatedAt: new Date(),
         resumeBullets: parsed.bullets,
         resumeBulletEmbeddings: embeddings,
-      },
+        resumeContentHash: hashResumeText(parsed.text),
+        resumeStructuredV1: resumeStructuredV1 as unknown as Prisma.InputJsonValue,
+        applyProfileSummary: applyProfileSummary as unknown as Prisma.InputJsonValue,
+      } as Prisma.UserUpdateInput,
     });
+
+    server.log.info(
+      {
+        event: "resume_uploaded",
+        userId: ctx.internalUserId,
+        fileName: file.filename ?? "resume",
+        wordCount: parsed.wordCount,
+        bulletCount: parsed.bullets.length,
+      },
+      "smart_apply_event",
+    );
 
     return reply.send({
       success: true,
@@ -131,9 +121,12 @@ export function registerAccountResumeRoutes(server: FastifyInstance): void {
         resumeFileName: null,
         resumeFileData: null,
         resumeUpdatedAt: null,
+        resumeContentHash: null,
         resumeBullets: Prisma.DbNull,
         resumeBulletEmbeddings: Prisma.DbNull,
-      },
+        resumeStructuredV1: Prisma.DbNull,
+        applyProfileSummary: Prisma.DbNull,
+      } as Prisma.UserUpdateInput,
     });
 
     return reply.send({ success: true });
@@ -145,20 +138,23 @@ export function registerAccountResumeRoutes(server: FastifyInstance): void {
       return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
     }
 
-    const row = await server.prisma.user.findUnique({
-      where: { id: ctx.internalUserId },
-      select: { resumeText: true, resumeFileName: true, resumeUpdatedAt: true },
-    });
+    const row = await getResumeStatusRow(server.prisma, ctx.internalUserId);
+    if (!row) {
+      return reply.status(404).send({ error: "User not found", code: "USER_NOT_FOUND" });
+    }
 
-    const hasResume = !!(row?.resumeText?.trim() && row?.resumeFileName);
-    const wordCount = row?.resumeText?.trim()
-      ? row.resumeText.split(/\s+/).filter(Boolean).length
-      : 0;
+    const hasResume = computeHasResumeFromParts({
+      resumeText: row.resumeText,
+      resumeFileName: row.resumeFileName,
+      fileOctets: row.fileOctets,
+    });
+    const textNorm = normalizeResumePlainText(row.resumeText);
+    const wordCount = textNorm.length ? textNorm.split(/\s+/).filter(Boolean).length : 0;
 
     return reply.send({
       hasResume,
-      fileName: row?.resumeFileName ?? null,
-      updatedAt: row?.resumeUpdatedAt?.toISOString() ?? null,
+      fileName: row.resumeFileName ?? null,
+      updatedAt: row.resumeUpdatedAt?.toISOString() ?? null,
       wordCount,
     });
   });
@@ -198,7 +194,7 @@ export function registerAccountResumeRoutes(server: FastifyInstance): void {
     }
 
     const name = row.resumeFileName ?? "resume";
-    const mime = mimeFromFileName(name);
+    const mime = mimeTypeFromResumeFileName(name);
     const contentType =
       mime === "application/octet-stream" ? "application/pdf" : mime;
 
@@ -216,23 +212,45 @@ export function registerAccountResumeRoutes(server: FastifyInstance): void {
 
     const body = request.body as { keywords?: string[]; bullets?: string[] };
     const keywords = body.keywords ?? [];
-    const bullets = body.bullets ?? [];
+    const fallbackBullets = body.bullets ?? [];
 
     const out: Record<string, { bullet: string; similarity: number }> = {};
 
-    if (!keywords.length || !bullets.length) {
+    if (!keywords.length) {
       return reply.send(out);
     }
 
-    const results = await runParallelLimit(keywords, 10, async (keyword) => {
-      const match = await findClosestBullet(keyword, bullets);
-      return { keyword, match };
+    const row = await server.prisma.user.findUnique({
+      where: { id: ctx.internalUserId },
+      select: {
+        resumeBullets: true,
+        resumeBulletEmbeddings: true,
+      },
     });
+    const storedBullets = (row?.resumeBullets as string[] | null) ?? [];
+    let bullets = storedBullets.length > 0 ? storedBullets : fallbackBullets;
+    if (!bullets.length) return reply.send(out);
 
-    for (const { keyword, match } of results) {
-      if (match) {
-        out[keyword] = { bullet: match.bullet, similarity: match.similarity };
+    let embeddings = (row?.resumeBulletEmbeddings as number[][] | null) ?? [];
+    const embeddingsValid =
+      Array.isArray(embeddings) &&
+      embeddings.length === bullets.length &&
+      embeddings.every((v) => Array.isArray(v) && v.length > 0);
+
+    if (!embeddingsValid) {
+      // Backfill once for legacy rows to avoid per-request bullet re-embedding.
+      embeddings = await embedBullets(bullets);
+      if (storedBullets.length > 0 && embeddings.length === storedBullets.length) {
+        await server.prisma.user.update({
+          where: { id: ctx.internalUserId },
+          data: { resumeBulletEmbeddings: embeddings as unknown as Prisma.InputJsonValue },
+        });
       }
+    }
+
+    const matches = await matchKeywordsToBullets(keywords, bullets, embeddings);
+    for (const [keyword, match] of Object.entries(matches)) {
+      out[keyword] = { bullet: match.bullet, similarity: match.similarity };
     }
 
     return reply.send(out);

@@ -33,6 +33,20 @@ function extractBearerJwt(authorization: string): string | null {
 }
 
 /**
+ * Dev-only extension auth bypass.
+ * Usage (local only):
+ *   Authorization: Bearer dev:user_xxx
+ * Enable with:
+ *   DEV_EXTENSION_AUTH_BYPASS=true
+ */
+function devBypassClerkIdFromToken(token: string): string | null {
+  if (process.env.NODE_ENV === "production") return null;
+  if (process.env.DEV_EXTENSION_AUTH_BYPASS?.trim() !== "true") return null;
+  const m = token.match(/^dev:(user_[A-Za-z0-9_-]+)$/);
+  return m?.[1] ?? null;
+}
+
+/**
  * Session JWTs may be signed with keys published on the instance Frontend API JWKS,
  * while `verifyToken(..., { secretKey })` loads keys from the Backend API `/v1/jwks` only.
  * Those sets can differ (different `kid`), which surfaces as JWKKidMismatch.
@@ -115,6 +129,26 @@ export async function resolveClerkUser(
 
   const token = extractBearerJwt(authorization);
   if (!token) return null;
+
+  const devBypassClerkId = devBypassClerkIdFromToken(token);
+  if (devBypassClerkId) {
+    const email = syntheticEmail(devBypassClerkId);
+    const user = await prisma.user.upsert({
+      where: { clerkId: devBypassClerkId },
+      create: { clerkId: devBypassClerkId, email },
+      update: {},
+      select: { id: true },
+    });
+    logger.info(
+      { event: "dev_extension_auth_bypass", clerkId: devBypassClerkId },
+      "Using dev extension auth bypass",
+    );
+    return {
+      clerkId: devBypassClerkId,
+      email: null,
+      internalUserId: user.id,
+    };
+  }
 
   const secretKey = process.env.CLERK_SECRET_KEY?.trim();
   const jwtKey = process.env.CLERK_JWT_KEY?.trim();

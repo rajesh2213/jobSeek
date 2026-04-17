@@ -1,6 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
 import { devPlanOverrideForUser } from "./devPlanOverride.js";
 
+export type BillingPlan = "free" | "pro" | "pro_plus";
+
 function pickEmailForOverride(
   emailHint: string | null | undefined,
   dbEmail: string | null | undefined,
@@ -26,7 +28,7 @@ export async function resolveProPlan(
   prisma: PrismaClient,
   internalUserId: string,
   emailHint?: string | null,
-): Promise<{ pro: boolean; plan: "free" | "pro" }> {
+): Promise<{ pro: boolean; plan: BillingPlan }> {
   const row = await prisma.user.findUnique({
     where: { id: internalUserId },
     include: { subscription: true },
@@ -36,11 +38,18 @@ export async function resolveProPlan(
   const email = pickEmailForOverride(emailHint, row.email);
   const override = devPlanOverrideForUser({ email, clerkId: row.clerkId });
   if (override === "pro") return { pro: true, plan: "pro" };
+  if (override === "pro_plus") return { pro: true, plan: "pro_plus" };
   if (override === "free") return { pro: false, plan: "free" };
 
+  if (row.plan === "pro_plus") return { pro: true, plan: "pro_plus" };
+  if (row.plan === "pro") return { pro: true, plan: "pro" };
+
   const subActive = row.subscription?.status === "active";
-  const pro = row.plan === "pro" || subActive;
-  return { pro, plan: pro ? "pro" : "free" };
+  if (subActive) {
+    return { pro: true, plan: "pro" };
+  }
+
+  return { pro: false, plan: "free" };
 }
 
 export async function isUserPro(

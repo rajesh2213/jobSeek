@@ -54,7 +54,7 @@ export function registerJobRoutes(
           : undefined;
 
       const filters = parseJobDiscoveryQuery(q);
-      request.log.info({ filters }, "jobs_query_filters");
+      request.log.debug({ filters }, "jobs_query_filters");
       const sortRaw = String(q.sort ?? "latest");
       const sort: "latest" | "salary_desc" =
         sortRaw === "salary_desc" || sortRaw === "salary" ? "salary_desc" : "latest";

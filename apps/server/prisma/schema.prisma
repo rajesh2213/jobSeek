@@ -162,7 +162,7 @@ model User {
   id                 String         @id @default(uuid())
   clerkId            String         @unique
   email              String         @unique
-  plan               String         @default("free") // "free" | "pro"
+  plan               String         @default("free") // "free" | "pro" | "pro_plus"
   stripeCustomerId   String?        @unique
   jobViewsToday      Int            @default(0)
   jobViewsResetAt    DateTime       @default(now())
@@ -170,8 +170,46 @@ model User {
   resumeFileName       String?      // original filename
   resumeFileData       Bytes?       // raw file bytes for download
   resumeUpdatedAt      DateTime?
+  resumeContentHash    String?      // sha256 of normalized text; scoring/debug
   resumeBullets        Json?        // String[] of extracted bullet points
   resumeBulletEmbeddings Json?      // number[][] parallel array of embeddings
+  resumeStructuredV1   Json?        // deterministic structured extraction payload
+  profileExtractLastAt DateTime?    // last POST extract-profile (1/day UTC limit)
+  // Apply profile
+  firstName              String?
+  lastName               String?
+  phone                  String?
+  address                String?
+  city                   String?
+  country                String?
+  linkedinUrl            String?
+  githubUrl              String?
+  portfolioUrl           String?
+  workAuthorization      String?
+  // "citizen" | "permanent_resident" | "visa_required" | "other"
+  salaryExpectation      String?
+  currentCompensation    String?    // current pay — forms; rarely on resume
+  availableFrom          String?
+  noticePeriod           String?
+  relocationPreference   String?
+  remotePreference       String?    // remote | hybrid | onsite | no_preference
+  yearsOfExperience      Int?
+  currentTitle           String?
+  currentCompany         String?
+  professionalSummary    String?
+  languages              String?    // comma-separated or free text
+  certifications         String?
+  highestEducation       String?
+  customQA               Json?
+  // Array<{ question: string, answer: string }>
+  applyProfileSummary    Json?
+  smartApplyPreferences  Json?      // { tone, length, firstPerson } answer style
+  applyProfileExtras     Json?      // long-tail form fields
+  // Compact extracted profile for AI prompts
+  // Smart Apply usage tracking
+  smartApplyEnabled      Boolean   @default(false)
+  smartApplyJobsToday    Int       @default(0)
+  smartApplyResetAt      DateTime  @default(now())
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
   subscription       Subscription?

@@ -2,7 +2,8 @@ import type { FastifyInstance } from "fastify";
 import type { SavedSearch } from "@prisma/client";
 import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
 import { verifyJobAlertUnsubscribeToken } from "../../utils/jobAlertToken.js";
-import { isUserPro } from "../../utils/userPlan.js";
+import { getPlanLimits } from "../../config/plans.js";
+import { isUserPro, resolveProPlan } from "../../utils/userPlan.js";
 import {
   getUserSavedSearchCount,
   isValidQuery,
@@ -124,8 +125,17 @@ export function registerSavedSearchRoutes(server: FastifyInstance): void {
       });
     }
 
+    const { plan } = await resolveProPlan(server.prisma, ctx.internalUserId, ctx.email);
+    const searchLimit = getPlanLimits(plan).savedSearches;
+    if (searchLimit === 0) {
+      return reply.status(403).send({
+        error: "Saved searches require Pro",
+        code: "PRO_REQUIRED",
+      });
+    }
+
     const count = await getUserSavedSearchCount(server.prisma, ctx.internalUserId);
-    if (count >= 3) {
+    if (count >= searchLimit) {
       return reply
         .status(409)
         .send({ error: "Saved search limit reached", code: "SAVED_SEARCH_LIMIT_REACHED" });
@@ -154,6 +164,9 @@ export function registerSavedSearchRoutes(server: FastifyInstance): void {
       return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
     }
 
+    const { plan } = await resolveProPlan(server.prisma, ctx.internalUserId, ctx.email);
+    const limit = getPlanLimits(plan).savedSearches;
+
     const rows = await server.prisma.savedSearch.findMany({
       where: { userId: ctx.internalUserId },
       orderBy: { createdAt: "desc" },
@@ -161,7 +174,7 @@ export function registerSavedSearchRoutes(server: FastifyInstance): void {
 
     return reply.send({
       data: rows.map(mapSavedSearchRow),
-      meta: { count: rows.length, limit: 3 },
+      meta: { count: rows.length, limit },
     });
   });
 

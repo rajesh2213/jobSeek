@@ -32,10 +32,21 @@ function ensureLemonSqueezy(): boolean {
 function allowedVariantIds(): Set<string> {
   const annual = process.env.LEMONSQUEEZY_PRO_ANNUAL_VARIANT_ID?.trim();
   const monthly = process.env.LEMONSQUEEZY_PRO_MONTHLY_VARIANT_ID?.trim();
+  const plusAnnual = process.env.LEMONSQUEEZY_PRO_PLUS_ANNUAL_VARIANT_ID?.trim();
+  const plusMonthly = process.env.LEMONSQUEEZY_PRO_PLUS_MONTHLY_VARIANT_ID?.trim();
   const set = new Set<string>();
   if (annual) set.add(annual);
   if (monthly) set.add(monthly);
+  if (plusAnnual) set.add(plusAnnual);
+  if (plusMonthly) set.add(plusMonthly);
   return set;
+}
+
+function planFromVariantId(variantId: string): "pro" | "pro_plus" {
+  const plusAnnual = process.env.LEMONSQUEEZY_PRO_PLUS_ANNUAL_VARIANT_ID?.trim();
+  const plusMonthly = process.env.LEMONSQUEEZY_PRO_PLUS_MONTHLY_VARIANT_ID?.trim();
+  if (variantId === plusAnnual || variantId === plusMonthly) return "pro_plus";
+  return "pro";
 }
 
 function mapLsSubscriptionStatus(lsStatus: string | undefined): string {
@@ -95,6 +106,8 @@ async function upsertProSubscription(
   const user = await prisma.user.findUnique({ where: { clerkId: params.clerkId } });
   if (!user) return;
 
+  const plan = planFromVariantId(params.variantId);
+
   await prisma.$transaction([
     prisma.subscription.upsert({
       where: { userId: user.id },
@@ -116,7 +129,7 @@ async function upsertProSubscription(
     }),
     prisma.user.update({
       where: { id: user.id },
-      data: { plan: "pro", stripeCustomerId: params.customerId },
+      data: { plan, stripeCustomerId: params.customerId },
     }),
   ]);
 }
@@ -210,6 +223,7 @@ export function registerBillingRoutes(server: FastifyInstance): void {
             });
 
             if (existing) {
+              const plan = variantId ? planFromVariantId(variantId) : undefined;
               await server.prisma.subscription.update({
                 where: { stripeSubscriptionId: lsSubscriptionId },
                 data: {
@@ -219,6 +233,12 @@ export function registerBillingRoutes(server: FastifyInstance): void {
                   ...(customerId ? { stripeCustomerId: customerId } : {}),
                 },
               });
+              if (plan) {
+                await server.prisma.user.update({
+                  where: { id: existing.userId },
+                  data: { plan },
+                });
+              }
               break;
             }
 
