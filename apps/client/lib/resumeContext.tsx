@@ -1,7 +1,15 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { API_BASE_URL } from "./api";
 
 interface ResumeState {
@@ -94,34 +102,37 @@ export function ResumeProvider({ children }: { children: ReactNode }) {
     void fetchResumeData();
   }, [fetchResumeData]);
 
-  const uploadResume = async (file: File) => {
-    setState((s) => ({ ...s, isUploading: true, uploadError: null }));
-    try {
-      const token = await getToken();
-      if (!token) throw new Error("Not signed in");
-      const formData = new FormData();
-      formData.append("resume", file);
-      const res = await fetch(`${API_BASE_URL}/account/resume`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-      if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
-        throw new Error(err.message ?? err.error ?? "Upload failed");
+  const uploadResume = useCallback(
+    async (file: File) => {
+      setState((s) => ({ ...s, isUploading: true, uploadError: null }));
+      try {
+        const token = await getToken();
+        if (!token) throw new Error("Not signed in");
+        const formData = new FormData();
+        formData.append("resume", file);
+        const res = await fetch(`${API_BASE_URL}/account/resume`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+        if (!res.ok) {
+          const err = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
+          throw new Error(err.message ?? err.error ?? "Upload failed");
+        }
+        const { clearScoreCache } = await import("./resumeScorer");
+        clearScoreCache();
+        await fetchResumeData();
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Upload failed";
+        setState((s) => ({ ...s, uploadError: msg, isUploading: false }));
+        throw e instanceof Error ? e : new Error(msg);
       }
-      const { clearScoreCache } = await import("./resumeScorer");
-      clearScoreCache();
-      await fetchResumeData();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Upload failed";
-      setState((s) => ({ ...s, uploadError: msg, isUploading: false }));
-      throw e instanceof Error ? e : new Error(msg);
-    }
-    setState((s) => ({ ...s, isUploading: false }));
-  };
+      setState((s) => ({ ...s, isUploading: false }));
+    },
+    [fetchResumeData, getToken],
+  );
 
-  const deleteResume = async () => {
+  const deleteResume = useCallback(async () => {
     const token = await getToken();
     if (!token) return;
     await fetch(`${API_BASE_URL}/account/resume`, {
@@ -139,15 +150,19 @@ export function ResumeProvider({ children }: { children: ReactNode }) {
       wordCount: 0,
       resumeUpdatedAt: null,
     }));
-  };
+  }, [getToken]);
 
-  return (
-    <ResumeContext.Provider
-      value={{ ...state, uploadResume, deleteResume, refreshStatus: fetchResumeData }}
-    >
-      {children}
-    </ResumeContext.Provider>
+  const value = useMemo<ResumeContextValue>(
+    () => ({
+      ...state,
+      uploadResume,
+      deleteResume,
+      refreshStatus: fetchResumeData,
+    }),
+    [state, uploadResume, deleteResume, fetchResumeData],
   );
+
+  return <ResumeContext.Provider value={value}>{children}</ResumeContext.Provider>;
 }
 
 export function useResume(): ResumeContextValue {

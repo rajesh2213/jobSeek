@@ -1,16 +1,16 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ToastProvider } from "../ui/Toast";
+import { AccountPlanProvider } from "../../lib/accountPlanContext";
 import { ApplicationsProvider } from "../../lib/applicationsContext";
-import { ResumeProvider } from "../../lib/resumeContext";
+import { ToastProvider } from "../ui/Toast";
 
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <ToastProvider>
-      <ApplicationsProvider>
-        <ResumeProvider>{children}</ResumeProvider>
-      </ApplicationsProvider>
+      <AccountPlanProvider>
+        <ApplicationsProvider>{children}</ApplicationsProvider>
+      </AccountPlanProvider>
     </ToastProvider>
   );
 }

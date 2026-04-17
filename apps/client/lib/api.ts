@@ -150,7 +150,7 @@ export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? "http://localhost:3000";
 
 export interface AccountSummary {
-  plan: "free" | "pro" | "pro_plus";
+  plan: "free" | "pro";
   jobViewsToday: number;
   jobViewsLimit: number | null;
   resetAt: string;
@@ -1103,11 +1103,15 @@ export async function fetchResumeSemanticMatch(
   });
 
   if (!res.ok) {
-    const errBody = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+    const errBody = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      message?: string;
+      code?: string;
+    };
     throw new ApiRequestError(
       errBody.message ?? errBody.error ?? "Semantic match failed",
       res.status,
-      "SEMANTIC_MATCH_FAILED",
+      errBody.code,
     );
   }
   return (await res.json()) as SemanticMatchMap;
