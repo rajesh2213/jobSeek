@@ -1,0 +1,23 @@
+{
+  "name": "@jobseek/extension",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "webpack --mode production",
+    "dev": "webpack --mode development --watch"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "copy-webpack-plugin": "^12",
+    "ts-loader": "^9",
+    "typescript": "^5",
+    "webpack": "^5",
+    "webpack-cli": "^5"
+  },
+  "dependencies": {
+    "react": "^18",
+    "react-dom": "^18"
+  }
+}

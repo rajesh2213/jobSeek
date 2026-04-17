@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "JobSeek Smart Apply",
+  "version": "1.0.0",
+  "description": "Auto-fill job applications using your JobSeek profile. You review and submit.",
+  "permissions": ["activeTab", "storage", "scripting", "webNavigation"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "action": {
+    "default_title": "JobSeek Smart Apply"
+  }
+}
