@@ -32,20 +32,14 @@ function ensureLemonSqueezy(): boolean {
 function allowedVariantIds(): Set<string> {
   const annual = process.env.LEMONSQUEEZY_PRO_ANNUAL_VARIANT_ID?.trim();
   const monthly = process.env.LEMONSQUEEZY_PRO_MONTHLY_VARIANT_ID?.trim();
-  const plusAnnual = process.env.LEMONSQUEEZY_PRO_PLUS_ANNUAL_VARIANT_ID?.trim();
-  const plusMonthly = process.env.LEMONSQUEEZY_PRO_PLUS_MONTHLY_VARIANT_ID?.trim();
   const set = new Set<string>();
   if (annual) set.add(annual);
   if (monthly) set.add(monthly);
-  if (plusAnnual) set.add(plusAnnual);
-  if (plusMonthly) set.add(plusMonthly);
   return set;
 }
 
-function planFromVariantId(variantId: string): "pro" | "pro_plus" {
-  const plusAnnual = process.env.LEMONSQUEEZY_PRO_PLUS_ANNUAL_VARIANT_ID?.trim();
-  const plusMonthly = process.env.LEMONSQUEEZY_PRO_PLUS_MONTHLY_VARIANT_ID?.trim();
-  if (variantId === plusAnnual || variantId === plusMonthly) return "pro_plus";
+/** All paid Lemon Squeezy variants map to Pro (legacy Pro+ product IDs are no longer sold). */
+function planFromVariantId(_variantId: string): "pro" {
   return "pro";
 }
 

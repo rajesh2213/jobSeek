@@ -162,7 +162,7 @@ model User {
   id                 String         @id @default(uuid())
   clerkId            String         @unique
   email              String         @unique
-  plan               String         @default("free") // "free" | "pro" | "pro_plus"
+  plan               String         @default("free") // "free" | "pro" (legacy "pro_plus" treated as Pro in app)
   stripeCustomerId   String?        @unique
   jobViewsToday      Int            @default(0)
   jobViewsResetAt    DateTime       @default(now())

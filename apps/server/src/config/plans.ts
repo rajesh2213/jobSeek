@@ -2,21 +2,14 @@ export const PLAN_LIMITS = {
   free: {
     dailyJobViews: 10,
     smartApplyJobs: 0,
-    savedSearches: 0,
-    resumeScore: true,
+    savedSearches: 3,
+    resumeScore: false,
     resumeBreakdown: false,
   },
   pro: {
     dailyJobViews: Infinity,
     smartApplyJobs: 5,
     savedSearches: 3,
-    resumeScore: true,
-    resumeBreakdown: true,
-  },
-  pro_plus: {
-    dailyJobViews: Infinity,
-    smartApplyJobs: 25,
-    savedSearches: 10,
     resumeScore: true,
     resumeBreakdown: true,
   },
@@ -29,9 +22,5 @@ export function getPlanLimits(plan: string) {
 }
 
 export function isPro(plan: string): boolean {
-  return plan === "pro" || plan === "pro_plus";
-}
-
-export function isProPlus(plan: string): boolean {
-  return plan === "pro_plus";
+  return plan === "pro";
 }

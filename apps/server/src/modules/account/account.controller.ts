@@ -1,6 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { Prisma } from "@prisma/client";
 import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
+import { getPlanLimits } from "../../config/plans.js";
+import { resolveProPlan } from "../../utils/userPlan.js";
 import { embedBullets, matchKeywordsToBullets } from "../../utils/resumeEmbedder.js";
 import {
   hashResumeText,
@@ -208,6 +210,14 @@ export function registerAccountResumeRoutes(server: FastifyInstance): void {
     const ctx = await resolveClerkUser(server.prisma, request.headers.authorization);
     if (!ctx) {
       return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+    }
+
+    const { plan } = await resolveProPlan(server.prisma, ctx.internalUserId, ctx.email);
+    if (!getPlanLimits(plan).resumeScore) {
+      return reply.status(403).send({
+        error: "Resume scoring requires Pro",
+        code: "PRO_REQUIRED",
+      });
     }
 
     const body = request.body as { keywords?: string[]; bullets?: string[] };

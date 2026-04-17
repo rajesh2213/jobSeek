@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { devPlanOverrideForUser } from "./devPlanOverride.js";
 
-export type BillingPlan = "free" | "pro" | "pro_plus";
+export type BillingPlan = "free" | "pro";
 
 function pickEmailForOverride(
   emailHint: string | null | undefined,
@@ -23,6 +23,7 @@ function pickEmailForOverride(
 /**
  * Effective Pro/Free for API and limits. Optional `emailHint` is the Clerk JWT email when present;
  * otherwise the user's stored email is used (needed when the session token omits `email`).
+ * Legacy `pro_plus` DB values are treated as Pro.
  */
 export async function resolveProPlan(
   prisma: PrismaClient,
@@ -38,11 +39,9 @@ export async function resolveProPlan(
   const email = pickEmailForOverride(emailHint, row.email);
   const override = devPlanOverrideForUser({ email, clerkId: row.clerkId });
   if (override === "pro") return { pro: true, plan: "pro" };
-  if (override === "pro_plus") return { pro: true, plan: "pro_plus" };
   if (override === "free") return { pro: false, plan: "free" };
 
-  if (row.plan === "pro_plus") return { pro: true, plan: "pro_plus" };
-  if (row.plan === "pro") return { pro: true, plan: "pro" };
+  if (row.plan === "pro" || row.plan === "pro_plus") return { pro: true, plan: "pro" };
 
   const subActive = row.subscription?.status === "active";
   if (subActive) {

@@ -127,12 +127,6 @@ export function registerSavedSearchRoutes(server: FastifyInstance): void {
 
     const { plan } = await resolveProPlan(server.prisma, ctx.internalUserId, ctx.email);
     const searchLimit = getPlanLimits(plan).savedSearches;
-    if (searchLimit === 0) {
-      return reply.status(403).send({
-        error: "Saved searches require Pro",
-        code: "PRO_REQUIRED",
-      });
-    }
 
     const count = await getUserSavedSearchCount(server.prisma, ctx.internalUserId);
     if (count >= searchLimit) {
