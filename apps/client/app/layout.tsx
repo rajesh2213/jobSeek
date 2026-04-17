@@ -9,8 +9,10 @@ import "./globals.css";
 const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-sans",
-  weight: ["400", "500", "700", "800"],
+  /** 800 omitted — `font-extrabold` maps to 700 in Tailwind to avoid an extra file. */
+  weight: ["400", "500", "700"],
   display: "swap",
+  adjustFontFallback: true,
 });
 
 const instrumentSerif = Instrument_Serif({
@@ -19,6 +21,7 @@ const instrumentSerif = Instrument_Serif({
   weight: "400",
   style: ["normal", "italic"],
   display: "swap",
+  adjustFontFallback: true,
 });
 
 export const metadata: Metadata = {

@@ -558,14 +558,15 @@ function PricingSection() {
             <p className="text-sm font-semibold">Free</p>
             <p className="mt-1 text-4xl font-bold">$0</p>
             <ul className="mt-3 space-y-1.5 text-sm text-ink/75">
-              <li>• 5 jobs/day</li>
+              <li>• 10 job views/day (UTC)</li>
+              <li>• Up to 3 saved searches</li>
               <li>• See roles the moment they are posted</li>
               <li>• Discover roles not listed on LinkedIn</li>
-              <li className="text-ink/45">✕ No resume match insights</li>
+              <li className="text-ink/45">✕ No AI resume match</li>
               <li className="text-ink/45">✕ No Smart Apply</li>
-              <li className="text-ink/45">✕ No Pro application tracker</li>
+              <li className="text-ink/45">✕ No email job alerts</li>
             </ul>
-            <p className="mt-3 text-xs font-medium text-ink/55">Only 5 roles/day - you may miss others</p>
+            <p className="mt-3 text-xs font-medium text-ink/55">Limited daily views — you may miss roles</p>
           </motion.div>
           <motion.div
             ref={proCardRef}
@@ -602,13 +603,13 @@ function PricingSection() {
               Most popular
             </motion.span>
             <p className="text-sm font-semibold">Pro Annual</p>
-            <p className="mt-1 text-4xl font-bold">$3/mo</p>
+            <p className="mt-1 text-4xl font-bold">$4/mo</p>
             <ul className="mt-3 space-y-1.5 text-sm text-ink/80">
-              <li>• Unlimited jobs</li>
-              <li>• Resume match + missing keywords</li>
-              <li>• Smart Apply for faster applications</li>
-              <li>• Application tracker + email insights (coming soon)</li>
-              <li>• Apply early, consistently</li>
+              <li>• Unlimited job browsing</li>
+              <li>• AI resume match (score + gaps)</li>
+              <li>• Smart Apply — 5 applications/day</li>
+              <li>• Email job alerts on saved searches</li>
+              <li>• Application tracker (coming soon)</li>
             </ul>
             <p className="mt-3 text-xs font-semibold text-brand">Never miss a role. Never lose track.</p>
           </motion.div>

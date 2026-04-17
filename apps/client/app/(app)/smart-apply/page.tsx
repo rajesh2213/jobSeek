@@ -14,7 +14,7 @@ import {
   type ApplyProfileResponse,
   type SmartApplyTone,
 } from "../../../lib/api";
-import { getPlanLimits, isPro, isProPlus } from "../../../lib/planLimits";
+import { getPlanLimits, isPro } from "../../../lib/planLimits";
 import { useResume } from "../../../lib/resumeContext";
 import { ResumeUploadModal } from "../../../components/resume/ResumeUploadModal";
 import { HeroPositioning } from "../../../components/smart-apply/HeroPositioning";
@@ -332,7 +332,7 @@ export default function SmartApplyPage() {
 
   const plan = status?.plan ?? "free";
   const isPaid = isPro(plan);
-  const planLabel = isProPlus(plan) ? "Pro+" : isPaid ? "Pro" : null;
+  const planLabel = isPaid ? "Pro" : null;
   const limits = getPlanLimits(plan);
   const jobsToday = status?.jobsToday ?? 0;
   const jobsLimit = status?.jobsLimit ?? limits.smartApplyJobs;

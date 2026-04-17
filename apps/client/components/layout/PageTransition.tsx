@@ -14,6 +14,9 @@ import { usePathname } from "next/navigation";
  *   3. Re-add the class to play the fade-in
  *
  * First render shows content immediately (no animation).
+ *
+ * Double `requestAnimationFrame` before the forced reflow batches layout work and reduces
+ * synchronous layout thrash on client navigations in some browsers.
  */
 export function PageTransition({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -28,8 +31,12 @@ export function PageTransition({ children }: { children: ReactNode }) {
     const el = ref.current;
     if (!el) return;
     el.classList.remove("page-enter");
-    void el.offsetHeight;
-    el.classList.add("page-enter");
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        void el.offsetHeight;
+        el.classList.add("page-enter");
+      });
+    });
   }, [pathname]);
 
   return <div ref={ref}>{children}</div>;

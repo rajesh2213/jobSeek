@@ -31,6 +31,7 @@ export function FixedGetProButton() {
           <Link
             id={GET_PRO_BUTTON_ID}
             href="/pricing"
+            prefetch={false}
             className={cn(
               "relative z-[2] inline-flex h-11 items-center rounded-full bg-brand px-4 text-sm font-bold !text-white no-underline shadow-sm",
               "visited:!text-white hover:bg-brand-hover hover:!text-white active:!text-white",

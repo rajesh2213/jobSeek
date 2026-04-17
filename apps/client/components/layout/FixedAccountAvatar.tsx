@@ -51,6 +51,7 @@ export function FixedAccountAvatar() {
       <Link
         id={proWorkflowTarget ? WORKFLOW_ACCOUNT_ENDPOINT_ID : undefined}
         href="/account"
+        prefetch={false}
         style={fixedFrame}
         className={shellClass}
         aria-label={`Account (${label})`}

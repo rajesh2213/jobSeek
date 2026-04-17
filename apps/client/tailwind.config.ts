@@ -41,6 +41,10 @@ const config: Config = {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
         display: ["var(--font-display)", "Georgia", "serif"],
       },
+      fontWeight: {
+        /** Matches loaded DM Sans weights (no separate 800 file). */
+        extrabold: "700",
+      },
       maxWidth: {
         content: "56rem",
         readable: "64rem",

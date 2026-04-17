@@ -18,6 +18,7 @@ export function MarketingHeader() {
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
         <Link
           href="/"
+          prefetch={false}
           className="group relative z-[80] flex shrink-0 items-baseline gap-1 no-underline transition-transform duration-200 hover:scale-[1.02]"
         >
           <span className="font-display text-2xl italic text-ink transition-colors group-hover:text-brand sm:text-3xl">
@@ -32,6 +33,7 @@ export function MarketingHeader() {
           {showGetPro ? (
             <Link
               href="/pricing"
+              prefetch={false}
               className="rounded-full bg-brand px-4 py-2 text-sm font-bold !text-white no-underline transition-colors visited:!text-white hover:bg-brand-hover hover:!text-white active:!text-white"
             >
               Get Pro
@@ -42,6 +44,7 @@ export function MarketingHeader() {
           ) : user ? (
             <Link
               href="/account"
+              prefetch={false}
               className="group flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 border-ink/10 bg-surface transition-all duration-300 hover:border-brand hover:shadow-md"
               aria-label="Account"
             >

@@ -18,6 +18,7 @@ export function SiteHeader() {
           <Link
             id="site-logo-link"
             href="/"
+            prefetch={false}
             className="group relative z-[80] flex shrink-0 items-baseline gap-1 no-underline transition-transform duration-200 hover:scale-[1.02]"
           >
             <span className="font-display text-2xl italic text-ink transition-colors group-hover:text-brand sm:text-3xl">
@@ -34,10 +35,10 @@ export function SiteHeader() {
             className="hidden min-w-0 items-center gap-3 text-xs font-bold uppercase tracking-wide text-ink/50 min-[420px]:flex lg:hidden"
             aria-label="Sections"
           >
-            <Link href="/jobs" className="no-underline hover:text-brand">
+            <Link href="/jobs" prefetch={false} className="no-underline hover:text-brand">
               Jobs
             </Link>
-            <Link href="/companies" className="no-underline hover:text-brand">
+            <Link href="/companies" prefetch={false} className="no-underline hover:text-brand">
               Companies
             </Link>
           </nav>
