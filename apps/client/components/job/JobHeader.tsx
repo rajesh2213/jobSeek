@@ -3,6 +3,7 @@ import type { JobItem } from "../../lib/api";
 import { formatTimeAgo } from "../../lib/format";
 import { jobDetailPinLocationText, workTypeDisplayLabel } from "../../lib/jobDisplay";
 import { ApplyJobButton } from "./ApplyJobButton";
+import { AppliedToggleButton } from "./AppliedToggleButton";
 
 interface Props {
   job: JobItem;
@@ -31,8 +32,9 @@ export function JobHeader({ job, applyHref }: Props) {
             <span>🏢 {workTypeDisplayLabel(job)}</span>
           </p>
         </div>
-        <div className="shrink-0">
+        <div className="shrink-0 flex items-center gap-2">
           <ApplyJobButton jobId={job.id} applyUrl={applyHref} variant="primary" size="md" />
+          <AppliedToggleButton jobId={job.id} size="md" />
         </div>
       </div>
     </header>

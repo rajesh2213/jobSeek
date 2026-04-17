@@ -243,7 +243,7 @@ function ApplyEarlyCard() {
         )}
       </AnimatePresence>
 
-      {/* Auto-applied badge */}
+      {/* Smart Apply badge */}
       <AnimatePresence>
         {showBadge && (
           <motion.div
@@ -258,7 +258,7 @@ function ApplyEarlyCard() {
               transition={{ repeat: Infinity, duration: 2.1, ease: "easeInOut" }}
               className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-bold text-amber-700"
             >
-              ⚡ Auto-applied in &lt; 2 mins
+              ⚡ Smart Apply in &lt; 2 mins
             </motion.span>
           </motion.div>
         )}

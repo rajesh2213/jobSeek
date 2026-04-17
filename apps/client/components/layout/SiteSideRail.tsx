@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
+import { useCallback } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "../../lib/cn";
 import { useApplications } from "../../lib/applicationsContext";
 
@@ -14,12 +16,26 @@ const railTab =
 
 export function SiteSideRail() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { isSignedIn, isLoaded: authLoaded } = useAuth();
   const jobs = pathname.startsWith("/jobs");
   const companies = pathname.startsWith("/companies") || pathname.startsWith("/company");
+  const smartApply = pathname.startsWith("/smart-apply");
   const applications = pathname.startsWith("/applications");
   const { stats } = useApplications();
 
   const actionCount = stats && stats.needsAction > 0 ? stats.needsAction : 0;
+  const goProtected = useCallback(
+    (path: string) => {
+      if (!authLoaded) return;
+      if (isSignedIn) {
+        router.push(path);
+        return;
+      }
+      router.push(`/sign-in?redirect_url=${encodeURIComponent(path)}`);
+    },
+    [authLoaded, isSignedIn, router],
+  );
 
   return (
     <nav
@@ -71,8 +87,32 @@ export function SiteSideRail() {
           <span className="absolute right-2 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-white/60" />
         ) : null}
       </Link>
-      <Link
-        href="/applications"
+      <button
+        type="button"
+        onClick={() => goProtected("/smart-apply")}
+        title="Smart Apply"
+        className={cn(
+          railTab,
+          smartApply ? `${W_EXPANDED} shadow-md` : `${W_COLLAPSED} hover:w-[186px] hover:shadow-md`,
+          smartApply
+            ? "bg-brand font-bold tracking-wide !text-white shadow-md"
+            : "bg-brand/85 font-bold tracking-wide !text-white hover:bg-brand hover:!text-white active:!text-white visited:!text-white",
+        )}
+      >
+        <span className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white/15 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+        <span className="shrink-0 text-sm opacity-90" aria-hidden>
+          ⚡
+        </span>
+        <span className="min-w-0 flex-1 truncate text-sm tracking-[0.08em] transition-[letter-spacing,text-shadow] duration-300 group-hover:tracking-[0.12em] group-hover:[text-shadow:0_0_10px_rgba(255,255,255,0.28)]">
+          Smart Apply
+        </span>
+        {smartApply ? (
+          <span className="absolute right-2 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-white/60" />
+        ) : null}
+      </button>
+      <button
+        type="button"
+        onClick={() => goProtected("/applications")}
         title="Applications"
         className={cn(
           railTab,
@@ -100,7 +140,7 @@ export function SiteSideRail() {
           ) : null}
           {applications ? <span className="h-1.5 w-1.5 rounded-full bg-white/60" /> : null}
         </span>
-      </Link>
+      </button>
     </nav>
   );
 }

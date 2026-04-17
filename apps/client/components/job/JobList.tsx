@@ -1,11 +1,53 @@
+"use client";
+
+import { useMemo, useRef } from "react";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import type { JobItem } from "../../lib/api";
 import { JobCard } from "./JobCard";
 
 interface Props {
   jobs: JobItem[];
+  flashAppliedJobId?: string | null;
 }
 
-export function JobList({ jobs }: Props) {
+function VirtualizedJobList({ jobs, flashAppliedJobId }: Props) {
+  const listRef = useRef<HTMLElement | null>(null);
+  const scrollMargin = listRef.current?.offsetTop ?? 0;
+  const rowVirtualizer = useWindowVirtualizer({
+    count: jobs.length,
+    estimateSize: () => 420,
+    overscan: 8,
+    scrollMargin,
+  });
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalHeight = rowVirtualizer.getTotalSize();
+  const rowWidthClass = useMemo(() => "absolute left-0 top-0 w-full", []);
+
+  return (
+    <section ref={listRef} className="relative" style={{ height: `${totalHeight}px` }} aria-label="Job results">
+      {virtualRows.map((virtualRow) => {
+        const job = jobs[virtualRow.index];
+        if (!job) return null;
+        return (
+          <div
+            key={job.id}
+            ref={rowVirtualizer.measureElement}
+            data-index={virtualRow.index}
+            className={rowWidthClass}
+            style={{
+              transform: `translateY(${virtualRow.start - scrollMargin}px)`,
+              paddingBottom: virtualRow.index === jobs.length - 1 ? 0 : "1.25rem",
+            }}
+          >
+            <JobCard job={job} flashAppliedJobId={flashAppliedJobId} />
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+export function JobList({ jobs, flashAppliedJobId }: Props) {
   if (jobs.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-line bg-white px-6 py-12 text-center text-sm text-ink-muted">
@@ -14,11 +56,5 @@ export function JobList({ jobs }: Props) {
     );
   }
 
-  return (
-    <section className="flex flex-col gap-5" aria-label="Job results">
-      {jobs.map((job) => (
-        <JobCard key={job.id} job={job} />
-      ))}
-    </section>
-  );
+  return <VirtualizedJobList jobs={jobs} flashAppliedJobId={flashAppliedJobId} />;
 }

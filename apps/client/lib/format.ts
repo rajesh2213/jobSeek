@@ -62,7 +62,7 @@ export function formatTimeAgo(
 
 /** Format annual salary floor for display (USD). */
 export function formatSalaryUsd(min: number): string {
-  return new Intl.NumberFormat(undefined, {
+  return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 0,

@@ -18,7 +18,7 @@ export function pseudoMatchScore(jobId: string): number {
 }
 
 export const MICRO_HINTS = [
-  "⚡ Auto-applied in 2 mins (Pro)",
+  "⚡ Smart Apply ready in 2 mins (Pro)",
   "🎯 Match insights available",
   "📩 Application tracker (Pro) · Email insights coming soon",
 ] as const;

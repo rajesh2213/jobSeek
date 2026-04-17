@@ -150,7 +150,7 @@ export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? "http://localhost:3000";
 
 export interface AccountSummary {
-  plan: "free" | "pro";
+  plan: "free" | "pro" | "pro_plus";
   jobViewsToday: number;
   jobViewsLimit: number | null;
   resetAt: string;
@@ -210,6 +210,272 @@ export async function fetchAccountSummary(token: string): Promise<AccountSummary
   });
   if (!res.ok) return null;
   return (await res.json()) as AccountSummary;
+}
+
+export interface ApplyProfileCustomQA {
+  question: string;
+  answer: string;
+}
+
+export type SmartApplyTone = "professional" | "friendly" | "formal" | "casual";
+export type SmartApplyLength = "short" | "medium" | "long";
+
+export interface SmartApplyPreferencesClient {
+  tone?: SmartApplyTone;
+  length?: SmartApplyLength;
+  firstPerson?: boolean;
+}
+
+export interface ApplyProfileResponse {
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  country: string | null;
+  linkedinUrl: string | null;
+  githubUrl: string | null;
+  portfolioUrl: string | null;
+  workAuthorization: string | null;
+  salaryExpectation: string | null;
+  currentCompensation: string | null;
+  availableFrom: string | null;
+  noticePeriod: string | null;
+  relocationPreference: string | null;
+  remotePreference: string | null;
+  yearsOfExperience: number | null;
+  currentTitle: string | null;
+  currentCompany: string | null;
+  professionalSummary: string | null;
+  languages: string | null;
+  certifications: string | null;
+  highestEducation: string | null;
+  customQA: ApplyProfileCustomQA[];
+  applyProfileSummary: unknown;
+  smartApplyPreferences: SmartApplyPreferencesClient | null;
+  applyProfileExtras: unknown;
+  profileExtractLastAt: string | null;
+  extractDailyLimitBypassed?: boolean;
+  hasResume: boolean;
+  resumeFileName: string | null;
+  resumeUpdatedAt: string | null;
+  resumeWordCount: number;
+}
+
+export type ApplyProfilePatch = Partial<{
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  country: string | null;
+  linkedinUrl: string | null;
+  githubUrl: string | null;
+  portfolioUrl: string | null;
+  workAuthorization: string | null;
+  salaryExpectation: string | null;
+  currentCompensation: string | null;
+  availableFrom: string | null;
+  noticePeriod: string | null;
+  relocationPreference: string | null;
+  remotePreference: string | null;
+  yearsOfExperience: number | null;
+  currentTitle: string | null;
+  currentCompany: string | null;
+  professionalSummary: string | null;
+  languages: string | null;
+  certifications: string | null;
+  highestEducation: string | null;
+  customQA: ApplyProfileCustomQA[];
+  smartApplyPreferences: SmartApplyPreferencesClient | null;
+  applyProfileExtras: unknown;
+}>;
+
+export async function fetchApplyProfile(token: string): Promise<ApplyProfileResponse | null> {
+  const t = token.trim();
+  if (!t) return null;
+  const res = await fetch(`${API_BASE_URL}/account/apply-profile`, {
+    headers: { Authorization: `Bearer ${t}` },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as ApplyProfileResponse;
+}
+
+export async function patchApplyProfile(
+  token: string,
+  body: ApplyProfilePatch,
+): Promise<ApplyProfileResponse> {
+  const t = token.trim();
+  if (!t) throw new ApiRequestError("Unauthorized", 401, "UNAUTHORIZED");
+  const res = await fetch(`${API_BASE_URL}/account/apply-profile`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${t}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ApiRequestError(err.error ?? "Failed to save profile", res.status, err.code);
+  }
+  return (await res.json()) as ApplyProfileResponse;
+}
+
+export async function extractProfileFromResume(token: string): Promise<{
+  success: boolean;
+  mergedFields: string[];
+  resetAt: string;
+}> {
+  const t = token.trim();
+  if (!t) throw new ApiRequestError("Unauthorized", 401, "UNAUTHORIZED");
+  const res = await fetch(`${API_BASE_URL}/account/resume/extract-profile`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${t}`,
+    },
+  });
+  if (res.status === 429) {
+    const err = (await res.json().catch(() => ({}))) as { resetAt?: string; message?: string; code?: string };
+    const reset =
+      err.resetAt != null
+        ? ` Next import after ${new Date(err.resetAt).toLocaleString(undefined, { timeZone: "UTC" })} UTC.`
+        : "";
+    throw new ApiRequestError(
+      (err.message ?? "Daily limit for profile import") + reset,
+      429,
+      err.code,
+    );
+  }
+  if (res.status === 400) {
+    const err = (await res.json().catch(() => ({}))) as {
+      message?: string;
+      error?: string;
+      code?: string;
+    };
+    const msg =
+      (typeof err.message === "string" && err.message.trim()) ||
+      (typeof err.error === "string" && err.error.trim()) ||
+      "Could not import profile from your resume.";
+    throw new ApiRequestError(msg, res.status, err.code);
+  }
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+    throw new ApiRequestError(err.message ?? err.error ?? "Extract failed", res.status);
+  }
+  return (await res.json()) as { success: boolean; mergedFields: string[]; resetAt: string };
+}
+
+export interface SmartApplyStatusResponse {
+  jobsToday: number;
+  jobsLimit: number;
+  jobsRemaining: number;
+  resetsAt: string;
+  plan: string;
+  profileComplete: boolean;
+  profileCompletionPct: number;
+}
+
+export async function fetchSmartApplyStatus(
+  token: string,
+): Promise<SmartApplyStatusResponse | null> {
+  const t = token.trim();
+  if (!t) return null;
+  const res = await fetch(`${API_BASE_URL}/account/smart-apply/status`, {
+    headers: { Authorization: `Bearer ${t}` },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as SmartApplyStatusResponse;
+}
+
+export interface SmartApplyBatchAnswerResponse {
+  answers: Array<{ id: string; answer: string }>;
+  answerMeta?: Array<{
+    id: string;
+    source: "structured" | "llm";
+    confidence: "high" | "medium" | "low";
+  }>;
+  tokensUsed: number;
+  jobsRemainingToday: number;
+  jobsLimit: number;
+}
+
+export type SmartApplyEventName =
+  | "resume_uploaded"
+  | "extension_installed_clicked"
+  | "ats_page_detected"
+  | "fields_detected_count"
+  | "fill_started"
+  | "fill_completed"
+  | "long_answer_generated_count"
+  | "answer_edited_before_apply"
+  | "session_to_first_success_time";
+
+export async function postSmartApplyEvent(
+  token: string,
+  event: SmartApplyEventName,
+  payload: Record<string, unknown> = {},
+): Promise<void> {
+  const t = token.trim();
+  if (!t) return;
+  await fetch(`${API_BASE_URL}/account/smart-apply/events`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${t}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ event, payload }),
+  });
+}
+
+export async function batchSmartApplyAnswers(
+  token: string,
+  payload: {
+    questions: Array<{
+      id: string;
+      question: string;
+      charLimit?: number;
+      kind?: "structured" | "free_text";
+    }>;
+    jobTitle: string;
+    companyName: string;
+    jobId?: string;
+    /** Overrides stored profile preferences for this request only. */
+    preferenceOverrides?: SmartApplyPreferencesClient;
+  },
+): Promise<SmartApplyBatchAnswerResponse> {
+  const t = token.trim();
+  if (!t) throw new ApiRequestError("Unauthorized", 401, "UNAUTHORIZED");
+  const res = await fetch(`${API_BASE_URL}/account/smart-apply/batch-answer`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${t}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (res.status === 403) {
+    const err = (await res.json().catch(() => ({}))) as { message?: string; code?: string };
+    throw new ApiRequestError(err.message ?? "Upgrade to Pro", 403, err.code);
+  }
+  if (res.status === 429) {
+    const err = (await res.json().catch(() => ({}))) as { resetAt?: string; code?: string };
+    throw new ApiRequestError(
+      `Daily limit reached. Resets at ${err.resetAt ?? ""}`,
+      429,
+      err.code,
+    );
+  }
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+    throw new ApiRequestError(
+      err.message ?? err.error ?? "Failed to generate answers",
+      res.status,
+    );
+  }
+  return (await res.json()) as SmartApplyBatchAnswerResponse;
 }
 
 export async function createSavedSearch(
@@ -450,7 +716,12 @@ export async function fetchJobs(
   const bypass = opts?.viewCapBypassSecret?.trim();
   if (bypass) headers.set("x-jobseek-view-cap-bypass", bypass);
 
-  const res = await fetch(url, { headers, next: { revalidate: 30 } });
+  const res = await fetch(
+    url,
+    t
+      ? { headers, cache: "no-store" }
+      : { headers, next: { revalidate: 30 } },
+  );
   if (!res.ok) {
     throw new Error(`Failed to fetch jobs: ${res.status} ${res.statusText}`);
   }
@@ -470,14 +741,31 @@ export interface JobCategoryAggregate {
 }
 
 export async function fetchRoles(): Promise<JobRoleSuggestion[]> {
-  const res = await fetch(`${API_BASE_URL}/jobs/roles`, {
-    next: { revalidate: 300 },
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch roles: ${res.status}`);
+  const now = Date.now();
+  if (rolesCache && rolesCache.expiresAt > now) {
+    return rolesCache.value;
   }
-  const body = (await res.json()) as { roles: JobRoleSuggestion[] };
-  return body.roles ?? [];
+  if (rolesInFlight) {
+    return rolesInFlight;
+  }
+  rolesInFlight = (async () => {
+    const res = await fetch(`${API_BASE_URL}/jobs/roles`, {
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to fetch roles: ${res.status}`);
+    }
+    const body = (await res.json()) as { roles: JobRoleSuggestion[] };
+    const rows = body.roles ?? [];
+    rolesCache = {
+      value: rows,
+      expiresAt: Date.now() + TAXONOMY_CACHE_TTL_MS,
+    };
+    return rows;
+  })().finally(() => {
+    rolesInFlight = null;
+  });
+  return rolesInFlight;
 }
 
 export async function fetchJobCategories(): Promise<JobCategoryAggregate[]> {
@@ -496,15 +784,38 @@ export interface JobSkillAggregate {
   count: number;
 }
 
+const TAXONOMY_CACHE_TTL_MS = 5 * 60 * 1000;
+let rolesCache: { value: JobRoleSuggestion[]; expiresAt: number } | null = null;
+let rolesInFlight: Promise<JobRoleSuggestion[]> | null = null;
+let skillsCache: { value: JobSkillAggregate[]; expiresAt: number } | null = null;
+let skillsInFlight: Promise<JobSkillAggregate[]> | null = null;
+
 export async function fetchJobSkills(): Promise<JobSkillAggregate[]> {
-  const res = await fetch(`${API_BASE_URL}/jobs/skills`, {
-    next: { revalidate: 300 },
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch job skills: ${res.status}`);
+  const now = Date.now();
+  if (skillsCache && skillsCache.expiresAt > now) {
+    return skillsCache.value;
   }
-  const body = (await res.json()) as { skills: JobSkillAggregate[] };
-  return body.skills ?? [];
+  if (skillsInFlight) {
+    return skillsInFlight;
+  }
+  skillsInFlight = (async () => {
+    const res = await fetch(`${API_BASE_URL}/jobs/skills`, {
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to fetch job skills: ${res.status}`);
+    }
+    const body = (await res.json()) as { skills: JobSkillAggregate[] };
+    const rows = body.skills ?? [];
+    skillsCache = {
+      value: rows,
+      expiresAt: Date.now() + TAXONOMY_CACHE_TTL_MS,
+    };
+    return rows;
+  })().finally(() => {
+    skillsInFlight = null;
+  });
+  return skillsInFlight;
 }
 
 export async function fetchCountrySuggestions(query: string): Promise<CountrySuggestion[]> {

@@ -5,7 +5,12 @@ import Link from "next/link";
 import { UserProfile, useAuth, useClerk, useUser } from "@clerk/nextjs";
 import { createPortal } from "react-dom";
 import type { Appearance } from "@clerk/types";
-import { fetchSavedSearchAlertStatus, type UserMeResponse } from "../../lib/api";
+import {
+  fetchSavedSearchAlertStatus,
+  fetchSmartApplyStatus,
+  type UserMeResponse,
+} from "../../lib/api";
+import { isPro as isPaidPlan } from "../../lib/planLimits";
 import { useResume } from "../../lib/resumeContext";
 import { ResumeUploadModal } from "../resume/ResumeUploadModal";
 
@@ -48,7 +53,7 @@ const clerkAppearance = {
 
 export function AccountDashboard() {
   const { signOut } = useClerk();
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn } = useAuth();
   const { user, isLoaded } = useUser();
   const { hasResume, fileName, wordCount, resumeUpdatedAt, deleteResume, refreshStatus } =
     useResume();
@@ -58,6 +63,9 @@ export function AccountDashboard() {
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [activeAlertCount, setActiveAlertCount] = useState<number | null>(null);
+  const [smartApplyStatus, setSmartApplyStatus] = useState<Awaited<
+    ReturnType<typeof fetchSmartApplyStatus>
+  > | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,13 +105,36 @@ export function AccountDashboard() {
     };
   }, [getToken]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const token = await getToken({ skipCache: true });
+        if (!token) {
+          if (!cancelled) setSmartApplyStatus(null);
+          return;
+        }
+        const s = await fetchSmartApplyStatus(token);
+        if (!cancelled) setSmartApplyStatus(s);
+      } catch {
+        if (!cancelled) setSmartApplyStatus(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken]);
+
   // Prefer plan from /api/user/me; default matches backend free tier when absent.
   const plan = me?.plan ?? "free";
-  const isPro = plan === "pro";
+  const isPro = isPaidPlan(plan);
   const limit = me?.jobViewsLimit ?? 10;
   const rawUsed = me?.jobViewsToday ?? 0;
   const usedDisplay = isPro ? rawUsed : Math.min(rawUsed, limit);
   const pct = isPro || limit <= 0 ? 0 : Math.round((usedDisplay / limit) * 100);
+  const smartApplyHref = isSignedIn
+    ? "/smart-apply"
+    : `/sign-in?redirect_url=${encodeURIComponent("/smart-apply")}`;
 
   const primary = user?.emailAddresses?.find((e) => e.id === user?.primaryEmailAddressId) ??
     user?.emailAddresses?.[0];
@@ -165,9 +196,9 @@ export function AccountDashboard() {
           </p>
           <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
             <span className="text-sm font-semibold text-ink">
-              {plan === "pro" ? "PRO" : "FREE"}
+              {plan === "pro_plus" ? "PRO+" : plan === "pro" ? "PRO" : "FREE"}
             </span>
-            {plan !== "pro" ? (
+            {plan === "free" ? (
               <>
                 <span className="text-ink/35" aria-hidden>
                   →
@@ -240,6 +271,66 @@ export function AccountDashboard() {
           <p className="mt-3 text-xs leading-relaxed text-ink-muted">
             Refreshes daily at midnight UTC
           </p>
+        </div>
+
+        <hr className="my-6 border-ink/10" />
+
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-ink/45">
+            Smart Apply
+          </p>
+          {!isPro ? (
+            <>
+              <p className="mt-2 text-sm text-ink-muted">⚡ Pro feature</p>
+              <Link
+                href="/pricing"
+                className="mt-2 inline-block text-sm font-semibold text-brand hover:underline"
+              >
+                Upgrade to unlock →
+              </Link>
+            </>
+          ) : smartApplyStatus && smartApplyStatus.jobsLimit > 0 ? (
+            <>
+              <div
+                className="mt-3 h-2 w-full overflow-hidden rounded-full bg-ink/10"
+                role="progressbar"
+                aria-valuenow={smartApplyStatus.jobsToday}
+                aria-valuemin={0}
+                aria-valuemax={smartApplyStatus.jobsLimit}
+              >
+                <div
+                  className="h-full rounded-full bg-brand transition-[width] duration-300"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      Math.round(
+                        (smartApplyStatus.jobsToday / smartApplyStatus.jobsLimit) * 100,
+                      ),
+                    )}%`,
+                  }}
+                />
+              </div>
+              <p className="mt-2 text-sm text-ink">
+                <span className="font-semibold">
+                  {smartApplyStatus.jobsToday} of {smartApplyStatus.jobsLimit} today
+                </span>
+              </p>
+              <p className="mt-1 text-xs text-ink-muted">Resets at midnight UTC</p>
+              <Link
+                href={smartApplyHref}
+                className="mt-2 inline-block text-sm font-semibold text-brand hover:underline"
+              >
+                Set up profile →
+              </Link>
+            </>
+          ) : isPro ? (
+            <Link
+              href={smartApplyHref}
+              className="mt-2 inline-block text-sm font-semibold text-brand hover:underline"
+            >
+              Set up profile →
+            </Link>
+          ) : null}
         </div>
 
         <hr className="my-6 border-ink/10" />

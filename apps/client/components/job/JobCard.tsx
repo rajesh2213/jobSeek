@@ -1,17 +1,18 @@
 "use client";
 
-import { motion, useInView, useReducedMotion } from "framer-motion";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useMemo } from "react";
 import type { JobItem } from "../../lib/api";
 import { accentFromId } from "../../lib/accent";
 import { formatSalaryUsd, formatTimeAgo } from "../../lib/format";
 import { filterSkillPillsForDisplay, jobCardPinLocationText } from "../../lib/jobDisplay";
 import { cn } from "../../lib/cn";
 import { companyLogoSrcForDisplay } from "../../lib/logoDisplay";
+import { useNowTicker } from "../../lib/useNowTicker";
 import { Badge } from "../ui/Badge";
 import { buttonClassName } from "../ui/Button";
 import { ApplyJobButton } from "./ApplyJobButton";
+import { AppliedToggleButton } from "./AppliedToggleButton";
 import { Card } from "../ui/Card";
 import { WorkTypeOutlinePill } from "./WorkTypeOutlinePill";
 import { ResumeScorePill } from "../resume/ResumeScorePill";
@@ -49,18 +50,11 @@ interface Props {
   job: JobItem;
   /** Dense card for similar-jobs grid (no excerpt, max 3 skill tags). */
   compact?: boolean;
+  flashAppliedJobId?: string | null;
 }
 
-export function JobCard({ job, compact }: Props) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const inView = useInView(rootRef, { amount: 0.2, margin: "0px" });
-  const reduceMotion = useReducedMotion();
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    if (!inView) return;
-    const id = window.setInterval(() => setTick((n) => n + 1), 60_000);
-    return () => window.clearInterval(id);
-  }, [inView]);
+function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
+  const tick = useNowTicker(true);
 
   const postedLabel = useMemo(
     () => postedMetaLine(job),
@@ -83,6 +77,7 @@ export function JobCard({ job, compact }: Props) {
       : [descFallback.length > 220 ? `${descFallback.slice(0, 220)}…` : descFallback];
   const previewFromResponsibility = job.previewLinesSource === "responsibility";
   const hasSalary = job.salaryMin != null && job.salaryMin > 0;
+  const isAppliedFlash = flashAppliedJobId === job.id;
   const logo = job.company.logoUrl?.trim();
   const initial = job.company.name.slice(0, 1).toUpperCase();
   const titleHover =
@@ -98,49 +93,31 @@ export function JobCard({ job, compact }: Props) {
     "will-change-transform",
     "hover:shadow-[0_14px_44px_-12px_rgba(0,0,0,0.14)]",
   );
+  const motionLiteClass = "transition-transform duration-150 ease-out hover:scale-[1.01]";
 
   const justPostedBadge = justPosted ? (
-    <motion.span
-      className="rounded-full bg-emerald-500/14 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-900 ring-1 ring-emerald-500/25 dark:text-emerald-100"
-      animate={
-        inView && !reduceMotion ? { opacity: [0.75, 1, 0.75], scale: [1, 1.05, 1] } : { opacity: 1 }
-      }
-      transition={inView && !reduceMotion ? { duration: 2.4, repeat: Infinity, ease: "easeInOut" } : {}}
-    >
+    <span className="rounded-full bg-emerald-500/14 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-900 ring-1 ring-emerald-500/25 dark:text-emerald-100">
       Just posted
-    </motion.span>
+    </span>
   ) : null;
 
   const newBadge = showNewBadge ? (
-    <motion.span
-      className="rounded-full bg-brand px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white shadow-md ring-2 ring-brand/90 ring-offset-2 ring-offset-surface"
-      animate={
-        inView && !reduceMotion ? { opacity: [0.72, 1, 0.72] } : { opacity: 1 }
-      }
-      transition={
-        inView && !reduceMotion
-          ? { duration: 2, repeat: Infinity, ease: "easeInOut" }
-          : { duration: 0.15 }
-      }
-    >
+    <span className="rounded-full bg-brand px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white shadow-md ring-2 ring-brand/90 ring-offset-2 ring-offset-surface">
       NEW
-    </motion.span>
+    </span>
   ) : null;
 
   if (compact) {
     return (
-      <motion.div
-        ref={rootRef}
-        className="h-full"
-        whileHover={reduceMotion ? undefined : { scale: 1.015 }}
-        transition={{ type: "spring", stiffness: 420, damping: 32 }}
-        style={{ transformOrigin: "50% 50%" }}
+      <div
+        className={cn("h-full", motionLiteClass)}
       >
       <Card
         accent={accent}
         className={cn(
           "h-full !p-4 transition-all duration-300",
           cardHoverClass,
+          isAppliedFlash && "ring-2 ring-teal/45 bg-teal-soft/40",
         )}
       >
         <div className="flex h-full min-h-0 flex-col justify-between gap-3">
@@ -250,6 +227,11 @@ export function JobCard({ job, compact }: Props) {
               size="sm"
               variant="outline"
             />
+            <AppliedToggleButton
+              jobId={job.id}
+              outlineTone={accent}
+              size="sm"
+            />
             <Link
               href={`/job/${job.id}`}
               className={buttonClassName({ variant: "primary", size: "sm" })}
@@ -259,19 +241,18 @@ export function JobCard({ job, compact }: Props) {
           </div>
         </div>
       </Card>
-      </motion.div>
+      </div>
     );
   }
 
   return (
-    <motion.div
-      ref={rootRef}
-      className="h-full"
-      whileHover={reduceMotion ? undefined : { scale: 1.015 }}
-      transition={{ type: "spring", stiffness: 420, damping: 32 }}
-      style={{ transformOrigin: "50% 50%" }}
+    <div
+      className={cn("h-full", motionLiteClass)}
     >
-    <Card accent={accent} className={cn("h-full", cardHoverClass)}>
+    <Card
+      accent={accent}
+      className={cn("h-full transition-shadow", cardHoverClass, isAppliedFlash && "ring-2 ring-teal/45 bg-teal-soft/35")}
+    >
       <div className="relative z-0 flex items-start gap-5">
         <div className="absolute right-6 top-6 z-10 flex max-w-[min(100%,calc(100%-1rem))] min-w-0 flex-col gap-2">
           <div className="flex flex-nowrap justify-end gap-2">
@@ -281,6 +262,12 @@ export function JobCard({ job, compact }: Props) {
               outlineTone={accent}
               size="sm"
               variant="outline"
+              className="shrink-0"
+            />
+            <AppliedToggleButton
+              jobId={job.id}
+              outlineTone={accent}
+              size="sm"
               className="shrink-0"
             />
             <Link
@@ -415,6 +402,9 @@ export function JobCard({ job, compact }: Props) {
         </div>
       </div>
     </Card>
-    </motion.div>
+    </div>
   );
 }
+
+export const JobCard = memo(JobCardComponent);
+JobCard.displayName = "JobCard";

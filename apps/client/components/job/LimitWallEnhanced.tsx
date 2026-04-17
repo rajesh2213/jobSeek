@@ -384,7 +384,11 @@ export function LimitWallEnhanced({ resetAt, count, previewJobs }: Props) {
               aria-label="Pro features"
             >
               {[
-                { k: "auto", icon: "⚡", line: "Auto-apply → Apply within seconds" },
+                {
+                  k: "auto",
+                  icon: "⚡",
+                  line: "Smart Apply ⚡ — Fill ATS forms fast; you review and submit",
+                },
                 { k: "resume", icon: "🎯", line: "Resume match → Know before you apply" },
                 {
                   k: "track",

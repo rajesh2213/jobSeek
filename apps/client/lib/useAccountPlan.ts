@@ -3,9 +3,10 @@
 import { useAuth } from "@clerk/nextjs";
 import { useCallback, useEffect, useState } from "react";
 import { fetchAccountSummary, type AccountSummary } from "./api";
+import { isPro as planIsPro } from "./planLimits";
 
 export function useAccountPlan(): {
-  plan: "free" | "pro";
+  plan: "free" | "pro" | "pro_plus";
   isPro: boolean;
   isLoaded: boolean;
   refresh: () => Promise<void>;
@@ -36,7 +37,7 @@ export function useAccountPlan(): {
   }, [refresh]);
 
   const plan = summary?.plan ?? "free";
-  const isPro = plan === "pro";
+  const isPro = planIsPro(plan);
 
   return {
     plan,

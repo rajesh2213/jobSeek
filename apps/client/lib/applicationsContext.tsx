@@ -29,6 +29,7 @@ export interface ApplicationsContextValue {
   applications: ApplicationItem[];
   isLoading: boolean;
   markApplied: (jobId: string) => Promise<void>;
+  unmarkApplied: (jobId: string) => Promise<void>;
   updateStatus: (id: string, status: string) => Promise<void>;
   updateNotes: (id: string, notes: string | null) => Promise<void>;
   removeApplication: (id: string) => Promise<void>;
@@ -44,16 +45,20 @@ export function ApplicationsProvider({ children }: { children: ReactNode }) {
 
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [optimisticAppliedJobIds, setOptimisticAppliedJobIds] = useState<string[]>([]);
+  const [optimisticUnappliedJobIds, setOptimisticUnappliedJobIds] = useState<string[]>([]);
   const [stats, setStats] = useState<{ total: number; needsAction: number } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const appliedJobIds = useMemo(() => {
     const s = new Set(applications.map((a) => a.job.id));
+    for (const id of optimisticUnappliedJobIds) {
+      s.delete(id);
+    }
     for (const id of optimisticAppliedJobIds) {
       s.add(id);
     }
     return s;
-  }, [applications, optimisticAppliedJobIds]);
+  }, [applications, optimisticAppliedJobIds, optimisticUnappliedJobIds]);
 
   const refresh = useCallback(async () => {
     if (!isSignedIn) {
@@ -94,6 +99,7 @@ export function ApplicationsProvider({ children }: { children: ReactNode }) {
     async (jobId: string) => {
       if (!isSignedIn) return;
 
+      setOptimisticUnappliedJobIds((prev) => prev.filter((id) => id !== jobId));
       setOptimisticAppliedJobIds((prev) =>
         prev.includes(jobId) ? prev : [...prev, jobId],
       );
@@ -113,6 +119,34 @@ export function ApplicationsProvider({ children }: { children: ReactNode }) {
       }
     },
     [getToken, isSignedIn, refresh, showToast],
+  );
+
+  const unmarkApplied = useCallback(
+    async (jobId: string) => {
+      if (!isSignedIn) return;
+      setOptimisticAppliedJobIds((prev) => prev.filter((id) => id !== jobId));
+      setOptimisticUnappliedJobIds((prev) =>
+        prev.includes(jobId) ? prev : [...prev, jobId],
+      );
+
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const existing = applications.find((a) => a.job.id === jobId);
+        if (existing) {
+          await deleteApplication(token, existing.id);
+          showToast({ message: "Marked as not applied", type: "success" });
+        }
+        await refresh();
+      } catch (e) {
+        if (e instanceof ApiRequestError && e.status === 401) {
+          return;
+        }
+      } finally {
+        setOptimisticUnappliedJobIds((prev) => prev.filter((id) => id !== jobId));
+      }
+    },
+    [applications, getToken, isSignedIn, refresh, showToast],
   );
 
   const updateStatus = useCallback(
@@ -151,6 +185,7 @@ export function ApplicationsProvider({ children }: { children: ReactNode }) {
       applications,
       isLoading,
       markApplied,
+      unmarkApplied,
       updateStatus,
       updateNotes,
       removeApplication,
@@ -162,6 +197,7 @@ export function ApplicationsProvider({ children }: { children: ReactNode }) {
       applications,
       isLoading,
       markApplied,
+      unmarkApplied,
       updateStatus,
       updateNotes,
       removeApplication,

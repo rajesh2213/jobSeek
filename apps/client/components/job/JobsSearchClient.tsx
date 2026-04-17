@@ -175,8 +175,31 @@ export function JobsSearchClient({
   meta: initialMeta,
   relatedSlugs,
 }: Props) {
-  const { getToken, isSignedIn } = useAuth();
+  const { getToken, isSignedIn, isLoaded: authLoaded } = useAuth();
   const { isPro } = useAccountPlan();
+  const [smartApplyBannerDismissed, setSmartApplyBannerDismissed] = useState(false);
+  const [extensionPresent, setExtensionPresent] = useState(false);
+
+  useEffect(() => {
+    try {
+      setSmartApplyBannerDismissed(
+        typeof window !== "undefined" &&
+          localStorage.getItem("smartApplyBannerDismissed") === "true",
+      );
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    const tick = () => {
+      if (typeof window === "undefined") return;
+      setExtensionPresent(window.__JOBSEEK_EXTENSION__ === true);
+    };
+    tick();
+    const id = window.setInterval(tick, 3000);
+    return () => window.clearInterval(id);
+  }, []);
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlKey = searchParams.toString();
@@ -184,6 +207,12 @@ export function JobsSearchClient({
     () => parseJobFiltersFromSearch(Object.fromEntries(searchParams.entries())),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync when URL string changes
     [urlKey],
+  );
+
+  /** Stable identity for the current job search (ignores pagination and transient params like `appliedJob`). */
+  const jobListFiltersKey = useMemo(
+    () => filtersToSearchParams(listQueryBase(urlFilters)).toString(),
+    [urlFilters],
   );
 
   const [draft, setDraft] = useState<JobFilters>(urlFilters);
@@ -216,7 +245,10 @@ export function JobsSearchClient({
   const [hoveredSavedId, setHoveredSavedId] = useState<string | null>(null);
   const hoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [alertUpdatingId, setAlertUpdatingId] = useState<string | null>(null);
+  const [flashAppliedJobId, setFlashAppliedJobId] = useState<string | null>(null);
   const [isFilterPending, startFilterTransition] = useTransition();
+  /** Tracks which search the current `listJobs` / `listMeta` belong to; avoids wiping client "load more" on RSC refresh. */
+  const listServerSyncKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     setDraft(urlFilters);
@@ -237,9 +269,24 @@ export function JobsSearchClient({
   }, [urlFilters]);
 
   useEffect(() => {
-    setListJobs(jobs);
-    setListMeta(initialMeta);
-  }, [jobs, initialMeta]);
+    if (listServerSyncKeyRef.current !== jobListFiltersKey) {
+      listServerSyncKeyRef.current = jobListFiltersKey;
+      setListJobs(jobs);
+      setListMeta(initialMeta);
+      return;
+    }
+    // Same search as last sync — parent likely re-rendered from RSC (e.g. `router.replace` after apply flash).
+    // Do not shrink the list back to page 1; keep client-merged pages from "Load more".
+    setListJobs((prev) => (prev.length > jobs.length ? prev : jobs));
+    setListMeta((prev) => {
+      const prevPage = prev?.page ?? 1;
+      const serverPage = initialMeta?.page ?? 1;
+      if (prev && initialMeta && prevPage > serverPage) {
+        return prev;
+      }
+      return initialMeta ?? prev;
+    });
+  }, [jobs, initialMeta, jobListFiltersKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -275,6 +322,46 @@ export function JobsSearchClient({
     };
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(urlKey);
+    const markerFromUrl = params.get("appliedJob")?.trim() ?? "";
+    let marker = markerFromUrl;
+    if (!marker) {
+      try {
+        marker = window.sessionStorage.getItem("jobseek:applied-flash-job-id")?.trim() ?? "";
+      } catch {
+        marker = "";
+      }
+    }
+    if (!marker) return;
+    setFlashAppliedJobId(marker);
+    try {
+      window.sessionStorage.removeItem("jobseek:applied-flash-job-id");
+    } catch {
+      // ignore
+    }
+    if (markerFromUrl) {
+      params.delete("appliedJob");
+      const qs = params.toString();
+      router.replace(qs ? `/jobs?${qs}` : "/jobs", { scroll: false });
+    }
+  }, [router, urlKey]);
+
+  useEffect(() => {
+    if (!flashAppliedJobId) return;
+    const clear = () => setFlashAppliedJobId(null);
+    const timeoutId = window.setTimeout(clear, 4000);
+    window.addEventListener("pointerdown", clear, { once: true });
+    window.addEventListener("keydown", clear, { once: true });
+    window.addEventListener("scroll", clear, { once: true, passive: true });
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.removeEventListener("pointerdown", clear);
+      window.removeEventListener("keydown", clear);
+      window.removeEventListener("scroll", clear);
+    };
+  }, [flashAppliedJobId]);
+
   const navigate = useCallback(
     (f: JobFilters) => {
       const params = filtersToSearchParams(f).toString();
@@ -283,6 +370,18 @@ export function JobsSearchClient({
       });
     },
     [router, startFilterTransition],
+  );
+
+  const navigateProtected = useCallback(
+    (path: string) => {
+      if (!authLoaded) return;
+      if (isSignedIn) {
+        router.push(path);
+        return;
+      }
+      router.push(`/sign-in?redirect_url=${encodeURIComponent(path)}`);
+    },
+    [authLoaded, isSignedIn, router],
   );
 
   const onApply = useCallback(() => {
@@ -602,11 +701,71 @@ export function JobsSearchClient({
         : "Hover a saved search to enable job alerts."
       : null;
 
+  const dismissSmartApplyBanner = useCallback(() => {
+    try {
+      localStorage.setItem("smartApplyBannerDismissed", "true");
+    } catch {
+      /* ignore */
+    }
+    setSmartApplyBannerDismissed(true);
+  }, []);
+
+  const showSmartApplyInstallBanner =
+    isSignedIn && isPro && !extensionPresent && !smartApplyBannerDismissed;
+
   return (
     <div className="relative z-0 flex min-h-screen flex-col">
       <div className="-mb-6 w-full sm:-mb-8">
         <TimeAdvantageSimulator totalListings={listMeta?.total} />
       </div>
+
+      <Container width="jobs" className="pb-2 pt-0">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigateProtected("/smart-apply")}
+            className="inline-flex items-center gap-1.5 rounded-full border border-brand/25 bg-white/90 px-3 py-1.5 text-sm font-semibold text-brand shadow-sm transition-colors hover:bg-brand/5"
+            title="Smart Apply fills job forms automatically using your profile. You review and submit - always in control."
+          >
+            Smart Apply ⚡
+          </button>
+        </div>
+        {showSmartApplyInstallBanner ? (
+          <div
+            className="mb-3 flex items-center gap-3 rounded-[10px] border border-[rgba(232,83,58,0.2)] px-4 py-3"
+            style={{
+              background: "linear-gradient(135deg, #fff8f6, #ffffff)",
+            }}
+          >
+            <span className="text-lg" aria-hidden>
+              ⚡
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-ink">Smart Apply is ready</p>
+              <p className="m-0 text-[13px] text-[#666]">
+                Install the Chrome extension to auto-fill job applications
+              </p>
+            </div>
+            <a
+              href="https://chrome.google.com/webstore"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 rounded-lg px-4 py-2 text-[13px] font-semibold text-white no-underline"
+              style={{ background: "#E8533A" }}
+            >
+              Install →
+            </a>
+            <button
+              type="button"
+              onClick={dismissSmartApplyBanner}
+              className="shrink-0 border-0 bg-transparent p-1 text-ink/50 hover:text-ink"
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        ) : null}
+      </Container>
 
       <div
         id="section-filters"
@@ -1024,7 +1183,9 @@ export function JobsSearchClient({
               : listJobs;
           return (
             <>
-              {listJobs.length > 0 ? <JobList jobs={jobsForList} /> : null}
+              {listJobs.length > 0 ? (
+                <JobList jobs={jobsForList} flashAppliedJobId={flashAppliedJobId} />
+              ) : null}
               {showCapWall && capResetAt ? (
                 <LimitWallEnhanced
                   resetAt={capResetAt}

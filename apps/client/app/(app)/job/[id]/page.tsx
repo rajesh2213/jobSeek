@@ -68,7 +68,7 @@ export default async function JobDetailPage({ params }: Props) {
     fetchJobs(
       {
         category: job.category,
-        limit: 100,
+        limit: 20,
       },
       { token },
     ),

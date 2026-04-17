@@ -10,13 +10,24 @@ const CREAM_TINT = "linear-gradient(180deg, rgba(232, 122, 93, 0.08) 0%, rgba(24
 
 const ANNUAL_VARIANT_ID = process.env.NEXT_PUBLIC_LS_PRO_ANNUAL_VARIANT_ID?.trim() ?? "";
 const MONTHLY_VARIANT_ID = process.env.NEXT_PUBLIC_LS_PRO_MONTHLY_VARIANT_ID?.trim() ?? "";
+const PLUS_ANNUAL_VARIANT_ID = process.env.NEXT_PUBLIC_LS_PRO_PLUS_ANNUAL_VARIANT_ID?.trim() ?? "";
+const PLUS_MONTHLY_VARIANT_ID = process.env.NEXT_PUBLIC_LS_PRO_PLUS_MONTHLY_VARIANT_ID?.trim() ?? "";
 
 const PRO_FEATURES = [
   "Unlimited jobs daily",
   "AI resume review",
+  "⚡ Smart Apply — 5 jobs/day — Auto-fill any ATS job application form; AI answers for open-ended questions (requires free Chrome extension)",
   "Job alerts — get emailed when new roles match your search (choose 5 or 10 job threshold · instant email delivery)",
-  "Saved searches",
+  "Saved searches — up to 3",
   "Early access",
+] as const;
+
+const PRO_PLUS_FEATURES = [
+  "⚡ Smart Apply — 25 jobs/day",
+  "Everything in Pro",
+  "📊 Application response analytics (coming soon)",
+  "💼 Multiple apply profiles (coming soon)",
+  "🔔 Priority job alerts — 10 saved searches",
 ] as const;
 
 const FAQ = [
@@ -38,15 +49,24 @@ const FAQ = [
   },
 ] as const;
 
+type CheckoutKey = "pro_annual" | "pro_monthly" | "plus_annual" | "plus_monthly";
+
+const VARIANT_BY_KEY: Record<CheckoutKey, string> = {
+  pro_annual: ANNUAL_VARIANT_ID,
+  pro_monthly: MONTHLY_VARIANT_ID,
+  plus_annual: PLUS_ANNUAL_VARIANT_ID,
+  plus_monthly: PLUS_MONTHLY_VARIANT_ID,
+};
+
 export default function PricingPage() {
   const { isSignedIn, getToken } = useAuth();
-  const [busy, setBusy] = useState<null | "annual" | "monthly">(null);
+  const [busy, setBusy] = useState<null | CheckoutKey>(null);
   const [error, setError] = useState<string | null>(null);
 
   const startCheckout = useCallback(
-    async (which: "annual" | "monthly") => {
+    async (which: CheckoutKey) => {
       setError(null);
-      const variantId = which === "annual" ? ANNUAL_VARIANT_ID : MONTHLY_VARIANT_ID;
+      const variantId = VARIANT_BY_KEY[which];
       if (!variantId) {
         setError("Pricing is not configured. Add Lemon Squeezy variant IDs to your environment.");
         return;
@@ -91,10 +111,11 @@ export default function PricingPage() {
     which,
     label,
   }: {
-    which: "annual" | "monthly";
+    which: CheckoutKey;
     label: string;
   }) => {
     const loading = busy === which;
+    const configured = Boolean(VARIANT_BY_KEY[which]);
     if (!isSignedIn) {
       return (
         <SignInButton mode="modal" forceRedirectUrl="/pricing">
@@ -111,7 +132,7 @@ export default function PricingPage() {
     return (
       <button
         type="button"
-        disabled={loading || (which === "annual" ? !ANNUAL_VARIANT_ID : !MONTHLY_VARIANT_ID)}
+        disabled={loading || !configured}
         onClick={() => void startCheckout(which)}
         className="w-full rounded-xl py-3.5 text-center text-[15px] font-bold text-white transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
         style={{ backgroundColor: CORAL }}
@@ -140,7 +161,7 @@ export default function PricingPage() {
           </p>
         ) : null}
 
-        <div className="mx-auto mt-12 grid max-w-4xl gap-6 md:grid-cols-2 md:gap-8">
+        <div className="mx-auto mt-12 grid max-w-6xl gap-6 md:grid-cols-2 lg:grid-cols-3 md:gap-8">
           <div
             className="relative flex flex-col rounded-2xl border-2 border-brand bg-surface p-8 shadow-card ring-1 ring-brand/15"
             style={{ backgroundImage: CREAM_TINT }}
@@ -181,7 +202,7 @@ export default function PricingPage() {
               ))}
             </ul>
             <div className="mt-8">
-              <PlanAction which="annual" label="Get Pro Annual →" />
+              <PlanAction which="pro_annual" label="Get Pro Annual →" />
             </div>
           </div>
 
@@ -208,20 +229,60 @@ export default function PricingPage() {
               ))}
             </ul>
             <div className="mt-8">
-              <PlanAction which="monthly" label="Get Pro Monthly →" />
+              <PlanAction which="pro_monthly" label="Get Pro Monthly →" />
+            </div>
+          </div>
+
+          <div className="relative flex flex-col rounded-2xl border-2 border-ink/15 bg-surface p-8 shadow-card ring-1 ring-ink/10 lg:col-span-1 md:col-span-2 lg:col-span-1">
+            <span className="absolute -top-3 right-4 rounded-full bg-ink px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow-sm">
+              Power users
+            </span>
+            <h2 className="mt-4 font-sans text-lg font-bold text-ink">Pro+ Annual</h2>
+            <p className="mt-1 text-sm text-ink-muted">Maximum leverage</p>
+            <div className="mt-6">
+              <p className="font-sans text-4xl font-extrabold tabular-nums tracking-tight text-ink">
+                $12<span className="text-xl font-bold text-ink-muted">/mo</span>
+              </p>
+              <p className="mt-2 text-sm text-ink-muted">
+                billed <span className="font-semibold text-ink">$144/year</span>
+              </p>
+            </div>
+            <ul className="mt-6 flex flex-1 flex-col gap-3 text-sm text-ink">
+              {PRO_PLUS_FEATURES.map((f) => (
+                <li key={f} className="flex gap-2">
+                  <span className="font-bold text-brand" aria-hidden>
+                    ✓
+                  </span>
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-8">
+              <PlanAction which="plus_annual" label="Get Pro+ Annual →" />
+            </div>
+            <p className="mt-4 text-center text-sm text-ink-muted">or</p>
+            <div className="mt-2">
+              <p className="text-center font-sans text-2xl font-extrabold text-ink">
+                $15<span className="text-lg font-bold text-ink-muted">/mo</span>
+              </p>
+              <p className="text-center text-sm text-ink-muted">billed monthly</p>
+              <div className="mt-4">
+                <PlanAction which="plus_monthly" label="Get Pro+ Monthly →" />
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="mx-auto mt-16 max-w-3xl">
+        <div className="mx-auto mt-16 max-w-5xl overflow-x-auto">
           <h3 className="text-center font-sans text-xl font-bold text-ink">Compare plans</h3>
           <div className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
-            <table className="w-full border-collapse text-left text-sm">
+            <table className="w-full min-w-[520px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-line bg-canvas/80">
                   <th className="px-4 py-3 font-semibold text-ink">Feature</th>
                   <th className="px-4 py-3 font-semibold text-ink">Free</th>
                   <th className="px-4 py-3 font-semibold text-brand">Pro</th>
+                  <th className="px-4 py-3 font-semibold text-ink">Pro+</th>
                 </tr>
               </thead>
               <tbody className="text-ink/90">
@@ -229,25 +290,36 @@ export default function PricingPage() {
                   <td className="px-4 py-3">Jobs per day</td>
                   <td className="px-4 py-3 text-ink-muted">Limited</td>
                   <td className="px-4 py-3 font-medium text-ink">Unlimited</td>
+                  <td className="px-4 py-3 font-medium text-ink">Unlimited</td>
+                </tr>
+                <tr className="border-b border-line">
+                  <td className="px-4 py-3">Smart Apply</td>
+                  <td className="px-4 py-3 text-ink-muted">—</td>
+                  <td className="px-4 py-3 font-medium text-ink">5/day</td>
+                  <td className="px-4 py-3 font-medium text-ink">25/day</td>
                 </tr>
                 <tr className="border-b border-line">
                   <td className="px-4 py-3">AI resume review</td>
                   <td className="px-4 py-3 text-ink-muted">—</td>
                   <td className="px-4 py-3 font-medium text-ink">✓</td>
+                  <td className="px-4 py-3 font-medium text-ink">✓</td>
                 </tr>
                 <tr className="border-b border-line">
                   <td className="px-4 py-3">Job alerts</td>
-                  <td className="px-4 py-3 text-ink-muted">Basic</td>
+                  <td className="px-4 py-3 text-ink-muted">—</td>
                   <td className="px-4 py-3 font-medium text-ink">Full</td>
+                  <td className="px-4 py-3 font-medium text-ink">Priority (coming soon)</td>
                 </tr>
                 <tr className="border-b border-line">
                   <td className="px-4 py-3">Saved searches</td>
-                  <td className="px-4 py-3 text-ink-muted">Limited</td>
-                  <td className="px-4 py-3 font-medium text-ink">Unlimited</td>
+                  <td className="px-4 py-3 text-ink-muted">—</td>
+                  <td className="px-4 py-3 font-medium text-ink">3</td>
+                  <td className="px-4 py-3 font-medium text-ink">10</td>
                 </tr>
                 <tr>
                   <td className="px-4 py-3">Early access</td>
                   <td className="px-4 py-3 text-ink-muted">—</td>
+                  <td className="px-4 py-3 font-medium text-ink">✓</td>
                   <td className="px-4 py-3 font-medium text-ink">✓</td>
                 </tr>
               </tbody>

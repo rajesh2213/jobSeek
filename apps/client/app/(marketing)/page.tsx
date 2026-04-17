@@ -232,7 +232,7 @@ const PAIN_POINTS = [
   {
     pain: "You find jobs hours late.",
     sub: "Hundreds have already applied.",
-    fix: "Real-time job ingestion + auto-apply",
+    fix: "Real-time job ingestion + Smart Apply",
     outcome: "Be in the first 5 applicants, not the last 500.",
   },
   {
@@ -562,7 +562,7 @@ function PricingSection() {
               <li>• See roles the moment they are posted</li>
               <li>• Discover roles not listed on LinkedIn</li>
               <li className="text-ink/45">✕ No resume match insights</li>
-              <li className="text-ink/45">✕ No auto-apply</li>
+              <li className="text-ink/45">✕ No Smart Apply</li>
               <li className="text-ink/45">✕ No Pro application tracker</li>
             </ul>
             <p className="mt-3 text-xs font-medium text-ink/55">Only 5 roles/day - you may miss others</p>
@@ -606,7 +606,7 @@ function PricingSection() {
             <ul className="mt-3 space-y-1.5 text-sm text-ink/80">
               <li>• Unlimited jobs</li>
               <li>• Resume match + missing keywords</li>
-              <li>• Auto-apply to roles</li>
+              <li>• Smart Apply for faster applications</li>
               <li>• Application tracker + email insights (coming soon)</li>
               <li>• Apply early, consistently</li>
             </ul>
