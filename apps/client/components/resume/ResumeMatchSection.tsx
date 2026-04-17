@@ -1,12 +1,14 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { JobItem } from "../../lib/api";
 import { fetchResumeSemanticMatch } from "../../lib/api";
 import { resumeMatchSubtitle } from "../../lib/resumeGradeLabel";
 import { extractJobKeywords, scoreResume, type ScoringResult } from "../../lib/resumeScorer";
 import { useResume } from "../../lib/resumeContext";
+import { useAccountPlan } from "../../lib/useAccountPlan";
 import { ResumeScorePanel } from "./ResumeScorePanel";
 import { ResumeUploadModal } from "./ResumeUploadModal";
 
@@ -44,6 +46,7 @@ function MiniRing({ score }: { score: number }) {
 
 export function ResumeMatchSection({ job }: { job: JobItem }) {
   const { isSignedIn, getToken } = useAuth();
+  const { isPro, isLoaded: planLoaded } = useAccountPlan();
   const { hasResume, resumeText, resumeBullets } = useResume();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -92,6 +95,40 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
 
   if (!isSignedIn) {
     return null;
+  }
+
+  if (!planLoaded) {
+    return (
+      <section className="rounded-2xl border border-ink/10 bg-surface/80 p-5 shadow-sm ring-1 ring-ink/5">
+        <div className="h-24 animate-pulse rounded-xl bg-ink/10" aria-hidden />
+      </section>
+    );
+  }
+
+  if (!isPro) {
+    return (
+      <section className="rounded-2xl border border-ink/10 bg-surface/80 p-5 shadow-sm ring-1 ring-ink/5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-base font-semibold text-ink">
+              <span aria-hidden className="mr-1.5">
+                📄
+              </span>
+              AI resume match
+            </p>
+            <p className="mt-1 text-sm text-ink-muted">
+              See your fit score, matched keywords, and gaps for this role — Pro only.
+            </p>
+          </div>
+          <Link
+            href="/pricing"
+            className="shrink-0 rounded-lg bg-brand px-4 py-2.5 text-center text-sm font-semibold text-white no-underline transition-colors hover:bg-brand-hover sm:self-center"
+          >
+            Upgrade to Pro →
+          </Link>
+        </div>
+      </section>
+    );
   }
 
   return (

@@ -1,11 +1,13 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { JobItem } from "../../lib/api";
 import { fetchResumeSemanticMatch } from "../../lib/api";
 import { extractJobKeywords, scoreResume, type ScoringResult } from "../../lib/resumeScorer";
 import { useResume } from "../../lib/resumeContext";
+import { useAccountPlan } from "../../lib/useAccountPlan";
 import { cn } from "../../lib/cn";
 import { buttonFocusRing } from "../ui/Button";
 import { ResumeScorePanel } from "./ResumeScorePanel";
@@ -23,6 +25,7 @@ function pillColors(score: number): { bg: string; fg: string; border: string } {
 
 export function ResumeScorePill({ job }: { job: JobItem }) {
   const { isSignedIn, getToken } = useAuth();
+  const { isPro, isLoaded: planLoaded } = useAccountPlan();
   const { hasResume, resumeText, resumeBullets, isLoading } = useResume();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -77,6 +80,29 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
 
   if (!isSignedIn) {
     return null;
+  }
+
+  if (!planLoaded) {
+    return (
+      <div className="h-9 w-full min-w-[10rem] shrink-0 animate-pulse rounded-lg bg-ink/10" aria-hidden />
+    );
+  }
+
+  if (!isPro) {
+    return (
+      <Link
+        href="/pricing"
+        className={cn(
+          buttonFocusRing,
+          "relative flex h-9 w-full min-w-0 items-center justify-center rounded-lg border-2 border-brand/35 bg-brand/10 px-3 text-xs font-bold tracking-wide text-brand no-underline transition-[transform,box-shadow] duration-200 hover:bg-brand/15",
+        )}
+      >
+        <span aria-hidden className="absolute left-3 shrink-0 text-sm leading-none">
+          📄
+        </span>
+        <span className="text-center">Pro: resume match</span>
+      </Link>
+    );
   }
 
   if (isLoading) {

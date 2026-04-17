@@ -11,7 +11,6 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { motion } from "framer-motion";
 import { cn } from "../../lib/cn";
 
 export type ToastType = "success" | "info" | "error";
@@ -113,17 +112,14 @@ function ToastItemView({
   }, [item.id, item.durationMs, onDismiss]);
 
   return (
-    <motion.div
+    <div
       role="status"
-      initial={{ x: 48, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      transition={{ type: "spring", stiffness: 420, damping: 32 }}
       className={cn(
-        "pointer-events-auto rounded-xl border px-4 py-3 text-sm font-medium shadow-lg",
+        "toast-item-enter pointer-events-auto rounded-xl border px-4 py-3 text-sm font-medium shadow-lg",
         TYPE_STYLES[item.type],
       )}
     >
       {item.message}
-    </motion.div>
+    </div>
   );
 }
