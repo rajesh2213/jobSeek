@@ -54,7 +54,12 @@ export async function ensureUserJobViewsDayReset(
   if (user.jobViewsResetAt < dayStart) {
     await prisma.user.update({
       where: { id: userId },
-      data: { jobViewsToday: 0, jobViewsResetAt: new Date() },
+      data: {
+        jobViewsToday: 0,
+        jobViewsResetAt: new Date(),
+        discoverySearchesToday: 0,
+        discoveryBonusFiveUsed: false,
+      },
     });
   }
 }
@@ -103,7 +108,8 @@ export async function checkAndIncrementViewCap(
   delta: number,
 ): Promise<{ allowed: boolean; remaining: number; resetAt: Date; unlimited?: boolean }> {
   const resetAt = nextUtcMidnight();
-  if (delta <= 0) {
+  const safeDelta = Math.min(Math.max(0, Math.floor(delta)), 500);
+  if (safeDelta <= 0) {
     const s = await getJobViewCapState(prisma, redis, opts);
     return {
       allowed: s.unlimited || s.remaining > 0,
@@ -119,16 +125,13 @@ export async function checkAndIncrementViewCap(
     if (pro) {
       return { allowed: true, remaining: FREE_DAILY_JOB_VIEWS, resetAt, unlimited: true };
     }
-    const user = await prisma.user.findUnique({
-      where: { id: opts.internalUserId },
-      select: { jobViewsToday: true },
-    });
-    const before = user?.jobViewsToday ?? 0;
-    const next = Math.min(FREE_DAILY_JOB_VIEWS, before + delta);
-    await prisma.user.update({
-      where: { id: opts.internalUserId },
-      data: { jobViewsToday: next },
-    });
+    const rows = await prisma.$queryRaw<[{ jobViewsToday: number }]>`
+      UPDATE "User"
+      SET "jobViewsToday" = LEAST("jobViewsToday" + ${safeDelta}, ${FREE_DAILY_JOB_VIEWS})
+      WHERE "id" = ${opts.internalUserId}
+      RETURNING "jobViewsToday"
+    `;
+    const next = rows[0]?.jobViewsToday ?? 0;
     const remaining = Math.max(0, FREE_DAILY_JOB_VIEWS - next);
     return { allowed: true, remaining, resetAt, unlimited: false };
   }
@@ -136,11 +139,57 @@ export async function checkAndIncrementViewCap(
   const ip = (opts.ip ?? "unknown").trim() || "unknown";
   const key = anonRedisKey(ip);
   const ttl = secondsUntilUtcMidnight();
-  const after = await redis.incrby(key, delta);
-  const curTtl = await redis.ttl(key);
-  if (curTtl < 0) {
-    await redis.expire(key, ttl);
-  }
-  const remaining = Math.max(0, FREE_DAILY_JOB_VIEWS - after);
+  const remaining = await incrementAnonViewCapLua(
+    redis,
+    key,
+    safeDelta,
+    FREE_DAILY_JOB_VIEWS,
+    ttl,
+  );
   return { allowed: true, remaining, resetAt, unlimited: false };
+}
+
+const VIEWCAP_ANON_LUA = `
+local after = redis.call('INCRBY', KEYS[1], ARGV[1])
+local capn = tonumber(ARGV[2])
+if after > capn then
+  redis.call('SET', KEYS[1], capn)
+  after = capn
+end
+local t = redis.call('TTL', KEYS[1])
+if t < 0 then
+  redis.call('EXPIRE', KEYS[1], ARGV[3])
+end
+return capn - after
+`.trim();
+
+let viewCapAnonLuaSha: string | null = null;
+
+/** Atomically add delta to anon counter, clamp to cap, ensure TTL. Returns remaining after increment. */
+async function incrementAnonViewCapLua(
+  redis: Redis,
+  key: string,
+  delta: number,
+  cap: number,
+  ttlSeconds: number,
+): Promise<number> {
+  const args = [key, String(delta), String(cap), String(ttlSeconds)] as const;
+  const runEvalsha = async (sha: string) =>
+    redis.evalsha(sha, 1, ...args);
+
+  if (!viewCapAnonLuaSha) {
+    viewCapAnonLuaSha = (await redis.script("LOAD", VIEWCAP_ANON_LUA)) as string;
+  }
+  try {
+    const rem = await runEvalsha(viewCapAnonLuaSha);
+    return typeof rem === "number" ? rem : Number.parseInt(String(rem), 10) || 0;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("NOSCRIPT") || msg.includes("No matching script")) {
+      viewCapAnonLuaSha = (await redis.script("LOAD", VIEWCAP_ANON_LUA)) as string;
+      const rem = await runEvalsha(viewCapAnonLuaSha);
+      return typeof rem === "number" ? rem : Number.parseInt(String(rem), 10) || 0;
+    }
+    throw e;
+  }
 }

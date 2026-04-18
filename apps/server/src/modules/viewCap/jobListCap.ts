@@ -1,0 +1,347 @@
+import type { PrismaClient } from "@prisma/client";
+import type { Redis } from "ioredis";
+import type { FastifyRequest } from "fastify";
+import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
+import { getJobViewCapState } from "./viewCap.service.js";
+import type { PaginatedResult } from "../../types/api.js";
+import {
+  DISCOVERY_PREVIEW_ROWS,
+  FREE_DISCOVERY_BONUS_ROWS,
+  FREE_DISCOVERY_ROWS_PER_SEARCH,
+  FREE_DISCOVERY_SEARCHES,
+  getDiscoveryListState,
+  incrementDiscoverySearch,
+  isDiscoveryBonusFiveEnabled,
+  markDiscoveryBonusUsed,
+} from "./discoveryCap.js";
+
+export interface CapContext {
+  internalUserId: string | null;
+  ip: string;
+  userEmail: string | null;
+}
+
+export type DiscoveryPhase = "search" | "bonus" | "preview";
+
+export interface MeteredJobsListMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalCount: number;
+  totalPages: number;
+  offset: number;
+  hasMore: boolean;
+  capReached: boolean;
+  remaining: number | null;
+  resetAt: string;
+  totalHidden?: number;
+  viewCapUnlimited: boolean;
+  /** Free-tier discovery metering (omit when Pro / bypass). */
+  discoveryPhase?: DiscoveryPhase;
+  discoverySearchesRemaining?: number;
+  bonusBatchRemaining?: number;
+}
+
+export function isViewCapBypassRequest(request: FastifyRequest): boolean {
+  const bypassToken = process.env.JOB_LIST_VIEW_CAP_BYPASS_TOKEN?.trim();
+  const bypassHeader = request.headers["x-jobseek-view-cap-bypass"];
+  return (
+    Boolean(bypassToken) &&
+    typeof bypassHeader === "string" &&
+    bypassHeader === bypassToken
+  );
+}
+
+export function clientIp(request: FastifyRequest): string {
+  const xff = request.headers["x-forwarded-for"];
+  const raw =
+    typeof xff === "string"
+      ? xff.split(",")[0]?.trim()
+      : Array.isArray(xff)
+        ? xff[0]
+        : undefined;
+  return raw || request.socket.remoteAddress || "unknown";
+}
+
+export async function buildCapContextFromRequest(
+  prisma: PrismaClient,
+  request: FastifyRequest,
+): Promise<CapContext> {
+  const clerk = await resolveClerkUser(prisma, request.headers.authorization);
+  return {
+    internalUserId: clerk?.internalUserId ?? null,
+    ip: clientIp(request),
+    userEmail: clerk?.email ?? null,
+  };
+}
+
+function discoveryCtx(capCtx: CapContext) {
+  return {
+    internalUserId: capCtx.internalUserId,
+    ip: capCtx.ip,
+  };
+}
+
+function metaBase(
+  result: PaginatedResult<unknown>,
+  offset: number | undefined,
+  _requestLimit: number,
+): Pick<
+  MeteredJobsListMeta,
+  | "page"
+  | "limit"
+  | "total"
+  | "totalCount"
+  | "totalPages"
+  | "offset"
+  | "hasMore"
+> {
+  const skip =
+    typeof offset === "number"
+      ? offset
+      : (result.page - 1) * result.limit;
+  const hasMore = result.hasMore ?? skip + result.items.length < result.total;
+  return {
+    page: result.page,
+    limit: result.limit,
+    total: result.total,
+    totalCount: result.total,
+    totalPages: result.totalPages,
+    offset: skip,
+    hasMore,
+  };
+}
+
+function bonusBatchRemaining(
+  bonusOn: boolean,
+  bonusSurface: "browse" | "seo",
+  disc: Awaited<ReturnType<typeof getDiscoveryListState>>,
+): number {
+  if (!bonusOn || bonusSurface !== "seo") return 0;
+  if (disc.searchesUsed < FREE_DISCOVERY_SEARCHES || disc.bonusUsed) return 0;
+  return 1;
+}
+
+/**
+ * Shared metering for any paginated job list (discovery `/jobs`, company-scoped lists, etc.).
+ * Free tier: 2 searches × up to 10 rows (page-1 debits when `discoveryDebit`), optional bonus batch of 5 on SEO surfaces only, then preview.
+ */
+export async function runMeteredJobsList<T>(
+  prisma: PrismaClient,
+  redis: Redis,
+  capCtx: CapContext,
+  bypassCap: boolean,
+  args: {
+    limit: number;
+    offset?: number;
+    page: number;
+    fetchList: (effectiveLimit: number) => Promise<PaginatedResult<T>>;
+    /**
+     * When false, page-1 does not consume a discovery search (unfiltered `/jobs` landing).
+     * Company hubs should pass true so scoped lists always meter.
+     */
+    discoveryDebit?: boolean;
+    /** Bonus 5-row batch applies only on programmatic SEO slug pages (`surface=seo`). */
+    bonusSurface?: "browse" | "seo";
+  },
+): Promise<{ items: T[]; meta: MeteredJobsListMeta }> {
+  const { limit, offset, fetchList } = args;
+  const page = Math.max(1, args.page);
+  const discoveryDebit = args.discoveryDebit !== false;
+  const bonusSurface = args.bonusSurface ?? "browse";
+
+  if (bypassCap) {
+    const result = await fetchList(limit);
+    const base = metaBase(result, offset, limit);
+    return {
+      items: result.items,
+      meta: {
+        ...base,
+        capReached: false,
+        remaining: null,
+        resetAt: new Date().toISOString(),
+        viewCapUnlimited: true,
+      },
+    };
+  }
+
+  const capState = await getJobViewCapState(prisma, redis, capCtx);
+  if (capState.unlimited) {
+    const result = await fetchList(limit);
+    const base = metaBase(result, offset, limit);
+    return {
+      items: result.items,
+      meta: {
+        ...base,
+        capReached: false,
+        remaining: null,
+        resetAt: capState.resetAt.toISOString(),
+        viewCapUnlimited: true,
+      },
+    };
+  }
+
+  const dctx = discoveryCtx(capCtx);
+  let disc = await getDiscoveryListState(prisma, redis, dctx);
+  const bonusOn = isDiscoveryBonusFiveEnabled();
+  const bonusEligible = bonusOn && bonusSurface === "seo";
+
+  const fullyExhausted =
+    disc.searchesUsed >= FREE_DISCOVERY_SEARCHES &&
+    (!bonusEligible || disc.bonusUsed);
+
+  const searchesRem = Math.max(0, FREE_DISCOVERY_SEARCHES - disc.searchesUsed);
+  const bonusRem = bonusBatchRemaining(bonusOn, bonusSurface, disc);
+
+  const emptyPreviewMeta = (
+    totalMatching: number,
+    resetAt: Date,
+  ): MeteredJobsListMeta => ({
+    page,
+    limit,
+    total: totalMatching,
+    totalCount: totalMatching,
+    totalPages: Math.ceil(totalMatching / limit) || 1,
+    offset:
+      typeof offset === "number"
+        ? offset
+        : (page - 1) * limit,
+    hasMore: false,
+    capReached: true,
+    remaining: 0,
+    resetAt: resetAt.toISOString(),
+    totalHidden: Math.max(0, totalMatching - DISCOVERY_PREVIEW_ROWS),
+    viewCapUnlimited: false,
+    discoveryPhase: "preview",
+    discoverySearchesRemaining: 0,
+    bonusBatchRemaining: 0,
+  });
+
+  const blockedPageMeta = (): MeteredJobsListMeta => ({
+    page,
+    limit,
+    total: 0,
+    totalCount: 0,
+    totalPages: 1,
+    offset:
+      typeof offset === "number"
+        ? offset
+        : (page - 1) * limit,
+    hasMore: false,
+    capReached: fullyExhausted,
+    remaining: fullyExhausted ? 0 : searchesRem + bonusRem,
+    resetAt: disc.resetAt.toISOString(),
+    viewCapUnlimited: false,
+    discoveryPhase: fullyExhausted ? "preview" : "search",
+    discoverySearchesRemaining: fullyExhausted ? 0 : searchesRem,
+    bonusBatchRemaining: fullyExhausted ? 0 : bonusRem,
+  });
+
+  // Free tier: no extra pages beyond metered slices (blocks "Load more" pagination).
+  if (fullyExhausted && page > 1) {
+    return {
+      items: [] as T[],
+      meta: emptyPreviewMeta(0, disc.resetAt),
+    };
+  }
+
+  if (fullyExhausted && page === 1) {
+    const previewLimit = Math.min(limit, DISCOVERY_PREVIEW_ROWS);
+    const result = await fetchList(previewLimit);
+    const totalMatching = result.total;
+    const base = metaBase(result, offset, limit);
+    return {
+      items: result.items,
+      meta: {
+        ...base,
+        hasMore: false,
+        capReached: true,
+        remaining: 0,
+        resetAt: disc.resetAt.toISOString(),
+        totalHidden: Math.max(0, totalMatching - DISCOVERY_PREVIEW_ROWS),
+        viewCapUnlimited: false,
+        discoveryPhase: "preview",
+        discoverySearchesRemaining: 0,
+        bonusBatchRemaining: 0,
+      },
+    };
+  }
+
+  if (page > 1) {
+    return {
+      items: [] as T[],
+      meta: blockedPageMeta(),
+    };
+  }
+
+  // Page 1 only below.
+
+  if (!discoveryDebit) {
+    const eff = Math.min(limit, FREE_DISCOVERY_ROWS_PER_SEARCH);
+    const result = await fetchList(eff);
+    const base = metaBase(result, offset, limit);
+    return {
+      items: result.items,
+      meta: {
+        ...base,
+        hasMore: false,
+        capReached: false,
+        remaining: searchesRem + bonusRem,
+        resetAt: disc.resetAt.toISOString(),
+        viewCapUnlimited: false,
+        discoveryPhase: "search",
+        discoverySearchesRemaining: searchesRem,
+        bonusBatchRemaining: bonusRem,
+      },
+    };
+  }
+
+  if (disc.searchesUsed < FREE_DISCOVERY_SEARCHES) {
+    const eff = Math.min(limit, FREE_DISCOVERY_ROWS_PER_SEARCH);
+    const result = await fetchList(eff);
+    disc = await incrementDiscoverySearch(prisma, redis, dctx);
+    const base = metaBase(result, offset, limit);
+    const searchesRemAfter = Math.max(0, FREE_DISCOVERY_SEARCHES - disc.searchesUsed);
+    const bonusRemAfter = bonusBatchRemaining(bonusOn, bonusSurface, disc);
+    return {
+      items: result.items,
+      meta: {
+        ...base,
+        hasMore: false,
+        capReached: false,
+        remaining: searchesRemAfter + bonusRemAfter,
+        resetAt: disc.resetAt.toISOString(),
+        viewCapUnlimited: false,
+        discoveryPhase: "search",
+        discoverySearchesRemaining: searchesRemAfter,
+        bonusBatchRemaining: bonusRemAfter,
+      },
+    };
+  }
+
+  if (bonusEligible && !disc.bonusUsed && disc.searchesUsed >= FREE_DISCOVERY_SEARCHES) {
+    const eff = Math.min(limit, FREE_DISCOVERY_BONUS_ROWS);
+    const result = await fetchList(eff);
+    await markDiscoveryBonusUsed(prisma, redis, dctx);
+    disc = await getDiscoveryListState(prisma, redis, dctx);
+    const base = metaBase(result, offset, limit);
+    return {
+      items: result.items,
+      meta: {
+        ...base,
+        hasMore: false,
+        capReached: false,
+        remaining: 0,
+        resetAt: disc.resetAt.toISOString(),
+        viewCapUnlimited: false,
+        discoveryPhase: "bonus",
+        discoverySearchesRemaining: 0,
+        bonusBatchRemaining: 0,
+      },
+    };
+  }
+
+  throw new Error(
+    "runMeteredJobsList: unreachable discovery state — check discovery branches",
+  );
+}
