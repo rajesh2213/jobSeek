@@ -1,3 +1,6 @@
+/** Matches server `DISCOVERY_PREVIEW_ROWS` — rows shown after daily discovery is exhausted. */
+export const FREE_DISCOVERY_PREVIEW_JOB_ROWS = 2;
+
 export const PLAN_LIMITS = {
   free: { dailyJobViews: 10, smartApplyJobs: 0, savedSearches: 3 },
   pro: { dailyJobViews: Infinity, smartApplyJobs: 5, savedSearches: 3 },

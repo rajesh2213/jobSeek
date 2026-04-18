@@ -93,6 +93,8 @@ export interface JobItem {
   company: JobCompany;
 }
 
+export type DiscoveryListPhase = "search" | "bonus" | "preview";
+
 export interface JobsApiResponse {
   data: JobItem[];
   meta?: {
@@ -108,6 +110,10 @@ export interface JobsApiResponse {
     resetAt?: string;
     totalHidden?: number;
     viewCapUnlimited?: boolean;
+    /** Free-tier discovery list metering (from GET /jobs meta). */
+    discoveryPhase?: DiscoveryListPhase;
+    discoverySearchesRemaining?: number;
+    bonusBatchRemaining?: number;
     company?: {
       id: string;
       name: string;
@@ -138,7 +144,20 @@ interface CompanyApiResponse {
 
 interface JobApiResponse {
   data: JobItem;
+  meta?: JobDetailCapMeta;
 }
+
+export interface JobDetailCapMeta {
+  capReached?: boolean;
+  remaining?: number | null;
+  resetAt?: string;
+  viewCapUnlimited?: boolean;
+}
+
+export type JobDetailFetchResult = {
+  data: JobItem;
+  meta?: JobDetailCapMeta;
+};
 
 /**
  * Fastify API origin. Must point at the jobseek server, not the Next.js dev server:
@@ -680,7 +699,14 @@ function buildJobDiscoverySearchParams(
   } else if (filters.country?.trim()) {
     params.set("country", filters.country.trim());
   }
-  if (filters.category) params.set("category", filters.category);
+  if (filters.categories?.length) {
+    params.set("categories", filters.categories.join(","));
+  } else if (filters.category) {
+    params.set("category", filters.category);
+  }
+  if (filters.surface === "seo") {
+    params.set("surface", "seo");
+  }
   if (filters.workTypes?.length) {
     params.set("types", filters.workTypes.map((t) => t.toUpperCase()).join(","));
   }
@@ -703,7 +729,7 @@ export async function fetchJobs(
   opts?: {
     /** Clerk session JWT for per-user view caps. */
     token?: string | null;
-    /** Server-only: must match API `JOB_LIST_VIEW_CAP_BYPASS_TOKEN` (e.g. sitemap). */
+    /** Server-only: must match API `JOB_LIST_VIEW_CAP_BYPASS_TOKEN` (sitemap, similar jobs, SEO). */
     viewCapBypassSecret?: string | null;
   },
 ): Promise<JobsApiResponse> {
@@ -716,16 +742,51 @@ export async function fetchJobs(
   const bypass = opts?.viewCapBypassSecret?.trim();
   if (bypass) headers.set("x-jobseek-view-cap-bypass", bypass);
 
-  const res = await fetch(
-    url,
-    t
-      ? { headers, cache: "no-store" }
-      : { headers, next: { revalidate: 30 } },
-  );
+  /** Metered discovery must not be cached by Next (stale caps / double-count risk). */
+  const fetchOptions: RequestInit & { next?: { revalidate?: number } } = bypass
+    ? { headers, next: { revalidate: 120 } }
+    : { headers, cache: "no-store" };
+
+  const res = await fetch(url, fetchOptions);
   if (!res.ok) {
     throw new Error(`Failed to fetch jobs: ${res.status} ${res.statusText}`);
   }
   return (await res.json()) as JobsApiResponse;
+}
+
+export interface SeoLandingEntry {
+  slug: string;
+  count: number;
+}
+
+/** Server-side: `GET /seo/landing-pages` (requires `x-jobseek-view-cap-bypass` matching server env). */
+export async function fetchSeoLandingPages(options?: {
+  minCount?: number;
+  maxSlugs?: number;
+  viewCapBypassSecret?: string | null;
+}): Promise<{ data: SeoLandingEntry[]; meta?: { minCount: number; maxSlugs: number; count: number } }> {
+  const params = new URLSearchParams();
+  if (options?.minCount !== undefined) params.set("minCount", String(options.minCount));
+  if (options?.maxSlugs !== undefined) params.set("maxSlugs", String(options.maxSlugs));
+  const qs = params.toString();
+  const url = `${API_BASE_URL}/seo/landing-pages${qs ? `?${qs}` : ""}`;
+  const headers = new Headers();
+  const bypass = (options?.viewCapBypassSecret ?? process.env.JOB_LIST_VIEW_CAP_BYPASS_TOKEN)?.trim();
+  if (bypass) headers.set("x-jobseek-view-cap-bypass", bypass);
+  const res = await fetch(url, {
+    headers,
+    next: { revalidate: 300 },
+  });
+  if (res.status === 401) {
+    return { data: [], meta: { minCount: 0, maxSlugs: 0, count: 0 } };
+  }
+  if (!res.ok) {
+    throw new Error(`fetchSeoLandingPages: ${res.status}`);
+  }
+  return (await res.json()) as {
+    data: SeoLandingEntry[];
+    meta?: { minCount: number; maxSlugs: number; count: number };
+  };
 }
 
 export interface JobRoleSuggestion {
@@ -876,6 +937,8 @@ export async function fetchCompanyJobs(
     limit?: number;
     /** Same discovery filters as `/jobs`; `companyId` is ignored (route scopes by slug). */
     filters?: Omit<JobFilters, "companyId">;
+    /** Clerk JWT — company job lists share the same daily view cap as `/jobs`. */
+    token?: string | null;
   } = {},
 ): Promise<JobsApiResponse> {
   const page = options.page ?? 1;
@@ -889,12 +952,10 @@ export async function fetchCompanyJobs(
   const params = buildJobDiscoverySearchParams(merged, { includeCompanyId: false });
   const qs = params.toString();
   const url = `${API_BASE_URL}/company/${encodeURIComponent(slug)}/jobs${qs ? `?${qs}` : ""}`;
-  const res = await fetch(
-    url,
-    typeof window === "undefined"
-      ? { next: { revalidate: 60 } }
-      : { cache: "no-store" },
-  );
+  const headers = new Headers();
+  const t = options.token?.trim();
+  if (t) headers.set("Authorization", `Bearer ${t}`);
+  const res = await fetch(url, { headers, cache: "no-store" });
   if (res.status === 404) {
     return {
       data: [],
@@ -907,16 +968,23 @@ export async function fetchCompanyJobs(
   return (await res.json()) as JobsApiResponse;
 }
 
-export async function fetchJobById(id: string): Promise<JobItem | null> {
+export async function fetchJobById(
+  id: string,
+  opts?: { token?: string | null },
+): Promise<JobDetailFetchResult | null> {
+  const headers = new Headers();
+  const t = opts?.token?.trim();
+  if (t) headers.set("Authorization", `Bearer ${t}`);
   const res = await fetch(`${API_BASE_URL}/jobs/${id}`, {
-    next: { revalidate: 60 },
+    headers,
+    cache: "no-store",
   });
   if (res.status === 404) return null;
   if (!res.ok) {
     throw new Error(`Failed to fetch job ${id}: ${res.status} ${res.statusText}`);
   }
   const payload = (await res.json()) as JobApiResponse;
-  return payload.data;
+  return { data: payload.data, meta: payload.meta };
 }
 
 export type SemanticMatchMap = Record<string, { bullet: string; similarity: number }>;

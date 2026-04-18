@@ -1,5 +1,9 @@
 import { JOB_CATEGORIES, KNOWN_SKILL_SLUGS } from "./taxonomy";
 
+/** Guardrails so malicious/huge query strings cannot OOM the Next dev server or RSC cache. */
+export const MAX_JOB_FILTER_QUERY_VALUE_LEN = 4096;
+export const MAX_JOB_FILTER_QUERY_TOKENS = 48;
+
 export interface JobFilters {
   page?: number;
   limit?: number;
@@ -14,6 +18,10 @@ export interface JobFilters {
   /** Multiple tokens — sent as `?locations=` (comma-separated); OR semantics on the server. */
   locations?: string[];
   category?: string;
+  /** Multi-select categories (API: `categories=a,b`). */
+  categories?: string[];
+  /** API-only (not shown in URLs): `surface=seo` for programmatic SEO routes. */
+  surface?: "browse" | "seo";
   /** Legacy SEO slug segment; prefer `workType`. */
   isRemote?: boolean;
   workType?: "remote" | "onsite" | "hybrid";
@@ -43,15 +51,34 @@ export function parseJobFiltersFromSearch(
 ): JobFilters {
   const g = (k: string): string | undefined => {
     const v = sp[k];
-    if (typeof v === "string") return v;
-    if (Array.isArray(v) && typeof v[0] === "string") return v[0];
-    return undefined;
+    let raw: string | undefined;
+    if (typeof v === "string") raw = v;
+    else if (Array.isArray(v) && typeof v[0] === "string") raw = v[0];
+    if (!raw) return undefined;
+    if (raw.length > MAX_JOB_FILTER_QUERY_VALUE_LEN) {
+      return raw.slice(0, MAX_JOB_FILTER_QUERY_VALUE_LEN);
+    }
+    return raw;
   };
 
   const filters: JobFilters = {};
 
+  const categoriesRaw = g("categories");
+  if (categoriesRaw?.trim()) {
+    const allowed = new Set(JOB_CATEGORIES);
+    const cats = categoriesRaw
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter((s) => allowed.has(s as (typeof JOB_CATEGORIES)[number]));
+    if (cats.length > 0) {
+      filters.categories = Array.from(new Set(cats)).slice(0, MAX_JOB_FILTER_QUERY_TOKENS);
+    }
+  }
+
   const category = g("category");
-  if (category) filters.category = category;
+  if (category && !filters.categories?.length) {
+    filters.category = category.slice(0, 160);
+  }
 
   const locationsRaw = g("locations");
   if (locationsRaw?.trim()) {
@@ -66,7 +93,7 @@ export function parseJobFiltersFromSearch(
       locations.push(t);
     }
     if (locations.length > 0) {
-      filters.locations = locations;
+      filters.locations = locations.slice(0, MAX_JOB_FILTER_QUERY_TOKENS);
     }
   }
 
@@ -82,7 +109,7 @@ export function parseJobFiltersFromSearch(
   }
 
   const role = g("role");
-  if (role) filters.role = role;
+  if (role) filters.role = role.slice(0, 160);
   const rolesRaw = g("roles");
   if (rolesRaw?.trim()) {
     const roles = rolesRaw
@@ -90,8 +117,9 @@ export function parseJobFiltersFromSearch(
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean);
     if (roles.length > 0) {
-      filters.roles = roles;
-      if (!filters.role) filters.role = roles[0];
+      const r = roles.slice(0, MAX_JOB_FILTER_QUERY_TOKENS);
+      filters.roles = r;
+      if (!filters.role) filters.role = r[0];
     }
   }
 
@@ -100,7 +128,8 @@ export function parseJobFiltersFromSearch(
     const skills = skillsRaw
       .split(",")
       .map((s) => s.trim().toLowerCase())
-      .filter(Boolean);
+      .filter(Boolean)
+      .slice(0, MAX_JOB_FILTER_QUERY_TOKENS);
     if (skills.length > 0) filters.skills = skills;
   }
 
@@ -139,7 +168,7 @@ export function parseJobFiltersFromSearch(
   }
 
   const companyId = g("companyId");
-  if (companyId) filters.companyId = companyId;
+  if (companyId) filters.companyId = companyId.slice(0, 80);
 
   const page = g("page");
   if (page) {
@@ -168,7 +197,11 @@ export function filtersToSearchParams(filters: JobFilters): URLSearchParams {
   if (filters.page) p.set("page", String(filters.page));
   if (filters.limit) p.set("limit", String(filters.limit));
   if (filters.offset !== undefined) p.set("offset", String(filters.offset));
-  if (filters.category) p.set("category", filters.category);
+  if (filters.categories?.length) {
+    p.set("categories", filters.categories.join(","));
+  } else if (filters.category) {
+    p.set("category", filters.category);
+  }
   if (filters.role) p.set("role", filters.role);
   if (filters.roles?.length) p.set("roles", filters.roles.join(","));
   if (filters.skills?.length) p.set("skills", filters.skills.join(","));
@@ -296,4 +329,56 @@ export function buildJobsListingUrl(filters: JobFilters): string {
     return qs ? `/jobs/${slug}?${qs}` : `/jobs/${slug}`;
   }
   return qs ? `/jobs?${qs}` : "/jobs";
+}
+
+const DEFAULT_LISTING_LIMIT = 20;
+
+/**
+ * Canonical job listing URL: path slug for slottable facets; query only for refinements
+ * (pagination, experience, posted, salary, sort, multi-location, multi-type, etc.).
+ */
+export function getCanonicalJobListingUrl(filters: JobFilters): string {
+  const slug = filtersToSlug({
+    category: filters.category,
+    role: filters.role,
+    skills: filters.skills,
+    country: filters.country,
+    isRemote: filters.isRemote,
+    workType: filters.workType,
+  });
+
+  if (!slug) {
+    const qs = filtersToSearchParams(filters).toString();
+    return qs ? `/jobs?${qs}` : "/jobs";
+  }
+
+  const p = new URLSearchParams();
+  if (filters.page && filters.page > 1) p.set("page", String(filters.page));
+  if (filters.limit && filters.limit !== DEFAULT_LISTING_LIMIT) {
+    p.set("limit", String(filters.limit));
+  }
+  if (filters.offset !== undefined && filters.offset > 0) {
+    p.set("offset", String(filters.offset));
+  }
+  if (filters.experience) p.set("experience", filters.experience);
+  if (filters.posted) p.set("posted", filters.posted);
+  if (filters.minSalary !== undefined && filters.minSalary > 0) {
+    p.set("minSalary", String(filters.minSalary));
+  }
+  if (filters.sort === "salary_desc") p.set("sort", "salary_desc");
+  if (filters.locations?.length) {
+    p.set("locations", filters.locations.join(","));
+  } else if (filters.location?.trim()) {
+    p.set("location", filters.location.trim());
+  }
+  if (filters.workTypes?.length) {
+    p.set("types", filters.workTypes.map((t) => t.toUpperCase()).join(","));
+  }
+  if (filters.roles && filters.roles.length > 1) {
+    p.set("roles", filters.roles.join(","));
+  }
+  if (filters.companyId) p.set("companyId", filters.companyId);
+
+  const qs = p.toString();
+  return qs ? `/jobs/${slug}?${qs}` : `/jobs/${slug}`;
 }
