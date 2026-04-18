@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { buildJobsListingUrl } from "../../lib/slug-parser";
 import { mergeBrowseSkillQueries } from "../../lib/seoSkillTokens";
 
 const defaultSkillQueries = ["react", "typescript", "nodejs", "python"];
@@ -49,20 +50,28 @@ export function SeoFooterLinks(props?: { browseSkills?: string[] }) {
       <BrowseGroup
         title="Browse by skills"
         values={skillQueries}
-        hrefBuilder={(s) => `/jobs?skills=${encodeURIComponent(s.toLowerCase())}`}
+        hrefBuilder={(s) => buildJobsListingUrl({ skills: [s.toLowerCase()] })}
       />
       <BrowseGroup
         title="Browse by role"
         values={roleQueries}
-        hrefBuilder={(r) => `/jobs?roles=${encodeURIComponent(r)}`}
+        hrefBuilder={(r) =>
+          buildJobsListingUrl({ role: r, roles: [r] })
+        }
       />
       <BrowseGroup
         title="Browse by location"
         values={locationQueries}
         hrefBuilder={(loc) =>
           loc === "remote"
-            ? "/jobs?types=REMOTE"
-            : `/jobs?locations=${encodeURIComponent(loc)}`
+            ? buildJobsListingUrl({
+                workTypes: ["remote"],
+                workType: "remote",
+                isRemote: true,
+              })
+            : loc === "US" || loc === "IN" || loc === "DE"
+              ? buildJobsListingUrl({ country: loc })
+              : buildJobsListingUrl({ locations: [loc] })
         }
       />
     </section>
