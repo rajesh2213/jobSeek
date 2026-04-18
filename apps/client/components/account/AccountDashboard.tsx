@@ -10,7 +10,7 @@ import {
   fetchSmartApplyStatus,
   type UserMeResponse,
 } from "../../lib/api";
-import { isPro as isPaidPlan } from "../../lib/planLimits";
+import { isPro as isPaidPlan, PLAN_LIMITS } from "../../lib/planLimits";
 import { useResume } from "../../lib/resumeContext";
 import { ResumeUploadModal } from "../resume/ResumeUploadModal";
 
@@ -128,7 +128,7 @@ export function AccountDashboard() {
   // Prefer plan from /api/user/me; default matches backend free tier when absent.
   const plan = me?.plan ?? "free";
   const isPro = isPaidPlan(plan);
-  const limit = me?.jobViewsLimit ?? 10;
+  const limit = me?.jobViewsLimit ?? PLAN_LIMITS.free.dailyJobViews;
   const rawUsed = me?.jobViewsToday ?? 0;
   const usedDisplay = isPro ? rawUsed : Math.min(rawUsed, limit);
   const pct = isPro || limit <= 0 ? 0 : Math.round((usedDisplay / limit) * 100);
@@ -266,11 +266,12 @@ export function AccountDashboard() {
                   {usedDisplay} of {limit} used
                 </span>
               </p>
+              <p className="mt-2 text-[11px] leading-snug text-ink/55">
+                Counts search results loaded, opening a job post, and company job lists. Refreshes
+                daily at midnight UTC.
+              </p>
             </>
           )}
-          <p className="mt-3 text-xs leading-relaxed text-ink-muted">
-            Refreshes daily at midnight UTC
-          </p>
         </div>
 
         <hr className="my-6 border-ink/10" />

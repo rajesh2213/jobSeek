@@ -1,186 +1,116 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SignInButton, useAuth } from "@clerk/nextjs";
 import type { JobItem } from "../../lib/api";
+import { cn } from "../../lib/cn";
 import { motionEase } from "../../lib/motion";
+import type { AccentTone } from "../ui/types";
+import { Card } from "../ui/Card";
+import { ScrollCollapseChrome } from "./ScrollCollapseChrome";
 
 const CORAL = "#E8533A";
 const INK = "#1a1a1a";
 
+const ACCENTS: AccentTone[] = ["brand", "teal", "rose", "amber"];
+
 const FAKE_JOBS = [
-  { title: "Backend Engineer — Stripe" },
-  { title: "Product Analyst — Notion" },
-  { title: "Frontend Engineer — Vercel" },
-  { title: "Data Scientist — OpenAI" },
-  { title: "Designer — Linear" },
-  { title: "Platform Engineer — Datadog" },
+  { title: "Backend Engineer", company: "Stripe", location: "Remote · United States" },
+  { title: "Product Analyst", company: "Notion", location: "San Francisco, CA" },
+  { title: "Frontend Engineer", company: "Vercel", location: "Remote · Worldwide" },
+  { title: "Data Scientist", company: "OpenAI", location: "San Francisco, CA" },
+  { title: "Product Designer", company: "Linear", location: "Remote · US" },
+  { title: "Platform Engineer", company: "Datadog", location: "New York, NY" },
 ] as const;
 
-const SLOT_COUNT = 4;
-const NEW_BADGE_MS = 10_000;
-const CARD_MOTION = { duration: 0.4, ease: "easeOut" as const };
+const POSTED_VARIANTS = ["Posted 2h ago", "Posted 1d ago", "Recently posted"] as const;
+
+const SLOT_COUNT_FULL = 4;
+const SLOT_COUNT_PREVIEW = 3;
 
 type BlurJobSlot = {
   id: number;
   title: string;
-  applicants: number;
-  replacedAt: number;
+  company: string;
+  location: string;
+  accent: AccentTone;
+  postedLabel: string;
 };
 
-function randomFakeJob(): (typeof FAKE_JOBS)[number] {
-  return FAKE_JOBS[Math.floor(Math.random() * FAKE_JOBS.length)];
-}
-
-/** Deterministic first paint so SSR and hydration match (no Math.random / Date.now in initial state). */
-function initialSlots(): BlurJobSlot[] {
-  return Array.from({ length: SLOT_COUNT }, (_, i) => {
-    const j = FAKE_JOBS[i % FAKE_JOBS.length];
-    return {
-      id: i,
-      title: j.title,
-      applicants: 18 + i * 7,
-      replacedAt: 0,
-    };
-  });
-}
-
-function LimitBlurFakeJobCard({
-  job,
-  reduceMotion,
-}: {
-  job: BlurJobSlot;
-  reduceMotion: boolean;
-}) {
-  const showNew =
-    job.replacedAt > 0 && Date.now() - job.replacedAt < NEW_BADGE_MS;
-
-  return (
-    <div
-      className="flex h-40 flex-col justify-between rounded-2xl border border-ink/[0.06] bg-white p-4 shadow-sm"
-      aria-hidden
-    >
-      <div className="min-w-0">
-        <div className="mb-1 flex flex-wrap items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-ink/35">
-            Posted moments ago
-          </span>
-          {showNew ? (
-            <motion.span
-              className="rounded-full bg-brand px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white ring-1 ring-brand/40"
-              initial={reduceMotion ? false : { opacity: 0.5 }}
-              animate={
-                reduceMotion
-                  ? { opacity: 1 }
-                  : { opacity: [0.5, 1, 0.5] }
-              }
-              transition={
-                reduceMotion
-                  ? {}
-                  : { duration: 1.2, repeat: Infinity, ease: "easeInOut" }
-              }
-            >
-              NEW
-            </motion.span>
-          ) : null}
-        </div>
-        <p className="line-clamp-2 text-sm font-semibold leading-snug text-ink">
-          {job.title}
-        </p>
-      </div>
-      <p className="text-[11px] font-medium tabular-nums text-ink/45">
-        {job.applicants}+ applicants
-      </p>
-    </div>
+function logoTileClass(accent: AccentTone): string {
+  return cn(
+    "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-base font-black ring-1 ring-ink/5",
+    accent === "teal" && "bg-teal-soft text-teal",
+    accent === "rose" && "bg-rose-soft text-rose",
+    accent === "amber" && "bg-amber-soft text-amber",
+    accent === "brand" && "bg-brand/10 text-brand",
   );
 }
 
-function LimitPreviewBlurStack({ reduceMotion }: { reduceMotion: boolean | null }) {
-  const [visibleJobs, setVisibleJobs] = useState<BlurJobSlot[]>(initialSlots);
-  const [, setNowTick] = useState(0);
-  useEffect(() => {
-    const id = window.setInterval(() => setNowTick((n) => n + 1), 1000);
-    return () => window.clearInterval(id);
-  }, []);
+/** Same information hierarchy as JobCard / Card, then blurred as a stack. */
+function LimitBlurFakeJobCard({ job }: { job: BlurJobSlot }) {
+  const initial = job.company.trim().slice(0, 1).toUpperCase();
 
-  const addRandomJob = useCallback(() => {
-    const pick = randomFakeJob();
-    setVisibleJobs((prev) => {
-      const next = [...prev];
-      const replaceIndex = Math.floor(Math.random() * next.length);
-      next[replaceIndex] = {
-        id: Date.now(),
-        title: pick.title,
-        applicants: 10 + Math.floor(Math.random() * 42),
-        replacedAt: Date.now(),
+  return (
+    <Card
+      as="div"
+      accent={job.accent}
+      className="pointer-events-none !p-5 !shadow-none ring-1 ring-ink/[0.06] sm:!p-6"
+      aria-hidden
+    >
+      <div className="flex gap-4 sm:gap-5">
+        <div className={logoTileClass(job.accent)}>{initial}</div>
+        <div className="min-w-0 flex-1">
+          <div className="mb-1.5 flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-ink/30">
+              {job.postedLabel}
+            </span>
+          </div>
+          <h3 className="line-clamp-2 text-base font-extrabold leading-snug tracking-tight text-ink sm:text-lg">
+            {job.title}
+          </h3>
+          <p className="mt-1 text-sm font-bold text-ink/75">{job.company}</p>
+          <p className="mt-2 text-[13px] leading-snug text-black/50">
+            📍 {job.location}
+          </p>
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-ink/5 pt-4 opacity-90">
+        <div className="h-8 w-[4.5rem] rounded-lg bg-ink/[0.06] ring-1 ring-ink/[0.06]" />
+        <div className="h-8 w-[4.5rem] rounded-lg bg-ink/[0.06] ring-1 ring-ink/[0.06]" />
+        <div className="h-8 min-w-[5.5rem] flex-1 rounded-lg bg-brand/[0.12] ring-1 ring-brand/20 sm:max-w-[7rem]" />
+      </div>
+    </Card>
+  );
+}
+
+function LimitPreviewBlurStack({ slotCount }: { slotCount: number }) {
+  const [visibleJobs, setVisibleJobs] = useState<BlurJobSlot[]>(() =>
+    Array.from({ length: slotCount }, (_, i) => {
+      const j = FAKE_JOBS[i % FAKE_JOBS.length];
+      return {
+        id: i,
+        title: j.title,
+        company: j.company,
+        location: j.location,
+        accent: ACCENTS[i % ACCENTS.length],
+        postedLabel: POSTED_VARIANTS[i % POSTED_VARIANTS.length],
       };
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (reduceMotion) return;
-    let timeoutId: ReturnType<typeof setTimeout>;
-    let cancelled = false;
-
-    const scheduleNext = () => {
-      const delay = 3000 + Math.random() * 7000;
-      timeoutId = setTimeout(() => {
-        if (cancelled) return;
-        addRandomJob();
-        scheduleNext();
-      }, delay);
-    };
-
-    scheduleNext();
-    return () => {
-      cancelled = true;
-      clearTimeout(timeoutId);
-    };
-  }, [addRandomJob, reduceMotion]);
-
-  useEffect(() => {
-    if (reduceMotion) return;
-    const id = window.setInterval(() => {
-      setVisibleJobs((prev) => {
-        const next = [...prev];
-        const i = Math.floor(Math.random() * next.length);
-        const bump = 1 + Math.floor(Math.random() * 3);
-        next[i] = {
-          ...next[i],
-          applicants: next[i].applicants + bump,
-        };
-        return next;
-      });
-    }, 8000);
-    return () => window.clearInterval(id);
-  }, [reduceMotion]);
+    }),
+  );
 
   return (
     <div
-      className="pointer-events-none flex select-none flex-col gap-5 opacity-[0.75]"
-      style={{ filter: "blur(6px)" }}
+      className="pointer-events-none flex select-none flex-col gap-3 opacity-[0.9] [transform:translateZ(0)] [mask-image:linear-gradient(to_bottom,black_0%,black_88%,transparent_100%)]"
+      style={{ filter: "blur(3.5px)" }}
     >
-      <AnimatePresence initial={false} mode="popLayout">
-        {visibleJobs.map((job) => (
-          <motion.div
-            key={job.id}
-            layout
-            initial={
-              reduceMotion ? false : { opacity: 0, y: 8, scale: 0.98 }
-            }
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0 }}
-            transition={CARD_MOTION}
-            className="h-40 will-change-transform"
-            style={{ transformOrigin: "50% 0%" }}
-          >
-            <LimitBlurFakeJobCard job={job} reduceMotion={!!reduceMotion} />
-          </motion.div>
-        ))}
-      </AnimatePresence>
+      {visibleJobs.map((job) => (
+        <div key={job.id}>
+          <LimitBlurFakeJobCard job={job} />
+        </div>
+      ))}
     </div>
   );
 }
@@ -223,10 +153,16 @@ function LockIconCoral({ size = 28 }: { size?: number }) {
   );
 }
 
+export type DiscoveryWallPhase = "search" | "bonus" | "preview";
+
 interface Props {
   resetAt: string;
+  /** Roles not shown (beyond free slice / preview). */
   count: number;
   previewJobs: JobItem[];
+  phase: DiscoveryWallPhase;
+  /** When false, preview-phase subcopy collapses (scroll-driven from parent). Default true. */
+  scrollRevealSubcopy?: boolean;
 }
 
 function countPostedInLast2Hours(jobs: JobItem[]): number {
@@ -264,15 +200,17 @@ function useCountUp(target: number, durationMs: number, active: boolean): number
   return value;
 }
 
-function fakeApplicants10Plus(hiddenCount: number): number {
-  const c = Math.max(0, hiddenCount);
-  return Math.max(12, Math.min(c || 9999, Math.round(c * 0.08 + 20)));
-}
-
-export function LimitWallEnhanced({ resetAt, count, previewJobs }: Props) {
+export function LimitWallEnhanced({
+  resetAt,
+  count,
+  previewJobs,
+  phase,
+  scrollRevealSubcopy = true,
+}: Props) {
   const { isSignedIn } = useAuth();
   const reduceMotion = useReducedMotion();
   const countActive = !reduceMotion;
+  const blurSlots = phase === "preview" ? SLOT_COUNT_PREVIEW : SLOT_COUNT_FULL;
 
   const [{ h, m }, setHm] = useState(() => {
     const target = new Date(resetAt).getTime();
@@ -282,14 +220,11 @@ export function LimitWallEnhanced({ resetAt, count, previewJobs }: Props) {
   const posted2hRaw = useMemo(() => countPostedInLast2Hours(previewJobs), [previewJobs]);
   const posted2hTarget = useMemo(() => {
     if (posted2hRaw > 0) return posted2hRaw;
-    return Math.max(3, Math.min(48, Math.round(count * 0.04 + 8)));
+    return Math.max(3, Math.min(48, Math.round(Math.max(0, count) * 0.04 + 8)));
   }, [posted2hRaw, count]);
-
-  const applicantsTarget = useMemo(() => fakeApplicants10Plus(count), [count]);
 
   const nHidden = useCountUp(Math.max(0, count), 1000, countActive);
   const n2h = useCountUp(posted2hTarget, 1050, countActive);
-  const nApplicants = useCountUp(applicantsTarget, 1100, countActive);
 
   useEffect(() => {
     const target = new Date(resetAt).getTime();
@@ -314,37 +249,76 @@ export function LimitWallEnhanced({ resetAt, count, previewJobs }: Props) {
     },
   };
 
+  const headline =
+    phase === "preview"
+      ? "You're out of free discovery for today"
+      : phase === "bonus"
+        ? "Last free batch — still a capped slice"
+        : "Most matches are still hidden on Free";
+
+  const subcopy =
+    phase === "preview"
+      ? "Only a tiny preview stays visible above — the rest of the list stays blurred until you upgrade or your limit resets."
+      : phase === "bonus"
+        ? "Up to five roles in this batch. Pro unlocks the full list and live updates."
+        : "You're browsing a short slice of what exists. Pro shows the full list as it changes.";
+
   return (
-    <div className="mt-6 space-y-5" aria-labelledby="limit-wall-heading">
+    <div
+      className="mt-8 overflow-hidden rounded-3xl border border-ink/[0.06] bg-gradient-to-b from-white via-[#faf8f5] to-canvas text-left shadow-[0_22px_55px_-26px_rgba(0,0,0,0.11)] ring-1 ring-black/[0.025]"
+      style={{
+        borderLeftWidth: 4,
+        borderLeftColor: CORAL,
+        borderLeftStyle: "solid",
+      }}
+      aria-labelledby="limit-wall-heading"
+    >
       <div
         id="limit-wall-heading"
-        className="jobseek-daily-cap-highlight rounded-2xl pl-6 pr-6 pt-7 pb-7 text-left"
-        style={{
-          border: "1px solid rgba(0,0,0,0.06)",
-          borderLeft: `4px solid ${CORAL}`,
-          background: "linear-gradient(135deg, #ffffff 0%, #fff8f6 55%, #F5F2EB 100%)",
-        }}
+        className="px-5 pb-7 pt-6 sm:px-7 sm:pb-8 sm:pt-8"
       >
-        <div className="flex items-start gap-4">
-          <div className="mt-0.5 shrink-0" aria-hidden>
-            <LockIconCoral size={28} />
+        <div className="flex items-start gap-4 sm:gap-5">
+          <div
+            className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_8px_24px_-12px_rgba(232,83,58,0.35)] ring-1 ring-ink/[0.06]"
+            aria-hidden
+          >
+            <LockIconCoral size={26} />
           </div>
           <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-ink/38">
+              {phase === "preview" ? "Limit reached" : "Free tier"}
+            </p>
             <h2
-              className="font-sans text-xl font-bold leading-snug tracking-tight text-ink"
+              className="mt-1.5 font-sans text-[1.35rem] font-bold leading-snug tracking-tight text-ink sm:text-2xl"
               style={{ color: INK }}
             >
-              You&apos;re ahead — but only for what you can see.
+              {headline}
             </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink/65">
-              You&apos;ve hit today&apos;s free view limit. Everything below is still moving — you
-              just can&apos;t see it yet.
-            </p>
+            {phase === "preview" ? (
+              <ScrollCollapseChrome
+                show={scrollRevealSubcopy}
+                className={cn(
+                  "transition-[margin-top] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                  scrollRevealSubcopy ? "mt-2" : "mt-0",
+                )}
+              >
+                <p className="max-w-2xl font-sans text-sm font-normal leading-relaxed tracking-normal text-ink/68">
+                  {subcopy}
+                </p>
+              </ScrollCollapseChrome>
+            ) : (
+              <p className="mt-2 max-w-2xl font-sans text-sm font-normal leading-relaxed tracking-normal text-ink/68">
+                {subcopy}
+              </p>
+            )}
 
-            <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 sm:gap-6">
-              <div>
+            <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 sm:gap-6">
+              <div className="sm:col-span-1 lg:col-span-1">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-ink/45">
-                  Roles you haven&apos;t seen yet
+                  Beyond your free view
+                </p>
+                <p className="mt-0.5 text-[10px] text-ink/40">
+                  Estimated from this search (not exact)
                 </p>
                 <p className="mt-1 text-lg font-bold tabular-nums" style={{ color: CORAL }}>
                   {nHidden.toLocaleString()}
@@ -352,18 +326,10 @@ export function LimitWallEnhanced({ resetAt, count, previewJobs }: Props) {
               </div>
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-ink/45">
-                  Posted in last 2 hours
+                  Fresh in last 2 hours
                 </p>
                 <p className="mt-1 text-lg font-bold tabular-nums" style={{ color: CORAL }}>
                   {n2h.toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink/45">
-                  Already have 10+ applicants
-                </p>
-                <p className="mt-1 text-lg font-bold tabular-nums" style={{ color: CORAL }}>
-                  {nApplicants.toLocaleString()}
                 </p>
               </div>
               <div>
@@ -387,13 +353,13 @@ export function LimitWallEnhanced({ resetAt, count, previewJobs }: Props) {
                 {
                   k: "auto",
                   icon: "⚡",
-                  line: "Smart Apply ⚡ — Fill ATS forms fast; you review and submit",
+                  line: "Smart Apply → Fill ATS forms fast; you review and submit",
                 },
                 { k: "resume", icon: "🎯", line: "Resume match → Know before you apply" },
                 {
-                  k: "track",
-                  icon: "📩",
-                  line: "Email tracking — Coming soon (application tracker included with Pro)",
+                  k: "alerts",
+                  icon: "📧",
+                  line: "Email job alerts → Get notified when new roles match your saved searches",
                 },
               ].map((row) => (
                 <motion.li
@@ -438,20 +404,21 @@ export function LimitWallEnhanced({ resetAt, count, previewJobs }: Props) {
         </div>
       </div>
 
-      <div className="relative isolate overflow-hidden rounded-2xl">
-        <LimitPreviewBlurStack reduceMotion={reduceMotion} />
+      <div className="relative min-h-[17rem] overflow-hidden sm:min-h-[19rem]">
+        <div className="relative z-0 px-5 pb-28 pt-5 sm:px-7 sm:pb-32 sm:pt-6">
+          <LimitPreviewBlurStack key={phase} slotCount={blurSlots} />
+        </div>
         <div
-          className="pointer-events-none absolute inset-0 rounded-2xl"
-          style={{
-            background: "linear-gradient(to bottom, rgba(245,242,235,0.35), rgba(245,242,235,0.96))",
-          }}
+          className="pointer-events-none absolute inset-x-0 bottom-0 top-[60%] bg-gradient-to-t from-canvas via-canvas/80 to-transparent"
           aria-hidden
         />
-        <div className="pointer-events-none absolute inset-0 flex flex-col justify-center px-6 py-8 sm:px-10 sm:py-10">
-          <div className="mx-auto max-w-lg text-center">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink/40">Preview</p>
-            <p className="mt-3 text-sm leading-relaxed text-ink/55 sm:text-[15px]">
-              Your filters still apply. Upgrade to scroll the full list in real time.
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] px-5 pb-8 pt-20 sm:px-7 sm:pb-10">
+          <div className="max-w-lg">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink/38">
+              More Jobs that match your search
+            </p>
+            <p className="mt-2.5 text-sm font-medium leading-relaxed text-ink/55 sm:text-[15px]">
+              Upgrade for unlimited browsing and the live list.
             </p>
           </div>
         </div>

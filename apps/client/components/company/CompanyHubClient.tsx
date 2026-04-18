@@ -2,8 +2,10 @@
 
 import { useInView } from "framer-motion";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 import {
   fetchCompanyJobs,
   type CompanyDetail,
@@ -21,9 +23,16 @@ import {
   type JobFilters,
 } from "../../lib/slug-parser";
 import { companyLogoSrcForDisplay } from "../../lib/logoDisplay";
+import { useAccountPlan } from "../../lib/useAccountPlan";
+import { FREE_DISCOVERY_PREVIEW_JOB_ROWS } from "../../lib/planLimits";
 import { Badge } from "../ui/Badge";
 import { Button, buttonClassName } from "../ui/Button";
 import { JobCard } from "../job/JobCard";
+
+const LimitWallEnhanced = dynamic(
+  () => import("../job/LimitWallEnhanced").then((m) => m.LimitWallEnhanced),
+  { ssr: true },
+);
 
 const HubJobCard = memo(JobCard);
 HubJobCard.displayName = "HubJobCard";
@@ -68,6 +77,26 @@ function buildCompanyHubPath(
   return qs ? `/company/${slug}?${qs}` : `/company/${slug}`;
 }
 
+/** Sort + work-type chips on the company hub are Pro-only; other query params (e.g. role) stay. */
+function hasProOnlyHubFilters(f: Omit<JobFilters, "companyId">): boolean {
+  if (f.sort === "salary_desc") return true;
+  if (Array.isArray(f.workTypes) && f.workTypes.length > 0) return true;
+  if (f.workType != null) return true;
+  if (f.isRemote === true) return true;
+  return false;
+}
+
+function stripProOnlyHubFilters(
+  f: Omit<JobFilters, "companyId">,
+): Omit<JobFilters, "companyId"> {
+  const out: Omit<JobFilters, "companyId"> = { ...f };
+  if (out.sort === "salary_desc") delete out.sort;
+  delete out.workTypes;
+  delete out.workType;
+  delete out.isRemote;
+  return out;
+}
+
 interface Props {
   company: CompanyDetail;
   slug: string;
@@ -83,6 +112,8 @@ export function CompanyHubClient({
   initialMeta,
   relatedCompanies,
 }: Props) {
+  const { getToken } = useAuth();
+  const { isPro, isLoaded: planLoaded } = useAccountPlan();
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlFilters = useMemo(
@@ -108,8 +139,9 @@ export function CompanyHubClient({
 
   const totalRoles = listMeta.total ?? 0;
   const canLoadMore =
-    listMeta.hasMore === true ||
-    (listMeta.totalPages != null && listMeta.page < listMeta.totalPages);
+    Boolean(listMeta.viewCapUnlimited) &&
+    (listMeta.hasMore === true ||
+      (listMeta.totalPages != null && listMeta.page < listMeta.totalPages));
 
   const filterBase = useMemo(() => {
     const { page: _p, limit: _l, offset: _o, ...rest } = urlFilters;
@@ -120,6 +152,7 @@ export function CompanyHubClient({
     if (!canLoadMore || loadingMore) return;
     setLoadingMore(true);
     try {
+      const token = await getToken();
       const nextPage = listMeta.page + 1;
       const res = await fetchCompanyJobs(slug, {
         page: nextPage,
@@ -130,6 +163,7 @@ export function CompanyHubClient({
           limit: undefined,
           offset: undefined,
         },
+        token,
       });
       setListJobs((prev) => {
         const seen = new Set(prev.map((j) => j.id));
@@ -146,7 +180,7 @@ export function CompanyHubClient({
     } finally {
       setLoadingMore(false);
     }
-  }, [canLoadMore, loadingMore, listMeta, slug, filterBase]);
+  }, [canLoadMore, loadingMore, listMeta, slug, filterBase, getToken]);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   const inView = useInView(sentinelRef, { amount: 0, margin: "200px" });
@@ -181,6 +215,36 @@ export function CompanyHubClient({
     limit: undefined,
     offset: undefined,
   });
+
+  /** Free tier: strip Pro-only hub params and refetch so the list matches the cleaned URL. */
+  useEffect(() => {
+    if (!planLoaded || isPro) return;
+    if (!hasProOnlyHubFilters(urlFilters)) return;
+    let cancelled = false;
+    const cleaned = stripProOnlyHubFilters(urlFilters);
+    void (async () => {
+      router.replace(buildCompanyHubPath(slug, cleaned));
+      const token = await getToken();
+      const { page: _p, limit: _l, offset: _o, ...filterRest } = cleaned;
+      const res = await fetchCompanyJobs(slug, {
+        page: 1,
+        limit: DEFAULT_LIMIT,
+        filters: {
+          ...filterRest,
+          page: undefined,
+          limit: undefined,
+          offset: undefined,
+        },
+        token,
+      });
+      if (cancelled) return;
+      setListJobs(res.data);
+      if (res.meta) setListMeta(res.meta);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [planLoaded, isPro, slug, urlFilters, router, getToken]);
 
   const emptyFiltered =
     listJobs.length === 0 && totalRoles === 0 && filtersActive;
@@ -256,7 +320,7 @@ export function CompanyHubClient({
               <Badge tone="teal" caps={false}>
                 {totalRoles} open roles
               </Badge>
-              {totalRoles > 0 ? (
+              {isPro && totalRoles > 0 ? (
                 <Badge tone="brand" caps={false}>
                   Hiring now
                 </Badge>
@@ -269,62 +333,73 @@ export function CompanyHubClient({
           Explore all open roles from {company.name}.
         </p>
 
-        <div
-          id="company-jobs"
-          className={cn(
-            "mt-6 flex flex-col gap-3 rounded-2xl border border-ink/10 bg-surface/80 p-4 shadow-card",
-            "md:flex-row md:flex-wrap md:items-end md:gap-3",
-          )}
-        >
-          <label className="flex flex-col gap-1.5 text-sm md:w-44 md:shrink-0">
-            <span className="font-semibold leading-none text-ink">Sort</span>
-            <select
-              className={cn(
-                "w-full rounded-2xl border-0 bg-surface px-3.5 py-2.5 text-sm text-ink shadow-sm ring-1 ring-ink/5",
-                "h-10 !py-0 leading-snug focus:outline-none focus:ring-2 focus:ring-brand/30",
-              )}
-              value={sortValue}
-              onChange={(e) => {
-                const v = e.target.value;
-                navigateHub({
-                  ...urlFilters,
-                  sort: v === "salary_desc" ? "salary_desc" : undefined,
-                });
-              }}
-              aria-label="Sort jobs"
-            >
-              <option value="latest">Latest</option>
-              <option value="salary_desc">Highest salary</option>
-            </select>
-          </label>
+        {isPro ? (
+          <div
+            id="company-jobs"
+            className={cn(
+              "mt-6 flex flex-col gap-3 rounded-2xl border border-ink/10 bg-surface/80 p-4 shadow-card",
+              "md:flex-row md:flex-wrap md:items-end md:gap-3",
+            )}
+          >
+            <label className="flex flex-col gap-1.5 text-sm md:w-44 md:shrink-0">
+              <span className="font-semibold leading-none text-ink">Sort</span>
+              <select
+                className={cn(
+                  "w-full rounded-2xl border-0 bg-surface px-3.5 py-2.5 text-sm text-ink shadow-sm ring-1 ring-ink/5",
+                  "h-10 !py-0 leading-snug focus:outline-none focus:ring-2 focus:ring-brand/30",
+                )}
+                value={sortValue}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  navigateHub({
+                    ...urlFilters,
+                    sort: v === "salary_desc" ? "salary_desc" : undefined,
+                  });
+                }}
+                aria-label="Sort jobs"
+              >
+                <option value="latest">Latest</option>
+                <option value="salary_desc">Highest salary</option>
+              </select>
+            </label>
 
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <span className="text-sm font-semibold leading-none text-ink">Filters</span>
-            <div className="flex flex-wrap gap-2">
-              {(
-                [
-                  ["remote", "Remote"],
-                  ["onsite", "On-site"],
-                  ["hybrid", "Hybrid"],
-                ] as const
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => toggleWorkType(key)}
-                  className={cn(
-                    "inline-flex h-9 items-center rounded-full border px-3 text-xs font-semibold transition-colors",
-                    activeWorkType === key
-                      ? "border-brand bg-brand/10 text-brand"
-                      : "border-ink/15 bg-surface text-ink/75 ring-1 ring-ink/5 hover:border-ink/25",
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <span className="text-sm font-semibold leading-none text-ink">Filters</span>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    ["remote", "Remote"],
+                    ["onsite", "On-site"],
+                    ["hybrid", "Hybrid"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => toggleWorkType(key)}
+                    className={cn(
+                      "inline-flex h-9 items-center rounded-full border px-3 text-xs font-semibold transition-colors",
+                      activeWorkType === key
+                        ? "border-brand bg-brand/10 text-brand"
+                        : "border-ink/15 bg-surface text-ink/75 ring-1 ring-ink/5 hover:border-ink/25",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div id="company-jobs" className="mt-6">
+            <p className="text-sm text-ink/65">
+              <Link href="/pricing" className="font-semibold text-brand no-underline hover:underline">
+                Upgrade to Pro
+              </Link>{" "}
+              to sort and filter roles by work type and salary.
+            </p>
+          </div>
+        )}
 
         {emptyFiltered ? (
           <div
@@ -361,16 +436,56 @@ export function CompanyHubClient({
           </p>
         ) : (
           <>
-            <section className="mt-8 flex flex-col gap-5" aria-label="Open roles">
-              {listJobs.map((job) => (
-                <div
-                  key={job.id}
-                  className="transition-transform duration-200 hover:-translate-y-0.5"
-                >
-                  <HubJobCard job={job} />
-                </div>
-              ))}
-            </section>
+            {(() => {
+              const discoveryPhase = listMeta.discoveryPhase;
+              const totalMatches = listMeta.total ?? 0;
+              const showDiscoveryWall = Boolean(
+                !isPro &&
+                  listMeta.viewCapUnlimited === false &&
+                  listMeta.resetAt &&
+                  listJobs.length > 0 &&
+                  (discoveryPhase === "search" ||
+                    discoveryPhase === "bonus" ||
+                    discoveryPhase === "preview" ||
+                    discoveryPhase === undefined),
+              );
+              const hiddenForWall =
+                discoveryPhase === "preview"
+                  ? Math.max(0, listMeta.totalHidden ?? 0)
+                  : Math.max(0, totalMatches - listJobs.length);
+              const jobsForList =
+                discoveryPhase === "preview"
+                  ? listJobs.slice(0, FREE_DISCOVERY_PREVIEW_JOB_ROWS)
+                  : listJobs;
+              const wallPhase =
+                discoveryPhase === "bonus"
+                  ? "bonus"
+                  : discoveryPhase === "preview"
+                    ? "preview"
+                    : "search";
+              return (
+                <>
+                  <section className="mt-8 flex flex-col gap-5" aria-label="Open roles">
+                    {jobsForList.map((job) => (
+                      <div
+                        key={job.id}
+                        className="transition-transform duration-200 hover:-translate-y-0.5"
+                      >
+                        <HubJobCard job={job} />
+                      </div>
+                    ))}
+                  </section>
+                  {showDiscoveryWall && listMeta.resetAt ? (
+                    <LimitWallEnhanced
+                      resetAt={listMeta.resetAt}
+                      count={hiddenForWall}
+                      previewJobs={jobsForList}
+                      phase={wallPhase}
+                    />
+                  ) : null}
+                </>
+              );
+            })()}
 
             {canLoadMore ? (
               <div ref={sentinelRef} className="mt-8 flex justify-center pb-4">

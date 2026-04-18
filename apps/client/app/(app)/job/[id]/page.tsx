@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { fetchCompanyJobs, fetchJobById, fetchJobs } from "../../../../lib/api";
+import { buildJobPostingJsonLd } from "../../../../lib/jobPostingJsonLd";
+import { absoluteUrl } from "../../../../lib/seoSite";
 import {
   refineSectionsForDisplay,
   resolveJobDetailSections,
@@ -28,26 +31,42 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const job = await fetchJobById(id);
-  if (!job) {
+  const { getToken } = await auth();
+  const token = await getToken();
+  const fetched = await fetchJobById(id, { token });
+  if (!fetched) {
     return { title: "Job not found | JobSeek" };
   }
+  const job = fetched.data;
   const sections = refineSectionsForDisplay(resolveJobDetailSections(job));
   const structured = sectionsPlainTextForSeo(sections);
   const desc =
     structured.slice(0, 160) ||
     job.description?.slice(0, 160) ||
     `View ${job.title} role details and apply.`;
+  const canonical = absoluteUrl(`/job/${id}`);
   return {
     title: `${job.title} at ${job.company.name} | JobSeek`,
     description: desc,
+    alternates: { canonical },
+    openGraph: {
+      title: `${job.title} at ${job.company.name}`,
+      description: desc,
+      url: canonical,
+    },
   };
 }
 
 export default async function JobDetailPage({ params }: Props) {
   const { id } = await params;
-  const job = await fetchJobById(id);
-  if (!job || !job.company) notFound();
+  const { getToken } = await auth();
+  const token = await getToken();
+  const fetched = await fetchJobById(id, { token });
+  if (!fetched?.data?.company) notFound();
+
+  const job = fetched.data;
+  const detailCap = fetched.meta;
+  const capReached = Boolean(detailCap?.capReached);
 
   const sections = refineSectionsForDisplay(resolveJobDetailSections(job));
   const structuredText = sectionsPlainTextForSeo(sections);
@@ -61,42 +80,23 @@ export default async function JobDetailPage({ params }: Props) {
     10,
   );
 
-  const { getToken } = await auth();
-  const token = await getToken();
   const [companyJobsRes, similarRes] = await Promise.all([
-    fetchCompanyJobs(job.company.slug, { limit: 5 }),
+    fetchCompanyJobs(job.company.slug, { limit: 5, token }),
     fetchJobs(
       {
         category: job.category,
         limit: 20,
       },
-      { token },
+      { viewCapBypassSecret: process.env.JOB_LIST_VIEW_CAP_BYPASS_TOKEN ?? null },
     ),
   ]);
   const companyJobs = (companyJobsRes.data ?? []).filter((x) => x.id !== job.id).slice(0, 3);
   const similarJobs = rankSimilarJobs(job, similarRes.data ?? [], 6);
 
-  const applyHref = job.applyUrl?.trim() || job.sourceUrl;
+  const applyHref = job.applyUrl?.trim() || job.sourceUrl?.trim() || "";
   const jsonLdDescription = structuredText || job.description || undefined;
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "JobPosting",
-    title: job.title,
-    hiringOrganization: {
-      "@type": "Organization",
-      name: job.company.name,
-    },
-    jobLocation: {
-      "@type": "Place",
-      address: {
-        "@type": "PostalAddress",
-        addressCountry: job.country,
-      },
-    },
-    datePosted: job.postedAt ?? undefined,
-    description: jsonLdDescription,
-  };
+  const jsonLd = buildJobPostingJsonLd(job, jsonLdDescription);
 
   return (
     <main className="min-h-screen">
@@ -104,14 +104,44 @@ export default async function JobDetailPage({ params }: Props) {
         <div className="mt-4 grid grid-cols-1 gap-8 lg:grid-cols-3">
           <div className="min-w-0 space-y-6 lg:col-span-2">
             <Card accent="brand" as="article" className="space-y-6 px-6 py-8 text-left sm:px-8">
-              <JobHeader job={job} applyHref={applyHref} />
+              <JobHeader
+                job={job}
+                applyHref={applyHref}
+                applyUrlLocked={capReached}
+              />
               <ResumeMatchSection job={job} />
               <div className="w-full min-w-0 max-w-full space-y-0">
                 <EnrichmentPills job={job} />
                 <JobDetailSeoPills job={job} />
               </div>
               <div className="pt-2">
-                <JobParsedContent sections={sections} />
+                {capReached ? (
+                  <div
+                    className="rounded-2xl border border-brand/25 bg-brand/5 px-5 py-6 text-center"
+                    role="region"
+                    aria-label="Browse limit"
+                  >
+                    <p className="text-sm font-semibold text-ink">
+                      You&apos;ve reached today&apos;s free browse limit.
+                    </p>
+                    <p className="mt-1 text-sm text-ink/70">
+                      Upgrade to read the full description and apply to this role.
+                    </p>
+                    <Link
+                      href="/pricing"
+                      className="mt-4 inline-block text-sm font-semibold text-brand underline underline-offset-2 hover:text-brand-hover"
+                    >
+                      View Pro plans
+                    </Link>
+                    {detailCap?.resetAt ? (
+                      <p className="mt-3 text-xs text-ink/50">
+                        Resets {new Date(detailCap.resetAt).toLocaleString()}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <JobParsedContent sections={sections} />
+                )}
               </div>
               {process.env.NODE_ENV === "development" ? (
                 <details className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-left">

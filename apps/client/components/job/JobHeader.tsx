@@ -4,13 +4,16 @@ import { formatTimeAgo } from "../../lib/format";
 import { jobDetailPinLocationText, workTypeDisplayLabel } from "../../lib/jobDisplay";
 import { ApplyJobButton } from "./ApplyJobButton";
 import { AppliedToggleButton } from "./AppliedToggleButton";
+import { buttonClassName } from "../ui/Button";
 
 interface Props {
   job: JobItem;
   applyHref: string;
+  /** Free tier hit daily browse cap — external apply URL hidden until Pro. */
+  applyUrlLocked?: boolean;
 }
 
-export function JobHeader({ job, applyHref }: Props) {
+export function JobHeader({ job, applyHref, applyUrlLocked }: Props) {
   return (
     <header className="space-y-3">
       <div className="flex flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
@@ -33,7 +36,20 @@ export function JobHeader({ job, applyHref }: Props) {
           </p>
         </div>
         <div className="shrink-0 flex items-center gap-2">
-          <ApplyJobButton jobId={job.id} applyUrl={applyHref} variant="primary" size="md" />
+          {applyUrlLocked ? (
+            <Link
+              href="/pricing"
+              className={buttonClassName({
+                variant: "primary",
+                size: "md",
+                className: "no-underline",
+              })}
+            >
+              Upgrade to view & apply
+            </Link>
+          ) : (
+            <ApplyJobButton jobId={job.id} applyUrl={applyHref} variant="primary" size="md" />
+          )}
           <AppliedToggleButton jobId={job.id} size="md" />
         </div>
       </div>

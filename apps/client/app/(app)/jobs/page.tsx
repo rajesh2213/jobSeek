@@ -1,27 +1,83 @@
-import { auth } from "@clerk/nextjs/server";
-import { fetchJobs } from "../../../lib/api";
-import { jobsMetadata } from "../../../lib/seo";
+import type { Metadata } from "next";
+import { loadJobsDiscoveryPage, stableJobFiltersKey } from "../../../lib/jobsPageData";
+import { fetchJobsRelatedSlugs } from "../../../lib/jobsRelatedSlugs";
+import {
+  buildBreadcrumbListJsonLd,
+  buildJobListingItemListJsonLd,
+  getSeoMinJobsIndex,
+  jobDiscoveryBreadcrumbJsonLdPaths,
+  jobsRouteMetadata,
+} from "../../../lib/seo";
 import { JobsSearchPage } from "../../../components/job/JobsSearchPage";
-import { parseJobFiltersFromSearch } from "../../../lib/slug-parser";
+import {
+  getCanonicalJobListingUrl,
+  parseJobFiltersFromSearch,
+  filtersToSlug,
+} from "../../../lib/slug-parser";
+import { JsonLdScript } from "../../../components/seo/JsonLdScript";
+import { JobsListingFaq } from "../../../components/seo/JobsListingFaq";
 
-export const metadata = jobsMetadata({});
+const FALLBACK_RELATED_SLUGS = [
+  "engineering-react-nodejs-us-remote",
+  "sales-salesforce-us",
+  "marketing-remote",
+];
 
 interface Props {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  const sp = await searchParams;
+  const filters = parseJobFiltersFromSearch(sp);
+  const response = await loadJobsDiscoveryPage(stableJobFiltersKey(filters));
+  return jobsRouteMetadata(filters, {
+    canonicalPath: getCanonicalJobListingUrl(filters),
+    total: response.meta?.total,
+  });
+}
+
 export default async function JobsPage({ searchParams }: Props) {
   const sp = await searchParams;
   const filters = parseJobFiltersFromSearch(sp);
-  const { getToken } = await auth();
-  const token = await getToken();
-  const response = await fetchJobs(
-    {
-      ...filters,
-      page: filters.page ?? 1,
-      limit: filters.limit ?? 20,
-    },
-    { token },
+  const filtersKey = stableJobFiltersKey(filters);
+  const currentSlug = filtersToSlug({
+    category: filters.category,
+    role: filters.role,
+    skills: filters.skills,
+    country: filters.country,
+    isRemote: filters.isRemote,
+    workType: filters.workType,
+  });
+
+  const [response, relatedSlugs] = await Promise.all([
+    loadJobsDiscoveryPage(filtersKey),
+    fetchJobsRelatedSlugs({ currentSlug, fallback: FALLBACK_RELATED_SLUGS }),
+  ]);
+
+  const total = response.meta?.total ?? 0;
+  const minIndex = getSeoMinJobsIndex();
+  const indexable = total >= minIndex;
+
+  const listingTop = (
+    <>
+      <JsonLdScript data={buildBreadcrumbListJsonLd(jobDiscoveryBreadcrumbJsonLdPaths(filters))} />
+      {indexable ? (
+        <JsonLdScript data={buildJobListingItemListJsonLd(response.data.slice(0, 10), total)} />
+      ) : null}
+    </>
   );
-  return <JobsSearchPage jobs={response.data} meta={response.meta} />;
+
+  const listingFaq =
+    total >= minIndex && total >= 8 ? <JobsListingFaq /> : null;
+
+  return (
+    <JobsSearchPage
+      jobs={response.data}
+      meta={response.meta}
+      relatedSlugs={relatedSlugs}
+      listingTop={listingTop}
+      listingFaq={listingFaq}
+    />
+  );
 }

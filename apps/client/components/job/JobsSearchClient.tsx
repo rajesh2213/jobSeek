@@ -7,9 +7,10 @@ import {
   useRef,
   useState,
   useTransition,
+  type ReactNode,
 } from "react";
 import dynamic from "next/dynamic";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import {
@@ -25,6 +26,7 @@ import {
   type SavedSearchItem,
 } from "../../lib/api";
 import { useAccountPlan } from "../../lib/useAccountPlan";
+import { FREE_DISCOVERY_PREVIEW_JOB_ROWS } from "../../lib/planLimits";
 import {
   parseJobFiltersFromSearch,
   filtersToSearchParams,
@@ -35,7 +37,9 @@ import { Container } from "../ui/Container";
 import { Button } from "../ui/Button";
 import { SortSegmented } from "../ui/SortSegmented";
 import { FilterChips } from "../filters/FilterChips";
+import type { JobsInlineUiFiltersState } from "./JobsInlineFilters";
 import { JobList } from "./JobList";
+import { ScrollCollapseChrome, useScrollRevealPromos } from "./ScrollCollapseChrome";
 import { EmptyState } from "../ui/EmptyState";
 import { cn } from "../../lib/cn";
 import {
@@ -68,14 +72,232 @@ interface Props {
   jobs: JobItem[];
   meta?: JobsApiResponse["meta"];
   relatedSlugs: string[];
+  listingTop?: ReactNode;
+  listingFaq?: ReactNode;
 }
 
-interface UiFiltersState {
-  roles: string[];
-  types: Array<"remote" | "onsite" | "hybrid">;
-  /** Region names, ISO codes, or city strings for `?locations=`. */
-  locations: string[];
-  skills: string[];
+function discoverySurfaceFromPathname(pathname: string): "browse" | "seo" {
+  if (pathname === "/jobs" || pathname === "/jobs/browse") return "browse";
+  if (pathname.startsWith("/jobs/")) return "seo";
+  return "browse";
+}
+
+const FREE_DISCOVERY_SEARCHES_CAP = 2;
+const FREE_DISCOVERY_JOBS_PER_SEARCH = 10;
+
+/** Local wall-clock time; timezone via {@link discoveryResetTimeZone}. */
+function formatDiscoveryResetDateTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+/** Short timezone label for “Resets (…)”. */
+function discoveryResetTimeZone(iso: string): string {
+  const d = new Date(iso);
+  const part = new Intl.DateTimeFormat(undefined, {
+    timeZoneName: "short",
+  })
+    .formatToParts(d)
+    .find((p) => p.type === "timeZoneName");
+  return part?.value?.trim() ?? "";
+}
+
+/** “Resets (TZ) Sat, Apr 19, …” for inline captions. */
+function DiscoveryResetCaption({ iso }: { iso: string }) {
+  const tz = discoveryResetTimeZone(iso);
+  return (
+    <>
+      Resets
+      {tz ? (
+        <span className="text-ink/45">
+          {" "}
+          ({tz})
+        </span>
+      ) : null}{" "}
+      {formatDiscoveryResetDateTime(iso)}
+    </>
+  );
+}
+
+function quotaDivider() {
+  return (
+    <div
+      className="w-px shrink-0 self-stretch bg-ink/[0.07]"
+      aria-hidden
+    />
+  );
+}
+
+/** Matches LimitWallEnhanced stat row typography (label + bold figure). */
+function DiscoveryMeterCell({
+  label,
+  accent,
+  secondary,
+  children,
+}: {
+  label: string;
+  accent?: boolean;
+  /** Smaller line under the figure (e.g. jobs per search). */
+  secondary?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex min-w-0 flex-col justify-center gap-1 px-3 py-2.5 sm:px-3.5",
+        accent &&
+          "relative bg-gradient-to-br from-brand/[0.07] via-white/50 to-transparent before:pointer-events-none before:absolute before:inset-y-2.5 before:left-0 before:w-px before:bg-gradient-to-b before:from-brand/45 before:via-brand/20 before:to-transparent before:content-['']",
+      )}
+    >
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink/45">
+        {label}
+      </p>
+      <p
+        className={cn(
+          "font-sans text-xs font-bold tabular-nums leading-none tracking-wide",
+          accent ? "text-brand" : "text-ink",
+        )}
+      >
+        {children}
+      </p>
+      {secondary ? (
+        <p className="text-[10px] font-semibold leading-tight tracking-wide text-ink/45">
+          {secondary}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function FreeDiscoveryQuotaStrip({
+  listMeta,
+  urlFilters,
+}: {
+  listMeta: NonNullable<JobsApiResponse["meta"]>;
+  urlFilters: JobFilters;
+}) {
+  if (listMeta.viewCapUnlimited !== false) return null;
+
+  const isPreview =
+    listMeta.discoveryPhase === "preview" || listMeta.capReached;
+  const isBonus = listMeta.discoveryPhase === "bonus";
+  const rem = listMeta.discoverySearchesRemaining ?? 0;
+  const resetAt = listMeta.resetAt;
+  const resetDateTime = resetAt ? formatDiscoveryResetDateTime(resetAt) : null;
+  const resetTz = resetAt ? discoveryResetTimeZone(resetAt) : "";
+
+  const noDebitHint =
+    !hasActiveJobFilters(urlFilters) && !isPreview && !isBonus
+      ? "Add filters or change sort to use a discovery credit"
+      : undefined;
+
+  const shell = cn(
+    "inline-flex max-w-full items-stretch overflow-x-auto rounded-2xl border border-ink/[0.07] text-ink",
+    "bg-gradient-to-br from-white via-[#fffaf8] to-[#f3f0ea]",
+    "shadow-[0_16px_50px_-28px_rgba(0,0,0,0.12)] ring-1 ring-black/[0.03]",
+    noDebitHint && "ring-amber-400/25",
+  );
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      title={noDebitHint}
+      className={shell}
+    >
+      <div className="flex shrink-0 flex-col justify-center border-r border-ink/[0.06] bg-white/40 px-3 py-2.5 sm:px-3.5">
+        <p className="text-xs font-bold uppercase tracking-[0.14em] text-ink/38">
+          Free
+        </p>
+      </div>
+      {isPreview ? (
+        <>
+          <DiscoveryMeterCell
+            label="Searches used"
+            secondary={`×${FREE_DISCOVERY_JOBS_PER_SEARCH} jobs per search`}
+          >
+            {FREE_DISCOVERY_SEARCHES_CAP}/{FREE_DISCOVERY_SEARCHES_CAP}
+          </DiscoveryMeterCell>
+          {quotaDivider()}
+          <DiscoveryMeterCell label="Now showing" accent>
+            Preview ×{FREE_DISCOVERY_PREVIEW_JOB_ROWS}
+          </DiscoveryMeterCell>
+          {resetDateTime ? (
+            <>
+              {quotaDivider()}
+              <div className="flex min-w-0 max-w-[14rem] flex-col justify-center gap-1 px-3 py-2.5 sm:max-w-[18rem] sm:px-3.5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink/45">
+                  Resets
+                  {resetTz ? (
+                    <span className="font-bold normal-case text-ink/50">
+                      {" "}
+                      ({resetTz})
+                    </span>
+                  ) : null}
+                </p>
+                <p className="break-words font-sans text-xs font-bold leading-snug tracking-wide text-ink/70">
+                  {resetDateTime}
+                </p>
+              </div>
+            </>
+          ) : null}
+        </>
+      ) : isBonus ? (
+        <div className="flex items-baseline gap-2 px-3 py-2.5 sm:px-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink/45">
+            Last batch
+          </p>
+          <span className="font-sans text-xs font-bold tabular-nums tracking-wide text-ink">
+            +5 roles
+          </span>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:gap-x-4 sm:px-3.5 sm:pr-4">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink/45">
+              Searches left
+            </p>
+            <p className="font-sans text-xs font-bold tabular-nums leading-none tracking-wide text-ink">
+              <span className="text-brand">{rem}</span>
+              <span className="text-ink/35"> / </span>
+              <span>{FREE_DISCOVERY_SEARCHES_CAP}</span>
+            </p>
+            <p className="text-[10px] font-semibold leading-tight tracking-wide text-ink/45">
+              ×{FREE_DISCOVERY_JOBS_PER_SEARCH} jobs per search
+            </p>
+          </div>
+          <div
+            className="hidden h-8 w-px bg-ink/[0.08] sm:block"
+            aria-hidden
+          />
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink/45">
+              Then
+            </p>
+            <p className="font-sans text-xs font-bold tabular-nums tracking-wide text-ink/80">
+              {FREE_DISCOVERY_PREVIEW_JOB_ROWS} preview
+            </p>
+          </div>
+          {listMeta.bonusBatchRemaining === 1 ? (
+            <>
+              <div
+                className="hidden h-8 w-px bg-ink/[0.08] lg:block"
+                aria-hidden
+              />
+              <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">
+                +5 on SEO hubs
+              </p>
+            </>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function toTitleCaseSlug(slug: string): string {
@@ -104,11 +326,18 @@ function buildSavedSearchDetails(
       label: "Role",
       value: role.map(toTitleCaseSlug).join(", "),
     });
-  if (filters.category)
+  const catVals =
+    filters.categories?.length
+      ? filters.categories
+      : filters.category
+        ? [filters.category]
+        : [];
+  if (catVals.length > 0) {
     details.push({
       label: "Category",
-      value: toTitleCaseSlug(filters.category),
+      value: catVals.map(toTitleCaseSlug).join(", "),
     });
+  }
   const work = filters.workTypes?.length
     ? filters.workTypes
     : filters.workType
@@ -193,6 +422,8 @@ export function JobsSearchClient({
   jobs,
   meta: initialMeta,
   relatedSlugs,
+  listingTop,
+  listingFaq,
 }: Props) {
   const { getToken, isSignedIn, isLoaded: authLoaded } = useAuth();
   const { isPro } = useAccountPlan();
@@ -220,6 +451,7 @@ export function JobsSearchClient({
     return () => window.clearInterval(id);
   }, []);
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const urlKey = searchParams.toString();
   const urlFilters = useMemo(
@@ -228,14 +460,20 @@ export function JobsSearchClient({
     [urlKey],
   );
 
+  const discoverySurface = useMemo(
+    () => discoverySurfaceFromPathname(pathname),
+    [pathname],
+  );
+
   /** Stable identity for the current job search (ignores pagination and transient params like `appliedJob`). */
   const jobListFiltersKey = useMemo(
-    () => filtersToSearchParams(listQueryBase(urlFilters)).toString(),
-    [urlFilters],
+    () =>
+      `${filtersToSearchParams(listQueryBase(urlFilters)).toString()}|${discoverySurface}`,
+    [urlFilters, discoverySurface],
   );
 
   const [draft, setDraft] = useState<JobFilters>(urlFilters);
-  const [uiFilters, setUiFilters] = useState<UiFiltersState>(() => ({
+  const [uiFilters, setUiFilters] = useState<JobsInlineUiFiltersState>(() => ({
     roles: urlFilters.roles ?? (urlFilters.role ? [urlFilters.role] : []),
     types:
       urlFilters.workTypes ??
@@ -248,6 +486,12 @@ export function JobsSearchClient({
           ? [urlFilters.country]
           : [],
     skills: urlFilters.skills ?? [],
+    categories:
+      urlFilters.categories?.length
+        ? urlFilters.categories
+        : urlFilters.category
+          ? [urlFilters.category]
+          : [],
   }));
   const [listJobs, setListJobs] = useState<JobItem[]>(jobs);
   const [listMeta, setListMeta] = useState(initialMeta);
@@ -267,6 +511,7 @@ export function JobsSearchClient({
   const [alertUpdatingId, setAlertUpdatingId] = useState<string | null>(null);
   const [flashAppliedJobId, setFlashAppliedJobId] = useState<string | null>(null);
   const [isFilterPending, startFilterTransition] = useTransition();
+  const scrollPromoChromeVisible = useScrollRevealPromos();
   /** Tracks which search the current `listJobs` / `listMeta` belong to; avoids wiping client "load more" on RSC refresh. */
   const listServerSyncKeyRef = useRef<string | null>(null);
 
@@ -285,6 +530,12 @@ export function JobsSearchClient({
             ? [urlFilters.country]
             : [],
       skills: urlFilters.skills ?? [],
+      categories:
+        urlFilters.categories?.length
+          ? urlFilters.categories
+          : urlFilters.category
+            ? [urlFilters.category]
+            : [],
     });
   }, [urlFilters]);
 
@@ -419,6 +670,8 @@ export function JobsSearchClient({
       location: undefined,
       workType: undefined,
       workTypes: uiFilters.types.length ? uiFilters.types : undefined,
+      category: undefined,
+      categories: uiFilters.categories.length ? uiFilters.categories : undefined,
       page: undefined,
       offset: undefined,
     });
@@ -445,7 +698,7 @@ export function JobsSearchClient({
 
   const onRemoveChip = useCallback(
     (payload: { type: keyof JobFilters | "skill"; value?: string }) => {
-      const updated: UiFiltersState = { ...uiFilters };
+      const updated: JobsInlineUiFiltersState = { ...uiFilters };
       const nextFilters: JobFilters = {
         ...urlFilters,
         page: undefined,
@@ -500,8 +753,21 @@ export function JobsSearchClient({
         nextFilters.sort = undefined;
       } else if (payload.type === "companyId") {
         nextFilters.companyId = undefined;
+      } else if (payload.type === "category" && payload.value) {
+        const cur =
+          urlFilters.categories?.length
+            ? urlFilters.categories
+            : urlFilters.category
+              ? [urlFilters.category]
+              : [];
+        const nextCats = cur.filter((c) => c !== payload.value);
+        nextFilters.categories = nextCats.length ? nextCats : undefined;
+        nextFilters.category = undefined;
+        updated.categories = nextCats;
       } else if (payload.type === "category") {
         nextFilters.category = undefined;
+        nextFilters.categories = undefined;
+        updated.categories = [];
       }
 
       nextFilters.role = updated.roles[0];
@@ -509,6 +775,10 @@ export function JobsSearchClient({
       nextFilters.workType = undefined;
       nextFilters.workTypes = updated.types.length ? updated.types : undefined;
       nextFilters.skills = updated.skills.length ? updated.skills : undefined;
+      nextFilters.category = undefined;
+      nextFilters.categories = updated.categories.length
+        ? updated.categories
+        : undefined;
 
       setUiFilters(updated);
       navigate(nextFilters);
@@ -517,6 +787,7 @@ export function JobsSearchClient({
   );
 
   const canLoadMore =
+    Boolean(listMeta?.viewCapUnlimited) &&
     !listMeta?.capReached &&
     listMeta &&
     (listMeta.hasMore === true ||
@@ -534,6 +805,7 @@ export function JobsSearchClient({
           ...base,
           page: nextPage,
           limit: listMeta.limit || 20,
+          surface: discoverySurface,
         },
         { token },
       );
@@ -554,7 +826,7 @@ export function JobsSearchClient({
     } finally {
       setLoadingMore(false);
     }
-  }, [listMeta, loadingMore, canLoadMore, urlFilters, getToken]);
+  }, [listMeta, loadingMore, canLoadMore, urlFilters, getToken, discoverySurface]);
 
   const canonicalQuery = useMemo(() => {
     return urlKey ? `/jobs?${urlKey}` : "/jobs";
@@ -756,6 +1028,7 @@ export function JobsSearchClient({
       </div>
 
       <Container width="jobs" className="pb-2 pt-0">
+        {listingTop}
         {showSmartApplyInstallBanner ? (
           <div
             className="mb-3 flex items-center gap-3 rounded-[10px] border border-[rgba(232,83,58,0.2)] px-4 py-3"
@@ -815,17 +1088,17 @@ export function JobsSearchClient({
             showSort={false}
             showChips={false}
             totalRoles={listMeta?.total}
-            selectedCategory={urlFilters.category}
-            onCategoryNavigate={(category) =>
-              navigate({
-                ...urlFilters,
-                category,
-                page: undefined,
-                offset: undefined,
-              })
+            selectedCategories={uiFilters.categories}
+            onCategoryToggle={(slug) =>
+              setUiFilters((prev) => ({
+                ...prev,
+                categories: prev.categories.includes(slug)
+                  ? prev.categories.filter((c) => c !== slug)
+                  : [...prev.categories, slug],
+              }))
             }
           />
-          <div className="mb-3 mt-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="mb-3 mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
               <Button
                 variant={savedMatch ? "primary" : "outline"}
@@ -1098,35 +1371,48 @@ export function JobsSearchClient({
                 </button>
               ) : null}
             </div>
-            <div className="min-w-[220px]">
-              <SortSegmented
-                value={
-                  urlFilters.sort === "salary_desc" ? "salary_desc" : "latest"
-                }
-                onChange={(v) =>
-                  onSortNavigate(
-                    v === "salary_desc" ? "salary_desc" : undefined,
-                  )
-                }
-                totalRoles={listMeta?.total}
-              />
+            <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:shrink-0 sm:gap-3">
+              {!isPro && listMeta && listMeta.viewCapUnlimited === false ? (
+                <FreeDiscoveryQuotaStrip listMeta={listMeta} urlFilters={urlFilters} />
+              ) : null}
+              <div className="min-w-0 sm:min-w-[220px]">
+                <SortSegmented
+                  value={
+                    urlFilters.sort === "salary_desc" ? "salary_desc" : "latest"
+                  }
+                  onChange={(v) =>
+                    onSortNavigate(
+                      v === "salary_desc" ? "salary_desc" : undefined,
+                    )
+                  }
+                  totalRoles={listMeta?.total}
+                />
+              </div>
             </div>
           </div>
           {isSignedIn && !isPro ? (
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand/20 bg-brand/5 px-3 py-2.5 text-xs text-ink">
-              <span>
-                <span aria-hidden className="mr-1.5">
-                  📧
+            <ScrollCollapseChrome
+              show={scrollPromoChromeVisible}
+              className={cn(
+                "transition-[margin-bottom] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                scrollPromoChromeVisible ? "mb-3" : "mb-0",
+              )}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand/20 bg-brand/5 px-3 py-2.5 text-xs text-ink">
+                <span>
+                  <span aria-hidden className="mr-1.5">
+                    📧
+                  </span>
+                  Get notified when new jobs match your saved searches
                 </span>
-                Get notified when new jobs match your saved searches
-              </span>
-              <Link
-                href="/pricing"
-                className="shrink-0 font-semibold text-brand hover:underline"
-              >
-                Enable job alerts →
-              </Link>
-            </div>
+                <Link
+                  href="/pricing"
+                  className="shrink-0 font-semibold text-brand hover:underline"
+                >
+                  Enable job alerts →
+                </Link>
+              </div>
+            </ScrollCollapseChrome>
           ) : null}
           {savedSearchNotice ? (
             <p className="mb-2 text-xs text-ink-muted" role="status">
@@ -1134,6 +1420,66 @@ export function JobsSearchClient({
             </p>
           ) : null}
           <FilterChips filters={urlFilters} onRemoveChip={onRemoveChip} />
+          {!isPro &&
+          !listMeta?.viewCapUnlimited &&
+          listMeta?.bonusBatchRemaining === 1 &&
+          listMeta?.discoverySearchesRemaining === 0 &&
+          listMeta?.discoveryPhase === "search" ? (
+            <div
+              role="status"
+              className="mt-3 rounded-xl border border-teal/30 bg-teal/10 px-4 py-3 text-sm text-ink"
+            >
+              <p className="font-semibold text-ink">One short batch left today</p>
+              <p className="mt-1 text-xs leading-relaxed text-ink/75">
+                Run one more search (same or new filters) to see up to{" "}
+                <span className="font-semibold">5 more roles</span> — your last free
+                glimpse before the paywall.
+              </p>
+            </div>
+          ) : null}
+          {listMeta?.discoveryPhase === "bonus" && !isPro && !listMeta?.viewCapUnlimited ? (
+            <div
+              role="status"
+              className="mt-3 rounded-xl border border-brand/25 bg-brand/5 px-4 py-3 text-sm text-ink"
+            >
+              <p className="font-semibold text-ink">Last free batch for today</p>
+              <p className="mt-1 text-xs text-ink/75">
+                Up to 5 roles below. Upgrade for unlimited browsing tomorrow.
+              </p>
+            </div>
+          ) : null}
+          {listMeta?.capReached &&
+          !listMeta?.viewCapUnlimited &&
+          !isPro &&
+          (listMeta?.total ?? 0) > 0 &&
+          listMeta?.discoveryPhase !== "preview" ? (
+            <div
+              role="status"
+              aria-live="polite"
+              className="mt-3 flex flex-col gap-2 rounded-xl border border-brand/25 bg-gradient-to-br from-brand/10 to-white px-4 py-3 text-left sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-ink">
+                  More new roles came in for this search
+                </p>
+                <p className="mt-0.5 text-xs leading-snug text-ink/70">
+                  You&apos;ve reached today&apos;s free browse limit—upgrade to see every new listing
+                  and full details.
+                </p>
+                {listMeta.resetAt ? (
+                  <p className="mt-1 text-[11px] text-ink/50">
+                    <DiscoveryResetCaption iso={listMeta.resetAt} />
+                  </p>
+                ) : null}
+              </div>
+              <Link
+                href="/pricing"
+                className="shrink-0 rounded-lg bg-brand px-4 py-2 text-center text-sm font-semibold text-white no-underline shadow-sm transition-colors hover:bg-brand-hover"
+              >
+                Upgrade to view all
+              </Link>
+            </div>
+          ) : null}
         </Container>
         {isFilterPending ? (
           <div
@@ -1165,9 +1511,23 @@ export function JobsSearchClient({
         {(() => {
           const totalMatches = listMeta?.total ?? 0;
           const noMatches = listJobs.length === 0 && totalMatches === 0;
-          const showCapWall = Boolean(
-            listMeta?.capReached && listMeta.resetAt && !noMatches,
+          const discoveryPhase = listMeta?.discoveryPhase;
+          const showDiscoveryWall = Boolean(
+            !isPro &&
+              listMeta &&
+              listMeta.viewCapUnlimited === false &&
+              listMeta.resetAt &&
+              !noMatches &&
+              listJobs.length > 0 &&
+              (discoveryPhase === "search" ||
+                discoveryPhase === "bonus" ||
+                discoveryPhase === "preview" ||
+                discoveryPhase === undefined),
           );
+          const hiddenForWall =
+            discoveryPhase === "preview"
+              ? Math.max(0, listMeta?.totalHidden ?? 0)
+              : Math.max(0, totalMatches - listJobs.length);
           if (noMatches) {
             return (
               <EmptyState
@@ -1204,19 +1564,27 @@ export function JobsSearchClient({
           }
           const capResetAt = listMeta?.resetAt;
           const jobsForList =
-            showCapWall && listJobs.length > 0
-              ? listJobs.slice(0, 10)
+            discoveryPhase === "preview"
+              ? listJobs.slice(0, FREE_DISCOVERY_PREVIEW_JOB_ROWS)
               : listJobs;
+          const wallPhase =
+            discoveryPhase === "bonus"
+              ? "bonus"
+              : discoveryPhase === "preview"
+                ? "preview"
+                : "search";
           return (
             <>
               {listJobs.length > 0 ? (
                 <JobList jobs={jobsForList} flashAppliedJobId={flashAppliedJobId} />
               ) : null}
-              {showCapWall && capResetAt ? (
+              {showDiscoveryWall && capResetAt ? (
                 <LimitWallEnhanced
                   resetAt={capResetAt}
-                  count={Math.max(0, listMeta?.totalHidden ?? 0)}
-                  previewJobs={listJobs}
+                  count={hiddenForWall}
+                  previewJobs={jobsForList}
+                  phase={wallPhase}
+                  scrollRevealSubcopy={scrollPromoChromeVisible}
                 />
               ) : null}
               {canLoadMore ? (
@@ -1238,6 +1606,12 @@ export function JobsSearchClient({
         })()}
       </Container>
 
+      {listingFaq ? (
+        <Container width="jobs" className="mt-14">
+          {listingFaq}
+        </Container>
+      ) : null}
+
       <Container width="jobs" className="mt-20 border-t border-ink/10 pt-12">
         <p className="text-center text-[10px] font-bold uppercase tracking-[0.2em] text-ink/40">
           Related searches
@@ -1253,6 +1627,14 @@ export function JobsSearchClient({
             </Link>
           ))}
         </div>
+        <p className="mt-6 text-center text-sm text-ink/55">
+          <Link
+            href="/jobs/browse"
+            className="font-semibold text-brand no-underline hover:underline"
+          >
+            Browse all categories and skill hubs
+          </Link>
+        </p>
       </Container>
     </div>
   );

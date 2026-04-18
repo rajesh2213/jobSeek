@@ -10,6 +10,7 @@ import {
   type CompaniesSort,
 } from "../../lib/api";
 import { cn } from "../../lib/cn";
+import { useAccountPlan } from "../../lib/useAccountPlan";
 import { Button } from "../ui/Button";
 import { Input, inputBaseClass } from "../ui/Input";
 import { CompanyCard } from "./CompanyCard";
@@ -37,6 +38,7 @@ interface Props {
 }
 
 export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) {
+  const { isPro, isLoaded: planLoaded } = useAccountPlan();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [list, setList] = useState<CompanyListItem[]>(initialCompanies);
@@ -50,6 +52,36 @@ export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) 
     searchParams.get("hiring") === "true" || searchParams.get("hiring") === "1";
   const remote =
     searchParams.get("remote") === "true" || searchParams.get("remote") === "1";
+
+  const proOnlyCompaniesParams =
+    sort !== "jobs" || hiring || remote;
+
+  /** Free tier: sort / hiring / remote filters are Pro-only; normalize URL and list. */
+  useEffect(() => {
+    if (!planLoaded || isPro) return;
+    if (!proOnlyCompaniesParams) return;
+    let cancelled = false;
+    void (async () => {
+      const p = new URLSearchParams();
+      if (q.trim()) p.set("q", q.trim());
+      const nextPath = p.toString() ? `/companies?${p}` : "/companies";
+      router.replace(nextPath);
+      const res = await fetchCompanies({
+        page: 1,
+        limit: LIMIT,
+        q: q.trim() || undefined,
+        sort: "jobs",
+        hiring: undefined,
+        remote: undefined,
+      });
+      if (cancelled) return;
+      setList(res.data);
+      setMeta(res.meta);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [planLoaded, isPro, q, proOnlyCompaniesParams, router]);
 
   useEffect(() => {
     setDraftQ(q);
@@ -207,20 +239,33 @@ export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) 
             className={cn(
               "flex w-full flex-col gap-1.5 text-sm",
               "md:w-44 md:shrink-0",
+              !isPro && "cursor-not-allowed",
             )}
+            title={!isPro ? "Pro only" : undefined}
           >
-            <span className="font-semibold leading-none text-ink">Sort</span>
+            <span className="flex flex-wrap items-center gap-2 leading-none">
+              <span className="font-semibold text-ink">Sort</span>
+              {!isPro ? (
+                <span className="rounded-md border border-brand/25 bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
+                  Pro only
+                </span>
+              ) : null}
+            </span>
             <select
               className={cn(
                 inputBaseClass,
                 "h-10 !py-0 leading-snug",
-                "w-full cursor-pointer text-sm tabular-nums",
+                "w-full text-sm tabular-nums",
+                isPro ? "cursor-pointer" : "cursor-not-allowed opacity-60",
               )}
               value={sort}
+              disabled={!isPro}
+              title={!isPro ? "Pro only" : undefined}
               onChange={(e) =>
                 navigate({ sort: e.target.value as CompaniesSort })
               }
               aria-label="Sort companies"
+              aria-disabled={!isPro}
             >
               <option value="jobs">Most jobs</option>
               <option value="recent">Recently active</option>
@@ -232,34 +277,81 @@ export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) 
             className={cn(
               "flex w-full min-w-0 flex-col gap-1.5 text-sm",
               "md:min-w-0 md:flex-1",
+              !isPro && "cursor-not-allowed",
             )}
+            title={!isPro ? "Pro only" : undefined}
           >
-            <span className="font-semibold leading-none text-ink">Filters</span>
+            <span className="flex flex-wrap items-center gap-2 leading-none">
+              <span className="font-semibold text-ink">Filters</span>
+              {!isPro ? (
+                <span className="rounded-md border border-brand/25 bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
+                  Pro only
+                </span>
+              ) : null}
+            </span>
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => navigate({ hiring: !hiring })}
-                className={cn(
-                  "inline-flex h-10 min-h-[2.5rem] shrink-0 items-center justify-center rounded-full border px-4 text-sm font-semibold transition-colors",
-                  hiring
-                    ? "border-brand bg-brand/10 text-brand shadow-sm"
-                    : "border-ink/15 bg-surface text-ink/80 ring-1 ring-ink/5 hover:border-ink/25 hover:bg-ink/[0.03]",
-                )}
-              >
-                Hiring now
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate({ remote: !remote })}
-                className={cn(
-                  "inline-flex h-10 min-h-[2.5rem] shrink-0 items-center justify-center rounded-full border px-4 text-sm font-semibold transition-colors",
-                  remote
-                    ? "border-brand bg-brand/10 text-brand shadow-sm"
-                    : "border-ink/15 bg-surface text-ink/80 ring-1 ring-ink/5 hover:border-ink/25 hover:bg-ink/[0.03]",
-                )}
-              >
-                Remote friendly
-              </button>
+              {!isPro ? (
+                <span
+                  title="Pro only"
+                  className="inline-flex cursor-not-allowed rounded-full"
+                >
+                  <button
+                    type="button"
+                    disabled
+                    tabIndex={-1}
+                    className={cn(
+                      "pointer-events-none inline-flex h-10 min-h-[2.5rem] shrink-0 items-center justify-center rounded-full border px-4 text-sm font-semibold opacity-60",
+                      "border-ink/15 bg-surface text-ink/60 ring-1 ring-ink/5",
+                    )}
+                  >
+                    Hiring now
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate({ hiring: !hiring })}
+                  className={cn(
+                    "inline-flex h-10 min-h-[2.5rem] shrink-0 items-center justify-center rounded-full border px-4 text-sm font-semibold transition-colors",
+                    hiring
+                      ? "border-brand bg-brand/10 text-brand shadow-sm"
+                      : "border-ink/15 bg-surface text-ink/80 ring-1 ring-ink/5 hover:border-ink/25 hover:bg-ink/[0.03]",
+                  )}
+                >
+                  Hiring now
+                </button>
+              )}
+              {!isPro ? (
+                <span
+                  title="Pro only"
+                  className="inline-flex cursor-not-allowed rounded-full"
+                >
+                  <button
+                    type="button"
+                    disabled
+                    tabIndex={-1}
+                    className={cn(
+                      "pointer-events-none inline-flex h-10 min-h-[2.5rem] shrink-0 items-center justify-center rounded-full border px-4 text-sm font-semibold opacity-60",
+                      "border-ink/15 bg-surface text-ink/60 ring-1 ring-ink/5",
+                    )}
+                  >
+                    Remote friendly
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate({ remote: !remote })}
+                  className={cn(
+                    "inline-flex h-10 min-h-[2.5rem] shrink-0 items-center justify-center rounded-full border px-4 text-sm font-semibold transition-colors",
+                    remote
+                      ? "border-brand bg-brand/10 text-brand shadow-sm"
+                      : "border-ink/15 bg-surface text-ink/80 ring-1 ring-ink/5 hover:border-ink/25 hover:bg-ink/[0.03]",
+                  )}
+                >
+                  Remote friendly
+                </button>
+              )}
             </div>
           </div>
         </div>

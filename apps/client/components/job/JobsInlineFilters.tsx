@@ -95,28 +95,29 @@ const BROWSE_BY_CATEGORY = [
   { slug: "research", label: "Research" },
 ] as const;
 
-interface UiFiltersState {
+export interface JobsInlineUiFiltersState {
   roles: string[];
   types: Array<"remote" | "onsite" | "hybrid">;
   /** Region names, ISO codes, or city strings — sent as `?locations=`. */
   locations: string[];
   skills: string[];
+  categories: string[];
 }
 
 interface Props {
   draft: JobFilters;
   appliedFilters: JobFilters;
   setDraft: Dispatch<SetStateAction<JobFilters>>;
-  uiFilters: UiFiltersState;
-  setUiFilters: Dispatch<SetStateAction<UiFiltersState>>;
+  uiFilters: JobsInlineUiFiltersState;
+  setUiFilters: Dispatch<SetStateAction<JobsInlineUiFiltersState>>;
   onApply: () => void;
   onRemoveChip: Parameters<typeof FilterChips>[0]["onRemoveChip"];
   onSortNavigate: (sort: JobFilters["sort"]) => void;
   showSort?: boolean;
   showChips?: boolean;
   totalRoles?: number;
-  selectedCategory?: string;
-  onCategoryNavigate: (category: string | undefined) => void;
+  selectedCategories: string[];
+  onCategoryToggle: (categorySlug: string) => void;
   onClearFilters?: () => void;
   clearFiltersDisabled?: boolean;
 }
@@ -133,8 +134,8 @@ export function JobsInlineFilters({
   showSort = true,
   showChips = true,
   totalRoles,
-  selectedCategory,
-  onCategoryNavigate,
+  selectedCategories,
+  onCategoryToggle,
   onClearFilters,
   clearFiltersDisabled = false,
 }: Props) {
@@ -354,6 +355,8 @@ export function JobsInlineFilters({
       workTypes: uiFilters.types.length ? uiFilters.types : undefined,
       isRemote: uiFilters.types.includes("remote") ? true : undefined,
       skills: uiFilters.skills.length ? uiFilters.skills : undefined,
+      category: undefined,
+      categories: uiFilters.categories.length ? uiFilters.categories : undefined,
     }));
   }, [uiFilters, setDraft]);
 
@@ -421,9 +424,12 @@ export function JobsInlineFilters({
   }
 
   const skillCount = uiFilters.skills.length;
-  const browseCategoryLabel = selectedCategory
-    ? BROWSE_BY_CATEGORY.find((c) => c.slug === selectedCategory)?.label
-    : undefined;
+  const browseCategoryLabel =
+    selectedCategories.length === 0
+      ? undefined
+      : selectedCategories.length === 1
+        ? BROWSE_BY_CATEGORY.find((c) => c.slug === selectedCategories[0])?.label
+        : `${selectedCategories.length} categories`;
   const roleLabel =
     uiFilters.roles.length === 0
       ? (browseCategoryLabel ?? "Role")
@@ -486,14 +492,12 @@ export function JobsInlineFilters({
               </p>
               <div className="mb-3 flex flex-wrap gap-2">
                 {BROWSE_BY_CATEGORY.map((c) => {
-                  const active = selectedCategory === c.slug;
+                  const active = selectedCategories.includes(c.slug);
                   return (
                     <button
                       key={c.slug}
                       type="button"
-                      onClick={() =>
-                        onCategoryNavigate(active ? undefined : c.slug)
-                      }
+                      onClick={() => onCategoryToggle(c.slug)}
                       className={cn(
                         "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
                         active

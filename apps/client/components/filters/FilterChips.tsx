@@ -28,13 +28,19 @@ function buildChips(filters: JobFilters, onRemove: Props["onRemoveChip"]): Filte
     for (const item of items) out.push(item);
   };
 
-  if (filters.category) {
-    out.push({
-      id: "category",
-      label: `Category: ${filters.category.replace(/-/g, " ")}`,
-      onRemove: () => onRemove({ type: "category" }),
-    });
-  }
+  const categoryVals =
+    filters.categories?.length
+      ? filters.categories
+      : filters.category
+        ? [filters.category]
+        : [];
+  push(
+    categoryVals.map((cat) => ({
+      id: `category-${cat}`,
+      label: `Category: ${cat.replace(/-/g, " ")}`,
+      onRemove: () => onRemove({ type: "category", value: cat }),
+    })),
+  );
   const roles = filters.roles?.length ? filters.roles : filters.role ? [filters.role] : [];
   push(
     roles.map((role) => ({

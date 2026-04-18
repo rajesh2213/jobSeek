@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
 import {
   fetchCompanies,
   fetchCompanyBySlug,
   fetchCompanyJobs,
 } from "../../../../lib/api";
+import { buildBreadcrumbListJsonLd } from "../../../../lib/seo";
+import { absoluteUrl } from "../../../../lib/seoSite";
 import { CompanyHubPage } from "../../../../components/company/CompanyHubPage";
+import { JsonLdScript } from "../../../../components/seo/JsonLdScript";
+import { SeoBreadcrumbs } from "../../../../components/seo/SeoBreadcrumbs";
 import { parseJobFiltersFromSearch } from "../../../../lib/slug-parser";
 
 const HUB_LIMIT = 20;
@@ -23,7 +28,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
   const title = `${company.name} Jobs & Careers | JobSeek`;
   const description = `Explore open roles at ${company.name}. Browse engineering, product, and remote jobs—verified listings with early apply links.`;
-  return { title, description, openGraph: { title, description } };
+  const canonical = absoluteUrl(`/company/${slug}`);
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: { title, description, url: canonical },
+  };
 }
 
 function searchRecord(
@@ -52,6 +63,8 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
       ? hubFilters.limit
       : HUB_LIMIT;
 
+  const { getToken } = await auth();
+  const token = await getToken();
   const jobsResponse = await fetchCompanyJobs(slug, {
     page,
     limit,
@@ -61,6 +74,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
       limit: undefined,
       offset: undefined,
     },
+    token,
   });
 
   const meta = jobsResponse.meta ?? {
@@ -77,12 +91,30 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
     .slice(0, 6);
 
   return (
-    <CompanyHubPage
-      company={company}
-      slug={slug}
-      initialJobs={jobsResponse.data}
-      initialMeta={meta}
-      relatedCompanies={relatedCompanies}
-    />
+    <>
+      <JsonLdScript
+        data={buildBreadcrumbListJsonLd([
+          { name: "Home", path: "/" },
+          { name: "Companies", path: "/companies" },
+          { name: company.name, path: `/company/${slug}` },
+        ])}
+      />
+      <div className="mx-auto w-[92%] max-w-6xl px-2 pt-6 sm:px-4">
+        <SeoBreadcrumbs
+          items={[
+            { name: "Home", href: "/" },
+            { name: "Companies", href: "/companies" },
+            { name: company.name },
+          ]}
+        />
+      </div>
+      <CompanyHubPage
+        company={company}
+        slug={slug}
+        initialJobs={jobsResponse.data}
+        initialMeta={meta}
+        relatedCompanies={relatedCompanies}
+      />
+    </>
   );
 }

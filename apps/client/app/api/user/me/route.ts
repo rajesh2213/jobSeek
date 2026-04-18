@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import type { UserMeResponse } from "../../../../lib/api";
+import { PLAN_LIMITS } from "../../../../lib/planLimits";
 
 const API_BASE =
   process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000";
@@ -24,7 +25,7 @@ export async function GET() {
       const fallback: UserMeResponse = {
         plan: "free",
         jobViewsToday: 0,
-        jobViewsLimit: 10,
+        jobViewsLimit: PLAN_LIMITS.free.dailyJobViews,
         resetAt: new Date().toISOString(),
       };
       return NextResponse.json(fallback);
@@ -35,7 +36,7 @@ export async function GET() {
     const fallback: UserMeResponse = {
       plan: "free",
       jobViewsToday: 0,
-      jobViewsLimit: 10,
+      jobViewsLimit: PLAN_LIMITS.free.dailyJobViews,
       resetAt: new Date().toISOString(),
     };
     return NextResponse.json(fallback);
