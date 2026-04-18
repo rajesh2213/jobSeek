@@ -3,6 +3,14 @@ import { toJobPublicJson, type JobWithCompanyRow } from "../job/job.mapper.js";
 import { CompanyService } from "./company.service.js";
 import { parseJobDiscoveryQuery } from "../../utils/taxonomyQuery.js";
 import type { ApiError } from "../../types/api.js";
+import { getIoredis } from "../../queues/job.queue.js";
+import {
+  runMeteredJobsList,
+  clientIp,
+  isViewCapBypassRequest,
+  buildCapContextFromRequest,
+} from "../viewCap/jobListCap.js";
+import { assertJobReadRateLimit } from "../viewCap/rateLimitRedis.js";
 import {
   createCompanyBodySchema,
   getCompaniesQuerySchema,
@@ -112,6 +120,16 @@ export function registerCompanyRoutes(
       request: FastifyRequest<{ Params: CompanySlugParams }>,
       reply: FastifyReply,
     ) => {
+      const redis = getIoredis();
+      const ip = clientIp(request);
+      const rl = await assertJobReadRateLimit(redis, ip);
+      if (!rl.ok) {
+        return reply.status(429).send({
+          error: "Too many requests",
+          code: "RATE_LIMIT",
+        } satisfies ApiError);
+      }
+
       const q = request.query as Record<string, unknown>;
       const { page, limit } = parsePageLimit(q, { defaultLimit: 50, maxLimit: 100 });
       const filterQuery = { ...q, page: undefined, limit: undefined };
@@ -122,35 +140,48 @@ export function registerCompanyRoutes(
       const sort: "latest" | "salary_desc" =
         sortRaw === "salary_desc" || sortRaw === "salary" ? "salary_desc" : "latest";
 
-      const bundle = await companyService.getCompanyJobs(request.params.slug, {
-        page,
-        limit,
-        filters: parsed,
-        sort,
-      });
-
-      if (!bundle) {
+      const slug = request.params.slug;
+      const exists = await companyService.getCompanyBySlug(slug);
+      if (!exists) {
         return reply.status(404).send({
           error: "Company not found",
           code: "COMPANY_NOT_FOUND",
         } satisfies ApiError);
       }
 
+      const bypassCap = isViewCapBypassRequest(request);
+      const capCtx = await buildCapContextFromRequest(server.prisma, request);
+
+      const out = await runMeteredJobsList(server.prisma, redis, capCtx, bypassCap, {
+        page,
+        limit,
+        discoveryDebit: true,
+        bonusSurface: "browse",
+        fetchList: async (effectiveLimit) => {
+          const bundle = await companyService.getCompanyJobs(slug, {
+            page,
+            limit: effectiveLimit,
+            filters: parsed,
+            sort,
+          });
+          if (!bundle) {
+            throw new Error("getCompanyJobs: company missing after existence check");
+          }
+          return bundle.jobs;
+        },
+      });
+
       return reply.send({
-        data: bundle.jobs.items.map((j) =>
+        data: out.items.map((j) =>
           toJobPublicJson(j as unknown as JobWithCompanyRow),
         ),
         meta: {
-          page: bundle.jobs.page,
-          limit: bundle.jobs.limit,
-          total: bundle.jobs.total,
-          totalPages: bundle.jobs.totalPages,
-          hasMore: bundle.jobs.hasMore,
+          ...out.meta,
           company: {
-            id: bundle.company.id,
-            name: bundle.company.name,
-            slug: bundle.company.slug,
-            domain: bundle.company.domain,
+            id: exists.id,
+            name: exists.name,
+            slug: exists.slug,
+            domain: exists.domain,
           },
         },
       });

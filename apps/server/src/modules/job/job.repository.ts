@@ -117,6 +117,8 @@ export interface JobDiscoveryFilters {
   countries?: string[];
   locationTerms?: string[];
   category?: string;
+  /** Multi-select categories (OR). When set, overrides `category`. */
+  categories?: string[];
   /** Legacy: when true and `workType` unset, treated as remote. */
   isRemote?: boolean;
   workType?: "remote" | "onsite" | "hybrid";
@@ -295,7 +297,9 @@ function buildDiscoveryWhere(
       })),
     });
   }
-  if (filters.category !== undefined && filters.category !== "") {
+  if (filters.categories !== undefined && filters.categories.length > 0) {
+    and.push({ category: { in: filters.categories } });
+  } else if (filters.category !== undefined && filters.category !== "") {
     and.push({ category: filters.category });
   }
   if (filters.workTypes !== undefined && filters.workTypes.length > 0) {
@@ -421,7 +425,13 @@ function buildDiscoveryWhereSql(filters?: JobDiscoveryFilters): Prisma.Sql {
       )})`,
     );
   }
-  if (filters.category !== undefined && filters.category !== "") {
+  if (filters.categories !== undefined && filters.categories.length > 0) {
+    parts.push(
+      Prisma.sql`j.category IN (${Prisma.join(
+        filters.categories.map((c) => Prisma.sql`${c}`),
+      )})`,
+    );
+  } else if (filters.category !== undefined && filters.category !== "") {
     parts.push(Prisma.sql`j.category = ${filters.category}`);
   }
   if (filters.workTypes !== undefined && filters.workTypes.length > 0) {

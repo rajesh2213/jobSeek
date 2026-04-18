@@ -41,3 +41,19 @@ export function toJobPublicJson(job: JobWithCompanyRow): Record<string, unknown>
     },
   };
 }
+
+/**
+ * Free tier over daily cap: keep title/company/location for SEO and upgrade UX; hide body and apply targets.
+ */
+export function toJobPublicJsonOverDailyCap(job: JobWithCompanyRow): Record<string, unknown> {
+  const full = toJobPublicJson(job);
+  return {
+    ...full,
+    description: null,
+    parsedDescription: null,
+    previewLines: [],
+    previewLinesSource: "none",
+    applyUrl: null,
+    sourceUrl: null,
+  };
+}

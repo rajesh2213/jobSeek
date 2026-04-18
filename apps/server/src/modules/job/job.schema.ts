@@ -14,6 +14,8 @@ export const getJobsQuerySchema: FastifySchema = {
       country: { type: "string" },
       locations: { type: "string" },
       category: { type: "string" },
+      categories: { type: "string" },
+      surface: { type: "string", enum: ["browse", "seo"] },
       remote: { type: "boolean" },
       workType: { type: "string", enum: ["remote", "onsite", "hybrid"] },
       types: { type: "string" },

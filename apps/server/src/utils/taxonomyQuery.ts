@@ -95,8 +95,23 @@ export function parseJobDiscoveryQuery(query: Record<string, unknown>): JobDisco
     }
   }
 
+  const categoriesRaw = query.categories;
+  if (typeof categoriesRaw === "string" && categoriesRaw.trim() !== "") {
+    const cats = categoriesRaw
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter((s) => isValidJobCategory(s));
+    if (cats.length > 0) {
+      filters.categories = Array.from(new Set(cats));
+    }
+  }
   const category = query.category;
-  if (typeof category === "string" && category.length > 0 && isValidJobCategory(category)) {
+  if (
+    !filters.categories?.length &&
+    typeof category === "string" &&
+    category.length > 0 &&
+    isValidJobCategory(category)
+  ) {
     filters.category = category;
   }
 
@@ -145,4 +160,62 @@ export function parseJobDiscoveryQuery(query: Record<string, unknown>): JobDisco
   }
 
   return filters;
+}
+
+/** True when the request carries any discovery filter beyond “default browse” (used to debit search quota). */
+export function hasDiscoveryMeteringFilters(f: JobDiscoveryFilters): boolean {
+  if (f.role) return true;
+  if (f.roles && f.roles.length > 0) return true;
+  if (f.skills && f.skills.length > 0) return true;
+  if (f.country) return true;
+  if (f.countries && f.countries.length > 0) return true;
+  const loc = f.location?.trim();
+  if (loc) return true;
+  if (f.locationTokens && f.locationTokens.length > 0) return true;
+  if (f.categories && f.categories.length > 0) return true;
+  if (f.category) return true;
+  if (f.workType) return true;
+  if (f.workTypes && f.workTypes.length > 0) return true;
+  if (f.isRemote === true) return true;
+  if (f.experienceLevel) return true;
+  if (f.postedWithin) return true;
+  if (f.minSalary !== undefined) return true;
+  if (f.companyId) return true;
+  return false;
+}
+
+/**
+ * Raw query still implies a "search" even when `parseJobDiscoveryQuery` drops invalid tokens
+ * (so we still debit discovery instead of treating the request as a free browse).
+ */
+export function hasDiscoveryQueryIntent(query: Record<string, unknown>): boolean {
+  const sort = String(query.sort ?? "").trim().toLowerCase();
+  if (sort && sort !== "latest") return true;
+
+  const keys = [
+    "role",
+    "roles",
+    "skills",
+    "locations",
+    "location",
+    "country",
+    "category",
+    "categories",
+    "types",
+    "workType",
+    "experience",
+    "posted",
+    "minSalary",
+    "companyId",
+  ] as const;
+  for (const k of keys) {
+    const v = query[k];
+    if (v === undefined || v === null) continue;
+    if (typeof v === "string" && v.trim() !== "") return true;
+  }
+
+  const remote = query.remote;
+  if (remote === true || remote === "true" || remote === "1") return true;
+
+  return false;
 }

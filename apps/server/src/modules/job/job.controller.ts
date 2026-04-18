@@ -3,29 +3,31 @@ import { createJobRepository } from "./job.repository.js";
 import { JobService } from "./job.service.js";
 import { getJobsQuerySchema, getJobParamsSchema } from "./job.schema.js";
 import type { ApiError } from "../../types/api.js";
-import { parseJobDiscoveryQuery } from "../../utils/taxonomyQuery.js";
-import { toJobPublicJson, type JobWithCompanyRow } from "./job.mapper.js";
+import {
+  hasDiscoveryMeteringFilters,
+  hasDiscoveryQueryIntent,
+  parseJobDiscoveryQuery,
+} from "../../utils/taxonomyQuery.js";
+import {
+  toJobPublicJson,
+  toJobPublicJsonOverDailyCap,
+  type JobWithCompanyRow,
+} from "./job.mapper.js";
 import { getIoredis } from "../../queues/job.queue.js";
-import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
+import {
+  runMeteredJobsList,
+  clientIp,
+  isViewCapBypassRequest,
+  buildCapContextFromRequest,
+} from "../viewCap/jobListCap.js";
 import {
   getJobViewCapState,
   checkAndIncrementViewCap,
-  FREE_DAILY_JOB_VIEWS,
 } from "../viewCap/viewCap.service.js";
+import { assertJobReadRateLimit } from "../viewCap/rateLimitRedis.js";
 
 interface GetJobParams {
   id: string;
-}
-
-function clientIp(request: FastifyRequest): string {
-  const xff = request.headers["x-forwarded-for"];
-  const raw =
-    typeof xff === "string"
-      ? xff.split(",")[0]?.trim()
-      : Array.isArray(xff)
-        ? xff[0]
-        : undefined;
-  return raw || request.socket.remoteAddress || "unknown";
 }
 
 export function registerJobRoutes(
@@ -36,6 +38,16 @@ export function registerJobRoutes(
     "/jobs",
     { schema: getJobsQuerySchema },
     async (request: FastifyRequest, reply: FastifyReply) => {
+      const redis = getIoredis();
+      const ip = clientIp(request);
+      const rl = await assertJobReadRateLimit(redis, ip);
+      if (!rl.ok) {
+        return reply.status(429).send({
+          error: "Too many requests",
+          code: "RATE_LIMIT",
+        } satisfies ApiError);
+      }
+
       const q = request.query as Record<string, unknown>;
       const pageRaw = q.page;
       const limitRaw = q.limit;
@@ -55,141 +67,44 @@ export function registerJobRoutes(
 
       const filters = parseJobDiscoveryQuery(q);
       request.log.debug({ filters }, "jobs_query_filters");
+      const surfaceRaw = String(q.surface ?? "browse").toLowerCase();
+      const bonusSurface = surfaceRaw === "seo" ? "seo" : "browse";
+      const discoveryDebit =
+        hasDiscoveryMeteringFilters(filters) || hasDiscoveryQueryIntent(q);
       const sortRaw = String(q.sort ?? "latest");
       const sort: "latest" | "salary_desc" =
         sortRaw === "salary_desc" || sortRaw === "salary" ? "salary_desc" : "latest";
 
-      const bypassToken = process.env.JOB_LIST_VIEW_CAP_BYPASS_TOKEN?.trim();
-      const bypassHeader = request.headers["x-jobseek-view-cap-bypass"];
-      const bypassCap =
-        Boolean(bypassToken) &&
-        typeof bypassHeader === "string" &&
-        bypassHeader === bypassToken;
+      const bypassCap = isViewCapBypassRequest(request);
+      const capCtx = await buildCapContextFromRequest(server.prisma, request);
 
-      const redis = getIoredis();
-      const clerk = await resolveClerkUser(server.prisma, request.headers.authorization);
-      const ip = clientIp(request);
-      const capCtx = {
-        internalUserId: clerk?.internalUserId ?? null,
-        ip,
-        userEmail: clerk?.email ?? null,
-      };
-
-      if (bypassCap) {
-        const result = await jobService.list({
-          page,
-          limit,
-          offset,
-          filters,
-          sort,
-        });
-        const skip =
-          typeof offset === "number"
-            ? offset
-            : (result.page - 1) * result.limit;
-        const hasMore = result.hasMore ?? skip + result.items.length < result.total;
-        return reply.send({
-          data: result.items.map((j) =>
-            toJobPublicJson(j as unknown as JobWithCompanyRow),
-          ),
-          meta: {
-            page: result.page,
-            limit: result.limit,
-            total: result.total,
-            totalCount: result.total,
-            totalPages: result.totalPages,
-            offset: skip,
-            hasMore,
-            capReached: false,
-            remaining: null,
-            resetAt: new Date().toISOString(),
-            viewCapUnlimited: true,
-          },
-        });
-      }
-
-      const capState = await getJobViewCapState(server.prisma, redis, capCtx);
-
-      if (!capState.unlimited && capState.remaining <= 0) {
-        /** Preview rows for the current query (no extra cap consumption). */
-        const previewLimit = Math.min(limit, FREE_DAILY_JOB_VIEWS);
-        const result = await jobService.list({
-          page,
-          limit: previewLimit,
-          offset,
-          filters,
-          sort,
-        });
-        const totalMatching = result.total;
-        const skip =
-          typeof offset === "number"
-            ? offset
-            : (result.page - 1) * result.limit;
-        const totalPages = Math.ceil(totalMatching / limit) || 1;
-        const hasMore = false;
-        return reply.send({
-          data: result.items.map((j) =>
-            toJobPublicJson(j as unknown as JobWithCompanyRow),
-          ),
-          meta: {
-            page: result.page,
-            limit: result.limit,
-            total: totalMatching,
-            totalCount: totalMatching,
-            totalPages,
-            offset: skip,
-            hasMore,
-            capReached: true,
-            remaining: 0,
-            resetAt: capState.resetAt.toISOString(),
-            totalHidden: Math.max(0, totalMatching - FREE_DAILY_JOB_VIEWS),
-            viewCapUnlimited: false,
-          },
-        });
-      }
-
-      const effectiveLimit = capState.unlimited
-        ? limit
-        : Math.min(limit, capState.remaining);
-
-      const result = await jobService.list({
-        page,
-        limit: effectiveLimit,
-        offset,
-        filters,
-        sort,
-      });
-
-      const afterCap = await checkAndIncrementViewCap(
+      const out = await runMeteredJobsList(
         server.prisma,
         redis,
         capCtx,
-        result.items.length,
+        bypassCap,
+        {
+          page,
+          limit,
+          offset,
+          discoveryDebit,
+          bonusSurface,
+          fetchList: (effectiveLimit) =>
+            jobService.list({
+              page,
+              limit: effectiveLimit,
+              offset,
+              filters,
+              sort,
+            }),
+        },
       );
 
-      const skip =
-        typeof offset === "number"
-          ? offset
-          : (result.page - 1) * result.limit;
-      const hasMore = result.hasMore ?? skip + result.items.length < result.total;
-
       return reply.send({
-        data: result.items.map((j) =>
+        data: out.items.map((j) =>
           toJobPublicJson(j as unknown as JobWithCompanyRow),
         ),
-        meta: {
-          page: result.page,
-          limit: result.limit,
-          total: result.total,
-          totalCount: result.total,
-          totalPages: result.totalPages,
-          offset: skip,
-          hasMore,
-          capReached: false,
-          remaining: afterCap.unlimited ? null : afterCap.remaining,
-          resetAt: afterCap.resetAt.toISOString(),
-          viewCapUnlimited: Boolean(afterCap.unlimited),
-        },
+        meta: out.meta,
       });
     },
   );
@@ -216,6 +131,16 @@ export function registerJobRoutes(
       request: FastifyRequest<{ Params: GetJobParams }>,
       reply: FastifyReply,
     ) => {
+      const redis = getIoredis();
+      const ip = clientIp(request);
+      const rl = await assertJobReadRateLimit(redis, ip);
+      if (!rl.ok) {
+        return reply.status(429).send({
+          error: "Too many requests",
+          code: "RATE_LIMIT",
+        } satisfies ApiError);
+      }
+
       const job = await jobService.getById(request.params.id);
       if (!job) {
         return reply.status(404).send({
@@ -223,8 +148,48 @@ export function registerJobRoutes(
           code: "JOB_NOT_FOUND",
         } satisfies ApiError);
       }
+
+      const capCtx = await buildCapContextFromRequest(server.prisma, request);
+      const capState = await getJobViewCapState(server.prisma, redis, capCtx);
+
+      if (capState.unlimited) {
+        return reply.send({
+          data: toJobPublicJson(job as unknown as JobWithCompanyRow),
+          meta: {
+            capReached: false,
+            resetAt: capState.resetAt.toISOString(),
+            viewCapUnlimited: true,
+          },
+        });
+      }
+
+      if (capState.remaining <= 0) {
+        return reply.send({
+          data: toJobPublicJsonOverDailyCap(job as unknown as JobWithCompanyRow),
+          meta: {
+            capReached: true,
+            remaining: 0,
+            resetAt: capState.resetAt.toISOString(),
+            viewCapUnlimited: false,
+          },
+        });
+      }
+
+      const afterCap = await checkAndIncrementViewCap(
+        server.prisma,
+        redis,
+        capCtx,
+        1,
+      );
+
       return reply.send({
         data: toJobPublicJson(job as unknown as JobWithCompanyRow),
+        meta: {
+          capReached: false,
+          remaining: afterCap.unlimited ? null : afterCap.remaining,
+          resetAt: afterCap.resetAt.toISOString(),
+          viewCapUnlimited: Boolean(afterCap.unlimited),
+        },
       });
     },
   );
