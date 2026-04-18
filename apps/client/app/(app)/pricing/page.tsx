@@ -83,8 +83,21 @@ export default function PricingPage() {
           </dl>
         </div>
 
-        <p className="mx-auto mt-12 text-center text-sm text-ink-muted">
-          🔒 Secured by Lemon Squeezy · Cancel anytime · No questions asked
+        <p className="mx-auto mt-12 text-center text-sm text-ink-muted">Secure checkout · Cancel anytime</p>
+        <p className="mx-auto mt-4 max-w-xl text-center text-xs leading-relaxed text-ink/65">
+          By subscribing you agree to our{" "}
+          <Link href="/terms" className="font-medium text-brand hover:underline">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="font-medium text-brand hover:underline">
+            Privacy Policy
+          </Link>
+          . See{" "}
+          <Link href="/billing" className="font-medium text-brand hover:underline">
+            Billing &amp; refunds
+          </Link>{" "}
+          for cancellation details.
         </p>
 
         <p className="mt-6 text-center text-sm">

@@ -3,7 +3,7 @@ export const CREAM_TINT =
   "linear-gradient(180deg, rgba(232, 122, 93, 0.08) 0%, rgba(244, 239, 230, 0.5) 100%)";
 
 export const PRO_FEATURES = [
-  "Unlimited jobs daily",
+  "Unlimited job browsing (search, company pages, full job posts)",
   "AI resume match — score, matched keywords, and gap analysis",
   "⚡ Smart Apply (Chrome extension) — unlimited auto-fill for standard ATS fields (name, contact, experience, etc.)",
   "AI-written answers for open-ended fields — up to 5 job applications per day (UTC); resets at midnight UTC (not a per-question cap)",

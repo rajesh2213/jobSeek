@@ -13,6 +13,7 @@ import {
   type MotionValue,
 } from "framer-motion";
 import GuidedHookDemo from "../../components/GuidedHookDemo";
+import { HERO_JOB_INDEX_TOTAL, SHOW_LANDING_TESTIMONIALS } from "../../lib/landingPublic";
 
 const sectionReveal = {
   initial: { opacity: 0, y: 20 },
@@ -50,9 +51,9 @@ function CountUp({ to, suffix = "" }: { to: number; suffix?: string }) {
 }
 
 const SIGNAL_MESSAGES = [
-  "79% of roles here aren't on LinkedIn",
-  "2.4x faster than traditional job boards",
-  "68% of users apply within first 10 minutes",
+  "Aggregate listings from career sites and boards in one place",
+  "Most users apply within first 10 minutes of posting",
+  "Resume aware matching helps you spot gaps before you apply",
   "New roles added every 3 minutes",
 ];
 
@@ -130,11 +131,11 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
   const pulseColor = useTransform(progress, [0, 0.05, 0.1, 0.2], ["#E8533A", "#F97316", "#E8533A", "#E8533A"]);
 
   const stats = useMemo(
-    () => [
-      { k: "Job seekers", v: 37842 },
-      { k: "Jobs indexed", v: 2300000 },
-      { k: "More interviews", v: 2.7, suffix: "x" },
-    ],
+    () =>
+      [
+        { k: "jobs", v: HERO_JOB_INDEX_TOTAL, numberSuffix: "+" as const },
+        { k: "More interviews", v: 2.7, suffix: "x" as const },
+      ] as const,
     [],
   );
 
@@ -143,7 +144,7 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
       className="mx-auto grid w-full max-w-6xl gap-8 px-4 pb-2 pt-8 sm:px-6 lg:grid-cols-2 lg:items-center"
     >
       <motion.div style={{ scale: heroScale, y: heroY, opacity: heroOpacity }}>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="whitespace-nowrap rounded-full border border-brand/20 bg-brand/[0.06] px-3.5 py-1.5 text-xs font-semibold text-ink/70 shadow-sm">
             <span className="font-extrabold text-brand">79%</span> of roles not on LinkedIn
           </span>
@@ -185,9 +186,10 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
               viewport={{ once: true }}
               transition={{ delay: i * 0.12 }}
             >
-              <p className="text-xl font-extrabold text-ink">
+              <p className="text-xl font-extrabold tabular-nums text-ink">
                 {s.v > 10 ? <CountUp to={s.v} /> : s.v}
-                {"suffix" in s ? s.suffix : ""}
+                {"numberSuffix" in s && s.numberSuffix ? s.numberSuffix : ""}
+                {"suffix" in s && s.suffix ? s.suffix : ""}
               </p>
               <p className="text-xs text-ink/60">{s.k}</p>
             </motion.div>
@@ -250,8 +252,8 @@ const PAIN_POINTS = [
   {
     pain: "Your inbox is chaos.",
     sub: "You miss assessments and follow-ups.",
-    fix: "Application pipeline (Pro) + email tracking (coming soon)",
-    outcome: "Every update tracked. Every deadline visible.",
+    fix: "Email job alerts on saved searches (Pro) + Applications view",
+    outcome: "Know when new matches land—follow up while the role is still fresh.",
   },
 ];
 
@@ -412,7 +414,7 @@ function SocialProofSection() {
     {
       quote:
         "I thought my resume was fine. The missing-keyword prompts were annoying at first, but after updating it I got more screens.",
-      name: "Ethan K., Data Engineer · response rate up 2x",
+      name: "Ethan K., Data Engineer · improved response rate",
     },
     {
       quote:
@@ -547,7 +549,7 @@ function PricingSection() {
           Apply earlier, fix your resume gaps, and start getting interview responses faster.
         </p>
         <p className="mx-auto mt-2 max-w-2xl text-center text-xs font-medium text-ink/55">
-          Users who upgrade typically see 2–3x more responses.
+          Pro is for unlimited browsing, resume insights, Smart Apply, and alerts—see the plan table for details.
         </p>
         <div className="mx-auto mt-8 grid max-w-3xl gap-4 md:grid-cols-2">
           <motion.div
@@ -559,9 +561,6 @@ function PricingSection() {
             <p className="mt-1 text-4xl font-bold">$0</p>
             <ul className="mt-3 space-y-1.5 text-sm text-ink/75">
               <li>• 10 job views/day (UTC)</li>
-              <li>• Up to 3 saved searches</li>
-              <li>• See roles the moment they are posted</li>
-              <li>• Discover roles not listed on LinkedIn</li>
               <li className="text-ink/45">✕ No AI resume match</li>
               <li className="text-ink/45">✕ No Smart Apply</li>
               <li className="text-ink/45">✕ No email job alerts</li>
@@ -607,9 +606,9 @@ function PricingSection() {
             <ul className="mt-3 space-y-1.5 text-sm text-ink/80">
               <li>• Unlimited job browsing</li>
               <li>• AI resume match (score + gaps)</li>
-              <li>• Smart Apply — 5 applications/day</li>
+              <li>• Smart Apply</li>
               <li>• Email job alerts on saved searches</li>
-              <li>• Application tracker (coming soon)</li>
+              <li>• Early access to new JobSeek features</li>
             </ul>
             <p className="mt-3 text-xs font-semibold text-brand">Never miss a role. Never lose track.</p>
           </motion.div>
@@ -665,7 +664,7 @@ function FinalUrgencySection() {
           You're competing with people who applied 10 minutes before you.
         </p>
         <p className="mx-auto mt-4 max-w-xl text-sm text-white/50">
-          The first applicants get seen. Everyone else gets filtered.
+          Earlier, targeted applications usually beat late, generic ones—timing and fit matter.
         </p>
 
         <div className="mx-auto mt-10 grid max-w-md gap-3 sm:grid-cols-2">
@@ -732,24 +731,8 @@ export default function LandingPage() {
       <PainSection />
       <SolutionSection />
       <PricingSection />
-      <SocialProofSection />
+      {SHOW_LANDING_TESTIMONIALS ? <SocialProofSection /> : null}
       <FinalUrgencySection />
-
-      <footer className="border-t border-ink/10 px-4 py-6 sm:px-6">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm text-ink/60">
-            <span className="font-display text-xl italic text-ink">jobseek</span>
-            <span className="h-2 w-2 rounded-full bg-brand" aria-hidden />
-            <span>© 2025 JobSeek</span>
-          </div>
-          <div className="flex items-center gap-4 text-sm text-ink/65">
-            <Link href="/jobs" className="hover:text-brand">Jobs</Link>
-            <Link href="/companies" className="hover:text-brand">Companies</Link>
-            <Link href="/pricing" className="hover:text-brand">Pricing</Link>
-            <Link href="/account" className="hover:text-brand">Account</Link>
-          </div>
-        </div>
-      </footer>
     </main>
   );
 }

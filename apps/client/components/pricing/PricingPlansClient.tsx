@@ -25,7 +25,7 @@ export function PricingPlansClient() {
       setError(null);
       const variantId = VARIANT_BY_KEY[which];
       if (!variantId) {
-        setError("Pricing is not configured. Add Lemon Squeezy variant IDs to your environment.");
+        setError("Pricing is not configured. Add payment variant IDs to your environment.");
         return;
       }
       setBusy(which);
