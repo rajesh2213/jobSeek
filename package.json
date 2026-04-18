@@ -19,7 +19,8 @@
     "test:functional": "npm run test:functional -w @jobseek/server",
     "test:all": "npm run test:all -w @jobseek/server",
     "test:ci": "npm run test:ci -w @jobseek/server",
-    "debug:location-failures": "npm run debug:location-failures -w @jobseek/server"
+    "debug:location-failures": "npm run debug:location-failures -w @jobseek/server",
+    "seo:check-sitemap": "node scripts/check-sitemap-health.mjs"
   },
   "engines": {
     "node": ">=20"
