@@ -8,6 +8,8 @@ import { registerInternalMetricsRoutes } from "../../modules/internal/internal.m
 import { registerBillingRoutes } from "../../modules/billing/billing.controller.js";
 import { registerSavedSearchRoutes } from "../../modules/saved-search/savedSearch.routes.js";
 import { registerApplicationsRoutes } from "../../modules/applications/applications.routes.js";
+import { createSeoService } from "../../modules/seo/seo.service.js";
+import { registerSeoRoutes } from "../../modules/seo/seo.routes.js";
 
 export async function registerRoutes(server: FastifyInstance): Promise<void> {
   server.get("/health", async (_request, reply) => {
@@ -23,6 +25,8 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   registerBillingRoutes(server);
   createJobController(server);
   createCompanyController(server);
+  const seoService = createSeoService(server.prisma);
+  registerSeoRoutes(server, seoService);
   registerInternalMetricsRoutes(server);
 
   const debugJobEndpointEnabled =
