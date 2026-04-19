@@ -648,8 +648,8 @@ export default function SmartApplyPage() {
             <ol className="mt-2 list-decimal space-y-2 pl-4 text-xs text-ink-muted">
               <li>Upload a resume first (required). Import your profile from it. Smart Apply uses it as the primary source for answers.</li>
               <li>This page is optional context: fill as much or as little as you want for more user-aligned answers.</li>
-              <li>Install the Chrome extension and make sure you are signed in with the same JobSeek account.</li>
-              <li>From JobSeek jobs, click Apply to open the application page in a new tab.</li>
+              <li>Install the Chrome extension and make sure you are signed in with the same JobLoom account.</li>
+              <li>From JobLoom jobs, click Apply to open the application page in a new tab.</li>
               <li>On the application form, use the extension to detect fields and auto-fill from this saved profile.</li>
               <li>Review every filled answer, edit where needed, then submit manually.</li>
             </ol>

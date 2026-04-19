@@ -22,7 +22,7 @@ export function MarketingHeader() {
           className="group relative z-[80] flex shrink-0 items-baseline gap-1 no-underline transition-transform duration-200 hover:scale-[1.02]"
         >
           <span className="font-display text-2xl italic text-ink transition-colors group-hover:text-brand sm:text-3xl">
-            jobseek
+            jobloom
           </span>
           <span
             className="mb-0.5 inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-brand transition-all group-hover:shadow-[0_0_0_6px_rgba(234,88,12,0.16)]"

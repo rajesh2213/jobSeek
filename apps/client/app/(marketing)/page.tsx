@@ -173,7 +173,7 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
           <span className="font-semibold text-ink">crowded.</span>
           <br />
           <span className="block h-1" aria-hidden />
-          JobSeek helps you <span className="font-semibold text-ink">move earlier</span>, <span className="font-semibold text-ink">fix what's missing</span>, and{" "}
+          JobLoom helps you <span className="font-semibold text-ink">move earlier</span>, <span className="font-semibold text-ink">fix what's missing</span>, and{" "}
           <span className="font-semibold text-ink">track everything</span> - so nothing slips through.
         </p>
         <div className="mt-6 grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-3">
@@ -370,7 +370,7 @@ function SolutionSection() {
               className="transition-all duration-200"
             >
               <div className="h-full bg-emerald-50/60 px-5 py-4 transition-all duration-300 group-hover:-translate-x-20 group-hover:bg-emerald-50/75">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500">JobSeek</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500">JobLoom</span>
                 <p className="mt-1.5 text-sm font-semibold text-ink/80 transition-all duration-200 group-hover:font-bold">{p.fix}</p>
                 <p className="mt-0.5 text-xs text-ink/45">{p.outcome}</p>
               </div>
@@ -386,7 +386,7 @@ function SolutionSection() {
       >
         <p className="text-sm font-semibold text-ink">This is not another job board.</p>
         <p className="mt-1 text-sm text-ink/70">
-          Most people are still applying blindly. A small group is using JobSeek to get ahead.
+          Most people are still applying blindly. A small group is using JobLoom to get ahead.
         </p>
       </motion.div>
       </motion.div>
@@ -447,7 +447,7 @@ function SocialProofSection() {
     >
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">Others are already winning</p>
-        <h2 className="mt-3 text-3xl font-semibold sm:text-4xl">Real users are landing interviews faster with JobSeek</h2>
+        <h2 className="mt-3 text-3xl font-semibold sm:text-4xl">Real users are landing interviews faster with JobLoom</h2>
         <p className="mt-3 text-sm text-ink/65">More first-round calls. Better shortlist rates. Fewer missed opportunities.</p>
         <div className="mt-6 space-y-4 overflow-hidden">
           <motion.div style={{ x: parallaxA }}>
@@ -608,7 +608,7 @@ function PricingSection() {
               <li>• AI resume match (score + gaps)</li>
               <li>• Smart Apply</li>
               <li>• Email job alerts on saved searches</li>
-              <li>• Early access to new JobSeek features</li>
+              <li>• Early access to new JobLoom features</li>
             </ul>
             <p className="mt-3 text-xs font-semibold text-brand">Never miss a role. Never lose track.</p>
           </motion.div>
@@ -670,7 +670,7 @@ function FinalUrgencySection() {
         <div className="mx-auto mt-10 grid max-w-md gap-3 sm:grid-cols-2">
           <div className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-4">
             <p className="text-[10px] font-bold uppercase tracking-wider text-white/35">
-              Without JobSeek
+              Without JobLoom
             </p>
             <p className="mt-2 text-2xl font-extrabold tabular-nums text-red-400">
               127
@@ -682,7 +682,7 @@ function FinalUrgencySection() {
           </div>
           <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-5 py-4 shadow-[0_0_20px_rgba(16,185,129,0.08)]">
             <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/60">
-              With JobSeek
+              With JobLoom
             </p>
             <p className="mt-2 text-2xl font-extrabold tabular-nums text-emerald-400">
               3

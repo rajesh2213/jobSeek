@@ -8,7 +8,7 @@ export const PRO_FEATURES = [
   "⚡ Smart Apply (Chrome extension) — unlimited auto-fill for standard ATS fields (name, contact, experience, etc.)",
   "AI-written answers for open-ended fields — up to 5 job applications per day (UTC); resets at midnight UTC (not a per-question cap)",
   "Job alerts — email when new roles match a saved search (5 or 10 new jobs threshold · instant delivery)",
-  "Early access to new JobSeek features",
+  "Early access to new JobLoom features",
 ] as const;
 
 export const FAQ = [
@@ -26,6 +26,6 @@ export const FAQ = [
   },
   {
     q: "How does early access work?",
-    a: "Pro members get first access to new JobSeek features and experiments before they roll out to everyone.",
+    a: "Pro members get first access to new JobLoom features and experiments before they roll out to everyone.",
   },
 ] as const;

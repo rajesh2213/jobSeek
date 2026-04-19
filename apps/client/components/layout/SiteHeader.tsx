@@ -22,7 +22,7 @@ export function SiteHeader() {
             className="group relative z-[80] flex shrink-0 items-baseline gap-1 no-underline transition-transform duration-200 hover:scale-[1.02]"
           >
             <span className="font-display text-2xl italic text-ink transition-colors group-hover:text-brand sm:text-3xl">
-              jobseek
+              jobloom
             </span>
             <span
               ref={siteLogoBrandDotRef}

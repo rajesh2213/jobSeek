@@ -425,7 +425,7 @@ export function AccountDashboard() {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 id="confirm-signout-title" className="text-lg font-semibold text-ink">
-              Sign out of JobSeek?
+              Sign out of JobLoom?
             </h3>
             <p id="confirm-signout-description" className="mt-2 text-sm text-ink/70">
               You will be signed out on this device and redirected to jobs.
