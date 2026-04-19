@@ -5,14 +5,20 @@ import { MarketingHeader } from "../../components/layout/MarketingHeader";
 import { PageTransition } from "../../components/layout/PageTransition";
 import { SiteSideRail } from "../../components/layout/SiteSideRail";
 
+const marketingDescription =
+  "Discover open roles from career sites and boards in one place. Filter by skill, location, and remote—resume-aware matching and fast apply flows.";
+
 export const metadata: Metadata = {
   title: "JobLoom — aggregate jobs, apply early, track applications",
-  description:
-    "Discover open roles from career sites and boards in one place. Filter by skill, location, and remote—resume-aware matching and fast apply flows.",
+  description: marketingDescription,
   openGraph: {
     title: "JobLoom — aggregate jobs, apply early",
-    description:
-      "Discover open roles from career sites and boards in one place.",
+    description: "Discover open roles from career sites and boards in one place.",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "JobLoom" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/og-image.png"],
   },
 };
 
