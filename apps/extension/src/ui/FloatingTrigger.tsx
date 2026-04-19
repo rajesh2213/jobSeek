@@ -1,10 +1,8 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
+import { extensionLogoPrimUrl } from "../lib/extensionAssets";
 import {
-  brand,
-  fontDisplay,
   fontSans,
-  ink,
   panelBg,
   panelBgDeep,
   panelBorder,
@@ -99,33 +97,18 @@ export function FloatingTrigger(props: { open: boolean; onClick: () => void }) {
           onMouseLeave={() => setHover(false)}
           style={btn}
         >
-          <div
+          <img
+            src={extensionLogoPrimUrl()}
+            alt="JobLoom"
             style={{
-              display: "flex",
-              alignItems: "baseline",
-              gap: 4,
-              fontFamily: fontDisplay,
-              fontStyle: "italic",
-              fontSize: 22,
-              fontWeight: 400,
-              color: ink,
-              lineHeight: 1,
+              display: "block",
+              height: 28,
+              width: "auto",
+              maxWidth: 140,
+              objectFit: "contain",
+              objectPosition: "left center",
             }}
-          >
-            <span>jobloom</span>
-            <span
-              style={{
-                display: "inline-block",
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                background: brand,
-                flexShrink: 0,
-                marginBottom: 2,
-              }}
-              aria-hidden
-            />
-          </div>
+          />
           <div
             style={{
               fontFamily: fontSans,

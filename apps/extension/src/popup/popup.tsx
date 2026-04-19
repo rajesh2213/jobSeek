@@ -9,6 +9,7 @@ import {
 } from "../lib/api";
 import type { ApplyProfile, FillFieldResult, ResumeFilePayload } from "../lib/formFiller";
 import { isLikelyAtsPage } from "../lib/atsDetection";
+import { extensionLogoPrimUrl } from "../lib/extensionAssets";
 
 const CORAL = "#E8533A";
 const SITE = "https://jobseek.app";
@@ -438,6 +439,11 @@ function Popup() {
   if (!token) {
     return (
       <div style={{ padding: 20, textAlign: "center" }}>
+        <img
+          src={extensionLogoPrimUrl()}
+          alt=""
+          style={{ height: 36, width: "auto", margin: "0 auto 10px", display: "block", objectFit: "contain" }}
+        />
         <p style={{ margin: "0 0 12px", fontWeight: 700 }}>JobLoom Smart Apply</p>
         <p style={{ margin: "0 0 16px", fontSize: 13, color: "#555" }}>
           Sign in to JobLoom to use Smart Apply
@@ -519,7 +525,12 @@ function Popup() {
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+        <img
+          src={extensionLogoPrimUrl()}
+          alt=""
+          style={{ height: 26, width: "auto", objectFit: "contain" }}
+        />
         <span style={{ fontWeight: 800 }}>Smart Apply</span>
         <span
           style={{

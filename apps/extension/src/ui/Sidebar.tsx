@@ -1,11 +1,9 @@
 import { FieldItem } from "./FieldItem";
 import type { FieldState, SidebarState } from "./store";
+import { extensionLogoPrimUrl } from "../lib/extensionAssets";
 import {
-  brand,
-  fontDisplay,
   fontSans,
   headerInsetGlow,
-  ink,
   panelBg,
   panelBgDeep,
   panelBorder,
@@ -95,33 +93,18 @@ export function Sidebar(props: {
       >
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
           <div style={{ minWidth: 0 }}>
-            <div
+            <img
+              src={extensionLogoPrimUrl()}
+              alt="JobLoom"
               style={{
-                display: "flex",
-                alignItems: "baseline",
-                gap: 4,
-                fontFamily: fontDisplay,
-                fontStyle: "italic",
-                fontSize: 22,
-                fontWeight: 400,
-                color: ink,
-                lineHeight: 1,
+                display: "block",
+                height: 28,
+                width: "auto",
+                maxWidth: "min(100%, 200px)",
+                objectFit: "contain",
+                objectPosition: "left center",
               }}
-            >
-              <span>jobloom</span>
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 10,
-                  height: 10,
-                  borderRadius: "50%",
-                  background: brand,
-                  flexShrink: 0,
-                  marginBottom: 2,
-                }}
-                aria-hidden
-              />
-            </div>
+            />
             <div
               style={{
                 fontFamily: fontSans,
