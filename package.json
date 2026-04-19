@@ -20,9 +20,14 @@
     "test:all": "npm run test:all -w @jobseek/server",
     "test:ci": "npm run test:ci -w @jobseek/server",
     "debug:location-failures": "npm run debug:location-failures -w @jobseek/server",
-    "seo:check-sitemap": "node scripts/check-sitemap-health.mjs"
+    "seo:check-sitemap": "node scripts/check-sitemap-health.mjs",
+    "generate:brand-assets": "node scripts/generate-jobloom-brand-assets.mjs"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.34.5"
   }
 }
