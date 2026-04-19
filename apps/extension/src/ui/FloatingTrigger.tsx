@@ -70,7 +70,7 @@ export function FloatingTrigger(props: { open: boolean; onClick: () => void }) {
     color: textStrong,
     borderRadius: "14px 0 0 14px",
     padding: "12px 14px 14px 16px",
-    minWidth: 56,
+    minWidth: 72,
     boxShadow: active
       ? "-8px 6px 28px rgba(124, 45, 18, 0.14)"
       : "-4px 4px 20px rgba(124, 45, 18, 0.1)",
@@ -102,9 +102,9 @@ export function FloatingTrigger(props: { open: boolean; onClick: () => void }) {
             alt="JobLoom"
             style={{
               display: "block",
-              height: 28,
+              height: 42,
               width: "auto",
-              maxWidth: 140,
+              maxWidth: 220,
               objectFit: "contain",
               objectPosition: "left center",
             }}

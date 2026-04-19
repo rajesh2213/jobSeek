@@ -442,7 +442,7 @@ function Popup() {
         <img
           src={extensionLogoPrimUrl()}
           alt=""
-          style={{ height: 36, width: "auto", margin: "0 auto 10px", display: "block", objectFit: "contain" }}
+          style={{ height: 48, width: "auto", margin: "0 auto 10px", display: "block", objectFit: "contain" }}
         />
         <p style={{ margin: "0 0 12px", fontWeight: 700 }}>JobLoom Smart Apply</p>
         <p style={{ margin: "0 0 16px", fontSize: 13, color: "#555" }}>
@@ -529,7 +529,7 @@ function Popup() {
         <img
           src={extensionLogoPrimUrl()}
           alt=""
-          style={{ height: 26, width: "auto", objectFit: "contain" }}
+          style={{ height: 36, width: "auto", objectFit: "contain" }}
         />
         <span style={{ fontWeight: 800 }}>Smart Apply</span>
         <span

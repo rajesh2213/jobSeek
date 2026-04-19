@@ -4,16 +4,22 @@
   "private": true,
   "scripts": {
     "build": "webpack --mode production",
-    "dev": "webpack --mode development --watch"
+    "build:analyze": "cross-env ANALYZE=1 webpack --mode production",
+    "dev": "webpack --mode development --watch",
+    "test:unit": "node --import tsx --test tests/unit/atsDetection.test.ts"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "@types/chrome": "^0.0.268",
+    "@types/node": "^22.9.0",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "copy-webpack-plugin": "^12",
     "ts-loader": "^9",
+    "tsx": "^4.19.2",
     "typescript": "^5",
     "webpack": "^5",
+    "webpack-bundle-analyzer": "^4.10.2",
     "webpack-cli": "^5"
   },
   "dependencies": {

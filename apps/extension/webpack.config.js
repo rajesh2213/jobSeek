@@ -1,6 +1,8 @@
 const path = require("path");
 const CopyPlugin = require("copy-webpack-plugin");
 
+const analyze = process.env.ANALYZE === "1";
+
 module.exports = {
   entry: {
     background: "./src/background.ts",
@@ -27,6 +29,15 @@ module.exports = {
     filename: "[name].js",
   },
   plugins: [
+    ...(analyze
+      ? [
+          new (require("webpack-bundle-analyzer").BundleAnalyzerPlugin)({
+            analyzerMode: "static",
+            openAnalyzer: false,
+            reportFilename: "bundle-report.html",
+          }),
+        ]
+      : []),
     new CopyPlugin({
       patterns: [
         { from: "manifest.json", to: "." },

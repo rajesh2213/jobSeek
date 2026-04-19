@@ -98,9 +98,9 @@ export function Sidebar(props: {
               alt="JobLoom"
               style={{
                 display: "block",
-                height: 28,
+                height: 44,
                 width: "auto",
-                maxWidth: "min(100%, 200px)",
+                maxWidth: "min(100%, 260px)",
                 objectFit: "contain",
                 objectPosition: "left center",
               }}
