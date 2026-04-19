@@ -4,10 +4,12 @@ Loads a HuggingFace sequence-classification model once at startup; runs batched 
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
+from functools import lru_cache
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
@@ -36,6 +38,11 @@ label_names: list[str] = []
 device = None
 
 EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "all-MiniLM-L6-v2")
+EMBEDDING_ENCODE_BATCH_SIZE = max(1, int(os.environ.get("EMBEDDING_ENCODE_BATCH_SIZE", "32")))
+TORCH_NUM_THREADS = max(1, int(os.environ.get("TORCH_NUM_THREADS", "1")))
+EMBEDDING_CACHE_MAX_ITEMS = max(0, int(os.environ.get("EMBEDDING_CACHE_MAX_ITEMS", "0")))
+PARSE_CACHE_MAX_ITEMS = max(0, int(os.environ.get("PARSE_CACHE_MAX_ITEMS", "0")))
+
 embedding_model: SentenceTransformer | None = None
 
 logger = logging.getLogger(__name__)
@@ -77,6 +84,11 @@ class MatchResponse(BaseModel):
     all_similarities: List[float]
 
 
+# Populated in startup: optional LRU-wrapped callables (same outputs as uncached paths).
+_embed_cached: Optional[Callable[[tuple[str, ...]], tuple[tuple[float, ...], ...]]] = None
+_parse_cached: Optional[Callable[[str], ParseResponse]] = None
+
+
 def _resolve_label_names() -> list[str]:
     """Map class index -> label string from the loaded HF config (never hardcode training order)."""
     global model
@@ -99,44 +111,15 @@ def _empty_buckets() -> dict[str, list[str]]:
     return {k: [] for k in API_LABEL_KEYS}
 
 
-@app.on_event("startup")
-def load_model() -> None:
-    global tokenizer, model, label_names, device, embedding_model
-    import torch
-    from transformers import AutoModelForSequenceClassification, AutoTokenizer
-
-    if not MODEL_DIR.is_dir():
-        raise RuntimeError(
-            f"Model directory not found: {MODEL_DIR}. "
-            "Set JOB_PARSER_MODEL_DIR or place the model under apps/inference/models/job-parser-model."
-        )
-
-    tokenizer = AutoTokenizer.from_pretrained(str(MODEL_DIR))
-    model = AutoModelForSequenceClassification.from_pretrained(str(MODEL_DIR))
-    model.eval()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-    label_names.clear()
-    label_names.extend(_resolve_label_names())
-
-    embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
-    logger.info("Embedding model loaded: %s", EMBEDDING_MODEL_NAME)
-
-
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "model_loaded": str(model is not None)}
-
-
-@app.post("/parse", response_model=ParseResponse)
-def parse(req: ParseRequest) -> ParseResponse:
+def _parse_uncached(description: str) -> ParseResponse:
+    """Full /parse logic; `description` is the raw request body field (stable cache key)."""
     if model is None or tokenizer is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
 
     import torch
     import torch.nn.functional as F
 
-    lines = [ln.strip() for ln in req.description.splitlines() if ln.strip()]
+    lines = [ln.strip() for ln in description.splitlines() if ln.strip()]
     if not lines:
         return ParseResponse(**_empty_buckets())
 
@@ -144,7 +127,7 @@ def parse(req: ParseRequest) -> ParseResponse:
     all_preds: list[int] = []
     all_conf: list[float] = []
 
-    with torch.no_grad():
+    with torch.inference_mode():
         for start in range(0, len(lines), batch_size):
             batch = lines[start : start + batch_size]
             enc = tokenizer(
@@ -195,27 +178,35 @@ def parse(req: ParseRequest) -> ParseResponse:
     )
 
 
-@app.post("/resume/embed", response_model=EmbedResponse)
-def embed_sentences(req: EmbedRequest) -> EmbedResponse:
-    """Embed a list of sentences using all-MiniLM-L6-v2"""
+def _embed_uncached_tuple(sentences: tuple[str, ...]) -> tuple[tuple[float, ...], ...]:
     if embedding_model is None:
         raise HTTPException(status_code=503, detail="Embedding model not loaded")
-    if not req.sentences:
-        return EmbedResponse(embeddings=[])
-    embeddings = embedding_model.encode(req.sentences, convert_to_numpy=True)
-    return EmbedResponse(embeddings=embeddings.tolist())
+    if not sentences:
+        return ()
+    arr = embedding_model.encode(
+        list(sentences),
+        convert_to_numpy=True,
+        batch_size=EMBEDDING_ENCODE_BATCH_SIZE,
+    )
+    return tuple(tuple(float(x) for x in row) for row in arr.tolist())
 
 
-@app.post("/resume/match", response_model=MatchResponse)
-def match_keyword_to_bullets(req: MatchRequest) -> MatchResponse:
-    """Find which resume bullet is semantically closest to a missing keyword"""
+def _match_sync(req: MatchRequest) -> MatchResponse:
     if embedding_model is None:
         raise HTTPException(status_code=503, detail="Embedding model not loaded")
     if not req.bullets:
         return MatchResponse(best_match=None, best_match_index=-1, similarity=0.0, all_similarities=[])
 
-    keyword_emb = embedding_model.encode([req.keyword], convert_to_numpy=True)
-    bullet_embs = embedding_model.encode(req.bullets, convert_to_numpy=True)
+    keyword_emb = embedding_model.encode(
+        [req.keyword],
+        convert_to_numpy=True,
+        batch_size=EMBEDDING_ENCODE_BATCH_SIZE,
+    )
+    bullet_embs = embedding_model.encode(
+        req.bullets,
+        convert_to_numpy=True,
+        batch_size=EMBEDDING_ENCODE_BATCH_SIZE,
+    )
 
     sims = cosine_similarity(keyword_emb, bullet_embs)[0]
     best_idx = int(np.argmax(sims))
@@ -226,3 +217,89 @@ def match_keyword_to_bullets(req: MatchRequest) -> MatchResponse:
         similarity=float(sims[best_idx]),
         all_similarities=sims.tolist(),
     )
+
+
+@app.on_event("startup")
+def load_model() -> None:
+    global tokenizer, model, label_names, device, embedding_model
+    global _embed_cached, _parse_cached
+
+    import torch
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+    torch.set_num_threads(TORCH_NUM_THREADS)
+    torch.set_num_interop_threads(1)
+
+    if not MODEL_DIR.is_dir():
+        raise RuntimeError(
+            f"Model directory not found: {MODEL_DIR}. "
+            "Set JOB_PARSER_MODEL_DIR or place the model under apps/inference/models/job-parser-model."
+        )
+
+    tokenizer = AutoTokenizer.from_pretrained(str(MODEL_DIR))
+    model = AutoModelForSequenceClassification.from_pretrained(str(MODEL_DIR))
+    model.eval()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    label_names.clear()
+    label_names.extend(_resolve_label_names())
+
+    embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+    logger.info(
+        "Embedding model loaded: %s (encode_batch_size=%s, torch_num_threads=%s)",
+        EMBEDDING_MODEL_NAME,
+        EMBEDDING_ENCODE_BATCH_SIZE,
+        TORCH_NUM_THREADS,
+    )
+
+    if EMBEDDING_CACHE_MAX_ITEMS > 0:
+        _embed_cached = lru_cache(maxsize=EMBEDDING_CACHE_MAX_ITEMS)(_embed_uncached_tuple)
+        logger.info("Embedding LRU cache enabled: max_items=%s", EMBEDDING_CACHE_MAX_ITEMS)
+    else:
+        _embed_cached = None
+
+    if PARSE_CACHE_MAX_ITEMS > 0:
+        _parse_cached = lru_cache(maxsize=PARSE_CACHE_MAX_ITEMS)(_parse_uncached)
+        logger.info("Parse LRU cache enabled: max_items=%s", PARSE_CACHE_MAX_ITEMS)
+    else:
+        _parse_cached = None
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok", "model_loaded": str(model is not None)}
+
+
+@app.post("/parse", response_model=ParseResponse)
+async def parse(req: ParseRequest) -> ParseResponse:
+    if _parse_cached is not None:
+        return await asyncio.to_thread(_parse_cached, req.description)
+    return await asyncio.to_thread(_parse_uncached, req.description)
+
+
+@app.post("/resume/embed", response_model=EmbedResponse)
+async def embed_sentences(req: EmbedRequest) -> EmbedResponse:
+    """Embed a list of sentences using the configured sentence-transformers model."""
+    if embedding_model is None:
+        raise HTTPException(status_code=503, detail="Embedding model not loaded")
+    if not req.sentences:
+        return EmbedResponse(embeddings=[])
+
+    if _embed_cached is not None:
+        rows = await asyncio.to_thread(_embed_cached, tuple(req.sentences))
+        return EmbedResponse(embeddings=[list(r) for r in rows])
+
+    embeddings = await asyncio.to_thread(
+        lambda: embedding_model.encode(
+            req.sentences,
+            convert_to_numpy=True,
+            batch_size=EMBEDDING_ENCODE_BATCH_SIZE,
+        ).tolist()
+    )
+    return EmbedResponse(embeddings=embeddings)
+
+
+@app.post("/resume/match", response_model=MatchResponse)
+async def match_keyword_to_bullets(req: MatchRequest) -> MatchResponse:
+    """Find which resume bullet is semantically closest to a missing keyword"""
+    return await asyncio.to_thread(_match_sync, req)
