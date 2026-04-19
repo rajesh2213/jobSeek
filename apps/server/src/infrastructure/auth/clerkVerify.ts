@@ -92,6 +92,7 @@ async function verifySessionTokenViaIssuerJwks(token: string): Promise<JwtPayloa
   const jwksUrl = new URL(".well-known/jwks.json", iss.endsWith("/") ? iss : `${iss}/`);
   const res = await fetch(jwksUrl.href, {
     headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) {
     throw new Error(`JWKS fetch failed ${res.status}`);

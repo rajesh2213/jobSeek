@@ -48,6 +48,28 @@ export async function buildServer() {
     });
   });
 
+  const logSlowRouteMs = Number(process.env.LOG_SLOW_ROUTE_MS ?? "0");
+  if (logSlowRouteMs > 0) {
+    server.addHook("onResponse", (request, reply, done) => {
+      const ms = reply.elapsedTime;
+      if (ms >= logSlowRouteMs) {
+        const path = request.url.split("?")[0] ?? "";
+        if (path.includes("/jobs")) {
+          request.log.warn(
+            {
+              event: "slow_http_route",
+              durationMs: ms,
+              method: request.method,
+              path,
+            },
+            "slow_http_route",
+          );
+        }
+      }
+      done();
+    });
+  }
+
   await server.register(prismaPlugin);
   await registerRoutes(server);
 

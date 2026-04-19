@@ -10,11 +10,31 @@ import { registerSavedSearchRoutes } from "../../modules/saved-search/savedSearc
 import { registerApplicationsRoutes } from "../../modules/applications/applications.routes.js";
 import { createSeoService } from "../../modules/seo/seo.service.js";
 import { registerSeoRoutes } from "../../modules/seo/seo.routes.js";
+import { getIoredis } from "../../queues/job.queue.js";
 
 export async function registerRoutes(server: FastifyInstance): Promise<void> {
   server.get("/health", async (_request, reply) => {
     return reply.send({ status: "ok", timestamp: new Date().toISOString() });
   });
+
+  if (process.env.ENABLE_READINESS_PROBE?.trim() === "true") {
+    server.get("/health/ready", async (_request, reply) => {
+      try {
+        await server.prisma.$queryRaw`SELECT 1`;
+        const redis = getIoredis();
+        const pong = await redis.ping();
+        if (pong !== "PONG") {
+          return reply.status(503).send({ status: "not_ready", reason: "redis_ping" });
+        }
+        return reply.send({
+          status: "ready",
+          timestamp: new Date().toISOString(),
+        });
+      } catch {
+        return reply.status(503).send({ status: "not_ready" });
+      }
+    });
+  }
 
   // Locations: GET /locations, GET /locations/cities?q= (min 2 chars), GET /locations/countries?q=
   // No global prefix — full paths are as listed (same port as `PORT`, default 3000).
