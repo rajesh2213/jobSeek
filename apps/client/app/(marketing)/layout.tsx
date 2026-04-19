@@ -6,11 +6,11 @@ import { PageTransition } from "../../components/layout/PageTransition";
 import { SiteSideRail } from "../../components/layout/SiteSideRail";
 
 export const metadata: Metadata = {
-  title: "JobSeek — aggregate jobs, apply early, track applications",
+  title: "JobLoom — aggregate jobs, apply early, track applications",
   description:
     "Discover open roles from career sites and boards in one place. Filter by skill, location, and remote—resume-aware matching and fast apply flows.",
   openGraph: {
-    title: "JobSeek — aggregate jobs, apply early",
+    title: "JobLoom — aggregate jobs, apply early",
     description:
       "Discover open roles from career sites and boards in one place.",
   },

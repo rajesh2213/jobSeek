@@ -160,7 +160,7 @@ export type JobDetailFetchResult = {
 };
 
 /**
- * Fastify API origin. Must point at the jobseek server, not the Next.js dev server:
+ * Fastify API origin. Must point at the Fastify API server, not the Next.js dev server:
  * same host/path as `/health` and `/locations/cities`. If Next runs on 3000, run
  * the API on another `PORT` and set `NEXT_PUBLIC_API_BASE_URL` (and `API_BASE_URL`
  * for SSR) to that origin, e.g. `http://127.0.0.1:3000`.
@@ -219,7 +219,7 @@ export class ApiRequestError extends Error {
   }
 }
 
-/** Server or client: JobSeek usage stats (requires signed-in Clerk JWT). */
+/** Server or client: JobLoom usage stats (requires signed-in Clerk JWT). */
 export async function fetchAccountSummary(token: string): Promise<AccountSummary | null> {
   const t = token.trim();
   if (!t) return null;

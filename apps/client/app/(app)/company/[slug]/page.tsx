@@ -24,9 +24,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const company = await fetchCompanyBySlug(slug);
   if (!company) {
-    return { title: "Company not found | JobSeek" };
+    return { title: "Company not found | JobLoom" };
   }
-  const title = `${company.name} Jobs & Careers | JobSeek`;
+  const title = `${company.name} Jobs & Careers | JobLoom`;
   const description = `Explore open roles at ${company.name}. Browse engineering, product, and remote jobs—verified listings with early apply links.`;
   const canonical = absoluteUrl(`/company/${slug}`);
   return {

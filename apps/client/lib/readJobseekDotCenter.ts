@@ -2,7 +2,7 @@ import { siteLogoBrandDotRef } from "./siteLogoBrandDotRef";
 
 export type DotCenter = { x: number; y: number };
 
-/** Viewport center of the JobSeek logo brand dot (getBoundingClientRect), or null if missing / not laid out. */
+/** Viewport center of the JobLoom logo brand dot (getBoundingClientRect), or null if missing / not laid out. */
 export function readJobseekDotCenter(): DotCenter | null {
   const dotEl = siteLogoBrandDotRef.current ?? document.getElementById("site-logo-brand-dot");
   if (!dotEl) return null;

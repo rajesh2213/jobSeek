@@ -25,8 +25,9 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "JobSeek",
-  description: "SEO-first job discovery platform",
+  title: "JobLoom – Find Jobs Faster",
+  description:
+    "Discover open roles, apply early, and track applications—SEO-aware job discovery in one place.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

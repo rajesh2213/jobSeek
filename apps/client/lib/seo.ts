@@ -50,7 +50,7 @@ export function buildJobsSeo(filters: JobFilters, total?: number): {
   let titleCore = parts.join(" ");
   if (filters.sort === "salary_desc") titleCore += " (by salary)";
   if (filters.page && filters.page > 1) titleCore += ` · Page ${filters.page}`;
-  const title = `${titleCore} | JobSeek`;
+  const title = `${titleCore} | JobLoom`;
 
   const refinements: string[] = [];
   if (filters.experience) {
@@ -83,7 +83,7 @@ export function buildJobsSeo(filters: JobFilters, total?: number): {
 export function formatJobDiscoveryBreadcrumbLabel(filters: JobFilters): string {
   const { title } = buildJobsSeo(filters);
   return title
-    .replace(/\s*\|\s*JobSeek$/i, "")
+    .replace(/\s*\|\s*JobLoom$/i, "")
     .replace(/\s*·\s*Page \d+$/i, "")
     .replace(/\s*\(by salary\)/i, "")
     .trim();

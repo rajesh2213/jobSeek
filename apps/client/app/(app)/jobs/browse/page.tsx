@@ -6,7 +6,7 @@ import { buildJobsListingUrl } from "../../../../lib/slug-parser";
 import { Container } from "../../../../components/ui/Container";
 
 export const metadata: Metadata = {
-  title: "Browse jobs by category and skill | JobSeek",
+  title: "Browse jobs by category and skill | JobLoom",
   description:
     "Explore indexed job discovery pages by category, tech stack, and location. Jump to high-signal searches with one click.",
 };

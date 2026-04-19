@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ApplicationsPageClient } from "./ApplicationsPageClient";
 
 export const metadata: Metadata = {
-  title: "Applications | JobSeek",
+  title: "Applications | JobLoom",
   description: "Track your job applications and status",
 };
 

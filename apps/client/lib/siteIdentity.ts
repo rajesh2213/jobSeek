@@ -4,7 +4,7 @@
  */
 
 export function getSiteOperator(): string {
-  return process.env.NEXT_PUBLIC_COMPANY_LEGAL_NAME?.trim() || "JobSeek";
+  return process.env.NEXT_PUBLIC_COMPANY_LEGAL_NAME?.trim() || "JobLoom";
 }
 
 /** Support contact email, or null if unset (LegalFooter hides mailto link). */

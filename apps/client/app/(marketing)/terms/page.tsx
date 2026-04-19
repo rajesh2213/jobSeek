@@ -7,8 +7,8 @@ import {
 } from "../../../lib/siteIdentity";
 
 export const metadata: Metadata = {
-  title: "Terms of Service | JobSeek",
-  description: "Terms of Service for the JobSeek product and website.",
+  title: "Terms of Service | JobLoom",
+  description: "Terms of Service for the JobLoom product and website.",
 };
 
 export default function TermsPage() {
@@ -23,13 +23,13 @@ export default function TermsPage() {
     >
       <p>
         These Terms of Service (&quot;Terms&quot;) govern your access to and use of the websites, applications, and services
-        offered by {operator} (&quot;we,&quot; &quot;us,&quot; or &quot;JobSeek&quot;) (collectively, the &quot;Service&quot;). By creating an account,
+        offered by {operator} (&quot;we,&quot; &quot;us,&quot; or &quot;JobLoom&quot;) (collectively, the &quot;Service&quot;). By creating an account,
         subscribing, or using the Service, you agree to these Terms.
       </p>
 
       <h2>1. The Service</h2>
       <p>
-        JobSeek provides job search tools, including aggregated job listings, filters, account features, optional resume-related
+        JobLoom provides job search tools, including aggregated job listings, filters, account features, optional resume-related
         features, and optional browser extension functionality (&quot;Smart Apply&quot;). Features may change over time. We do not
         guarantee that any particular job listing will remain available, that listings are error-free, or that you will obtain
         employment or interviews by using the Service.

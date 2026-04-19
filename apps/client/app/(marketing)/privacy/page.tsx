@@ -3,8 +3,8 @@ import { LegalPageShell } from "../../../components/legal/LegalPageShell";
 import { getPaymentProviderName, getSiteOperator, getSupportEmail } from "../../../lib/siteIdentity";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | JobSeek",
-  description: "How JobSeek collects, uses, and shares personal information.",
+  title: "Privacy Policy | JobLoom",
+  description: "How JobLoom collects, uses, and shares personal information.",
 };
 
 export default function PrivacyPage() {
@@ -19,7 +19,7 @@ export default function PrivacyPage() {
     >
       <p>
         This Privacy Policy describes how {operator} (&quot;we,&quot; &quot;us,&quot;) collects, uses, and shares information when you use
-        JobSeek websites, APIs, and related services (the &quot;Service&quot;).
+        JobLoom websites, APIs, and related services (the &quot;Service&quot;).
       </p>
 
       <h2>1. Information we collect</h2>
@@ -63,7 +63,7 @@ export default function PrivacyPage() {
       <h2>3. Smart Apply browser extension</h2>
       <p>
         The optional Smart Apply extension may request permission to access pages you visit so it can detect application forms
-        and help fill fields using your JobSeek profile. <strong>You choose when to run it and what to submit.</strong> Data
+        and help fill fields using your JobLoom profile. <strong>You choose when to run it and what to submit.</strong> Data
         needed for autofill may be read from the page context and sent to our servers to generate suggestions; we design flows
         to minimize what is transmitted. Review the extension permissions in your browser and our Terms for acceptable use.
       </p>

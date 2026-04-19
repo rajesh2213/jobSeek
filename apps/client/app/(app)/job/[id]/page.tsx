@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const token = await getToken();
   const fetched = await fetchJobById(id, { token });
   if (!fetched) {
-    return { title: "Job not found | JobSeek" };
+    return { title: "Job not found | JobLoom" };
   }
   const job = fetched.data;
   const sections = refineSectionsForDisplay(resolveJobDetailSections(job));
@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     `View ${job.title} role details and apply.`;
   const canonical = absoluteUrl(`/job/${id}`);
   return {
-    title: `${job.title} at ${job.company.name} | JobSeek`,
+    title: `${job.title} at ${job.company.name} | JobLoom`,
     description: desc,
     alternates: { canonical },
     openGraph: {

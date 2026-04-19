@@ -7,7 +7,7 @@ const API_BASE =
   process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000";
 
 /**
- * Proxies JobSeek usage from Fastify `GET /account/summary` using the active Clerk session.
+ * Proxies JobLoom usage from Fastify `GET /account/summary` using the active Clerk session.
  */
 export async function GET() {
   const { getToken } = await auth();

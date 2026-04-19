@@ -1,3 +1,3 @@
-# JobSeek Client
+# JobLoom Client
 
 Frontend placeholder. No implementation yet.

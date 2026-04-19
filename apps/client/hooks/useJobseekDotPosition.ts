@@ -8,7 +8,7 @@ import {
 import { siteLogoBrandDotRef } from "../lib/siteLogoBrandDotRef";
 
 /**
- * Live viewport center of the JobSeek logo dot. Updates on resize / dot ResizeObserver only
+ * Live viewport center of the JobLoom logo dot. Updates on resize / dot ResizeObserver only
  * (no scroll) — use for UI that tracks the dot without coupling to full path remeasure.
  */
 export function useJobseekDotPosition(): { position: DotCenter | null } {

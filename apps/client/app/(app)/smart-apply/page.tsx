@@ -25,7 +25,7 @@ import { TrustSafetyBlock } from "../../../components/smart-apply/TrustSafetyBlo
 import { useExtensionPresence } from "../../../lib/useExtensionPresence";
 
 const CORAL = "#E8533A";
-const CHROME_STORE = "https://chromewebstore.google.com/search/JobSeek%20Smart%20Apply";
+const CHROME_STORE = "https://chromewebstore.google.com/search/JobLoom%20Smart%20Apply";
 const SMART_APPLY_PREMIUM_V1 = process.env.NEXT_PUBLIC_SMART_APPLY_PREMIUM_V1 !== "false";
 
 const COUNTRIES = [

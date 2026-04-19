@@ -6,7 +6,7 @@ import {
 import { CompaniesSearchPage } from "../../../components/companies/CompaniesSearchPage";
 
 export const metadata: Metadata = {
-  title: "Companies | JobSeek",
+  title: "Companies | JobLoom",
   description:
     "Browse employers hiring now: tech companies careers, remote companies hiring, and startup jobs. Explore open roles and apply early.",
 };

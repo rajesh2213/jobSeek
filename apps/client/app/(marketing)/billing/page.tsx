@@ -3,8 +3,8 @@ import { LegalPageShell } from "../../../components/legal/LegalPageShell";
 import { getSiteOperator, getSupportEmail } from "../../../lib/siteIdentity";
 
 export const metadata: Metadata = {
-  title: "Billing & refunds | JobSeek",
-  description: "Subscriptions, cancellation, and refunds for JobSeek Pro.",
+  title: "Billing & refunds | JobLoom",
+  description: "Subscriptions, cancellation, and refunds for JobLoom Pro.",
 };
 
 export default function BillingPage() {
@@ -17,7 +17,7 @@ export default function BillingPage() {
       description={`Last updated: ${new Date().toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" })}. Template — have qualified counsel review before reliance.`}
     >
       <p>
-        This page describes how paid plans for {operator}&apos;s JobSeek product (&quot;Pro&quot; or similar) work at a high level. The
+        This page describes how paid plans for {operator}&apos;s JobLoom product (&quot;Pro&quot; or similar) work at a high level. The
         checkout screen and third-party billing portal may contain additional details.
       </p>
 
