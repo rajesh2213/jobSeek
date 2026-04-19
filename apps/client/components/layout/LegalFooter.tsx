@@ -1,5 +1,7 @@
+import Image from "next/image";
 import Link from "next/link";
 import { getCompanyAddress, getSiteOperator, getSupportEmail } from "../../lib/siteIdentity";
+import { SITE_LOGO_FOOTER, SITE_LOGO_PRIM_SRC } from "../../lib/siteLogo";
 
 /** Legal links, contact, and operator identity — used on marketing and app layouts. */
 export function LegalFooter() {
@@ -13,8 +15,15 @@ export function LegalFooter() {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm text-ink/60">
-            <span className="font-display text-xl italic text-ink">jobloom</span>
-            <span className="h-2 w-2 shrink-0 rounded-full bg-brand" aria-hidden />
+            <Link href="/" prefetch={false} className="inline-flex shrink-0 items-center no-underline">
+              <Image
+                src={SITE_LOGO_PRIM_SRC}
+                alt="JobLoom"
+                width={SITE_LOGO_FOOTER.width}
+                height={SITE_LOGO_FOOTER.height}
+                className="h-7 w-auto max-w-[160px] object-contain object-left"
+              />
+            </Link>
             <span>
               © {year} {operator}
             </span>

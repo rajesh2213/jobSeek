@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { SignInButton, useUser } from "@clerk/nextjs";
+import { SiteLogoHeaderLink } from "../brand/SiteLogoHeaderLink";
 import { useAccountPlan } from "../../lib/useAccountPlan";
 
 export function MarketingHeader() {
@@ -16,19 +17,7 @@ export function MarketingHeader() {
       className="sticky top-0 z-[70] border-b border-ink/10 bg-[rgba(245,242,235,0.92)] backdrop-blur"
     >
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link
-          href="/"
-          prefetch={false}
-          className="group relative z-[80] flex shrink-0 items-baseline gap-1 no-underline transition-transform duration-200 hover:scale-[1.02]"
-        >
-          <span className="font-display text-2xl italic text-ink transition-colors group-hover:text-brand sm:text-3xl">
-            jobloom
-          </span>
-          <span
-            className="mb-0.5 inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-brand transition-all group-hover:shadow-[0_0_0_6px_rgba(234,88,12,0.16)]"
-            aria-hidden
-          />
-        </Link>
+        <SiteLogoHeaderLink />
         <div className="flex items-center gap-2">
           {showGetPro ? (
             <Link
