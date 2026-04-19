@@ -192,11 +192,11 @@ function Popup() {
     setError(null);
     setResumeAttachMessage(null);
     if (!token || !profile) {
-      setError("Sign in to JobSeek and open your profile.");
+      setError("Sign in to JobLoom and open your profile.");
       return;
     }
     if (!status?.profileComplete) {
-      setError("Complete your profile in JobSeek first.");
+      setError("Complete your profile in JobLoom first.");
       return;
     }
     if (status.jobsRemaining !== undefined && status.jobsRemaining <= 0) {
@@ -438,9 +438,9 @@ function Popup() {
   if (!token) {
     return (
       <div style={{ padding: 20, textAlign: "center" }}>
-        <p style={{ margin: "0 0 12px", fontWeight: 700 }}>JobSeek Smart Apply</p>
+        <p style={{ margin: "0 0 12px", fontWeight: 700 }}>JobLoom Smart Apply</p>
         <p style={{ margin: "0 0 16px", fontSize: 13, color: "#555" }}>
-          Sign in to JobSeek to use Smart Apply
+          Sign in to JobLoom to use Smart Apply
         </p>
         <button
           type="button"
@@ -531,7 +531,7 @@ function Popup() {
             borderRadius: 4,
           }}
         >
-          JobSeek Smart Apply
+          JobLoom Smart Apply
         </span>
       </div>
       <p style={{ fontSize: 12, color: "#555", margin: "0 0 6px" }}>

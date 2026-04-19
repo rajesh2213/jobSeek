@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "JobSeek Smart Apply",
+  "name": "JobLoom",
   "version": "1.0.0",
-  "description": "Auto-fill job applications using your JobSeek profile. You review and submit.",
+  "description": "Auto-fill job applications using your JobLoom profile. You review and submit.",
   "permissions": ["activeTab", "storage", "scripting", "webNavigation"],
   "host_permissions": ["<all_urls>"],
   "background": {
@@ -18,6 +18,6 @@
     }
   ],
   "action": {
-    "default_title": "JobSeek Smart Apply"
+    "default_title": "JobLoom"
   }
 }

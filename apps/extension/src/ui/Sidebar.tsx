@@ -108,7 +108,7 @@ export function Sidebar(props: {
                 lineHeight: 1,
               }}
             >
-              <span>jobseek</span>
+              <span>jobloom</span>
               <span
                 style={{
                   display: "inline-block",

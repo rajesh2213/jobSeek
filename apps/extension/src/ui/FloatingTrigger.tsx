@@ -93,7 +93,7 @@ export function FloatingTrigger(props: { open: boolean; onClick: () => void }) {
       <div style={btnSlot} aria-hidden={hidden}>
         <button
           type="button"
-          aria-label="Open JobSeek Smart Apply"
+          aria-label="Open JobLoom Smart Apply"
           onClick={props.onClick}
           onMouseEnter={() => setHover(true)}
           onMouseLeave={() => setHover(false)}
@@ -112,7 +112,7 @@ export function FloatingTrigger(props: { open: boolean; onClick: () => void }) {
               lineHeight: 1,
             }}
           >
-            <span>jobseek</span>
+            <span>jobloom</span>
             <span
               style={{
                 display: "inline-block",

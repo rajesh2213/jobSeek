@@ -73,7 +73,9 @@ function mapProfile(raw: Record<string, unknown> | null): ApplyProfile | null {
 export function SidebarApp(props: { isAtsPage: boolean }) {
   const [state, setState] = useState(getSidebarState());
 
-  useEffect(() => subscribeSidebarState(() => setState({ ...getSidebarState() })), []);
+  useEffect(() => {
+    return subscribeSidebarState(() => setState({ ...getSidebarState() }));
+  }, []);
 
   useEffect(() => {
     patchSidebarState({ atsDetected: props.isAtsPage, isVisible: props.isAtsPage });
@@ -188,8 +190,8 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
       if (!current.resumeFile) {
         const noBytesHint =
           current.profile?.hasResume === true
-            ? "Smart Apply shows a resume, but the original PDF is not available to download (profile may be text-only). Re-upload your PDF on the JobSeek Smart Apply page, then try again."
-            : "Resume file is unavailable. Re-upload resume in JobSeek and try again.";
+            ? "Smart Apply shows a resume, but the original PDF is not available to download (profile may be text-only). Re-upload your PDF on the JobLoom Smart Apply page, then try again."
+            : "Resume file is unavailable. Re-upload resume in JobLoom and try again.";
         patchSidebarState({ error: noBytesHint });
         return;
       }
