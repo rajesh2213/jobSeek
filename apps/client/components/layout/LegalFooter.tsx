@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { getCompanyAddress, getSiteOperator, getSupportEmail } from "../../lib/siteIdentity";
-import { SITE_LOGO_FOOTER, SITE_LOGO_PRIM_SRC } from "../../lib/siteLogo";
+import { SITE_LOGO_FOOTER, SITE_LOGO_UI_SRC } from "../../lib/siteLogo";
 
 /** Legal links, contact, and operator identity — used on marketing and app layouts. */
 export function LegalFooter() {
@@ -17,11 +17,11 @@ export function LegalFooter() {
           <div className="flex items-center gap-2 text-sm text-ink/60">
             <Link href="/" prefetch={false} className="inline-flex shrink-0 items-center no-underline">
               <Image
-                src={SITE_LOGO_PRIM_SRC}
+                src={SITE_LOGO_UI_SRC}
                 alt="JobLoom"
                 width={SITE_LOGO_FOOTER.width}
                 height={SITE_LOGO_FOOTER.height}
-                className="h-7 w-auto max-w-[160px] object-contain object-left"
+                className="h-10 w-auto max-w-[220px] object-contain object-left sm:h-11"
               />
             </Link>
             <span>
