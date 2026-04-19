@@ -105,7 +105,10 @@ function jsonObjectOrEmpty(
   return {};
 }
 
-/** Filter-first discovery (taxonomy slugs + ISO country). */
+/**
+ * Filter-first discovery (taxonomy slugs + ISO country).
+ * Exported for parity/integration tests against {@link buildDiscoveryWhereSql}.
+ */
 export interface JobDiscoveryFilters {
   role?: string;
   roles?: string[];
@@ -235,7 +238,8 @@ function sqlForLocationToken(locQ: string): Prisma.Sql {
   return Prisma.sql`j."locationCity" ILIKE ${`%${locQ}%`}`;
 }
 
-function buildDiscoveryWhere(
+/** Prisma `where` for canonical discovery — keep in sync with `buildDiscoveryWhereSql`. */
+export function buildDiscoveryWhere(
   filters?: JobDiscoveryFilters,
 ): Prisma.JobWhereInput {
   const and: Prisma.JobWhereInput[] = [
@@ -352,7 +356,8 @@ function sqlResolvedCountryIn(codes: string[]): Prisma.Sql {
   )`;
 }
 
-function buildDiscoveryWhereSql(filters?: JobDiscoveryFilters): Prisma.Sql {
+/** Raw SQL `WHERE` for table `j` — keep in sync with `buildDiscoveryWhere`. */
+export function buildDiscoveryWhereSql(filters?: JobDiscoveryFilters): Prisma.Sql {
   const excluded = Prisma.join(
     LISTING_EXCLUDED_ROLE_SLUGS.map((s) => Prisma.sql`${s}`),
   );
@@ -555,7 +560,11 @@ export function createJobRepository(prisma: PrismaClient) {
     },
 
     async countCanonicalFiltered(filters?: JobDiscoveryFilters): Promise<number> {
-      return prisma.job.count({ where: buildDiscoveryWhere(filters) });
+      const whereSql = buildDiscoveryWhereSql(filters);
+      const rows = await prisma.$queryRaw<{ c: bigint }[]>`
+        SELECT COUNT(*)::bigint AS c FROM "Job" j WHERE ${whereSql}
+      `;
+      return Number(rows[0]?.c ?? 0);
     },
 
     async listRoleSuggestions(): Promise<
