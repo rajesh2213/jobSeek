@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import mammoth from "mammoth";
 import pdfParse from "pdf-parse";
 
+const MAX_RESUME_BULLETS = 8;
+
 /** Normalized SHA-256 of resume text (scoring / dedupe). */
 export function hashResumeText(text: string): string {
   const n = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\s+/g, " ").trim();
@@ -163,6 +165,6 @@ function extractBullets(text: string): string[] {
     }
   }
 
-  // Deduplicate
-  return [...new Set(bullets)];
+  // Deduplicate and cap to control embedding/storage growth.
+  return [...new Set(bullets)].slice(0, MAX_RESUME_BULLETS);
 }

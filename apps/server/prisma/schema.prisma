@@ -90,6 +90,8 @@ model Job {
   applyUrl           String?
   postedAt           DateTime?
   lastSeenAt         DateTime  @default(now())
+  expiresAt          DateTime?
+  isActive           Boolean   @default(true)
   fingerprint        String?
   canonicalJobId     String?
   fingerprintVersion String?
@@ -111,6 +113,10 @@ model Job {
   @@index([companyId])
   @@index([fingerprint])
   @@index([canonicalJobId])
+  @@index([expiresAt])
+  @@index([isActive, expiresAt])
+  @@index([lastSeenAt])
+  @@index([canonicalJobId, lastSeenAt])
   @@index([freshnessScore])
   @@index([sourceWeight])
   @@index([role])
@@ -170,7 +176,9 @@ model User {
   discoverySearchesToday Int      @default(0)
   discoveryBonusFiveUsed Boolean  @default(false)
   resumeText           String?      // parsed plain text
+  resumeFileKey        String?      // object storage key for resume bytes
   resumeFileName       String?      // original filename
+  resumeFileSize       Int?         // object size in bytes
   resumeFileData       Bytes?       // raw file bytes for download
   resumeUpdatedAt      DateTime?
   resumeContentHash    String?      // sha256 of normalized text; scoring/debug

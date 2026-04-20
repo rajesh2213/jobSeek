@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { Prisma } from "@prisma/client";
 import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
+import { getResumeObjectStore } from "../../infrastructure/storage/resumeObjectStore.js";
 import { getPlanLimits } from "../../config/plans.js";
 import { resolveProPlan } from "../../utils/userPlan.js";
 import {
@@ -32,6 +33,7 @@ import type {
   ResumeStructured,
 } from "../resume/extraction/types.js";
 
+const MAX_RESUME_BYTES = 5 * 1024 * 1024;
 const WORK_AUTH = new Set(["citizen", "permanent_resident", "visa_required", "other"]);
 const REMOTE_PREF = new Set(["remote", "hybrid", "onsite", "no_preference", ""]);
 
@@ -309,6 +311,58 @@ function computeProfileMetrics(user: {
   const filled = checks.filter(Boolean).length;
   const profileCompletionPct = Math.round((filled / checks.length) * 100);
   return { profileComplete, profileCompletionPct };
+}
+
+async function streamToBufferLimited(
+  stream: NodeJS.ReadableStream,
+  maxBytes: number,
+): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of stream) {
+    const chunkAny: unknown = chunk;
+    let b: Buffer;
+    if (Buffer.isBuffer(chunkAny)) {
+      b = chunkAny;
+    } else if (typeof chunkAny === "string") {
+      b = Buffer.from(chunkAny);
+    } else if (ArrayBuffer.isView(chunkAny)) {
+      b = Buffer.from(chunkAny.buffer, chunkAny.byteOffset, chunkAny.byteLength);
+    } else if (chunkAny instanceof ArrayBuffer) {
+      b = Buffer.from(chunkAny);
+    } else {
+      b = Buffer.from(String(chunkAny));
+    }
+    total += b.length;
+    if (total > maxBytes) {
+      throw new Error("Resume file too large");
+    }
+    chunks.push(b);
+  }
+  return Buffer.concat(chunks);
+}
+
+async function loadResumeBytes(
+  resumeFileKey: string | null,
+  resumeFileData: Buffer | Uint8Array | null,
+): Promise<Buffer | null> {
+  if (resumeFileKey) {
+    try {
+      const obj = await getResumeObjectStore().getObject(resumeFileKey);
+      if (obj) {
+        const buff = await streamToBufferLimited(obj.stream, MAX_RESUME_BYTES);
+        if (buff.length > 0) return buff;
+      }
+    } catch {
+      // Fallback to legacy DB bytes during migration.
+    }
+  }
+  if (!resumeFileData) return null;
+  const buff = Buffer.from(resumeFileData);
+  if (buff.length > MAX_RESUME_BYTES) {
+    throw new Error("Resume file too large");
+  }
+  return buff.length > 0 ? buff : null;
 }
 
 async function ensureSmartApplyDayReset(
@@ -704,13 +758,28 @@ export function registerAccountApplyProfileRoutes(server: FastifyInstance): void
 
     let text = normalizeResumePlainText(user.resumeText);
 
-    const resumeBytes = user.resumeFileData;
-    const fileDataLen = resumeBytes ? Buffer.from(resumeBytes).byteLength : 0;
+    const resumeFileKey =
+      typeof (user as Record<string, unknown>).resumeFileKey === "string"
+        ? ((user as Record<string, unknown>).resumeFileKey as string)
+        : null;
+    let resumeBytes: Buffer | null = null;
+    try {
+      resumeBytes = await loadResumeBytes(resumeFileKey, user.resumeFileData ?? null);
+    } catch (err) {
+      return reply.status(400).send({
+        error: "Resume parse failed",
+        code: "RESUME_PARSE_FAILED",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Could not read your stored resume. Please upload again.",
+      });
+    }
+    const fileDataLen = resumeBytes?.byteLength ?? 0;
 
     // Stored file but missing/empty parsed text (legacy rows, failed partial writes, etc.): re-parse bytes.
     if (!text && fileDataLen > 0 && resumeBytes) {
       try {
-        const buffer = Buffer.from(resumeBytes);
         const mime = mimeTypeFromResumeFileName(user.resumeFileName ?? undefined);
         if (
           mime !== "application/pdf" &&
@@ -723,7 +792,7 @@ export function registerAccountApplyProfileRoutes(server: FastifyInstance): void
             message: "Could not detect PDF or Word from the stored file name. Re-upload your resume.",
           });
         }
-        const parsed = await parseResumeFile(buffer, mime);
+        const parsed = await parseResumeFile(resumeBytes, mime);
         const t = normalizeResumePlainText(parsed.text);
         if (!t) {
           return reply.status(400).send({
@@ -840,7 +909,7 @@ export function registerAccountApplyProfileRoutes(server: FastifyInstance): void
           mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
           mime === "text/plain"
         ) {
-          const reparsed = await parseResumeFile(Buffer.from(resumeBytes), mime);
+          const reparsed = await parseResumeFile(resumeBytes, mime);
           structured = extractResumeStructured(reparsed.text, { links: reparsed.links });
           const structuredUpdateData: Record<string, unknown> = {
             resumeStructuredV1: structured as unknown as Prisma.InputJsonValue,

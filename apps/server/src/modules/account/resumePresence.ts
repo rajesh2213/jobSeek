@@ -20,7 +20,7 @@ export async function getResumeStatusRow(
     }>
   >`
     SELECT "resumeText", "resumeFileName", "resumeUpdatedAt",
-      octet_length("resumeFileData") AS "fileOctets"
+      COALESCE("resumeFileSize"::bigint, octet_length("resumeFileData")) AS "fileOctets"
     FROM "User"
     WHERE id = ${userId}
   `;
@@ -32,7 +32,9 @@ export async function getResumeFileOctetLength(
   userId: string,
 ): Promise<bigint | null> {
   const rows = await prisma.$queryRaw<[{ n: bigint | null }]>`
-    SELECT octet_length("resumeFileData") AS n FROM "User" WHERE id = ${userId}
+    SELECT COALESCE("resumeFileSize"::bigint, octet_length("resumeFileData")) AS n
+    FROM "User"
+    WHERE id = ${userId}
   `;
   return rows[0]?.n ?? null;
 }

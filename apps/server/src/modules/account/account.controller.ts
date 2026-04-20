@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { Prisma } from "@prisma/client";
 import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
+import { getResumeObjectStore } from "../../infrastructure/storage/resumeObjectStore.js";
 import { getPlanLimits } from "../../config/plans.js";
 import { resolveProPlan } from "../../utils/userPlan.js";
 import { embedBullets, matchKeywordsToBullets } from "../../utils/resumeEmbedder.js";
@@ -13,6 +14,13 @@ import {
 import { computeHasResumeFromParts, getResumeStatusRow } from "./resumePresence.js";
 import { extractProfileSummary } from "../../utils/resumeProfileExtractor.js";
 import { extractResumeStructured } from "../resume/extraction/pipeline.js";
+import {
+  buildResumeObjectKey,
+  bufferToStream,
+  contentTypeForResume,
+  detectResumeExtension,
+  sha256Hex,
+} from "./resumeStorage.js";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME = new Set([
@@ -33,6 +41,7 @@ export function registerAccountResumeRoutes(server: FastifyInstance): void {
       return reply.status(400).send({ error: "Bad request", message: "Missing resume file" });
     }
 
+    const fileName = file.filename?.trim() || "resume";
     const buffer = await file.toBuffer();
     let mimeType = file.mimetype;
     if (!ALLOWED_MIME.has(mimeType)) {
@@ -76,26 +85,57 @@ export function registerAccountResumeRoutes(server: FastifyInstance): void {
     const applyProfileSummary = extractProfileSummary(parsed.text, parsed.bullets);
     const resumeStructuredV1 = extractResumeStructured(parsed.text, { links: parsed.links });
 
-    await server.prisma.user.update({
-      where: { id: ctx.internalUserId },
-      data: {
-        resumeText: parsed.text,
-        resumeFileName: file.filename ?? "resume",
-        resumeFileData: buffer,
-        resumeUpdatedAt: new Date(),
-        resumeBullets: parsed.bullets,
-        resumeBulletEmbeddings: embeddings,
-        resumeContentHash: hashResumeText(parsed.text),
-        resumeStructuredV1: resumeStructuredV1 as unknown as Prisma.InputJsonValue,
-        applyProfileSummary: applyProfileSummary as unknown as Prisma.InputJsonValue,
-      } as Prisma.UserUpdateInput,
-    });
+    try {
+      const objectStore = getResumeObjectStore();
+      const hashHex = sha256Hex(buffer);
+      const extension = detectResumeExtension({ fileName, mimeType });
+      const objectKey = buildResumeObjectKey({
+        userId: ctx.internalUserId,
+        hashHex,
+        extension,
+      });
+      const exists = await objectStore.hasObject(objectKey);
+      if (!exists) {
+        await objectStore.putObject({
+          key: objectKey,
+          body: bufferToStream(buffer),
+          contentType: mimeType,
+          contentLength: buffer.length,
+        });
+      }
+
+      await server.prisma.user.update({
+        where: { id: ctx.internalUserId },
+        data: {
+          resumeText: parsed.text,
+          resumeFileKey: objectKey,
+          resumeFileName: fileName,
+          resumeFileSize: buffer.length,
+          resumeFileData: null,
+          resumeUpdatedAt: new Date(),
+          resumeBullets: parsed.bullets,
+          resumeBulletEmbeddings: embeddings,
+          resumeContentHash: hashResumeText(parsed.text),
+          resumeStructuredV1: resumeStructuredV1 as unknown as Prisma.InputJsonValue,
+          applyProfileSummary: applyProfileSummary as unknown as Prisma.InputJsonValue,
+        } as Prisma.UserUpdateInput,
+      });
+    } catch (err) {
+      server.log.error(
+        { event: "resume_upload_storage_failed", userId: ctx.internalUserId, err },
+        "resume_upload_storage_failed",
+      );
+      return reply.status(503).send({
+        error: "Service unavailable",
+        message: "Resume storage unavailable",
+      });
+    }
 
     server.log.info(
       {
         event: "resume_uploaded",
         userId: ctx.internalUserId,
-        fileName: file.filename ?? "resume",
+        fileName,
         wordCount: parsed.wordCount,
         bulletCount: parsed.bullets.length,
       },
@@ -104,7 +144,7 @@ export function registerAccountResumeRoutes(server: FastifyInstance): void {
 
     return reply.send({
       success: true,
-      fileName: file.filename ?? "resume",
+      fileName,
       wordCount: parsed.wordCount,
       bulletCount: parsed.bullets.length,
     });
@@ -116,11 +156,33 @@ export function registerAccountResumeRoutes(server: FastifyInstance): void {
       return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
     }
 
+    const existingRows = await server.prisma.$queryRaw<
+      Array<{ resumeFileKey: string | null }>
+    >`
+      SELECT "resumeFileKey"
+      FROM "User"
+      WHERE id = ${ctx.internalUserId}
+    `;
+    const existing = existingRows[0] ?? null;
+
+    if (existing?.resumeFileKey) {
+      try {
+        await getResumeObjectStore().deleteObject(existing.resumeFileKey);
+      } catch (err) {
+        server.log.warn(
+          { event: "resume_object_delete_failed", userId: ctx.internalUserId, err },
+          "resume_object_delete_failed",
+        );
+      }
+    }
+
     await server.prisma.user.update({
       where: { id: ctx.internalUserId },
       data: {
         resumeText: null,
+        resumeFileKey: null,
         resumeFileName: null,
+        resumeFileSize: null,
         resumeFileData: null,
         resumeUpdatedAt: null,
         resumeContentHash: null,
@@ -186,22 +248,55 @@ export function registerAccountResumeRoutes(server: FastifyInstance): void {
       return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
     }
 
-    const row = await server.prisma.user.findUnique({
-      where: { id: ctx.internalUserId },
-      select: { resumeFileData: true, resumeFileName: true },
-    });
+    const rows = await server.prisma.$queryRaw<
+      Array<{
+        resumeFileKey: string | null;
+        resumeFileData: Uint8Array | null;
+        resumeFileName: string | null;
+      }>
+    >`
+      SELECT "resumeFileKey", "resumeFileData", "resumeFileName"
+      FROM "User"
+      WHERE id = ${ctx.internalUserId}
+    `;
+    const row = rows[0] ?? null;
+
+    const name = row.resumeFileName ?? "resume";
+    const legacyMime = mimeTypeFromResumeFileName(name);
+    const fallbackType = legacyMime === "application/octet-stream" ? "application/pdf" : legacyMime;
+
+    if (row?.resumeFileKey) {
+      try {
+        const object = await getResumeObjectStore().getObject(row.resumeFileKey);
+        if (object) {
+          const objectContentType = contentTypeForResume(
+            name,
+            object.contentType ?? fallbackType,
+          );
+          return reply
+            .header("Content-Type", objectContentType)
+            .header("Content-Disposition", `attachment; filename="${encodeURIComponent(name)}"`)
+            .send(object.stream);
+        }
+      } catch (err) {
+        server.log.warn(
+          {
+            event: "resume_download_object_read_failed",
+            userId: ctx.internalUserId,
+            key: row.resumeFileKey,
+            err,
+          },
+          "resume_download_object_read_failed",
+        );
+      }
+    }
 
     if (!row?.resumeFileData?.length) {
       return reply.status(404).send({ error: "Not found", code: "NOT_FOUND" });
     }
 
-    const name = row.resumeFileName ?? "resume";
-    const mime = mimeTypeFromResumeFileName(name);
-    const contentType =
-      mime === "application/octet-stream" ? "application/pdf" : mime;
-
     return reply
-      .header("Content-Type", contentType)
+      .header("Content-Type", fallbackType)
       .header("Content-Disposition", `attachment; filename="${encodeURIComponent(name)}"`)
       .send(row.resumeFileData);
   });
