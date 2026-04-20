@@ -20,8 +20,8 @@ import { assertWorkerProcessEnv } from "../../infrastructure/env/validateWorkerE
 import { registerWorkerShutdown } from "../../utils/workerShutdown.js";
 import { recordSerpQueryPipelineTotals } from "../../services/atsPipelineCounters.service.js";
 
-const MAX_QUERIES_PER_RUN = 8;
-const MAX_QUERIES_DEBUG = 3;
+const DEFAULT_MAX_QUERIES_PER_RUN = 8;
+const DEFAULT_MAX_QUERIES_DEBUG = 3;
 const QUERY_DELAY_MS = 800;
 
 /** Per-query key `serp:skip_query:<sha256>` with TTL; avoids re-fetching when results are mostly already in DB. */
@@ -50,6 +50,28 @@ function getSkipQueryTtlSeconds(): number {
   if (raw === undefined || raw === "") return DEFAULT_SKIP_QUERY_TTL_SECONDS;
   const n = Number.parseInt(raw, 10);
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_SKIP_QUERY_TTL_SECONDS;
+}
+
+function getMaxQueriesPerRun(): number {
+  const raw = process.env.SERP_MAX_QUERIES_PER_RUN?.trim();
+  if (raw !== undefined && raw !== "") {
+    const n = Number.parseInt(raw, 10);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return isSerpDebugMode() ? DEFAULT_MAX_QUERIES_DEBUG : DEFAULT_MAX_QUERIES_PER_RUN;
+}
+
+function getSerpMonthlyBudget(): number | null {
+  const raw = process.env.SERP_MONTHLY_BUDGET?.trim();
+  if (raw === undefined || raw === "") return null;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function getCurrentMonthUtcRange(now = new Date()): { start: Date; end: Date } {
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+  return { start, end };
 }
 
 async function isQuerySkippedForHighDedup(redis: Redis, query: string): Promise<boolean> {
@@ -303,7 +325,35 @@ function logSerpQueryAnalysis(args: {
 }
 
 async function runSerpBatch(): Promise<void> {
-  const maxQueriesPerRun = isSerpDebugMode() ? MAX_QUERIES_DEBUG : MAX_QUERIES_PER_RUN;
+  const maxQueriesPerRun = getMaxQueriesPerRun();
+  const monthlyBudget = getSerpMonthlyBudget();
+  const monthRange = getCurrentMonthUtcRange();
+  let monthlyUsed =
+    monthlyBudget === null
+      ? 0
+      : await prisma.serpBatch.count({
+          where: {
+            createdAt: {
+              gte: monthRange.start,
+              lt: monthRange.end,
+            },
+          },
+        });
+
+  if (monthlyBudget !== null && monthlyUsed >= monthlyBudget) {
+    logger.warn(
+      {
+        event: "serp_monthly_budget_reached",
+        monthlyBudget,
+        monthlyUsed,
+        monthStartUtc: monthRange.start.toISOString(),
+        monthEndUtc: monthRange.end.toISOString(),
+      },
+      "serp_monthly_budget_reached",
+    );
+    return;
+  }
+
   const allQueries = serpQueryGenerator();
   let queriesExecuted = 0;
 
@@ -312,6 +362,19 @@ async function runSerpBatch(): Promise<void> {
       logger.warn(
         { event: "serp_max_queries_per_run_reached", maxQueriesPerRun, queriesExecuted },
         "serp_max_queries_per_run_reached",
+      );
+      break;
+    }
+    if (monthlyBudget !== null && monthlyUsed >= monthlyBudget) {
+      logger.warn(
+        {
+          event: "serp_monthly_budget_reached",
+          monthlyBudget,
+          monthlyUsed,
+          queriesExecuted,
+          maxQueriesPerRun,
+        },
+        "serp_monthly_budget_reached",
       );
       break;
     }
@@ -346,6 +409,7 @@ async function runSerpBatch(): Promise<void> {
       },
       select: { id: true },
     });
+    if (monthlyBudget !== null) monthlyUsed += 1;
 
     logger.info(
       {
@@ -354,6 +418,8 @@ async function runSerpBatch(): Promise<void> {
         batchId: batch.id,
         serpDebug: isSerpDebugMode(),
         maxQueriesPerRun,
+        monthlyBudget,
+        monthlyUsed,
       },
       "serp_batch_started",
     );
