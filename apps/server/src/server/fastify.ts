@@ -1,13 +1,17 @@
 import Fastify, { type FastifyError } from "fastify";
 import multipart from "@fastify/multipart";
+import rateLimit from "@fastify/rate-limit";
 import prismaPlugin from "./plugins/prisma.plugin.js";
 import { registerRoutes } from "./routes/index.js";
 import cors from "@fastify/cors";
 import fastifyRawBody from "fastify-raw-body";
+import { getIoredis } from "../queues/job.queue.js";
 
 export async function buildServer() {
   const server = Fastify({
     logger: { level: process.env.LOG_LEVEL ?? "info" },
+    /** Required so `request.ip` reflects the client behind nginx (`X-Forwarded-For`). */
+    trustProxy: true,
   });
 
   await server.register(fastifyRawBody, {
@@ -35,6 +39,45 @@ export async function buildServer() {
       "x-jobseek-view-cap-bypass",
     ],
   });
+
+  /**
+   * Global fallback safety net. Uses Redis when `REDIS_URL` is set so limits are shared
+   * across processes/instances; otherwise in-memory (per-process only).
+   * Route-level Redis limits (`assertJobReadRateLimit` on `/jobs`, etc.) are unchanged.
+   */
+  const redisUrl = process.env.REDIS_URL?.trim();
+  const globalRlRedis = redisUrl ? getIoredis() : undefined;
+  await server.register(rateLimit, {
+    global: true,
+    max: 250,
+    timeWindow: "1 minute",
+    nameSpace: "jobseek-global-rl-",
+    ...(globalRlRedis
+      ? { redis: globalRlRedis, skipOnError: true }
+      : {}),
+    keyGenerator: (request) => request.ip,
+    onExceeded: (request, key) => {
+      request.log.warn(
+        {
+          event: "global_rate_limit_exceeded",
+          key,
+          ip: request.ip,
+          path: request.url.split("?")[0] ?? request.url,
+          store: globalRlRedis ? "redis" : "memory",
+        },
+        "global_rate_limit_exceeded",
+      );
+    },
+  });
+  if (!globalRlRedis) {
+    server.log.warn(
+      {
+        event: "global_rate_limit_store_memory",
+        hint: "Set REDIS_URL for shared limits across instances",
+      },
+      "global_rate_limit_store_memory",
+    );
+  }
 
   server.setErrorHandler((error: FastifyError, _request, reply) => {
     const statusCode = error.statusCode ?? 500;

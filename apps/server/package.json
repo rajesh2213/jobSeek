@@ -57,6 +57,7 @@
     "@clerk/nextjs": "^6.39.1",
     "@fastify/cors": "^8.5.0",
     "@fastify/multipart": "^8.3.0",
+    "@fastify/rate-limit": "^9.1.0",
     "@lemonsqueezy/lemonsqueezy.js": "^4.0.0",
     "@prisma/client": "^5.22.0",
     "axios": "^1.14.0",
