@@ -4,6 +4,7 @@ import type { Job } from "@prisma/client";
 import { enrichJob } from "../enrichment/enrichment.service.js";
 import type { DedupJobInput } from "../crawler/crawler.types.js";
 import { computeStoredScores } from "../../services/jobRanking.service.js";
+import { computeJobExpiresAt } from "../../services/jobRetentionPolicy.service.js";
 import { isValidJobUrl } from "../../utils/url.js";
 import { logger } from "../../utils/logger.js";
 import { expandLocationFilter, getRegions } from "../../utils/locationResolver.js";
@@ -494,6 +495,10 @@ export function createJobRepository(prisma: PrismaClient) {
     const now = new Date();
     /** Ingest-time proxy for DB `createdAt`; `computeStoredScores` ages from COALESCE(postedAt, createdAt). */
     const scores = computeStoredScores(input.source, input.postedAt ?? null, now);
+    const expiresAt = computeJobExpiresAt({
+      source: input.source,
+      lastSeenAt: now,
+    });
     const workType =
       input.workType ??
       (input.isRemote ? "remote" : "onsite");
@@ -515,6 +520,8 @@ export function createJobRepository(prisma: PrismaClient) {
       applyUrl: safeApplyUrl(input.applyUrl),
       postedAt: input.postedAt ?? null,
       lastSeenAt: now,
+      expiresAt,
+      isActive: true,
       freshnessScore: scores.freshnessScore,
       sourceWeight: scores.sourceWeight,
       atsJobId: input.atsJobId ?? null,
@@ -728,12 +735,18 @@ export function createJobRepository(prisma: PrismaClient) {
     },
 
     async create(input: DedupJobInput): Promise<Job> {
+      const seenAt = new Date();
       return prisma.job.upsert({
         where: { sourceUrl: input.sourceUrl },
         update: {
-          updatedAt: new Date(),
-          lastSeenAt: new Date(),
-        },
+          updatedAt: seenAt,
+          lastSeenAt: seenAt,
+          expiresAt: computeJobExpiresAt({
+            source: input.source,
+            lastSeenAt: seenAt,
+          }),
+          isActive: true,
+        } as Prisma.JobUpdateInput,
         create: {
           ...buildBaseJobData(input),
           fingerprintVersion: "v2",
@@ -956,9 +969,18 @@ export function createJobRepository(prisma: PrismaClient) {
     },
 
     async updateLastSeenById(id: string, lastSeenAt: Date): Promise<void> {
+      const row = await prisma.job.findUnique({
+        where: { id },
+        select: { source: true },
+      });
+      if (!row) return;
       await prisma.job.update({
         where: { id },
-        data: { lastSeenAt },
+        data: {
+          lastSeenAt,
+          expiresAt: computeJobExpiresAt({ source: row.source, lastSeenAt }),
+          isActive: true,
+        } as Prisma.JobUpdateInput,
       });
     },
 
@@ -983,9 +1005,18 @@ export function createJobRepository(prisma: PrismaClient) {
     },
 
     async updateLastSeenBySourceUrl(sourceUrl: string, lastSeenAt: Date): Promise<void> {
+      const row = await prisma.job.findUnique({
+        where: { sourceUrl },
+        select: { source: true },
+      });
+      if (!row) return;
       await prisma.job.update({
         where: { sourceUrl },
-        data: { lastSeenAt },
+        data: {
+          lastSeenAt,
+          expiresAt: computeJobExpiresAt({ source: row.source, lastSeenAt }),
+          isActive: true,
+        } as Prisma.JobUpdateInput,
       });
     },
 
@@ -994,11 +1025,32 @@ export function createJobRepository(prisma: PrismaClient) {
       lastSeenAt: Date,
     ): Promise<number> {
       if (sourceUrls.length === 0) return 0;
-      const result = await prisma.job.updateMany({
+      const rows = await prisma.job.findMany({
         where: { sourceUrl: { in: sourceUrls } },
-        data: { lastSeenAt },
+        select: { id: true, source: true },
       });
-      return result.count;
+      if (rows.length === 0) return 0;
+
+      const idsBySource = new Map<string, string[]>();
+      for (const row of rows) {
+        const existing = idsBySource.get(row.source);
+        if (existing) existing.push(row.id);
+        else idsBySource.set(row.source, [row.id]);
+      }
+
+      let touched = 0;
+      for (const [source, ids] of idsBySource) {
+        const result = await prisma.job.updateMany({
+          where: { id: { in: ids } },
+          data: {
+            lastSeenAt,
+            expiresAt: computeJobExpiresAt({ source, lastSeenAt }),
+            isActive: true,
+          } as Prisma.JobUpdateManyMutationInput,
+        });
+        touched += result.count;
+      }
+      return touched;
     },
 
     async updateParsedDescription(
