@@ -71,6 +71,7 @@ function listQueryBase(f: JobFilters): JobFilters {
 interface Props {
   jobs: JobItem[];
   meta?: JobsApiResponse["meta"];
+  weeklyJobsPosted?: number;
   relatedSlugs: string[];
   listingTop?: ReactNode;
   listingFaq?: ReactNode;
@@ -421,6 +422,7 @@ function formatAlertLastSent(iso: string | null): string {
 export function JobsSearchClient({
   jobs,
   meta: initialMeta,
+  weeklyJobsPosted,
   relatedSlugs,
   listingTop,
   listingFaq,
@@ -1013,7 +1015,7 @@ export function JobsSearchClient({
     <div className="relative z-0 flex min-h-screen flex-col">
       <div className="-mb-6 w-full sm:-mb-8">
         <TimeAdvantageSimulator
-          totalListings={listMeta?.total}
+          jobsPostedThisWeek={weeklyJobsPosted}
           statRowPrefix={
             <button
               type="button"

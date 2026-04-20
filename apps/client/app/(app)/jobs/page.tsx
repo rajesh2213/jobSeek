@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
-import { loadJobsDiscoveryPage, stableJobFiltersKey } from "../../../lib/jobsPageData";
+import {
+  loadJobsDiscoveryPage,
+  loadWeeklyJobsPostedCount,
+  stableJobFiltersKey,
+} from "../../../lib/jobsPageData";
 import { fetchJobsRelatedSlugs } from "../../../lib/jobsRelatedSlugs";
 import {
   buildBreadcrumbListJsonLd,
@@ -50,9 +54,10 @@ export default async function JobsPage({ searchParams }: Props) {
     workType: filters.workType,
   });
 
-  const [response, relatedSlugs] = await Promise.all([
+  const [response, relatedSlugs, weeklyJobsPosted] = await Promise.all([
     loadJobsDiscoveryPage(filtersKey),
     fetchJobsRelatedSlugs({ currentSlug, fallback: FALLBACK_RELATED_SLUGS }),
+    loadWeeklyJobsPostedCount(),
   ]);
 
   const total = response.meta?.total ?? 0;
@@ -75,6 +80,7 @@ export default async function JobsPage({ searchParams }: Props) {
     <JobsSearchPage
       jobs={response.data}
       meta={response.meta}
+      weeklyJobsPosted={weeklyJobsPosted}
       relatedSlugs={relatedSlugs}
       listingTop={listingTop}
       listingFaq={listingFaq}

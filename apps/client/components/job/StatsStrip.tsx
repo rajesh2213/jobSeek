@@ -28,8 +28,8 @@ function useCountUp(target: number, durationMs: number, active: boolean): number
 }
 
 export interface StatsStripProps {
-  /** Optional listing total to derive a plausible “this week” figure (still illustrative). */
-  totalListings?: number;
+  /** Real weekly posted-job count from API (or env override). */
+  jobsPostedThisWeek?: number;
   className?: string;
   /** Applied to the horizontal row of pills (e.g. `lg:justify-end` in the hero). */
   rowClassName?: string;
@@ -45,7 +45,7 @@ export interface StatsStripProps {
 }
 
 export function StatsStrip({
-  totalListings,
+  jobsPostedThisWeek,
   className,
   rowClassName,
   variant = "default",
@@ -57,10 +57,10 @@ export function StatsStrip({
   const countActive = !reduceMotion;
 
   const linkedInPct = useCountUp(73, 1000, countActive);
-  const jobsThisWeekTarget = useMemo(() => {
-    const t = totalListings ?? 18_000;
-    return Math.max(3_200, Math.min(52_000, Math.round(t * 0.62 + 4_800)));
-  }, [totalListings]);
+  const jobsThisWeekTarget = useMemo(
+    () => Math.max(0, Math.round(jobsPostedThisWeek ?? 0)),
+    [jobsPostedThisWeek],
+  );
   const jobsWeek = useCountUp(jobsThisWeekTarget, 1100, countActive);
 
   const [shimmerIndex, setShimmerIndex] = useState(0);

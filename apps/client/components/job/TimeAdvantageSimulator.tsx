@@ -8,8 +8,8 @@ import { Container } from "../ui/Container";
 import { StatsStrip } from "./StatsStrip";
 
 export interface TimeAdvantageSimulatorProps {
-  /** Passed through to stats pills (illustrative “this week” count). */
-  totalListings?: number;
+  /** Real weekly posted-job count from API (or env override). */
+  jobsPostedThisWeek?: number;
   /** Shown to the left of the LinkedIn / jobs-this-week pills (e.g. Smart Apply). */
   statRowPrefix?: ReactNode;
 }
@@ -18,7 +18,7 @@ export interface TimeAdvantageSimulatorProps {
  * Jobs page hero — full-width headline; subline on one row; “Stay early” + both stat pills on the next.
  */
 export function TimeAdvantageSimulator({
-  totalListings,
+  jobsPostedThisWeek,
   statRowPrefix,
 }: TimeAdvantageSimulatorProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -49,7 +49,7 @@ export function TimeAdvantageSimulator({
 
         <StatsStrip
           variant="hero-split"
-          totalListings={totalListings}
+          jobsPostedThisWeek={jobsPostedThisWeek}
           className="mb-0 mt-4"
           heroStatRowPrefix={statRowPrefix}
           heroFirstRowLeading={

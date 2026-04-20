@@ -6,6 +6,14 @@ import {
   MAX_JOB_FILTER_QUERY_TOKENS,
 } from "./slug-parser";
 
+function weeklyJobsPostedOverride(): number | null {
+  const raw = process.env.JOBS_WEEKLY_POSTED_OVERRIDE?.trim();
+  if (!raw) return null;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
+}
+
 /** Deterministic key so React `cache()` dedupes metadata + page in one navigation. */
 export function stableJobFiltersKey(filters: JobFilters): string {
   const keys = Object.keys(filters).sort() as (keyof JobFilters)[];
@@ -45,3 +53,23 @@ export const loadJobsDiscoveryPage = cache(
     );
   },
 );
+
+/** Real weekly posted jobs count used by jobs hero stats strip. */
+export const loadWeeklyJobsPostedCount = cache(async (): Promise<number> => {
+  const override = weeklyJobsPostedOverride();
+  if (override !== null) return override;
+
+  const { getToken } = await auth();
+  const token = await getToken();
+  const response = await fetchJobs(
+    {
+      posted: "1w",
+      page: 1,
+      limit: 1,
+      sort: "latest",
+    },
+    { token },
+  );
+  const total = Number(response.meta?.total ?? 0);
+  return Number.isFinite(total) && total >= 0 ? Math.round(total) : 0;
+});

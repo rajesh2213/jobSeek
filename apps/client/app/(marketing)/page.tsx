@@ -14,6 +14,7 @@ import {
 } from "framer-motion";
 import GuidedHookDemo from "../../components/GuidedHookDemo";
 import { HERO_JOB_INDEX_TOTAL, SHOW_LANDING_TESTIMONIALS } from "../../lib/landingPublic";
+import { PLAN_LIMITS } from "../../lib/planLimits";
 
 const sectionReveal = {
   initial: { opacity: 0, y: 20 },
@@ -560,7 +561,7 @@ function PricingSection() {
             <p className="text-sm font-semibold">Free</p>
             <p className="mt-1 text-4xl font-bold">$0</p>
             <ul className="mt-3 space-y-1.5 text-sm text-ink/75">
-              <li>• 10 job views/day (UTC)</li>
+              <li>• {PLAN_LIMITS.free.dailyJobViews}/day (UTC)</li>
               <li className="text-ink/45">✕ No AI resume match</li>
               <li className="text-ink/45">✕ No Smart Apply</li>
               <li className="text-ink/45">✕ No email job alerts</li>

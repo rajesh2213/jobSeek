@@ -1,3 +1,5 @@
+import { PLAN_LIMITS } from "../../lib/planLimits";
+
 export const CORAL = "#E8533A";
 export const CREAM_TINT =
   "linear-gradient(180deg, rgba(232, 122, 93, 0.08) 0%, rgba(244, 239, 230, 0.5) 100%)";
@@ -6,7 +8,7 @@ export const PRO_FEATURES = [
   "Unlimited job browsing (search, company pages, full job posts)",
   "AI resume match — score, matched keywords, and gap analysis",
   "⚡ Smart Apply (Chrome extension) — unlimited auto-fill for standard ATS fields (name, contact, experience, etc.)",
-  "AI-written answers for open-ended fields — up to 5 job applications per day (UTC); resets at midnight UTC (not a per-question cap)",
+  `AI-written answers for open-ended fields — up to ${PLAN_LIMITS.pro.smartApplyJobs} job applications per day (UTC); resets at midnight UTC (not a per-question cap)`,
   "Job alerts — email when new roles match a saved search (5 or 10 new jobs threshold · instant delivery)",
   "Early access to new JobLoom features",
 ] as const;

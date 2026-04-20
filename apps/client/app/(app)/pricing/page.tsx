@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PricingPlansClient } from "../../../components/pricing/PricingPlansClient";
 import { FAQ } from "../../../components/pricing/pricingCopy";
+import { PLAN_LIMITS } from "../../../lib/planLimits";
 
 export default function PricingPage() {
   return (
@@ -33,7 +34,7 @@ export default function PricingPage() {
               <tbody className="text-ink/90">
                 <tr className="border-b border-line">
                   <td className="px-4 py-3">Jobs per day</td>
-                  <td className="px-4 py-3 text-ink-muted">10/day (UTC)</td>
+                  <td className="px-4 py-3 text-ink-muted">{PLAN_LIMITS.free.dailyJobViews}/day (UTC)</td>
                   <td className="px-4 py-3 font-medium text-ink">Unlimited</td>
                 </tr>
                 <tr className="border-b border-line">
@@ -44,7 +45,9 @@ export default function PricingPage() {
                 <tr className="border-b border-line">
                   <td className="px-4 py-3">Smart Apply — AI open-ended answers</td>
                   <td className="px-4 py-3 text-ink-muted">—</td>
-                  <td className="px-4 py-3 font-medium text-ink">5 job applications/day (UTC)</td>
+                  <td className="px-4 py-3 font-medium text-ink">
+                    {PLAN_LIMITS.pro.smartApplyJobs} job applications/day (UTC)
+                  </td>
                 </tr>
                 <tr className="border-b border-line">
                   <td className="px-4 py-3">AI resume match</td>

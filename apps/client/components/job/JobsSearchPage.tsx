@@ -13,6 +13,7 @@ const FALLBACK_RELATED_SLUGS = [
 interface Props {
   jobs: JobItem[];
   meta?: JobsApiResponse["meta"];
+  weeklyJobsPosted?: number;
   relatedSlugs?: string[];
   listingTop?: ReactNode;
   /** FAQ block rendered below job results (above related searches). */
@@ -22,6 +23,7 @@ interface Props {
 export function JobsSearchPage({
   jobs,
   meta,
+  weeklyJobsPosted,
   relatedSlugs = FALLBACK_RELATED_SLUGS,
   listingTop,
   listingFaq,
@@ -31,6 +33,7 @@ export function JobsSearchPage({
       <JobsSearchClient
         jobs={jobs}
         meta={meta}
+        weeklyJobsPosted={weeklyJobsPosted}
         relatedSlugs={relatedSlugs}
         listingTop={listingTop}
         listingFaq={listingFaq}
