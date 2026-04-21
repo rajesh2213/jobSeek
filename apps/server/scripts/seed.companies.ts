@@ -66,6 +66,16 @@ function dedupeSeedCompanies(companies: SeedCompany[]): SeedCompany[] {
   return Array.from(deduped.values());
 }
 
+function parsePositiveIntEnv(name: string): number | null {
+  const raw = process.env[name];
+  if (raw == null || raw.trim() === "") return null;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n <= 0) {
+    throw new Error(`${name} must be a positive integer when set`);
+  }
+  return n;
+}
+
 async function main(): Promise<void> {
   loadRootEnv();
 
@@ -113,9 +123,32 @@ async function main(): Promise<void> {
   }
 
   const companies = dedupeSeedCompanies(validated);
+  const batchSize = parsePositiveIntEnv("BATCH_SIZE") ?? companies.length;
+  const batchIndex = parsePositiveIntEnv("BATCH_INDEX") ?? 1;
+  const totalBatches = Math.max(1, Math.ceil(companies.length / batchSize));
+
+  if (batchIndex > totalBatches) {
+    throw new Error(
+      `BATCH_INDEX out of range: got ${batchIndex}, total batches ${totalBatches} for BATCH_SIZE=${batchSize}`,
+    );
+  }
+
+  const start = (batchIndex - 1) * batchSize;
+  const end = Math.min(start + batchSize, companies.length);
+  const batchCompanies = companies.slice(start, end);
 
   logger.info(
-    { event: "seed_start", total_companies: companies.length, raw_count: raw.length },
+    {
+      event: "seed_start",
+      total_companies: companies.length,
+      raw_count: raw.length,
+      batch_size: batchSize,
+      batch_index: batchIndex,
+      total_batches: totalBatches,
+      batch_count: batchCompanies.length,
+      batch_start_index: start,
+      batch_end_index_exclusive: end,
+    },
     "Company seeding started",
   );
 
@@ -125,13 +158,17 @@ async function main(): Promise<void> {
   );
   const seedingService = new SeedingService(companyService);
 
-  const result = await seedingService.seedCompanies(companies);
+  const result = await seedingService.seedCompanies(batchCompanies);
 
   logger.info(
     {
       event: "seed_summary",
       inserted: result.inserted,
       skipped: result.skipped,
+      batch_size: batchSize,
+      batch_index: batchIndex,
+      total_batches: totalBatches,
+      batch_count: batchCompanies.length,
     },
     "Company seeding completed",
   );
