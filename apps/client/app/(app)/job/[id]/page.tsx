@@ -24,6 +24,7 @@ import { CompanyJobsPreview } from "../../../../components/company/CompanyJobsPr
 import { SimilarJobsSection } from "../../../../components/job/SimilarJobsSection";
 import { ResumeMatchSection } from "../../../../components/resume/ResumeMatchSection";
 import { SeoFooterLinks } from "../../../../components/seo/SeoFooterLinks";
+import { UserLocalResetCaption } from "../../../../components/job/UserLocalResetCaption";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -134,9 +135,11 @@ export default async function JobDetailPage({ params }: Props) {
                       View Pro plans
                     </Link>
                     {detailCap?.resetAt ? (
-                      <p className="mt-3 text-xs text-ink/50">
-                        Resets {new Date(detailCap.resetAt).toLocaleString()}
-                      </p>
+                      <UserLocalResetCaption
+                        iso={detailCap.resetAt}
+                        className="mt-3 text-xs text-ink/50"
+                        muted
+                      />
                     ) : null}
                   </div>
                 ) : (

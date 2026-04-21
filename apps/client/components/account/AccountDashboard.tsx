@@ -13,6 +13,10 @@ import {
 import { isPro as isPaidPlan, PLAN_LIMITS } from "../../lib/planLimits";
 import { useResume } from "../../lib/resumeContext";
 import { ResumeUploadModal } from "../resume/ResumeUploadModal";
+import {
+  formatUserLocalResetDateTime,
+  getUserLocalTimeZoneLabel,
+} from "../../lib/userLocalResetTime";
 
 function formatRelativeTime(iso: string): string {
   const t = new Date(iso).getTime();
@@ -316,7 +320,19 @@ export function AccountDashboard() {
                   {smartApplyStatus.jobsToday} of {smartApplyStatus.jobsLimit} today
                 </span>
               </p>
-              <p className="mt-1 text-xs text-ink-muted">Resets at midnight UTC</p>
+              <p
+                className="mt-1 text-xs text-ink-muted"
+                suppressHydrationWarning
+              >
+                {smartApplyStatus.resetsAt ? (
+                  <>
+                    Resets ({getUserLocalTimeZoneLabel(smartApplyStatus.resetsAt)}):{" "}
+                    {formatUserLocalResetDateTime(smartApplyStatus.resetsAt)}
+                  </>
+                ) : (
+                  "Quota resets at the next day boundary (your time)."
+                )}
+              </p>
               <Link
                 href={smartApplyHref}
                 className="mt-2 inline-block text-sm font-semibold text-brand hover:underline"

@@ -47,6 +47,11 @@ import {
   JobsInlineFiltersDynamicLoading,
   LimitWallDynamicLoading,
 } from "./jobsRouteDynamicFallbacks";
+import {
+  formatUserLocalResetDateTime,
+  getUserLocalTimeZoneLabel,
+} from "../../lib/userLocalResetTime";
+import { UserLocalResetCaption } from "./UserLocalResetCaption";
 
 const TimeAdvantageSimulator = dynamic(
   () => import("./TimeAdvantageSimulator").then((m) => m.TimeAdvantageSimulator),
@@ -85,45 +90,6 @@ function discoverySurfaceFromPathname(pathname: string): "browse" | "seo" {
 
 const FREE_DISCOVERY_SEARCHES_CAP = 2;
 const FREE_DISCOVERY_JOBS_PER_SEARCH = 10;
-
-/** Local wall-clock time; timezone via {@link discoveryResetTimeZone}. */
-function formatDiscoveryResetDateTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-/** Short timezone label for “Resets (…)”. */
-function discoveryResetTimeZone(iso: string): string {
-  const d = new Date(iso);
-  const part = new Intl.DateTimeFormat(undefined, {
-    timeZoneName: "short",
-  })
-    .formatToParts(d)
-    .find((p) => p.type === "timeZoneName");
-  return part?.value?.trim() ?? "";
-}
-
-/** “Resets (TZ) Sat, Apr 19, …” for inline captions. */
-function DiscoveryResetCaption({ iso }: { iso: string }) {
-  const tz = discoveryResetTimeZone(iso);
-  return (
-    <>
-      Resets
-      {tz ? (
-        <span className="text-ink/45">
-          {" "}
-          ({tz})
-        </span>
-      ) : null}{" "}
-      {formatDiscoveryResetDateTime(iso)}
-    </>
-  );
-}
 
 function quotaDivider() {
   return (
@@ -189,8 +155,8 @@ function FreeDiscoveryQuotaStrip({
   const isBonus = listMeta.discoveryPhase === "bonus";
   const rem = listMeta.discoverySearchesRemaining ?? 0;
   const resetAt = listMeta.resetAt;
-  const resetDateTime = resetAt ? formatDiscoveryResetDateTime(resetAt) : null;
-  const resetTz = resetAt ? discoveryResetTimeZone(resetAt) : "";
+  const resetDateTime = resetAt ? formatUserLocalResetDateTime(resetAt) : null;
+  const resetTz = resetAt ? getUserLocalTimeZoneLabel(resetAt) : "";
 
   const noDebitHint =
     !hasActiveJobFilters(urlFilters) && !isPreview && !isBonus
@@ -231,7 +197,10 @@ function FreeDiscoveryQuotaStrip({
           {resetDateTime ? (
             <>
               {quotaDivider()}
-              <div className="flex min-w-0 max-w-[14rem] flex-col justify-center gap-1 px-3 py-2.5 sm:max-w-[18rem] sm:px-3.5">
+              <div
+                className="flex min-w-0 max-w-[14rem] flex-col justify-center gap-1 px-3 py-2.5 sm:max-w-[18rem] sm:px-3.5"
+                suppressHydrationWarning
+              >
                 <p className="text-xs font-semibold uppercase tracking-wide text-ink/45">
                   Resets
                   {resetTz ? (
@@ -1469,9 +1438,11 @@ export function JobsSearchClient({
                   and full details.
                 </p>
                 {listMeta.resetAt ? (
-                  <p className="mt-1 text-[11px] text-ink/50">
-                    <DiscoveryResetCaption iso={listMeta.resetAt} />
-                  </p>
+                  <UserLocalResetCaption
+                    iso={listMeta.resetAt}
+                    className="mt-1 text-[11px] text-ink/50"
+                    muted
+                  />
                 ) : null}
               </div>
               <Link

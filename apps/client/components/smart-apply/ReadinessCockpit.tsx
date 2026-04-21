@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  formatUserLocalResetDateTime,
+  getUserLocalTimeZoneLabel,
+} from "../../lib/userLocalResetTime";
+
 interface ReadinessCockpitProps {
   hasResume: boolean;
   profileCompletionPct: number;
@@ -12,7 +17,10 @@ function Item({ label, ok, detail }: { label: string; ok: boolean; detail: strin
   return (
     <div className="rounded-lg border border-line bg-white px-3 py-2">
       <p className="text-xs font-semibold text-ink">{label}</p>
-      <p className={`mt-0.5 text-xs ${ok ? "text-emerald-700" : "text-amber-700"}`}>
+      <p
+        className={`mt-0.5 text-xs ${ok ? "text-emerald-700" : "text-amber-700"}`}
+        suppressHydrationWarning
+      >
         {ok ? "Ready" : "Needs attention"} · {detail}
       </p>
     </div>
@@ -33,7 +41,13 @@ export function ReadinessCockpit({
       ? "Unlimited"
       : jobsRemaining > 0
         ? `${jobsRemaining} jobs remaining today`
-        : `0 remaining · resets ${resetsAt ? new Date(resetsAt).toLocaleString() : "soon"}`;
+        : (() => {
+            if (!resetsAt) return "0 remaining · resets soon";
+            const t = formatUserLocalResetDateTime(resetsAt);
+            const z = getUserLocalTimeZoneLabel(resetsAt);
+            const when = t ? (z ? `${t} (${z})` : t) : "soon";
+            return `0 remaining · resets ${when}`;
+          })();
 
   return (
     <section className="mb-4 rounded-2xl border border-line bg-surface p-4 shadow-card ring-1 ring-ink/5">

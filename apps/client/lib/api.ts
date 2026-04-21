@@ -1,4 +1,5 @@
 import type { JobFilters } from "./slug-parser";
+import { formatUserLocalResetForMessage } from "./userLocalResetTime";
 
 export interface JobCompany {
   id: string;
@@ -359,7 +360,7 @@ export async function extractProfileFromResume(token: string): Promise<{
     const err = (await res.json().catch(() => ({}))) as { resetAt?: string; message?: string; code?: string };
     const reset =
       err.resetAt != null
-        ? ` Next import after ${new Date(err.resetAt).toLocaleString(undefined, { timeZone: "UTC" })} UTC.`
+        ? ` Next import after ${formatUserLocalResetForMessage(err.resetAt)}.`
         : "";
     throw new ApiRequestError(
       (err.message ?? "Daily limit for profile import") + reset,
@@ -481,8 +482,12 @@ export async function batchSmartApplyAnswers(
   }
   if (res.status === 429) {
     const err = (await res.json().catch(() => ({}))) as { resetAt?: string; code?: string };
+    const when =
+      err.resetAt != null ? formatUserLocalResetForMessage(err.resetAt) : "";
     throw new ApiRequestError(
-      `Daily limit reached. Resets at ${err.resetAt ?? ""}`,
+      when
+        ? `Daily limit reached. Next reset: ${when}.`
+        : "Daily limit reached. Try again after the next reset.",
       429,
       err.code,
     );
