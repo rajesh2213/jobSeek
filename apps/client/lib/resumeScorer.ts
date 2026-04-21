@@ -1,5 +1,10 @@
 import type { JobItem } from "./api";
 import { generateSuggestionFromBullet, getTemplateSuggestion } from "./keywordSuggestions";
+import {
+  MAX_RESUME_MATCH_KEYWORDS,
+  resumeTextMatchesKeyword,
+  takeTopScorableKeywords,
+} from "./resumeKeywordFilter";
 
 export interface KeywordResult {
   keyword: string;
@@ -70,17 +75,15 @@ export function scoreResume(
   const partial: KeywordResult[] = [];
 
   for (const kw of keywords) {
-    const kwLower = kw.keyword.toLowerCase();
-
-    // 1. Exact match
-    if (resumeLower.includes(kwLower)) {
+    // 1. Match with word boundaries (and tight substring rules for sql/api/…)
+    if (resumeTextMatchesKeyword(resumeText, kw.keyword)) {
       const foundIn = extractContext(resumeText, kw.keyword);
       matched.push({ ...kw, foundIn });
       continue;
     }
 
     // 2. Fuzzy match (Levenshtein ≤ 1 for keywords > 5 chars)
-    if (kw.keyword.length > 5 && fuzzyMatchExists(resumeLower, kwLower)) {
+    if (kw.keyword.length > 5 && fuzzyMatchExists(resumeLower, kw.keyword.toLowerCase())) {
       partial.push({ ...kw, foundIn: "approximate match found" });
       continue;
     }
@@ -152,7 +155,7 @@ export function extractJobKeywords(
 
   const addKeyword = (word: string, category: "required" | "preferred", priority: 1 | 2 | 3) => {
     const key = word.toLowerCase().trim();
-    if (key.length < 3) return;
+    if (key.length < 2) return;
     if (!keywords.has(key)) {
       keywords.set(key, { keyword: key, category, priority });
     }
@@ -168,63 +171,67 @@ export function extractJobKeywords(
     addKeyword(tech, "required", 3);
   }
 
-  // From parsedDescription.requirement lines → extract meaningful phrases
+  // From parsedDescription.requirement lines → short tokens (filtered) + 2-grams
   for (const line of job.parsedDescription?.requirement ?? []) {
-    extractPhrasesFromLine(line).forEach((p) => addKeyword(p, "required", 2));
+    for (const p of extractRequirementKeywordCandidates(line)) {
+      addKeyword(p, "required", 2);
+    }
   }
 
-  // From parsedDescription.responsibility lines → preferred
+  // Responsibility: multi-word phrases only (avoids 100+ spurious "missing" single words)
   for (const line of job.parsedDescription?.responsibility ?? []) {
-    extractPhrasesFromLine(line).forEach((p) => addKeyword(p, "preferred", 1));
+    for (const p of extractNgramPhrasesFromLine(line, 2, 3)) {
+      addKeyword(p, "preferred", 1);
+    }
   }
 
-  return [...keywords.values()];
+  return takeTopScorableKeywords([...keywords.values()], MAX_RESUME_MATCH_KEYWORDS);
 }
 
-// Extract meaningful 1-3 word technical phrases from a line
-function extractPhrasesFromLine(line: string): string[] {
-  // Remove common filler words
-  const STOP_WORDS = new Set([
-    "and",
-    "or",
-    "the",
-    "with",
-    "for",
-    "in",
-    "of",
-    "to",
-    "a",
-    "an",
-    "you",
-    "will",
-    "your",
-    "our",
-    "we",
-    "are",
-    "is",
-    "be",
-    "have",
-    "has",
-    "that",
-    "this",
-    "from",
-    "on",
-    "at",
-    "by",
-    "as",
-    "not",
-    "but",
-    "its",
-    "it",
-  ]);
+const PHRASE_STOP = new Set(
+  `a an the and or but if in on at to for of as is are was were be been being
+it its this that these those we you our your they their them
+will can could should would may must with from by not no an a
+on at has have had
+`
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean),
+);
 
-  const words = line
+function tokenizeLineForKeywords(line: string): string[] {
+  return line
     .replace(/[^a-zA-Z0-9\s\-+#.]/g, " ")
     .split(/\s+/)
     .map((w) => w.toLowerCase().trim())
-    .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
+    .filter((w) => w.length > 1 && !PHRASE_STOP.has(w));
+}
 
-  return words;
+/** Requirement bullets: scorable single tokens + 2-word n-grams (e.g. machine learning). */
+function extractRequirementKeywordCandidates(line: string): string[] {
+  const words = tokenizeLineForKeywords(line);
+  const out: string[] = [];
+  for (const w of words) {
+    out.push(w);
+  }
+  for (let i = 0; i + 2 <= words.length; i++) {
+    const bi = `${words[i]} ${words[i + 1]}`;
+    out.push(bi);
+  }
+  return out;
+}
+
+/** Responsibility lines: 2- and 3-word phrases that pass {@link isScorableResumeKeyword} in filter. */
+function extractNgramPhrasesFromLine(line: string, nMin: 2, nMax: 3): string[] {
+  const words = tokenizeLineForKeywords(line);
+  if (words.length < nMin) return [];
+  const out: string[] = [];
+  for (let n = nMax; n >= nMin; n--) {
+    for (let i = 0; i + n <= words.length; i++) {
+      out.push(words.slice(i, i + n).join(" "));
+    }
+  }
+  return out;
 }
 
 function extractContext(text: string, keyword: string): string {
