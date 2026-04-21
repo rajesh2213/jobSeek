@@ -185,10 +185,12 @@ function FreeDiscoveryQuotaStrip({
       {isPreview ? (
         <>
           <DiscoveryMeterCell
-            label="Searches used"
+            label="Searches left"
             secondary={`×${FREE_DISCOVERY_JOBS_PER_SEARCH} jobs per search`}
           >
-            {FREE_DISCOVERY_SEARCHES_CAP}/{FREE_DISCOVERY_SEARCHES_CAP}
+            <span className="text-brand tabular-nums">{rem}</span>
+            <span className="text-ink/35"> / </span>
+            <span className="tabular-nums">{FREE_DISCOVERY_SEARCHES_CAP}</span>
           </DiscoveryMeterCell>
           {quotaDivider()}
           <DiscoveryMeterCell label="Now showing" accent>
