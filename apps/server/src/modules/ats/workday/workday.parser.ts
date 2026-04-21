@@ -274,6 +274,20 @@ function buildWorkdayLocationLine(job: WorkdayRawJob["job"], listingUrl: string 
   return parts.length ? parts.join(" | ") : undefined;
 }
 
+/**
+ * Workday CXS may expose remote work in structured fields, badges, or JSON-only keys
+ * that never appear in `locationsText`. Scan a few common shapes without failing on unknown payloads.
+ */
+function workdayRemoteSignalsFromJson(job: WorkdayRawJob["job"]): boolean {
+  const j = job as Record<string, unknown>;
+  for (const k of ["remoteType", "timeType", "jobType", "workplaceType", "workArrangement"] as const) {
+    const v = j[k];
+    if (typeof v !== "string" || !v.trim()) continue;
+    if (inferRemote(v)) return true;
+  }
+  return false;
+}
+
 export function parseWorkdayJob(
   raw: WorkdayRawJob,
   companyId: string,
@@ -309,7 +323,11 @@ export function parseWorkdayJob(
   const postedAt = parsePostedAt(job);
   const locationLine = buildWorkdayLocationLine(job, listingUrl);
   const isRemote =
-    inferRemote(locationLine) || inferRemote(title) || inferRemote(job.locationsText);
+    inferRemote(locationLine) ||
+    inferRemote(title) ||
+    inferRemote(job.locationsText) ||
+    inferRemote(description) ||
+    workdayRemoteSignalsFromJson(job);
 
   return {
     title,

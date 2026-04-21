@@ -101,8 +101,13 @@ export function parseDate(value: string | undefined): Date | undefined {
   return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
-export function inferRemote(location: string | undefined): boolean {
-  return (location ?? "").toLowerCase().includes("remote");
+export function inferRemote(text: string | undefined): boolean {
+  if (!text) return false;
+  const s = text.toLowerCase();
+  if (s.includes("remote")) return true;
+  if (/\b(wfh|work\s*from\s*home|work-from-home)\b/.test(s)) return true;
+  if (/(fully|100%)\s*remote/.test(s)) return true;
+  return false;
 }
 
 export function trimWhitespace(value: string | undefined): string | undefined {
