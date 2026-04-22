@@ -14,7 +14,7 @@
     "worker:ats-discovery": "tsx src/modules/atsDiscovery/atsDiscovery.processor.ts",
     "scheduler:ats-discovery": "tsx src/modules/atsDiscovery/atsDiscovery.scheduler.ts",
     "test": "npm run test:unit",
-    "test:unit": "node --import tsx --test tests/unit/utils/jobValidation.test.ts tests/unit/utils/jobRetryStrategies.test.ts tests/unit/utils/locationResolver.subnational.test.ts tests/unit/utils/taxonomyNormalizer.global.test.ts tests/unit/utils/taxonomyNormalizer.multiLocation.test.ts tests/unit/utils/jobDetailHtml.locationCandidates.test.ts tests/unit/utils/resumeEmbedder.test.ts tests/unit/modules/job/parsedDescriptionUpdate.test.ts tests/unit/modules/ats/workday/workdayListingSlug.test.ts tests/unit/modules/atsDiscovery/atsUrlParser.phase02.test.ts tests/unit/services/jobLocationMerge.test.ts tests/unit/modules/viewCap/discoveryCap.config.test.ts",
+    "test:unit": "node --import tsx --test tests/unit/utils/jobValidation.test.ts tests/unit/utils/jobRetryStrategies.test.ts tests/unit/utils/locationResolver.subnational.test.ts tests/unit/utils/taxonomyNormalizer.global.test.ts tests/unit/utils/taxonomyNormalizer.multiLocation.test.ts tests/unit/utils/jobDetailHtml.locationCandidates.test.ts tests/unit/utils/resumeEmbedder.test.ts tests/unit/modules/job/parsedDescriptionUpdate.test.ts tests/unit/modules/ats/workday/workdayListingSlug.test.ts tests/unit/modules/atsDiscovery/atsUrlParser.phase02.test.ts tests/unit/services/jobLocationMerge.test.ts tests/unit/modules/viewCap/discoveryCap.config.test.ts ../../packages/skill-constants/src/skill-constants.test.ts",
     "test:functional": "node --import tsx --test tests/functional/careersPhase2Urls.functional.test.ts",
     "test:all": "npm run test:unit && npm run test:functional",
     "test:integration": "node --import tsx --test tests/integration/jobDiscoveryParity.integration.test.ts",
@@ -51,6 +51,7 @@
     "postinstall": "cd ../.. && prisma generate --schema=apps/server/prisma/schema.prisma"
   },
   "dependencies": {
+    "@jobseek/skill-constants": "*",
     "@anthropic-ai/sdk": "^0.88.0",
     "@aws-sdk/client-s3": "^3.1032.0",
     "@clerk/backend": "^1.34.0",

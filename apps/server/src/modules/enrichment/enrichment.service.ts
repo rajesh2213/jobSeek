@@ -1,3 +1,4 @@
+import { extractEnrichmentTechStack } from "@jobseek/skill-constants";
 import type { ParsedJobDescriptionAI } from "../ai/ai.types.js";
 import { emptyParsedJobDescription } from "../ai/ai.types.js";
 
@@ -9,45 +10,6 @@ export interface JobEnrichment {
   remote: boolean;
   remoteType: JobEnrichmentRemoteType | null;
 }
-
-/** Canonical keyword → display label (stable, deterministic). */
-const TECH_KEYWORDS = [
-  "react",
-  "node",
-  "typescript",
-  "javascript",
-  "python",
-  "java",
-  "c#",
-  ".net",
-  "aws",
-  "docker",
-  "kubernetes",
-  "postgresql",
-  "mysql",
-  "mongodb",
-  "redis",
-  "graphql",
-] as const;
-
-const TECH_LABELS: Record<string, string> = {
-  react: "React",
-  node: "Node",
-  typescript: "TypeScript",
-  javascript: "JavaScript",
-  python: "Python",
-  java: "Java",
-  "c#": "C#",
-  ".net": ".NET",
-  aws: "AWS",
-  docker: "Docker",
-  kubernetes: "Kubernetes",
-  postgresql: "PostgreSQL",
-  mysql: "MySQL",
-  mongodb: "MongoDB",
-  redis: "Redis",
-  graphql: "GraphQL",
-};
 
 const BUCKETS: (keyof ParsedJobDescriptionAI)[] = [
   "position",
@@ -72,31 +34,6 @@ function normalizeParsed(parsedDescription: unknown): ParsedJobDescriptionAI {
       .filter((x): x is string => typeof x === "string")
       .map((s) => s.trim())
       .filter(Boolean);
-  }
-  return out;
-}
-
-function keywordMatches(text: string, kw: string): boolean {
-  const lower = text.toLowerCase();
-  const k = kw.toLowerCase();
-  if (k === "c#") return lower.includes("c#");
-  if (k === ".net") {
-    return /(^|[^a-z0-9])\.net(?![a-z0-9])/i.test(text);
-  }
-  const escaped = k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`, "i").test(text);
-}
-
-function extractTechStack(text: string): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const kw of TECH_KEYWORDS) {
-    if (!keywordMatches(text, kw)) continue;
-    const label = TECH_LABELS[kw.toLowerCase()] ?? kw;
-    const key = label.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(label);
   }
   return out;
 }
@@ -185,7 +122,7 @@ export function enrichJob(parsedDescription: unknown): JobEnrichment {
   const lines = [...p.requirement, ...p.responsibility, ...p.other];
   const text = lines.join("\n");
 
-  const techStack = extractTechStack(text);
+  const techStack = extractEnrichmentTechStack(text);
   const salary = extractSalary(text);
   const { remote, remoteType } = extractRemoteSignals(text);
 
