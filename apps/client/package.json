@@ -4,8 +4,9 @@
   "private": true,
   "description": "Next.js frontend for job discovery",
   "scripts": {
-    "dev": "next dev",
-    "dev:turbo": "next dev --turbo",
+    "dev": "node ./scripts/ensure-routes-manifest.cjs && next dev",
+    "dev:3001": "node ./scripts/ensure-routes-manifest.cjs && next dev -p 3001",
+    "dev:turbo": "node ./scripts/ensure-routes-manifest.cjs && next dev --turbo",
     "build": "next build",
     "start": "next start",
     "test:soft": "node --import tsx --test lib/resumeScoreSoftening.test.ts"
