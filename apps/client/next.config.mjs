@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: ["@jobseek/skill-constants"],
+
   // Dynamic filter query strings use string hrefs; keep untyped routes for DX.
 
   experimental: {
@@ -8,6 +10,13 @@ const nextConfig = {
   },
 
   webpack: (config, { dev }) => {
+    /**
+     * ESM+TS in workspace packages use `.js` specifiers; Webpack would otherwise not resolve
+     * `dictionaryData.js` → `dictionaryData.ts` on disk. Aligns with TypeScript `NodeNext` output.
+     */
+    config.resolve.extensionAlias = {
+      ".js": [".ts", ".tsx", ".js", ".jsx"],
+    };
     if (dev) {
       /**
        * Webpack 5 persistent cache can hit `RangeError: Array buffer allocation failed` on Windows

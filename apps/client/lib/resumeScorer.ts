@@ -1,15 +1,43 @@
+import {
+  ALIASES_BY_CANONICAL,
+  DICTIONARY_VERSION,
+} from "@jobseek/skill-constants";
 import type { JobItem } from "./api";
 import { generateSuggestionFromBullet, getTemplateSuggestion } from "./keywordSuggestions";
 import {
   MAX_RESUME_MATCH_KEYWORDS,
+  normalizeKeywordForMatch,
   resumeTextMatchesKeyword,
   takeTopScorableKeywords,
 } from "./resumeKeywordFilter";
+import {
+  computeMatchBonus,
+  computeSofterMissingMass,
+  computeSofterScorePercent,
+} from "./resumeScoreSoftening";
+import { extractJobSkills, jobSkillCanonicalsForSemantic, type JobSkill } from "./skillExtractor";
+
+const RESUME_FUZZY_ENABLED = false;
+const LEGACY_ENV = "NEXT_PUBLIC_RESUME_LEGACY_KEYWORDS";
+
+export function isResumeLegacyKeywordMode(): boolean {
+  if (typeof process === "undefined" || !process.env) return false;
+  return process.env[LEGACY_ENV] === "true";
+}
+
+function isLegacyResumeScoring(): boolean {
+  return isResumeLegacyKeywordMode();
+}
+
+const SCORE_DEBUG =
+  (typeof process !== "undefined" && process.env && process.env.NODE_ENV === "development") ||
+  (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_RESUME_SCORE_DEBUG === "true");
 
 export interface KeywordResult {
   keyword: string;
   category: "required" | "preferred";
   priority: 1 | 2 | 3;
+  weight?: number;
   // For matched:
   foundIn?: string; // excerpt from resume containing this keyword
   // For missing:
@@ -23,15 +51,26 @@ export interface ScoringResult {
   grade: "excellent" | "good" | "fair" | "poor"; // ≥75, ≥55, ≥35, <35
   matched: KeywordResult[];
   missing: KeywordResult[];
-  partial: KeywordResult[]; // fuzzy/semantic matches
+  partial: KeywordResult[]; // semantic matches
   breakdown: {
     required: { matched: number; total: number };
     preferred: { matched: number; total: number };
   };
-  topMissingKeywords: string[]; // top 5 highest-priority missing
+  topMissingKeywords: string[]; // up to 10, highest-priority missing
+  debug?: {
+    extractedCanonicals: string[];
+    matchedCanonicals: string[];
+    missingCanonicals: string[];
+    matchedWeight?: number;
+    partialWeight?: number;
+    rawMissingWeight?: number;
+    adjustedMissingWeight?: number;
+    bonus?: number;
+    clusters?: string[][];
+  };
 }
 
-// Session-level cache: key includes job id + semantic match signature
+// Session-level cache: key includes job id + scoring mode + dict version + semantic match signature
 const scoreCache = new Map<string, ScoringResult>();
 
 function semanticSig(semanticMatches: Record<string, { bullet: string; similarity: number }>): string {
@@ -41,9 +80,10 @@ function semanticSig(semanticMatches: Record<string, { bullet: string; similarit
 
 function cacheKey(
   jobId: string,
+  legacy: boolean,
   semanticMatches: Record<string, { bullet: string; similarity: number }>,
 ): string {
-  return `${jobId}|${semanticSig(semanticMatches)}`;
+  return `v2-skills|soft-v1|legacy=${legacy ? "1" : "0"}|d=${DICTIONARY_VERSION}|${jobId}|${semanticSig(semanticMatches)}`;
 }
 
 export function clearScoreCache(): void {
@@ -54,41 +94,247 @@ export function getCachedScore(
   jobId: string,
   semanticMatches: Record<string, { bullet: string; similarity: number }> = {},
 ): ScoringResult | null {
-  return scoreCache.get(cacheKey(jobId, semanticMatches)) ?? null;
+  return (
+    scoreCache.get(cacheKey(jobId, isLegacyResumeScoring(), semanticMatches)) ?? null
+  );
 }
 
-export function scoreResume(
+function jobSkillToKeywordResultBase(s: JobSkill): Omit<KeywordResult, "foundIn" | "suggestion"> {
+  return {
+    keyword: s.canonical,
+    category: s.source === "parsed_requirement" ? "preferred" : "required",
+    priority: s.weight === 1.0 ? 3 : s.weight === 0.9 ? 2 : 1,
+    weight: s.weight,
+  };
+}
+
+function findMatchCandidateForExcerpt(resumeText: string, canonical: string): string {
+  if (resumeTextMatchesKeyword(resumeText, canonical)) return canonical;
+  for (const a of ALIASES_BY_CANONICAL[canonical] ?? []) {
+    if (resumeTextMatchesKeyword(resumeText, a)) return a;
+  }
+  return canonical;
+}
+
+function textMatchesForCanonicalOrAliases(resumeText: string, canonical: string): boolean {
+  if (resumeTextMatchesKeyword(resumeText, canonical)) return true;
+  for (const a of ALIASES_BY_CANONICAL[canonical] ?? []) {
+    if (resumeTextMatchesKeyword(resumeText, a)) return true;
+  }
+  return false;
+}
+
+type MatchTier = "matched" | "partial" | "missing";
+
+function matchJobSkill(
+  resumeText: string,
+  skill: JobSkill,
+  semanticMatches: Record<string, { bullet: string; similarity: number }>,
+): MatchTier {
+  if (textMatchesForCanonicalOrAliases(resumeText, skill.canonical)) {
+    return "matched";
+  }
+  const sim = semanticMatches[skill.canonical];
+  if (sim && sim.similarity >= 0.65) {
+    return "partial";
+  }
+  return "missing";
+}
+
+function extractContextForKeyword(text: string, keyword: string): string {
+  const idx = text.toLowerCase().indexOf(keyword.toLowerCase());
+  if (idx === -1) return "";
+  const start = Math.max(0, idx - 60);
+  const end = Math.min(text.length, idx + keyword.length + 60);
+  return `...${text.slice(start, end).replace(/\n/g, " ").trim()}...`;
+}
+
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)),
+  );
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i]![j]! =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1]![j - 1]!
+          : 1 + Math.min(dp[i - 1]![j]!, dp[i]![j - 1]!, dp[i - 1]![j - 1]!);
+    }
+  }
+  return dp[m]![n]!;
+}
+
+function fuzzyMatchExists(text: string, keyword: string): boolean {
+  const words = text.split(/\s+/);
+  return words.some((word) => levenshtein(word, keyword) <= 1);
+}
+
+function sortMissingByWeight(a: JobSkill, b: JobSkill): number {
+  if (b.weight !== a.weight) return b.weight - a.weight;
+  return a.canonical.localeCompare(b.canonical);
+}
+
+function scoreResumeSkills(
+  resumeText: string,
+  _resumeBullets: string[],
+  job: JobItem,
+  semanticMatches: Record<string, { bullet: string; similarity: number }>,
+): ScoringResult {
+  const skills = extractJobSkills(job);
+  const ck = cacheKey(job.id, false, semanticMatches);
+  const cached = scoreCache.get(ck);
+  if (cached) return cached;
+
+  const matched: KeywordResult[] = [];
+  const partial: KeywordResult[] = [];
+  const missingUnsorted: { skill: JobSkill; kw: KeywordResult }[] = [];
+
+  for (const s of skills) {
+    const base = jobSkillToKeywordResultBase(s);
+    const tier = matchJobSkill(resumeText, s, semanticMatches);
+
+    if (tier === "matched") {
+      const excerptKey = findMatchCandidateForExcerpt(resumeText, s.canonical);
+      matched.push({
+        ...base,
+        foundIn: extractContextForKeyword(resumeText, excerptKey),
+      });
+      continue;
+    }
+    if (tier === "partial") {
+      const sem = semanticMatches[s.canonical]!;
+      const suggestion = generateSuggestionFromBullet(s.canonical, sem.bullet);
+      partial.push({
+        ...base,
+        closestBullet: sem.bullet,
+        suggestion,
+        semanticSimilarity: sem.similarity,
+        foundIn: "semantic match",
+      });
+      continue;
+    }
+    const sem = semanticMatches[s.canonical];
+    const suggestion =
+      sem && sem.similarity >= 0.45
+        ? generateSuggestionFromBullet(s.canonical, sem.bullet)
+        : getTemplateSuggestion(s.canonical);
+    missingUnsorted.push({
+      skill: s,
+      kw: {
+        ...base,
+        suggestion,
+        closestBullet: sem?.bullet,
+        semanticSimilarity: sem?.similarity,
+      },
+    });
+  }
+
+  const missing = [...missingUnsorted]
+    .sort((x, y) => sortMissingByWeight(x.skill, y.skill))
+    .map((o) => o.kw);
+
+  const missingSkills = missingUnsorted.map((o) => o.skill);
+  const { rawMissingWeight, adjustedMissingWeight, clusters } = computeSofterMissingMass(missingSkills);
+
+  const tiers: MatchTier[] = skills.map((s) => matchJobSkill(resumeText, s, semanticMatches));
+  let wMatched = 0;
+  let wPartial = 0;
+  for (let i = 0; i < skills.length; i++) {
+    const t = tiers[i]!;
+    const s = skills[i]!;
+    if (t === "matched") wMatched += s.weight;
+    else if (t === "partial") wPartial += s.weight;
+  }
+  const totalW = skills.reduce((sum, s) => sum + s.weight, 0);
+  const score = computeSofterScorePercent({
+    wMatched,
+    wPartial,
+    totalW,
+    adjustedMissingWeight,
+  });
+  const bonus = computeMatchBonus(wMatched, totalW);
+
+  const extractedCanonicals = jobSkillCanonicalsForSemantic(skills);
+  const missingCanonicals = missing.map((m) => m.keyword);
+  const matchedCanonicals = [
+    ...matched.map((m) => m.keyword),
+    ...partial.map((m) => m.keyword),
+  ];
+
+  const result: ScoringResult = {
+    score,
+    grade: score >= 75 ? "excellent" : score >= 55 ? "good" : score >= 35 ? "fair" : "poor",
+    matched,
+    missing,
+    partial,
+    breakdown: {
+      required: {
+        matched: matched.filter((k) => k.category === "required").length,
+        total: skills.filter((s) => s.source !== "parsed_requirement").length,
+      },
+      preferred: {
+        matched: matched.filter((k) => k.category === "preferred").length,
+        total: skills.filter((s) => s.source === "parsed_requirement").length,
+      },
+    },
+    topMissingKeywords: missing
+      .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0) || a.keyword.localeCompare(b.keyword))
+      .slice(0, 10)
+      .map((k) => k.keyword),
+  };
+
+  if (SCORE_DEBUG) {
+    result.debug = {
+      extractedCanonicals: [...extractedCanonicals].sort(),
+      matchedCanonicals: [...new Set(matchedCanonicals)].sort(),
+      missingCanonicals: [...missingCanonicals].sort(),
+      matchedWeight: wMatched,
+      partialWeight: wPartial,
+      rawMissingWeight,
+      adjustedMissingWeight,
+      bonus,
+      clusters,
+    };
+  }
+
+  scoreCache.set(ck, result);
+  return result;
+}
+
+function scoreResumeLegacy(
   resumeText: string,
   resumeBullets: string[],
   job: JobItem,
   semanticMatches: Record<string, { bullet: string; similarity: number }> = {},
 ): ScoringResult {
-  const ck = cacheKey(job.id, semanticMatches);
+  const keywords = collectLegacyKeywords(job);
+  const resumeLower = resumeText.toLowerCase();
+  const ck = cacheKey(job.id, true, semanticMatches);
   const cached = scoreCache.get(ck);
   if (cached) return cached;
-
-  const keywords = extractJobKeywords(job);
-  const resumeLower = resumeText.toLowerCase();
 
   const matched: KeywordResult[] = [];
   const missing: KeywordResult[] = [];
   const partial: KeywordResult[] = [];
 
   for (const kw of keywords) {
-    // 1. Match with word boundaries (and tight substring rules for sql/api/…)
     if (resumeTextMatchesKeyword(resumeText, kw.keyword)) {
-      const foundIn = extractContext(resumeText, kw.keyword);
+      const foundIn = extractContextForKeyword(resumeText, kw.keyword);
       matched.push({ ...kw, foundIn });
       continue;
     }
 
-    // 2. Fuzzy match (Levenshtein ≤ 1 for keywords > 5 chars)
-    if (kw.keyword.length > 5 && fuzzyMatchExists(resumeLower, kw.keyword.toLowerCase())) {
+    if (
+      RESUME_FUZZY_ENABLED &&
+      kw.keyword.length > 5 &&
+      fuzzyMatchExists(resumeLower, kw.keyword.toLowerCase())
+    ) {
       partial.push({ ...kw, foundIn: "approximate match found" });
       continue;
     }
 
-    // 3. Semantic match from pre-fetched results
     const semantic = semanticMatches[kw.keyword];
     if (semantic && semantic.similarity >= 0.65) {
       const suggestion = generateSuggestionFromBullet(kw.keyword, semantic.bullet);
@@ -101,7 +347,6 @@ export function scoreResume(
       continue;
     }
 
-    // 4. Missing — use template suggestion
     const suggestion =
       semantic && semantic.similarity >= 0.45
         ? generateSuggestionFromBullet(kw.keyword, semantic.bullet)
@@ -115,7 +360,6 @@ export function scoreResume(
     });
   }
 
-  // Score calculation
   const matchedPts = matched.reduce((s, k) => s + k.priority, 0);
   const partialPts = partial.reduce((s, k) => s + k.priority * 0.6, 0);
   const totalPts = keywords.reduce((s, k) => s + k.priority, 0);
@@ -123,10 +367,11 @@ export function scoreResume(
 
   const result: ScoringResult = {
     score,
-    grade:
-      score >= 75 ? "excellent" : score >= 55 ? "good" : score >= 35 ? "fair" : "poor",
+    grade: score >= 75 ? "excellent" : score >= 55 ? "good" : score >= 35 ? "fair" : "poor",
     matched,
-    missing,
+    missing: missing
+      .sort((a, b) => b.priority - a.priority)
+      .slice(0, 10),
     partial,
     breakdown: {
       required: {
@@ -144,48 +389,33 @@ export function scoreResume(
       .map((k) => k.keyword),
   };
 
+  if (SCORE_DEBUG) {
+    const kws = collectLegacyKeywords(job);
+    const keywordStrings = kws.map((k) => k.keyword);
+    result.debug = {
+      extractedCanonicals: keywordStrings,
+      matchedCanonicals: [
+        ...matched.map((k) => k.keyword),
+        ...partial.map((k) => k.keyword),
+      ],
+      missingCanonicals: result.missing.map((k) => k.keyword),
+    };
+  }
+
   scoreCache.set(ck, result);
   return result;
 }
 
-export function extractJobKeywords(
+export function scoreResume(
+  resumeText: string,
+  resumeBullets: string[],
   job: JobItem,
-): Omit<KeywordResult, "foundIn" | "suggestion">[] {
-  const keywords = new Map<string, Omit<KeywordResult, "foundIn" | "suggestion">>();
-
-  const addKeyword = (word: string, category: "required" | "preferred", priority: 1 | 2 | 3) => {
-    const key = word.toLowerCase().trim();
-    if (key.length < 2) return;
-    if (!keywords.has(key)) {
-      keywords.set(key, { keyword: key, category, priority });
-    }
-  };
-
-  // From skills array → required, priority 3
-  for (const skill of job.skills ?? []) {
-    addKeyword(skill, "required", 3);
+  semanticMatches: Record<string, { bullet: string; similarity: number }> = {},
+): ScoringResult {
+  if (isLegacyResumeScoring()) {
+    return scoreResumeLegacy(resumeText, resumeBullets, job, semanticMatches);
   }
-
-  // From enriched techStack → required, priority 3
-  for (const tech of job.enriched?.techStack ?? []) {
-    addKeyword(tech, "required", 3);
-  }
-
-  // From parsedDescription.requirement lines → short tokens (filtered) + 2-grams
-  for (const line of job.parsedDescription?.requirement ?? []) {
-    for (const p of extractRequirementKeywordCandidates(line)) {
-      addKeyword(p, "required", 2);
-    }
-  }
-
-  // Responsibility: multi-word phrases only (avoids 100+ spurious "missing" single words)
-  for (const line of job.parsedDescription?.responsibility ?? []) {
-    for (const p of extractNgramPhrasesFromLine(line, 2, 3)) {
-      addKeyword(p, "preferred", 1);
-    }
-  }
-
-  return takeTopScorableKeywords([...keywords.values()], MAX_RESUME_MATCH_KEYWORDS);
+  return scoreResumeSkills(resumeText, resumeBullets, job, semanticMatches);
 }
 
 const PHRASE_STOP = new Set(
@@ -199,67 +429,71 @@ on at has have had
     .filter(Boolean),
 );
 
+function cleanKeywordToken(w: string): string {
+  return w
+    .toLowerCase()
+    .replace(/^[.,;:!?'"()[\]{}]+/g, "")
+    .replace(/[.,;:!?'"()[\]{}]+$/g, "")
+    .trim();
+}
+
 function tokenizeLineForKeywords(line: string): string[] {
   return line
     .replace(/[^a-zA-Z0-9\s\-+#.]/g, " ")
     .split(/\s+/)
-    .map((w) => w.toLowerCase().trim())
+    .map((w) => cleanKeywordToken(w))
     .filter((w) => w.length > 1 && !PHRASE_STOP.has(w));
 }
 
-/** Requirement bullets: scorable single tokens + 2-word n-grams (e.g. machine learning). */
 function extractRequirementKeywordCandidates(line: string): string[] {
+  return tokenizeLineForKeywords(line);
+}
+
+function extractNgramPhrasesFromLine(line: string): string[] {
   const words = tokenizeLineForKeywords(line);
+  if (words.length < 2) return [];
   const out: string[] = [];
-  for (const w of words) {
-    out.push(w);
-  }
   for (let i = 0; i + 2 <= words.length; i++) {
-    const bi = `${words[i]} ${words[i + 1]}`;
-    out.push(bi);
+    out.push(`${words[i]} ${words[i + 1]}`);
   }
   return out;
 }
 
-/** Responsibility lines: 2- and 3-word phrases that pass {@link isScorableResumeKeyword} in filter. */
-function extractNgramPhrasesFromLine(line: string, nMin: 2, nMax: 3): string[] {
-  const words = tokenizeLineForKeywords(line);
-  if (words.length < nMin) return [];
-  const out: string[] = [];
-  for (let n = nMax; n >= nMin; n--) {
-    for (let i = 0; i + n <= words.length; i++) {
-      out.push(words.slice(i, i + n).join(" "));
+function collectLegacyKeywords(
+  job: JobItem,
+): Omit<KeywordResult, "foundIn" | "suggestion">[] {
+  const keywords = new Map<string, Omit<KeywordResult, "foundIn" | "suggestion">>();
+
+  const addKeyword = (word: string, category: "required" | "preferred", priority: 1 | 2 | 3) => {
+    const key = normalizeKeywordForMatch(word);
+    if (key.length < 2) return;
+    if (!keywords.has(key)) {
+      keywords.set(key, { keyword: key, category, priority });
+    }
+  };
+
+  for (const skill of job.skills ?? []) {
+    addKeyword(skill, "required", 3);
+  }
+  for (const tech of job.enriched?.techStack ?? []) {
+    addKeyword(tech, "required", 3);
+  }
+  for (const line of job.parsedDescription?.requirement ?? []) {
+    for (const p of extractRequirementKeywordCandidates(line)) {
+      addKeyword(p, "required", 2);
     }
   }
-  return out;
-}
-
-function extractContext(text: string, keyword: string): string {
-  const idx = text.toLowerCase().indexOf(keyword.toLowerCase());
-  if (idx === -1) return "";
-  const start = Math.max(0, idx - 60);
-  const end = Math.min(text.length, idx + keyword.length + 60);
-  return `...${text.slice(start, end).replace(/\n/g, " ").trim()}...`;
-}
-
-function fuzzyMatchExists(text: string, keyword: string): boolean {
-  const words = text.split(/\s+/);
-  return words.some((word) => levenshtein(word, keyword) <= 1);
-}
-
-function levenshtein(a: string, b: string): number {
-  const m = a.length;
-  const n = b.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
-    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)),
-  );
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      dp[i][j] =
-        a[i - 1] === b[j - 1]
-          ? dp[i - 1][j - 1]
-          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+  for (const line of job.parsedDescription?.responsibility ?? []) {
+    for (const p of extractNgramPhrasesFromLine(line)) {
+      addKeyword(p, "preferred", 1);
     }
   }
-  return dp[m][n];
+
+  return takeTopScorableKeywords([...keywords.values()], MAX_RESUME_MATCH_KEYWORDS);
+}
+
+export function extractJobKeywords(
+  job: JobItem,
+): Omit<KeywordResult, "foundIn" | "suggestion">[] {
+  return collectLegacyKeywords(job);
 }

@@ -6,7 +6,13 @@ import { useCallback, useEffect, useState } from "react";
 import type { JobItem } from "../../lib/api";
 import { fetchResumeSemanticMatch } from "../../lib/api";
 import { resumeMatchSubtitle } from "../../lib/resumeGradeLabel";
-import { extractJobKeywords, scoreResume, type ScoringResult } from "../../lib/resumeScorer";
+import {
+  extractJobKeywords,
+  isResumeLegacyKeywordMode,
+  scoreResume,
+  type ScoringResult,
+} from "../../lib/resumeScorer";
+import { extractJobSkills, jobSkillCanonicalsForSemantic } from "../../lib/skillExtractor";
 import { useResume } from "../../lib/resumeContext";
 import { useAccountPlan } from "../../lib/useAccountPlan";
 import { ResumeScorePanel } from "./ResumeScorePanel";
@@ -60,8 +66,9 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
   const runScore = useCallback(async () => {
     const text = resumeText ?? "";
     const bullets = resumeBullets;
-    const kws = extractJobKeywords(job);
-    const keywordStrings = kws.map((k) => k.keyword);
+    const keywordStrings = isResumeLegacyKeywordMode()
+      ? extractJobKeywords(job).map((k) => k.keyword)
+      : jobSkillCanonicalsForSemantic(extractJobSkills(job));
     const token = await getToken();
     if (!token) return;
 

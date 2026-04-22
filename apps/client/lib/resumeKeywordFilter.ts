@@ -45,6 +45,7 @@ inside outside within without via per plus minus
 const JOB_FLUFF = new Set(
   `
 experienced years year strong excellent great opportunity role working work worked work closely
+work
 responsible responsibilities responsibility drive passion passionate excited exciting journey
 together teammates teammate culture cultural diversity background backgrounds variety join joining
 growing grow scale scaling scaled fast faster customer customers enterprise enterprises market markets
@@ -69,7 +70,7 @@ const NOISE = new Set(
   `
 thousands many several various levels level internal external general overall daily weekly
 quarterly annual similar simple complex hands hand hands-on own owned ownership focus focused
-focusing help helping helped support supporting supported ensure ensuring ensures ensuring that
+focusing help helping helped support supports supporting supported ensure ensuring ensures ensuring that
 improve improved improving build built building deliver delivered delivering drive driving drives
 create created creating use using used need needed needs make makes making get gets getting
 put puts putting take takes taking go goes going do does doing done have has having had
@@ -89,6 +90,22 @@ analyzed analysis guide guided guiding translate translated translation closely 
 achieve achieve achievement kpi kpis goals goal objective objectives metric metrics measure
 milestone milestones timeline timelines roadmap roadmaps
 products product platform solutions solution offerings offering
+recruiting recruitment calendar willing curious diversity
+commercial competitive productivity narratives positioning engagement landscape
+prospect prospects stakeholders executives partners regional accounts
+excel spreadsheets spreadsheet answers automate docs
+experience experiences technology technologies software
+models model services service solution solutions application applications
+infrastructure codebases codebase components foundation fundamentals
+particularly seamlessly fundamental establishing contributing
+revenue financial billing advanced preferably ideally fluency
+proficient skilled excellent comfortable datasets recognition
+discussions issues including built complete provide feel handle
+command degree computer systems line developers developer customers
+testing administration operating databases
+engineering engineer engineers
+science
+learning
 `
     .toLowerCase()
     .split(/\s+/)
@@ -101,6 +118,7 @@ const COMPOUND_OK = new Set(
 deep learning
 data science
 data engineering
+computer science
 sign on
 single sign on
 single sign-on
@@ -115,11 +133,57 @@ production ready
 
 const BRAND = new Set(
   `openai toyota ramp notion figma asana atlassian jira confluence monday slacks slack
-shopify salesforce intercom hubspot datadog newrelic splunk mulesoft snowflake databricks
+shopify salesforce sfdc intercom hubspot datadog newrelic splunk mulesoft snowflake databricks
+netsuite workday
 `.toLowerCase().split(/\s+/).filter(Boolean),
 );
 
-export const MAX_RESUME_MATCH_KEYWORDS = 52;
+/** Title/role phrasing — not a stack “gap” token pair. */
+const BANNED_ROLE_PHRASES = new Set(
+  [
+    "software engineer",
+    "product manager",
+    "data scientist",
+    "project manager",
+    "full stack",
+    "full-stack",
+    "fullstack",
+    "backend developer",
+    "frontend developer",
+    "full stack engineer",
+    "web developer",
+    "site reliability",
+    "staff engineer",
+    "senior engineer",
+    "principal engineer",
+    "solutions engineer",
+    "customer success",
+    "account executive",
+    "business development",
+  ].map((s) => s.toLowerCase()),
+);
+
+/**
+ * 2-word phrases: reject JD boilerplate (noise/stop) and role title pairs.
+ * Does not run for {@link COMPOUND_OK} (handled in {@link isScorableResumeKeyword} first).
+ */
+export function isAcceptableResumeBigram(a: string, b: string): boolean {
+  const x = a.toLowerCase();
+  const y = b.toLowerCase();
+  const pair = `${x} ${y}`;
+  if (BANNED_ROLE_PHRASES.has(pair)) return false;
+  if (STOP.has(x) || STOP.has(y)) return false;
+  if (NOISE.has(x) || NOISE.has(y)) return false;
+  if (JOB_FLUFF.has(x) || JOB_FLUFF.has(y)) return false;
+  if (BRAND.has(x) || BRAND.has(y)) return false;
+  return true;
+}
+
+/** Shared dictionary aliases → canonical; keep filters aligned with resume scoring. */
+export { normalizeKeywordForMatch } from "@jobseek/skill-constants";
+
+/** Tighter cap: fewer, higher-signal terms for gap lists. */
+export const MAX_RESUME_MATCH_KEYWORDS = 32;
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -138,9 +202,16 @@ export function isScorableResumeKeyword(keyword: string): boolean {
   if (raw.includes(" ")) {
     if (COMPOUND_OK.has(raw)) return true;
     const parts = raw.split(/\s+/).filter((p) => p.length);
-    if (parts.length < 2) return isScorableResumeKeyword(parts[0] ?? "");
+    if (parts.length > 2) return false;
+    if (parts.length === 2) {
+      if (!isAcceptableResumeBigram(parts[0]!, parts[1]!)) return false;
+    } else if (parts.length < 2) {
+      return isScorableResumeKeyword(parts[0] ?? "");
+    }
     // Drop phrases made only of stop/fluff
-    const meaningful = parts.filter((p) => p.length > 0 && !STOP.has(p) && !JOB_FLUFF.has(p) && !NOISE.has(p));
+    const meaningful = parts.filter(
+      (p) => p.length > 0 && !STOP.has(p) && !JOB_FLUFF.has(p) && !NOISE.has(p),
+    );
     if (meaningful.length === 0) return false;
     if (parts.every((p) => p.length <= 3 && !THREE_CHAR_OK.has(p) && !FOUR_CHAR_OK.has(p)))
       return false;
@@ -180,7 +251,10 @@ export function isScorableResumeKeyword(keyword: string): boolean {
 /** Short tech/abbrev: allow substring (e.g. “sql” inside “MySQL”) */
 const TIGHT_OK_SUBSTRING = new Set(
   `sql api aws gcp cdn sso saml oidc scim etl sre rpc tls idp ldap sftp jdbc grpc nosql
-`.toLowerCase().split(/\s+/).filter(Boolean),
+postgresql postgres nodejs nextjs typescript golang csharp
+`.toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean),
 );
 
 /**
