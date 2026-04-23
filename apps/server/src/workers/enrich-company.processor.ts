@@ -94,21 +94,19 @@ async function start(): Promise<void> {
     recordEnrichmentFailure();
 
     if (isTransientEnrichmentError(err)) {
-      void prisma.company
-        .updateMany({
-          where: {
-            id: job.data.companyId,
-            status: { not: CompanyStatus.ready },
-          },
-          data: { status: CompanyStatus.enriching },
-        })
-        .then(async () => {
+      void (async () => {
+        try {
+          await prisma.company.updateMany({
+            where: {
+              id: job.data.companyId,
+              status: { not: CompanyStatus.ready },
+            },
+            data: { status: CompanyStatus.enriching },
+          });
           const pr = await resolveDeferredEnrichmentPriority(prisma, job.data.companyId);
           await enqueueDeferredCompanyEnrichment(job.data.companyId, job.data.companyName, {
             priority: pr,
           });
-        })
-        .then(() => {
           logger.warn(
             {
               event: "company_enrichment_transient_exhausted",
@@ -118,13 +116,13 @@ async function start(): Promise<void> {
             },
             "company_enrichment_transient_exhausted",
           );
-        })
-        .catch((e) => {
+        } catch (e) {
           logger.error(
             { event: "company_enrichment_recovery_failed", err: e },
             "company_enrichment_recovery_failed",
           );
-        });
+        }
+      })();
       return;
     }
 

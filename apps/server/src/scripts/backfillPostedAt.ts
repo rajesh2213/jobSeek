@@ -6,6 +6,7 @@
  */
 import { loadRootEnv } from "../infrastructure/env/loadEnv.js";
 import { prisma } from "../infrastructure/db/prisma.js";
+import { batchTransactionOptionsLong } from "../infrastructure/db/prismaTransactionOptions.js";
 
 const BATCH_SIZE = 100;
 const PROGRESS_EVERY = 500;
@@ -123,12 +124,15 @@ async function main(): Promise<void> {
     if (!dryRun && toWrite.length > 0) {
       const grouped = groupByPostedAtTime(toWrite);
       await prisma.$transaction(
-        [...grouped.entries()].map(([timeMs, ids]) =>
-          prisma.job.updateMany({
-            where: { id: { in: ids } },
-            data: { postedAt: new Date(timeMs) },
-          }),
-        ),
+        async (tx) => {
+          for (const [timeMs, ids] of grouped.entries()) {
+            await tx.job.updateMany({
+              where: { id: { in: ids } },
+              data: { postedAt: new Date(timeMs) },
+            });
+          }
+        },
+        { ...batchTransactionOptionsLong },
       );
     }
 

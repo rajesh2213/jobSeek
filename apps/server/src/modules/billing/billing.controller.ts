@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { createCheckout, lemonSqueezySetup } from "@lemonsqueezy/lemonsqueezy.js";
 import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
+import { batchTransactionOptionsDefault } from "../../infrastructure/db/prismaTransactionOptions.js";
 
 type LsWebhookPayload = {
   meta?: {
@@ -102,30 +103,33 @@ async function upsertProSubscription(
 
   const plan = planFromVariantId(params.variantId);
 
-  await prisma.$transaction([
-    prisma.subscription.upsert({
-      where: { userId: user.id },
-      create: {
-        userId: user.id,
-        stripeCustomerId: params.customerId,
-        stripePriceId: params.variantId,
-        stripeSubscriptionId: params.lsSubscriptionId,
-        status: params.status,
-        currentPeriodEnd: params.currentPeriodEnd,
-      },
-      update: {
-        stripeCustomerId: params.customerId,
-        stripePriceId: params.variantId,
-        stripeSubscriptionId: params.lsSubscriptionId,
-        status: params.status,
-        currentPeriodEnd: params.currentPeriodEnd,
-      },
-    }),
-    prisma.user.update({
-      where: { id: user.id },
-      data: { plan, stripeCustomerId: params.customerId },
-    }),
-  ]);
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.subscription.upsert({
+        where: { userId: user.id },
+        create: {
+          userId: user.id,
+          stripeCustomerId: params.customerId,
+          stripePriceId: params.variantId,
+          stripeSubscriptionId: params.lsSubscriptionId,
+          status: params.status,
+          currentPeriodEnd: params.currentPeriodEnd,
+        },
+        update: {
+          stripeCustomerId: params.customerId,
+          stripePriceId: params.variantId,
+          stripeSubscriptionId: params.lsSubscriptionId,
+          status: params.status,
+          currentPeriodEnd: params.currentPeriodEnd,
+        },
+      });
+      await tx.user.update({
+        where: { id: user.id },
+        data: { plan, stripeCustomerId: params.customerId },
+      });
+    },
+    { ...batchTransactionOptionsDefault },
+  );
 }
 
 export function registerBillingRoutes(server: FastifyInstance): void {
@@ -259,16 +263,19 @@ export function registerBillingRoutes(server: FastifyInstance): void {
             });
             if (!row) break;
 
-            await server.prisma.$transaction([
-              server.prisma.user.update({
-                where: { id: row.userId },
-                data: { plan: "free" },
-              }),
-              server.prisma.subscription.update({
-                where: { id: row.id },
-                data: { status: "canceled" },
-              }),
-            ]);
+            await server.prisma.$transaction(
+              async (tx) => {
+                await tx.user.update({
+                  where: { id: row.userId },
+                  data: { plan: "free" },
+                });
+                await tx.subscription.update({
+                  where: { id: row.id },
+                  data: { status: "canceled" },
+                });
+              },
+              { ...batchTransactionOptionsDefault },
+            );
             break;
           }
           default:

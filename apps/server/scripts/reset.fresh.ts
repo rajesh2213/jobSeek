@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { Redis } from "ioredis";
 import { loadRootEnv } from "../src/infrastructure/env/loadEnv.js";
 import { prisma } from "../src/infrastructure/db/prisma.js";
+import { batchTransactionOptionsLong } from "../src/infrastructure/db/prismaTransactionOptions.js";
 
 function repoRootDir(): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -100,10 +101,12 @@ async function main(): Promise<void> {
   console.log("[reset:fresh] started");
 
   // Wipe all pipeline data tables.
-  const deleted = await prisma.$transaction([
-    prisma.job.deleteMany({}),
-    prisma.company.deleteMany({}),
-  ]);
+  const deleted = await prisma.$transaction(
+    async (tx) => {
+      return [await tx.job.deleteMany({}), await tx.company.deleteMany({})] as const;
+    },
+    { ...batchTransactionOptionsLong },
+  );
 
   await flushRedis();
   await prisma.$disconnect();
