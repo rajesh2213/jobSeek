@@ -108,6 +108,36 @@ export function ApplicationsPageClient() {
     [filtered, selectedId],
   );
 
+  const emptyCopy = useMemo(() => {
+    if (applications.length === 0) {
+      return {
+        title: "No applications yet",
+        body: 'Click "Apply" on any job to automatically track your application',
+        showBrowse: true,
+      } as const;
+    }
+    if (filter === "action") {
+      return {
+        title: "No stale applications to follow up",
+        body:
+          "The Action tab shows roles still marked Applied with no activity in the last 14 days. Your other applications are either newer or already moved to a later stage — check Active or All.",
+        showBrowse: false,
+      } as const;
+    }
+    if (filter === "archived") {
+      return {
+        title: "No archived applications",
+        body: "Applications you remove or that auto-archive after 30 days will appear here.",
+        showBrowse: false,
+      } as const;
+    }
+    return {
+      title: "No applications in this view",
+      body: "Try another filter tab or add an application from the job board.",
+      showBrowse: true,
+    } as const;
+  }, [applications.length, filter]);
+
   useEffect(() => {
     if (selected) {
       setNotesDraft(selected.notes ?? "");
@@ -173,19 +203,19 @@ export function ApplicationsPageClient() {
               <p className="text-4xl" aria-hidden>
                 📋
               </p>
-              <h2 className="mt-4 font-semibold text-ink">No applications yet</h2>
-              <p className="mt-2 text-sm text-ink-muted">
-                Click &quot;Apply&quot; on any job to automatically track your application
-              </p>
-              <Link
-                href="/jobs"
-                className={cn(
-                  buttonClassName({ variant: "primary", size: "sm" }),
-                  "mt-6 inline-flex",
-                )}
-              >
-                Browse jobs →
-              </Link>
+              <h2 className="mt-4 font-semibold text-ink">{emptyCopy.title}</h2>
+              <p className="mt-2 text-sm text-ink-muted">{emptyCopy.body}</p>
+              {emptyCopy.showBrowse ? (
+                <Link
+                  href="/jobs"
+                  className={cn(
+                    buttonClassName({ variant: "primary", size: "sm" }),
+                    "mt-6 inline-flex",
+                  )}
+                >
+                  Browse jobs →
+                </Link>
+              ) : null}
             </Card>
           ) : (
             <ul className="space-y-3">
