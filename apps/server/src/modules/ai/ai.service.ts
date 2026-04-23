@@ -21,8 +21,22 @@ const DEFAULT_URL = "http://localhost:8001";
 
 export const BUCKET_LINE_CAP = 50;
 
-const CACHE_KEY_MAX_CHARS = 20_000;
 const PARSE_CACHE_KEY_PREFIX = "parse:v1";
+
+/** Short-term marker (separate from long-term v1 value TTL): another worker may skip HTTP if v1 is still present. */
+const PARSE_BURST_KEY_PREFIX = "parse:burst:recent";
+
+let parseStartsInWindow = 0;
+
+/**
+ * In-process counter reset by the job worker with each `worker_queue_snapshot` (≈1/min).
+ * Sum across all job-worker processes to approximate total parse starts/min.
+ */
+export function takeAndResetParseStartsInWindow(): number {
+  const n = parseStartsInWindow;
+  parseStartsInWindow = 0;
+  return n;
+}
 
 function parseCacheEnabled(): boolean {
   return process.env.PARSE_CACHE_ENABLED !== "0" && process.env.PARSE_CACHE_ENABLED !== "false";
@@ -33,9 +47,21 @@ function getParseCacheTtlSec(): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 86_400;
 }
 
+/**
+ * Limiter for concurrent HTTP /parse calls. Safe to tune 4 → 5 → 6: monitor `ai_parse_latency`
+ * p95; revert if it rises while load is flat.
+ * @see apps/server .env MAX_IN_FLIGHT_PARSE
+ */
 function getMaxInFlightParse(): number {
   const n = Number(process.env.MAX_IN_FLIGHT_PARSE ?? "6");
-  return Math.max(1, Math.min(32, Number.isFinite(n) ? n : 6));
+  return Math.max(1, Math.min(6, Number.isFinite(n) ? n : 6));
+}
+
+/** Short burst dedupe window (s). 0 = off. Uses Redis marker + existing v1 key read (no change to long-term cache semantics). */
+function getParseBurstRecentTtlSec(): number {
+  const n = Number(process.env.PARSE_BURST_DEDUPE_TTL_SEC ?? "0");
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(3_600, Math.floor(n));
 }
 
 class Limiter {
@@ -126,17 +152,80 @@ export function computeParseConfidence(parsed: ParsedJobDescriptionAI): number {
 }
 
 /**
- * Text identity for cache keys: not raw preprocessed "joined"; stable across trivial whitespace.
+ * Text identity for cache keys: not raw preprocessed "joined"; stable across case/whitespace.
+ * Used for hashing only (GET/SET use the same material via `cacheKeyV1(description)`).
  */
-export function normalizeDescriptionForCacheKey(description: string): string {
-  const t = description.trim().replace(/\s+/g, " ");
-  return t.length > CACHE_KEY_MAX_CHARS ? t.slice(0, CACHE_KEY_MAX_CHARS) : t;
+export function normalizeDescriptionForCacheKey(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .slice(0, 20000);
 }
 
 function cacheKeyV1(description: string): string {
   const material = normalizeDescriptionForCacheKey(description);
   const hash = createHash("sha256").update(material, "utf8").digest("hex");
   return `${PARSE_CACHE_KEY_PREFIX}:${hash}`;
+}
+
+/**
+ * If another parse completed recently for the same description text, resolve from existing v1 Redis
+ * value and skip the HTTP /parse call (separate from long-term cache; requires PARSE_BURST_DEDUPE_TTL_SEC>0).
+ */
+export async function tryParseFromBurstRecent(
+  description: string,
+  options?: ParseJobDescriptionOptions,
+): Promise<ParsedJobDescriptionAI | null> {
+  if (getParseBurstRecentTtlSec() <= 0 || !parseCacheEnabled()) return null;
+  const trimmed = description.trim();
+  if (!trimmed) return null;
+
+  let redis: ReturnType<typeof getIoredis>;
+  try {
+    redis = getIoredis();
+  } catch {
+    return null;
+  }
+
+  const v1key = cacheKeyV1(trimmed);
+  const hash = v1key.slice(v1key.lastIndexOf(":") + 1);
+  const burstKey = `${PARSE_BURST_KEY_PREFIX}:${hash}`;
+
+  try {
+    if (!(await redis.get(burstKey))) return null;
+    const raw = await redis.get(v1key);
+    if (!raw) {
+      await redis.del(burstKey).catch(() => undefined);
+      return null;
+    }
+    const parsed = JSON.parse(String(raw)) as unknown;
+    if (!isParsedShape(parsed)) return null;
+    const fromCache: ParsedJobDescriptionAI = {
+      position: capBucketLines(parsed.position, BUCKET_LINE_CAP),
+      responsibility: capBucketLines(parsed.responsibility, BUCKET_LINE_CAP),
+      requirement: capBucketLines(parsed.requirement, BUCKET_LINE_CAP),
+      experience: capBucketLines(parsed.experience, BUCKET_LINE_CAP),
+      benefit: capBucketLines(parsed.benefit, BUCKET_LINE_CAP),
+      contact: capBucketLines(parsed.contact, BUCKET_LINE_CAP),
+      other: capBucketLines(parsed.other, BUCKET_LINE_CAP),
+    };
+    const out = cloneParsed(fromCache);
+    applyTitleFallback(out, options?.jobTitle);
+    if (isParsedEffectivelyEmpty(out)) return null;
+    logger.info(
+      {
+        event: "parse_burst_dedupe_skip",
+        id: options?.canonicalJobId ?? null,
+        version: "v1",
+      },
+      "parse_burst_dedupe_skip",
+    );
+    return out;
+  } catch (err) {
+    logParseFailure("cache_error", { err, stage: "parse_burst_dedupe" });
+    return null;
+  }
 }
 
 function capBucketLines(lines: string[], cap: number = BUCKET_LINE_CAP): string[] {
@@ -265,6 +354,8 @@ function logParseFailure(
 
 export interface ParseJobDescriptionOptions {
   jobTitle?: string | null;
+  /** Canonical Job id for parse/cache visibility logs. */
+  canonicalJobId?: string | null;
 }
 
 function cloneParsed(p: ParsedJobDescriptionAI): ParsedJobDescriptionAI {
@@ -281,6 +372,7 @@ function cloneParsed(p: ParsedJobDescriptionAI): ParsedJobDescriptionAI {
 
 /**
  * Preprocesses description, /parse (in-flight–limited), optional Redis cache, then post-processes.
+ * (Future: batching N descriptions in one /parse in jobParser is the largest throughput win.)
  */
 export async function parseJobDescriptionAI(
   description: string,
@@ -314,7 +406,13 @@ export async function parseJobDescriptionAI(
             applyTitleFallback(out, options?.jobTitle);
             cacheHit = true;
             logger.info(
-              { event: "parse_cache", hit: true, version: "v1", source: "redis" },
+              {
+                event: "parse_cache",
+                hit: true,
+                id: options?.canonicalJobId ?? null,
+                version: "v1",
+                source: "redis",
+              },
               "parse_cache",
             );
             return out;
@@ -332,7 +430,13 @@ export async function parseJobDescriptionAI(
     }
     if (cacheHit === false) {
       logger.info(
-        { event: "parse_cache", hit: false, version: "v1", source: "redis" },
+        {
+          event: "parse_cache",
+          hit: false,
+          id: options?.canonicalJobId ?? null,
+          version: "v1",
+          source: "redis",
+        },
         "parse_cache",
       );
     }
@@ -345,7 +449,10 @@ export async function parseJobDescriptionAI(
   let data: unknown;
   const httpStart = Date.now();
   try {
-    data = await parseInFlight.use(() => postJobDescriptionParse(joined, client));
+    data = await parseInFlight.use(async () => {
+      parseStartsInWindow += 1;
+      return await postJobDescriptionParse(joined, client);
+    });
   } catch (err) {
     logParseFailure("http_error", { err });
     logger.warn(
@@ -406,6 +513,11 @@ export async function parseJobDescriptionAI(
         "EX",
         getParseCacheTtlSec(),
       );
+      const burstTtl = getParseBurstRecentTtlSec();
+      if (burstTtl > 0) {
+        const hash = key.slice(key.lastIndexOf(":") + 1);
+        await redis.set(`${PARSE_BURST_KEY_PREFIX}:${hash}`, "1", "EX", burstTtl);
+      }
     } catch (err) {
       logParseFailure("cache_error", { err, stage: "set" });
     }

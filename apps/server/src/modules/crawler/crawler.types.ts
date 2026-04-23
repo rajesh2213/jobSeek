@@ -47,6 +47,8 @@ export interface NormalizedJob {
   /** Display name for ensure-company-from-job when companyId is unknown. */
   companyName?: string;
   atsJobId?: string;
+  /** Optional: canonical Job id for traceability (e.g. requeue scripts, logs). */
+  jobId?: string;
 }
 
 /**

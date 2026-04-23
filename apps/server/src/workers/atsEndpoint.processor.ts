@@ -106,8 +106,10 @@ async function start(): Promise<void> {
 
   getIngestAtsEndpointQueue();
 
-  const ingestPoolConcurrency = clampPoolSize("ATS_POOL_INGEST_CONCURRENCY", "3", 4);
   const parsePoolConcurrency = clampPoolSize("ATS_PARSE_CONCURRENCY", "3", 4);
+  const ingestPoolConcurrencyRaw = clampPoolSize("ATS_POOL_INGEST_CONCURRENCY", "3", 4);
+  /** Ingest pressure should not exceed parse (downstream enrich + shared MAX_IN_FLIGHT_PARSE). */
+  const ingestPoolConcurrency = Math.min(ingestPoolConcurrencyRaw, parsePoolConcurrency);
   const parseChunkSize = Math.max(10, Math.min(500, Number(process.env.ATS_PARSE_CHUNK_SIZE ?? "100") || 100));
   const bullConcurrency = Math.max(1, Math.min(4, Number(process.env.ATS_ENDPOINT_WORKER_CONCURRENCY ?? "1") || 1));
 
@@ -116,6 +118,7 @@ async function start(): Promise<void> {
       event: "worker_concurrency_config",
       worker: "ats-endpoint",
       atsPoolIngestConcurrency: ingestPoolConcurrency,
+      atsPoolIngestConcurrencyRaw: ingestPoolConcurrencyRaw,
       atsPoolParseConcurrency: parsePoolConcurrency,
       atsParseChunkSize: parseChunkSize,
       atsEndpointBullConcurrency: bullConcurrency,

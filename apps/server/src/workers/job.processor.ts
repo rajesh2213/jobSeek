@@ -34,6 +34,8 @@ import { ENRICH_PRIORITY_JOB_DISCOVERED } from "../queues/enrich-company.queue.j
 import { isSupportedAtsType, type AtsType } from "../modules/ats/ats.interface.js";
 import { createAtsCrawlerStandard } from "../modules/ats/AtsCrawlerStandard.js";
 import { enrichCanonicalJobParsedDescription } from "../modules/ai/jobDescriptionEnrichment.js";
+import { takeAndResetParseStartsInWindow } from "../modules/ai/ai.service.js";
+import { hostname } from "node:os";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -143,6 +145,9 @@ function validateNormalizedJob(data: unknown): NormalizedJob | null {
       ? data.companyName.trim()
       : undefined;
 
+  const jobId =
+    typeof data.jobId === "string" && data.jobId.trim() !== "" ? data.jobId.trim() : undefined;
+
   return {
     title,
     description,
@@ -155,6 +160,7 @@ function validateNormalizedJob(data: unknown): NormalizedJob | null {
     companyId,
     companyName,
     atsJobId,
+    jobId,
   };
 }
 
@@ -238,8 +244,10 @@ async function start(): Promise<void> {
       const elapsed = Math.max(1, now - lastThroughputLog);
       const n = processJobCompletions;
       processJobCompletions = 0;
+      const parseN = takeAndResetParseStartsInWindow();
       lastThroughputLog = now;
       const jobsPerMin = (n / elapsed) * 60_000;
+      const parsePerMin = (parseN / elapsed) * 60_000;
       void (async () => {
         try {
           const c = await queue.getJobCounts("wait", "active", "delayed", "failed", "completed");
@@ -247,8 +255,12 @@ async function start(): Promise<void> {
             {
               event: "worker_queue_snapshot",
               processJobCompletions: n,
+              parseStartsInWindow: parseN,
               windowMs: elapsed,
               jobsPerMinApprox: Math.round(jobsPerMin * 100) / 100,
+              parseCallsPerMinApprox: Math.round(parsePerMin * 100) / 100,
+              host: hostname(),
+              pid: process.pid,
               ...c,
             },
             "worker_queue_snapshot",
