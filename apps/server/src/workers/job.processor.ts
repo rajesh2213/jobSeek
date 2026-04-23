@@ -199,9 +199,26 @@ interface CrawlSummaryCounters {
   failures: number;
 }
 
+const PROCESS_JOB_ADD_CHUNK = Math.max(10, Math.min(200, Number(process.env.PROCESS_JOB_ADD_CHUNK_SIZE ?? "50") || 50));
+
+function jobWorkerConcurrency(): number {
+  const n = Number(process.env.WORKER_CONCURRENCY ?? "5");
+  return Math.max(1, Math.min(32, Number.isFinite(n) ? n : 5));
+}
+
 async function start(): Promise<void> {
   loadRootEnv();
   assertWorkerProcessEnv();
+
+  const jobWorkerConc = jobWorkerConcurrency();
+  logger.info(
+    {
+      event: "worker_concurrency_config",
+      worker: "job",
+      jobWorkerConcurrency: jobWorkerConc,
+    },
+    "worker_concurrency_config",
+  );
 
   const jobRepository = createJobRepository(prisma);
   const companyService = new CompanyService(
@@ -211,6 +228,39 @@ async function start(): Promise<void> {
   const jobService = new JobService(jobRepository);
   const queue = getJobQueue();
   const crawlCounters = new Map<string, CrawlSummaryCounters>();
+
+  let processJobCompletions = 0;
+  const windowMs = 60_000;
+  let lastThroughputLog = Date.now();
+  const queueMetricsInterval = setInterval(
+    () => {
+      const now = Date.now();
+      const elapsed = Math.max(1, now - lastThroughputLog);
+      const n = processJobCompletions;
+      processJobCompletions = 0;
+      lastThroughputLog = now;
+      const jobsPerMin = (n / elapsed) * 60_000;
+      void (async () => {
+        try {
+          const c = await queue.getJobCounts("wait", "active", "delayed", "failed", "completed");
+          logger.info(
+            {
+              event: "worker_queue_snapshot",
+              processJobCompletions: n,
+              windowMs: elapsed,
+              jobsPerMinApprox: Math.round(jobsPerMin * 100) / 100,
+              ...c,
+            },
+            "worker_queue_snapshot",
+          );
+        } catch (err) {
+          logger.warn({ event: "queue_metrics_failed", err }, "queue_metrics_failed");
+        }
+      })();
+    },
+    windowMs,
+  );
+  (queueMetricsInterval as NodeJS.Timeout).unref();
 
   const worker = new Worker(
     JOB_QUEUE_NAME,
@@ -361,21 +411,26 @@ async function start(): Promise<void> {
           );
 
           let enqueueFailures = 0;
-          for (const normalizedJob of normalizedJobs) {
-            try {
-              await queue.add(PROCESS_JOB, normalizedJob);
-            } catch (err) {
-              enqueueFailures += 1;
-              logger.error(
-                {
-                  event: "process_job_enqueue_failed",
-                  companyId: resolvedCompanyId,
-                  atsType: resolvedAtsType,
-                  sourceUrl: normalizedJob.sourceUrl,
-                  err,
-                },
-                "Failed to enqueue process-job",
-              );
+          for (let i = 0; i < normalizedJobs.length; i += PROCESS_JOB_ADD_CHUNK) {
+            const batch = normalizedJobs.slice(i, i + PROCESS_JOB_ADD_CHUNK);
+            const results = await Promise.allSettled(
+              batch.map((j) => queue.add(PROCESS_JOB, j)),
+            );
+            for (let k = 0; k < results.length; k++) {
+              const r = results[k]!;
+              if (r.status === "rejected") {
+                enqueueFailures += 1;
+                logger.error(
+                  {
+                    event: "process_job_enqueue_failed",
+                    companyId: resolvedCompanyId,
+                    atsType: resolvedAtsType,
+                    sourceUrl: batch[k]!.sourceUrl,
+                    err: r.reason,
+                  },
+                  "Failed to enqueue process-job",
+                );
+              }
             }
           }
 
@@ -535,9 +590,15 @@ async function start(): Promise<void> {
     },
     {
       connection: getRedisConnection(),
-      concurrency: 5,
+      concurrency: jobWorkerConc,
     },
   );
+
+  worker.on("completed", (job) => {
+    if (job.name === PROCESS_JOB) {
+      processJobCompletions += 1;
+    }
+  });
 
   worker.on("failed", (job, err) => {
     if (job?.name === PROCESS_JOB) {

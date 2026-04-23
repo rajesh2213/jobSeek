@@ -28,6 +28,9 @@ import {
   recordAtsIngestionStarted,
 } from "../services/atsPipelineCounters.service.js";
 import { enrichCanonicalJobParsedDescription } from "../modules/ai/jobDescriptionEnrichment.js";
+import { asyncPool } from "../utils/asyncPool.js";
+import { chunkArray } from "../utils/chunkArray.js";
+import type { NormalizedJob } from "../modules/crawler/crawler.types.js";
 
 /** Skip ingest fetchJobs if a prior ingest run just updated lastCrawledAt (reduces back-to-back duplicate crawls). */
 const MIN_MS_SINCE_LAST_CRAWL_FOR_INGEST = Math.floor(2.5 * 60 * 1000);
@@ -84,6 +87,11 @@ async function throttleApiCall(): Promise<void> {
   await sleep(randomIntInclusive(100, 300));
 }
 
+function clampPoolSize(envName: string, fallback: string, hardMax: number): number {
+  const n = Math.max(1, Math.min(hardMax, Number(process.env[envName] ?? fallback)));
+  return Number.isFinite(n) ? n : Number(fallback);
+}
+
 async function start(): Promise<void> {
   loadRootEnv();
   assertWorkerProcessEnv();
@@ -97,6 +105,24 @@ async function start(): Promise<void> {
   const endpointService = createAtsEndpointService(prisma);
 
   getIngestAtsEndpointQueue();
+
+  const ingestPoolConcurrency = clampPoolSize("ATS_POOL_INGEST_CONCURRENCY", "3", 4);
+  const parsePoolConcurrency = clampPoolSize("ATS_PARSE_CONCURRENCY", "3", 4);
+  const parseChunkSize = Math.max(10, Math.min(500, Number(process.env.ATS_PARSE_CHUNK_SIZE ?? "100") || 100));
+  const bullConcurrency = Math.max(1, Math.min(4, Number(process.env.ATS_ENDPOINT_WORKER_CONCURRENCY ?? "1") || 1));
+
+  logger.info(
+    {
+      event: "worker_concurrency_config",
+      worker: "ats-endpoint",
+      atsPoolIngestConcurrency: ingestPoolConcurrency,
+      atsPoolParseConcurrency: parsePoolConcurrency,
+      atsParseChunkSize: parseChunkSize,
+      atsEndpointBullConcurrency: bullConcurrency,
+      jobWorkerConc: Number(process.env.WORKER_CONCURRENCY ?? "5"),
+    },
+    "worker_concurrency_config",
+  );
 
   const worker = new Worker(
     INGEST_ATS_ENDPOINT_QUEUE_NAME,
@@ -218,34 +244,67 @@ async function start(): Promise<void> {
       let failures = 0;
       let jobsInserted = 0;
       let duplicatesSkipped = 0;
-      for (const normalizedJob of normalizedJobs) {
-        try {
-          const { inserted, canonical } = await jobService.ingestDeduplicated({
-            ...normalizedJob,
-            companyDomain,
-          });
-          if (inserted) jobsInserted += 1;
-          else duplicatesSkipped += 1;
-          await enrichCanonicalJobParsedDescription(
-            prisma,
-            jobRepository,
-            canonical.id,
-            inserted,
-          );
-        } catch (err) {
-          failures += 1;
-          const errorKind = classifyAtsIngestError(err);
-          logger.error(
-            {
-              event: "ats_ingestion_failed",
-              ...logBase,
-              errorKind,
-              err,
-              sourceUrl: normalizedJob.sourceUrl,
-            },
-            "ats_ingestion_failed",
-          );
-        }
+
+      type IngestRow = { canonicalId: string; inserted: boolean; sourceUrl: string };
+
+      const ingestResults = await asyncPool(
+        normalizedJobs,
+        ingestPoolConcurrency,
+        async (normalizedJob: NormalizedJob): Promise<IngestRow | null> => {
+          try {
+            const { inserted, canonical } = await jobService.ingestDeduplicated({
+              ...normalizedJob,
+              companyDomain,
+            });
+            if (inserted) jobsInserted += 1;
+            else duplicatesSkipped += 1;
+            return { canonicalId: canonical.id, inserted, sourceUrl: normalizedJob.sourceUrl };
+          } catch (err) {
+            failures += 1;
+            const errorKind = classifyAtsIngestError(err);
+            logger.error(
+              {
+                event: "ats_ingestion_failed",
+                ...logBase,
+                errorKind,
+                err,
+                sourceUrl: normalizedJob.sourceUrl,
+                phase: "ingest",
+              },
+              "ats_ingestion_failed",
+            );
+            return null;
+          }
+        },
+      );
+
+      const flatIngest: IngestRow[] = ingestResults.filter((r): r is IngestRow => r !== null);
+
+      for (const chunk of chunkArray(flatIngest, parseChunkSize)) {
+        await asyncPool(chunk, parsePoolConcurrency, async (row) => {
+          try {
+            await enrichCanonicalJobParsedDescription(
+              prisma,
+              jobRepository,
+              row.canonicalId,
+              row.inserted,
+            );
+          } catch (err) {
+            failures += 1;
+            const errorKind = classifyAtsIngestError(err);
+            logger.error(
+              {
+                event: "ats_ingestion_failed",
+                ...logBase,
+                errorKind,
+                err,
+                sourceUrl: row.sourceUrl,
+                phase: "parse",
+              },
+              "ats_ingestion_failed",
+            );
+          }
+        });
       }
 
       recordAtsIngestionOutcome(endpointRow.source, {
@@ -299,7 +358,7 @@ async function start(): Promise<void> {
         "ats_ingestion_completed",
       );
     },
-    { connection: getRedisConnection(), concurrency: 2 },
+    { connection: getRedisConnection(), concurrency: bullConcurrency },
   );
 
   worker.on("failed", (job, err) => {

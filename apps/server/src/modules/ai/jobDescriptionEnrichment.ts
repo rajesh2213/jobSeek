@@ -2,10 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import type { JobRepository } from "../job/job.repository.js";
 import { logger } from "../../utils/logger.js";
-import {
-  fallbackParsedFromDescription,
-  parseJobDescriptionAI,
-} from "./ai.service.js";
+import { fallbackParsedFromDescription, parseJobDescriptionAI } from "./ai.service.js";
 import { emptyParsedJobDescription } from "./ai.types.js";
 
 function hasUsableParsedPayload(payload: unknown): boolean {

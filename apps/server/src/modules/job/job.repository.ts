@@ -21,6 +21,36 @@ const JOB_STATUS_PROCESSING: JobStatus = "processing";
 const JOB_STATUS_READY: JobStatus = "ready";
 const JOB_STATUS_FAILED: JobStatus = "failed";
 
+function maxMergedSkills(): number {
+  const n = Number(process.env.MAX_MERGED_SKILLS ?? "60");
+  return Math.max(1, Math.min(75, Number.isFinite(n) ? n : 60));
+}
+
+/** Union taxonomy + parsed tech; capped to avoid search/ranking bloat. */
+function mergeJobSkillsList(taxonomySkills: string[], techStack: string[], max: number): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of taxonomySkills) {
+    const t = s.trim();
+    if (!t) continue;
+    const k = t.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(t);
+    if (out.length >= max) return out;
+  }
+  for (const s of techStack) {
+    const t = s.trim();
+    if (!t) continue;
+    const k = t.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(t);
+    if (out.length >= max) return out;
+  }
+  return out;
+}
+
 function safeApplyUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   return isValidJobUrl(url) ? url : null;
@@ -1258,7 +1288,7 @@ export function createJobRepository(prisma: PrismaClient) {
     ): Promise<void> {
       const existing = await prisma.job.findUnique({
         where: { id },
-        select: { parsedDescription: true, enriched: true },
+        select: { parsedDescription: true, enriched: true, skills: true },
       });
       if (!existing) {
         logger.warn(
@@ -1290,12 +1320,16 @@ export function createJobRepository(prisma: PrismaClient) {
         ...existingEnriched,
         ...computedEnriched,
       };
+      const tech = computedEnriched.techStack;
+      const techStack: string[] = Array.isArray(tech) ? tech.filter((x): x is string => typeof x === "string") : [];
+      const mergedSkills = mergeJobSkillsList(existing.skills ?? [], techStack, maxMergedSkills());
 
       await prisma.job.update({
         where: { id },
         data: {
           parsedDescription: finalParsed as Prisma.InputJsonValue,
           enriched: mergedEnriched as Prisma.InputJsonValue,
+          skills: mergedSkills,
         },
       });
       await this.promoteJobToReadyIfParsedDescription(id, "parsed_description_present");

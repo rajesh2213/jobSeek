@@ -41,6 +41,24 @@ async function start(): Promise<void> {
 
   getEnrichCompanyQueue();
 
+  const enrichConc = Math.max(
+    1,
+    Math.min(
+      32,
+      Number(
+        process.env.ENRICH_COMPANY_WORKER_CONCURRENCY ?? process.env.WORKER_CONCURRENCY ?? "4",
+      ) || 4,
+    ),
+  );
+  logger.info(
+    {
+      event: "worker_concurrency_config",
+      worker: "enrich-company",
+      enrichCompanyWorkerConcurrency: enrichConc,
+    },
+    "worker_concurrency_config",
+  );
+
   const worker = new Worker(
     ENRICH_COMPANY_QUEUE_NAME,
     async (job) => {
@@ -63,7 +81,7 @@ async function start(): Promise<void> {
     },
     {
       connection: getRedisConnection(),
-      concurrency: 5,
+      concurrency: enrichConc,
     },
   );
 
