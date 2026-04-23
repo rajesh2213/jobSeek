@@ -9,6 +9,7 @@
 import { loadRootEnv } from "../infrastructure/env/loadEnv.js";
 import { prisma } from "../infrastructure/db/prisma.js";
 import { logger } from "../utils/logger.js";
+import { Prisma } from "@prisma/client";
 
 type CliArgs = {
   dryRun: boolean;
@@ -109,15 +110,46 @@ async function readStatusBuckets(): Promise<BucketTotals> {
   return totals;
 }
 
+async function countProcessingRows(): Promise<number> {
+  const rows = await prisma.$queryRaw<Array<{ c: bigint }>>`
+    SELECT COUNT(*)::bigint AS c
+    FROM "Job"
+    WHERE "status" = 'processing'
+  `;
+  return Number(rows[0]?.c ?? 0n);
+}
+
+async function fetchProcessingRows(lastId: string, limit: number): Promise<Row[]> {
+  const lastIdCond = lastId
+    ? Prisma.sql`AND id > ${lastId}`
+    : Prisma.sql``;
+  return prisma.$queryRaw<Row[]>`
+    SELECT id, "status", title, description, "parsedDescription"
+    FROM "Job"
+    WHERE "status" = 'processing'
+    ${lastIdCond}
+    ORDER BY id ASC
+    LIMIT ${limit}
+  `;
+}
+
+async function markReadyIfStillProcessing(id: string): Promise<number> {
+  const updated = await prisma.$executeRaw`
+    UPDATE "Job"
+    SET "status" = 'ready'
+    WHERE id = ${id}
+      AND "status" = 'processing'
+  `;
+  return Number(updated);
+}
+
 async function main(): Promise<void> {
   loadRootEnv();
   const startedAt = Date.now();
   const args = parseArgs(process.argv.slice(2));
 
   const beforeBuckets = await readStatusBuckets();
-  const targetCount = await prisma.job.count({
-    where: { status: "processing" },
-  });
+  const targetCount = await countProcessingRows();
   const assumedRowsPerSecond = 300;
   const estimatedSeconds = Math.ceil(targetCount / assumedRowsPerSecond);
 
@@ -147,21 +179,7 @@ async function main(): Promise<void> {
   const sampleFailedSkipped: string[] = [];
 
   while (batches < args.maxBatches) {
-    const rows = await prisma.job.findMany({
-      where: {
-        ...(lastId ? { id: { gt: lastId } } : {}),
-        status: "processing",
-      },
-      orderBy: { id: "asc" },
-      take: args.batchSize,
-      select: {
-        id: true,
-        status: true,
-        title: true,
-        description: true,
-        parsedDescription: true,
-      },
-    });
+    const rows = await fetchProcessingRows(lastId, args.batchSize);
 
     if (rows.length === 0) break;
     batches += 1;
@@ -190,14 +208,8 @@ async function main(): Promise<void> {
 
       try {
         if (nextReady) {
-          const res = await prisma.job.updateMany({
-            where: {
-              id: row.id,
-              status: "processing",
-            },
-            data: { status: "ready" },
-          });
-          if (res.count > 0) updatedReady += 1;
+          const updated = await markReadyIfStillProcessing(row.id);
+          if (updated > 0) updatedReady += 1;
           else skipped += 1;
         } else {
           skipped += 1;
