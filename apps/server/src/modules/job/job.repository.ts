@@ -9,10 +9,17 @@ import { isValidJobUrl } from "../../utils/url.js";
 import { logger } from "../../utils/logger.js";
 import { expandLocationFilter, getRegions } from "../../utils/locationResolver.js";
 import { computeLocationPatchFromReingest } from "../../services/jobCanonical.service.js";
+import { recordStatusTransition } from "../../services/jobStatusMetrics.service.js";
 import {
   LISTING_EXCLUDED_ROLE_SLUGS,
   ROLE_SUGGEST_EXTRA_EXCLUDED,
 } from "./jobListing.constants.js";
+
+export type JobStatus = "processing" | "ready" | "failed";
+
+const JOB_STATUS_PROCESSING: JobStatus = "processing";
+const JOB_STATUS_READY: JobStatus = "ready";
+const JOB_STATUS_FAILED: JobStatus = "failed";
 
 function safeApplyUrl(url: string | null | undefined): string | null {
   if (!url) return null;
@@ -142,6 +149,8 @@ export interface JobDiscoveryFilters {
    * Multiple `?locations=` tokens — OR semantics; each token uses the same rules as `location`.
    */
   locationTokens?: string[];
+  /** Internal/admin bypass for processing/failed visibility filters. */
+  includeProcessing?: boolean;
 }
 
 export interface JobWithCompany extends Job {
@@ -154,6 +163,18 @@ export interface JobWithCompany extends Job {
     careersUrl: string | null;
     _count?: { jobs: number };
   };
+}
+
+function readyStatusWhere(includeProcessing?: boolean): Prisma.JobWhereInput | null {
+  if (includeProcessing) return null;
+  return ({
+    OR: [{ status: JOB_STATUS_READY }, { status: null }],
+  } as unknown) as Prisma.JobWhereInput;
+}
+
+function readyStatusSql(includeProcessing?: boolean): Prisma.Sql | null {
+  if (includeProcessing) return null;
+  return Prisma.sql`(j."status" = ${JOB_STATUS_READY} OR j."status" IS NULL)`;
 }
 
 /** Match stored country when legacy `country` was populated before `locationCountry`. */
@@ -242,11 +263,16 @@ function sqlForLocationToken(locQ: string): Prisma.Sql {
 /** Prisma `where` for canonical discovery — keep in sync with `buildDiscoveryWhereSql`. */
 export function buildDiscoveryWhere(
   filters?: JobDiscoveryFilters,
+  options?: { includeProcessing?: boolean },
 ): Prisma.JobWhereInput {
+  const includeProcessing =
+    options?.includeProcessing ?? filters?.includeProcessing ?? false;
   const and: Prisma.JobWhereInput[] = [
     { canonicalJobId: null },
     { role: { notIn: [...LISTING_EXCLUDED_ROLE_SLUGS] } },
   ];
+  const statusFilter = readyStatusWhere(includeProcessing);
+  if (statusFilter) and.push(statusFilter);
 
   if (!filters) return { AND: and };
 
@@ -358,7 +384,12 @@ function sqlResolvedCountryIn(codes: string[]): Prisma.Sql {
 }
 
 /** Raw SQL `WHERE` for table `j` — keep in sync with `buildDiscoveryWhere`. */
-export function buildDiscoveryWhereSql(filters?: JobDiscoveryFilters): Prisma.Sql {
+export function buildDiscoveryWhereSql(
+  filters?: JobDiscoveryFilters,
+  options?: { includeProcessing?: boolean },
+): Prisma.Sql {
+  const includeProcessing =
+    options?.includeProcessing ?? filters?.includeProcessing ?? false;
   const excluded = Prisma.join(
     LISTING_EXCLUDED_ROLE_SLUGS.map((s) => Prisma.sql`${s}`),
   );
@@ -366,6 +397,8 @@ export function buildDiscoveryWhereSql(filters?: JobDiscoveryFilters): Prisma.Sq
     Prisma.sql`j."canonicalJobId" IS NULL`,
     Prisma.sql`j.role NOT IN (${excluded})`,
   ];
+  const statusFilter = readyStatusSql(includeProcessing);
+  if (statusFilter) parts.push(statusFilter);
 
   if (!filters) {
     return Prisma.join(parts, " AND ");
@@ -566,8 +599,13 @@ export function createJobRepository(prisma: PrismaClient) {
       });
     },
 
-    async countCanonicalFiltered(filters?: JobDiscoveryFilters): Promise<number> {
-      const whereSql = buildDiscoveryWhereSql(filters);
+    async countCanonicalFiltered(
+      filters?: JobDiscoveryFilters,
+      options?: { includeProcessing?: boolean },
+    ): Promise<number> {
+      const whereSql = buildDiscoveryWhereSql(filters, {
+        includeProcessing: options?.includeProcessing ?? false,
+      });
       const rows = await prisma.$queryRaw<{ c: bigint }[]>`
         SELECT COUNT(*)::bigint AS c FROM "Job" j WHERE ${whereSql}
       `;
@@ -582,6 +620,7 @@ export function createJobRepository(prisma: PrismaClient) {
         SELECT j.role, COUNT(*)::bigint AS count
         FROM "Job" j
         WHERE j."canonicalJobId" IS NULL
+          AND (j."status" = ${JOB_STATUS_READY} OR j."status" IS NULL)
           AND j.role NOT IN (${Prisma.join(
             excluded.map((e) => Prisma.sql`${e}`),
           )})
@@ -607,6 +646,7 @@ export function createJobRepository(prisma: PrismaClient) {
         SELECT j.category, COUNT(*)::bigint AS count
         FROM "Job" j
         WHERE j."canonicalJobId" IS NULL
+          AND (j."status" = ${JOB_STATUS_READY} OR j."status" IS NULL)
           AND j.role NOT IN (${Prisma.join(
             LISTING_EXCLUDED_ROLE_SLUGS.map((e) => Prisma.sql`${e}`),
           )})
@@ -626,6 +666,7 @@ export function createJobRepository(prisma: PrismaClient) {
         FROM "Job" j
         CROSS JOIN LATERAL unnest(j.skills) AS s(skill)
         WHERE j."canonicalJobId" IS NULL
+          AND (j."status" = ${JOB_STATUS_READY} OR j."status" IS NULL)
           AND j.role NOT IN (${Prisma.join(
             LISTING_EXCLUDED_ROLE_SLUGS.map((e) => Prisma.sql`${e}`),
           )})
@@ -651,6 +692,7 @@ export function createJobRepository(prisma: PrismaClient) {
       limit: number;
       offset: number;
       sort?: "latest" | "salary_desc";
+      includeProcessing?: boolean;
     }): Promise<JobWithCompany[]> {
       const sort = options.sort ?? "latest";
       const companyInclude = {
@@ -666,7 +708,9 @@ export function createJobRepository(prisma: PrismaClient) {
       };
 
       if (sort === "latest") {
-        const whereSql = buildDiscoveryWhereSql(options.filters);
+        const whereSql = buildDiscoveryWhereSql(options.filters, {
+          includeProcessing: options.includeProcessing ?? false,
+        });
         const idRows = await prisma.$queryRaw<{ id: string }[]>`
           SELECT j.id FROM "Job" j
           WHERE ${whereSql}
@@ -685,7 +729,9 @@ export function createJobRepository(prisma: PrismaClient) {
       }
 
       const rows = await prisma.job.findMany({
-        where: buildDiscoveryWhere(options.filters),
+        where: buildDiscoveryWhere(options.filters, {
+          includeProcessing: options.includeProcessing ?? false,
+        }),
         include: { company: companyInclude },
         orderBy: buildSalaryOrderBy(),
         take: options.limit,
@@ -694,7 +740,11 @@ export function createJobRepository(prisma: PrismaClient) {
       return rows as JobWithCompany[];
     },
 
-    async findById(id: string): Promise<JobWithCompany | null> {
+    async findById(
+      id: string,
+      options?: { includeProcessing?: boolean },
+    ): Promise<JobWithCompany | null> {
+      const includeProcessing = options?.includeProcessing ?? false;
       const job = await prisma.job.findUnique({
         where: { id },
         include: {
@@ -714,9 +764,16 @@ export function createJobRepository(prisma: PrismaClient) {
       if (!job) return null;
       const targetId = job.canonicalJobId ?? job.id;
       if (targetId === job.id) {
-        return job as JobWithCompany;
+        if (includeProcessing) return job as JobWithCompany;
+        const status = (job as unknown as { status?: string | null }).status ?? null;
+        const parsedDescription = (
+          job as unknown as { parsedDescription?: unknown }
+        ).parsedDescription;
+        const effectiveReady =
+          status === JOB_STATUS_READY || status === null || parsedDescription != null;
+        return effectiveReady ? (job as JobWithCompany) : null;
       }
-      return prisma.job.findUnique({
+      const canonical = await prisma.job.findUnique({
         where: { id: targetId },
         include: {
           company: {
@@ -732,6 +789,15 @@ export function createJobRepository(prisma: PrismaClient) {
           },
         },
       });
+      if (!canonical) return null;
+      if (includeProcessing) return canonical as JobWithCompany;
+      const status = (canonical as unknown as { status?: string | null }).status ?? null;
+      const parsedDescription = (
+        canonical as unknown as { parsedDescription?: unknown }
+      ).parsedDescription;
+      const effectiveReady =
+        status === JOB_STATUS_READY || status === null || parsedDescription != null;
+      return effectiveReady ? (canonical as JobWithCompany) : null;
     },
 
     async create(input: DedupJobInput): Promise<Job> {
@@ -1053,6 +1119,139 @@ export function createJobRepository(prisma: PrismaClient) {
       return touched;
     },
 
+    async ensureProcessingStatus(id: string, reason: string): Promise<boolean> {
+      const rows = await prisma.$queryRaw<Array<{ previous_status: string | null }>>`
+        WITH target AS (
+          SELECT id, "status" AS previous_status
+          FROM "Job"
+          WHERE "id" = ${id}
+            AND "status" IS NULL
+        )
+        UPDATE "Job" AS j
+        SET "status" = ${JOB_STATUS_PROCESSING}
+        FROM target
+        WHERE j.id = target.id
+        RETURNING target.previous_status
+      `;
+      if (rows.length > 0) {
+        for (const row of rows) {
+          recordStatusTransition(row.previous_status, JOB_STATUS_PROCESSING, reason);
+        }
+        logger.info(
+          {
+            event: "job_status_transition",
+            jobId: id,
+            from: null,
+            to: JOB_STATUS_PROCESSING,
+            reason,
+          },
+          "job_status_transition",
+        );
+        return true;
+      }
+      return false;
+    },
+
+    async promoteJobToReady(id: string, reason: string): Promise<boolean> {
+      const rows = await prisma.$queryRaw<Array<{ previous_status: string | null }>>`
+        WITH target AS (
+          SELECT id, "status" AS previous_status
+          FROM "Job"
+          WHERE "id" = ${id}
+            AND ("status" IN (${JOB_STATUS_PROCESSING}, ${JOB_STATUS_FAILED}) OR "status" IS NULL)
+        )
+        UPDATE "Job" AS j
+        SET "status" = ${JOB_STATUS_READY}
+        FROM target
+        WHERE j.id = target.id
+        RETURNING target.previous_status
+      `;
+      if (rows.length > 0) {
+        for (const row of rows) {
+          recordStatusTransition(row.previous_status, JOB_STATUS_READY, reason);
+        }
+        logger.info(
+          {
+            event: "job_status_transition",
+            jobId: id,
+            from: rows[0]?.previous_status ?? null,
+            to: JOB_STATUS_READY,
+            reason,
+          },
+          "job_status_transition",
+        );
+        return true;
+      }
+      return false;
+    },
+
+    async promoteJobToReadyIfParsedDescription(id: string, reason: string): Promise<boolean> {
+      const rows = await prisma.$queryRaw<Array<{ previous_status: string | null }>>`
+        WITH target AS (
+          SELECT id, "status" AS previous_status
+          FROM "Job"
+          WHERE "id" = ${id}
+            AND "parsedDescription" IS NOT NULL
+            AND ("status" IN (${JOB_STATUS_PROCESSING}, ${JOB_STATUS_FAILED}) OR "status" IS NULL)
+        )
+        UPDATE "Job" AS j
+        SET "status" = ${JOB_STATUS_READY}
+        FROM target
+        WHERE j.id = target.id
+        RETURNING target.previous_status
+      `;
+      if (rows.length > 0) {
+        for (const row of rows) {
+          recordStatusTransition(row.previous_status, JOB_STATUS_READY, reason);
+        }
+        logger.info(
+          {
+            event: "job_status_transition",
+            jobId: id,
+            from: rows[0]?.previous_status ?? null,
+            to: JOB_STATUS_READY,
+            reason,
+          },
+          "job_status_transition",
+        );
+        return true;
+      }
+      return false;
+    },
+
+    async markJobFailedFromProcessing(id: string, reason: string): Promise<boolean> {
+      const rows = await prisma.$queryRaw<Array<{ previous_status: string | null }>>`
+        WITH target AS (
+          SELECT id, "status" AS previous_status
+          FROM "Job"
+          WHERE "id" = ${id}
+            AND "status" = ${JOB_STATUS_PROCESSING}
+        )
+        UPDATE "Job" AS j
+        SET "status" = ${JOB_STATUS_FAILED}
+        FROM target
+        WHERE j.id = target.id
+        RETURNING target.previous_status
+      `;
+      if (rows.length > 0) {
+        for (const row of rows) {
+          recordStatusTransition(row.previous_status, JOB_STATUS_FAILED, reason);
+        }
+        logger.info(
+          {
+            event: "job_status_transition",
+            jobId: id,
+            from: JOB_STATUS_PROCESSING,
+            to: JOB_STATUS_FAILED,
+            reason,
+          },
+          "job_status_transition",
+        );
+        return true;
+      }
+      return false;
+    },
+
     async updateParsedDescription(
       id: string,
       parsed: Prisma.InputJsonValue,
@@ -1099,6 +1298,7 @@ export function createJobRepository(prisma: PrismaClient) {
           enriched: mergedEnriched as Prisma.InputJsonValue,
         },
       });
+      await this.promoteJobToReadyIfParsedDescription(id, "parsed_description_present");
     },
   };
 }

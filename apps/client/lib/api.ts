@@ -90,8 +90,16 @@ export interface JobItem {
   applyUrl?: string | null;
   postedAt: string | null;
   createdAt?: string;
+  status?: "processing" | "ready" | "failed" | null;
   companyId: string;
   company: JobCompany;
+}
+
+export function isJobReady(job: Pick<JobItem, "status" | "parsedDescription">): boolean {
+  const effectiveStatus = job.status ?? "ready";
+  if (effectiveStatus === "ready") return true;
+  // Rollout safety: treat parsed rows as effectively ready during transition windows.
+  return job.parsedDescription != null;
 }
 
 export type DiscoveryListPhase = "search" | "bonus" | "preview";
@@ -756,7 +764,11 @@ export async function fetchJobs(
   if (!res.ok) {
     throw new Error(`Failed to fetch jobs: ${res.status} ${res.statusText}`);
   }
-  return (await res.json()) as JobsApiResponse;
+  const body = (await res.json()) as JobsApiResponse;
+  return {
+    ...body,
+    data: (body.data ?? []).filter(isJobReady),
+  };
 }
 
 export interface SeoLandingEntry {
@@ -970,7 +982,11 @@ export async function fetchCompanyJobs(
   if (!res.ok) {
     throw new Error(`Failed to fetch company jobs: ${res.status}`);
   }
-  return (await res.json()) as JobsApiResponse;
+  const body = (await res.json()) as JobsApiResponse;
+  return {
+    ...body,
+    data: (body.data ?? []).filter(isJobReady),
+  };
 }
 
 export async function fetchJobById(
@@ -989,6 +1005,7 @@ export async function fetchJobById(
     throw new Error(`Failed to fetch job ${id}: ${res.status} ${res.statusText}`);
   }
   const payload = (await res.json()) as JobApiResponse;
+  if (!isJobReady(payload.data)) return null;
   return { data: payload.data, meta: payload.meta };
 }
 

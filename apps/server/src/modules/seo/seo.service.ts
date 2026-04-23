@@ -49,6 +49,7 @@ export function createSeoService(prisma: PrismaClient) {
       SELECT j.category, COUNT(*)::bigint AS count
       FROM "Job" j
       WHERE j."canonicalJobId" IS NULL
+        AND (j."status" = 'ready' OR j."status" IS NULL)
         AND j.role NOT IN (${excludedSql})
         AND j.category <> 'other'
       GROUP BY j.category
@@ -63,6 +64,7 @@ export function createSeoService(prisma: PrismaClient) {
       SELECT j.category, COUNT(*)::bigint AS count
       FROM "Job" j
       WHERE j."canonicalJobId" IS NULL
+        AND (j."status" = 'ready' OR j."status" IS NULL)
         AND j.role NOT IN (${excludedSql})
         AND j.category <> 'other'
         AND j."workType" = 'remote'
@@ -86,6 +88,7 @@ export function createSeoService(prisma: PrismaClient) {
         SELECT j.category, COUNT(*)::bigint AS count
         FROM "Job" j
         WHERE j."canonicalJobId" IS NULL
+          AND (j."status" = 'ready' OR j."status" IS NULL)
           AND j.role NOT IN (${excludedSql})
           AND j.category <> 'other'
           AND (
@@ -114,6 +117,7 @@ export function createSeoService(prisma: PrismaClient) {
       FROM "Job" j
       CROSS JOIN LATERAL unnest(j.skills) AS s(skill)
       WHERE j."canonicalJobId" IS NULL
+        AND (j."status" = 'ready' OR j."status" IS NULL)
         AND j.role NOT IN (${excludedSql})
         AND j.category <> 'other'
         AND LENGTH(TRIM(s.skill)) > 1
@@ -140,6 +144,7 @@ export function createSeoService(prisma: PrismaClient) {
         FROM "Job" j
         CROSS JOIN LATERAL unnest(j.skills) AS s(skill)
         WHERE j."canonicalJobId" IS NULL
+          AND (j."status" = 'ready' OR j."status" IS NULL)
           AND j.role NOT IN (${excludedSql})
           AND j.category <> 'other'
           AND LENGTH(TRIM(s.skill)) > 1

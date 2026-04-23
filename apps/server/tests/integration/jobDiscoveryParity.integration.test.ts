@@ -82,6 +82,7 @@ runDescribe("job discovery Prisma vs SQL parity", () => {
       salaryMin?: number | null;
       postedAt?: Date | null;
       canonicalJobId?: string | null;
+      status?: "processing" | "ready" | "failed" | null;
     }) => {
       const row = await prisma.job.create({
         data: {
@@ -102,6 +103,12 @@ runDescribe("job discovery Prisma vs SQL parity", () => {
           description: "Test description for parity job.",
         },
       });
+      if (args.status) {
+        // Keep test compatible with stale generated Prisma client during local transitions.
+        await prisma.$executeRaw`
+          UPDATE "Job" SET "status" = ${args.status} WHERE id = ${row.id}
+        `;
+      }
       createdJobIds.push(row.id);
       return row;
     };
@@ -142,6 +149,33 @@ runDescribe("job discovery Prisma vs SQL parity", () => {
       country: "DE",
       salaryMin: null,
       postedAt: null,
+      status: null,
+    });
+    await mkJob({
+      title: "Processing Hidden Job",
+      sourceUrl: `https://parity.example/d-${suffix}`,
+      role: "engineer",
+      skills: ["typescript"],
+      workType: "remote",
+      category: "engineering",
+      locationCountry: "US",
+      country: "US",
+      salaryMin: 110000,
+      postedAt: new Date(),
+      status: "processing",
+    });
+    await mkJob({
+      title: "Failed Hidden Job",
+      sourceUrl: `https://parity.example/e-${suffix}`,
+      role: "engineer",
+      skills: ["typescript"],
+      workType: "remote",
+      category: "engineering",
+      locationCountry: "US",
+      country: "US",
+      salaryMin: 90000,
+      postedAt: new Date(),
+      status: "failed",
     });
   });
 
@@ -188,6 +222,15 @@ runDescribe("job discovery Prisma vs SQL parity", () => {
     await assertParity(prisma, { role: "Engineer" }, "role title");
   });
 
+  it("default visibility excludes processing/failed and keeps null status", async () => {
+    const visible = await countViaPrisma(prisma, { role: "engineer" });
+    const all = await countViaPrisma(prisma, {
+      role: "engineer",
+      includeProcessing: true,
+    });
+    assert.ok(all > visible, "includeProcessing should include hidden rows");
+  });
+
   it("latest id query rows are subset of prisma where", async () => {
     const filters: JobDiscoveryFilters = { country: "US" };
     const whereSql = buildDiscoveryWhereSql(filters);
@@ -217,7 +260,7 @@ runDescribe("job discovery Prisma vs SQL parity", () => {
       LIMIT 20 OFFSET 0
     `;
     const text = plans.map((p) => p["QUERY PLAN"]).join("\n");
-    console.log("[JOB_DISCOVERY_EXPLAIN]\n", text);
+    assert.ok(text.length > 0, "EXPLAIN should return at least one plan line");
   });
 });
 

@@ -85,6 +85,8 @@ model Job {
   parsedDescription  Json?
   /// Rule-based signals from parsedDescription (tech stack, salary text, remote hints).
   enriched           Json?
+  /// Visibility lifecycle: processing -> ready -> failed.
+  status             String    @default("processing")
   source             String
   sourceUrl          String    @unique
   applyUrl           String?
@@ -128,6 +130,7 @@ model Job {
   @@index([workType])
   @@index([experienceLevel])
   @@index([skills], type: Gin)
+  @@index([status])
 }
 
 model SerpBatch {

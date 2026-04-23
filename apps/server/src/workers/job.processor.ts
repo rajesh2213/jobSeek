@@ -567,6 +567,28 @@ async function start(): Promise<void> {
             crawlCounters.delete(payload.companyId);
           }
         }
+        if (isTerminalFailure) {
+          void (async () => {
+            try {
+              const existing = await jobRepository.findBySourceUrl(payload.sourceUrl);
+              if (!existing) return;
+              const canonical = await jobRepository.resolveCanonicalJob(existing);
+              await jobRepository.markJobFailedFromProcessing(
+                canonical.id,
+                "process_job_terminal_failure",
+              );
+            } catch (markErr) {
+              logger.warn(
+                {
+                  event: "job_status_mark_failed_terminal_error",
+                  sourceUrl: payload.sourceUrl,
+                  err: markErr,
+                },
+                "job_status_mark_failed_terminal_error",
+              );
+            }
+          })();
+        }
       }
     }
 

@@ -1,4 +1,8 @@
 import { CompanyStatus, type PrismaClient } from "@prisma/client";
+import {
+  getJobsBlockedNotReadyTotal,
+  getStatusTransitionTotals,
+} from "./jobStatusMetrics.service.js";
 
 export interface CompanyDensityRow {
   companyId: string;
@@ -22,6 +26,11 @@ export interface MetricsSnapshot {
     totalJobs: number;
     totalCanonicalJobs: number;
     totalDuplicateJobs: number;
+    ready_jobs_count: number;
+    processing_jobs_count: number;
+    failed_jobs_count: number;
+    status_transition_total: Record<string, number>;
+    jobs_blocked_not_ready_total: number;
   };
   density: {
     avgJobsPerCompany: number;
@@ -81,6 +90,9 @@ export async function buildMetricsSnapshot(prisma: PrismaClient): Promise<Metric
     totalJobs,
     totalCanonicalJobs,
     totalDuplicateJobs,
+    readyJobsCount,
+    processingJobsCount,
+    failedJobsCount,
     topCountRows,
     bottomCountRows,
     allCompanyJobCountRows,
@@ -96,6 +108,9 @@ export async function buildMetricsSnapshot(prisma: PrismaClient): Promise<Metric
     prisma.job.count(),
     prisma.job.count({ where: { canonicalJobId: null } }),
     prisma.job.count({ where: { canonicalJobId: { not: null } } }),
+    prisma.job.count({ where: { status: "ready" } }),
+    prisma.job.count({ where: { status: "processing" } }),
+    prisma.job.count({ where: { status: "failed" } }),
     prisma.job.groupBy({
       by: ["companyId"],
       _count: { companyId: true },
@@ -149,6 +164,11 @@ export async function buildMetricsSnapshot(prisma: PrismaClient): Promise<Metric
       totalJobs,
       totalCanonicalJobs,
       totalDuplicateJobs,
+      ready_jobs_count: readyJobsCount,
+      processing_jobs_count: processingJobsCount,
+      failed_jobs_count: failedJobsCount,
+      status_transition_total: getStatusTransitionTotals(),
+      jobs_blocked_not_ready_total: getJobsBlockedNotReadyTotal(),
     },
     density: {
       avgJobsPerCompany,

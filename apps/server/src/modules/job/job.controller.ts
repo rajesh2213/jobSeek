@@ -25,9 +25,14 @@ import {
   checkAndIncrementViewCap,
 } from "../viewCap/viewCap.service.js";
 import { assertJobReadRateLimit } from "../viewCap/rateLimitRedis.js";
+import { recordJobBlockedNotReady } from "../../services/jobStatusMetrics.service.js";
 
 interface GetJobParams {
   id: string;
+}
+
+function parseQueryBool(raw: unknown): boolean {
+  return raw === true || raw === "true" || raw === "1";
 }
 
 export function registerJobRoutes(
@@ -74,6 +79,7 @@ export function registerJobRoutes(
       const sortRaw = String(q.sort ?? "latest");
       const sort: "latest" | "salary_desc" =
         sortRaw === "salary_desc" || sortRaw === "salary" ? "salary_desc" : "latest";
+      const includeProcessing = parseQueryBool(q.includeProcessing);
 
       const bypassCap = isViewCapBypassRequest(request);
       const capCtx = await buildCapContextFromRequest(server.prisma, request);
@@ -96,6 +102,7 @@ export function registerJobRoutes(
               offset,
               filters,
               sort,
+              includeProcessing,
             }),
         },
       );
@@ -141,8 +148,18 @@ export function registerJobRoutes(
         } satisfies ApiError);
       }
 
-      const job = await jobService.getById(request.params.id);
+      const q = request.query as Record<string, unknown>;
+      const includeProcessing = parseQueryBool(q.includeProcessing);
+      const job = await jobService.getById(request.params.id, { includeProcessing });
       if (!job) {
+        if (!includeProcessing) {
+          const hidden = await jobService.getById(request.params.id, {
+            includeProcessing: true,
+          });
+          if (hidden) {
+            recordJobBlockedNotReady();
+          }
+        }
         return reply.status(404).send({
           error: "Job not found",
           code: "JOB_NOT_FOUND",

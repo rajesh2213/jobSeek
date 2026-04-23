@@ -211,6 +211,7 @@ export class CompanyService {
       limit: number;
       filters?: Omit<JobDiscoveryFilters, "companyId">;
       sort?: "latest" | "salary_desc";
+      includeProcessing?: boolean;
     },
   ): Promise<{ company: Company; jobs: PaginatedResult<JobWithCompany> } | null> {
     const company = await this.companyRepository.findBySlug(slug);
@@ -221,13 +222,16 @@ export class CompanyService {
       companyId: company.id,
     };
 
-    const total = await this.jobRepository.countCanonicalFiltered(filters);
+    const total = await this.jobRepository.countCanonicalFiltered(filters, {
+      includeProcessing: input.includeProcessing,
+    });
     const skip = (input.page - 1) * input.limit;
     const items = await this.jobRepository.findManyCanonicalFiltered({
       filters,
       limit: input.limit,
       offset: skip,
       sort: input.sort ?? "latest",
+      includeProcessing: input.includeProcessing,
     });
 
     const totalPages = Math.ceil(total / input.limit) || 1;

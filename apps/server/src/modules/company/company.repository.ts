@@ -208,7 +208,11 @@ export function createCompanyRepository(prisma: PrismaClient) {
       options: { limit: number; offset: number },
     ): Promise<JobWithCompany[]> {
       const rows = await prisma.job.findMany({
-        where: { companyId, canonicalJobId: null },
+        where: {
+          companyId,
+          canonicalJobId: null,
+          status: "ready",
+        },
         include: {
           company: { select: { id: true, name: true, slug: true } },
         },
@@ -224,7 +228,11 @@ export function createCompanyRepository(prisma: PrismaClient) {
 
     async countCanonicalJobsByCompanyId(companyId: string): Promise<number> {
       return prisma.job.count({
-        where: { companyId, canonicalJobId: null },
+        where: {
+          companyId,
+          canonicalJobId: null,
+          status: "ready",
+        },
       });
     },
 
@@ -314,7 +322,9 @@ export function createCompanyRepository(prisma: PrismaClient) {
         FROM (
           SELECT c.id
           FROM "Company" c
-          LEFT JOIN "Job" j ON j."companyId" = c.id AND j."canonicalJobId" IS NULL
+          LEFT JOIN "Job" j ON j."companyId" = c.id
+            AND j."canonicalJobId" IS NULL
+            AND (j."status" = 'ready' OR j."status" IS NULL)
           WHERE 1 = 1
           ${nameCond}
           GROUP BY c.id
@@ -345,7 +355,9 @@ export function createCompanyRepository(prisma: PrismaClient) {
             COUNT(j.id)::int AS "jobCount",
             COALESCE(BOOL_OR(j."isRemote" OR j."workType" = 'remote'), false) AS "hasRemoteJobs"
           FROM "Company" c
-          LEFT JOIN "Job" j ON j."companyId" = c.id AND j."canonicalJobId" IS NULL
+          LEFT JOIN "Job" j ON j."companyId" = c.id
+            AND j."canonicalJobId" IS NULL
+            AND (j."status" = 'ready' OR j."status" IS NULL)
           WHERE 1 = 1
           ${nameCond}
           GROUP BY c.id
@@ -367,6 +379,7 @@ export function createCompanyRepository(prisma: PrismaClient) {
         prisma.job.findMany({
           where: {
             canonicalJobId: null,
+            status: "ready",
             lastSeenAt: { gte: weekAgo },
           },
           distinct: ["companyId"],

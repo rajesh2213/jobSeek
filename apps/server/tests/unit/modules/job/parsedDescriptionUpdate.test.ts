@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  buildDiscoveryWhere,
   countPopulatedSections,
   scoreParsedDescription,
   shouldReplaceParsedDescription,
@@ -84,5 +85,36 @@ describe("countPopulatedSections", () => {
       2,
     );
     assert.equal(countPopulatedSections({}), 0);
+  });
+});
+
+describe("buildDiscoveryWhere status visibility", () => {
+  it("adds ready-or-null status guard by default", () => {
+    const where = buildDiscoveryWhere();
+    assert.equal(Array.isArray(where.AND), true);
+    const andList = where.AND as unknown[];
+    const hasStatusGuard = andList.some((clause) => {
+      const orValue = (clause as { OR?: unknown }).OR;
+      if (!Array.isArray(orValue)) return false;
+      return orValue.some((entry) => {
+        const status = (entry as { status?: string | null }).status;
+        return status === "ready" || status === null;
+      });
+    });
+    assert.equal(hasStatusGuard, true);
+  });
+
+  it("omits status guard when includeProcessing is true", () => {
+    const where = buildDiscoveryWhere({ includeProcessing: true });
+    assert.equal(Array.isArray(where.AND), true);
+    const andList = where.AND as unknown[];
+    const hasStatusGuard = andList.some((clause) => {
+      const orValue = (clause as { OR?: unknown }).OR;
+      if (!Array.isArray(orValue)) return false;
+      return orValue.some((entry) =>
+        Object.prototype.hasOwnProperty.call(entry as object, "status"),
+      );
+    });
+    assert.equal(hasStatusGuard, false);
   });
 });

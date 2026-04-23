@@ -1,4 +1,4 @@
-import type { JobItem } from "./api";
+import { isJobReady, type JobItem } from "./api";
 
 /**
  * Rank candidates for "similar jobs" without relying on a tiny random slice.
@@ -11,7 +11,12 @@ export function rankSimilarJobs(
 ): JobItem[] {
   const curSkills = new Set(current.skills.map((s) => s.toLowerCase()));
   const scored = candidates
-    .filter((j) => j.id !== current.id && j.companyId !== current.companyId)
+    .filter(
+      (j) =>
+        j.id !== current.id &&
+        j.companyId !== current.companyId &&
+        isJobReady(j),
+    )
     .map((j) => {
       let score = 0;
       if (j.role === current.role) score += 3;

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
-import { fetchCompanyJobs, fetchJobById, fetchJobs } from "../../../../lib/api";
+import { fetchCompanyJobs, fetchJobById, fetchJobs, isJobReady } from "../../../../lib/api";
 import { buildJobPostingJsonLd } from "../../../../lib/jobPostingJsonLd";
 import { absoluteUrl } from "../../../../lib/seoSite";
 import {
@@ -91,8 +91,14 @@ export default async function JobDetailPage({ params }: Props) {
       { viewCapBypassSecret: process.env.JOB_LIST_VIEW_CAP_BYPASS_TOKEN ?? null },
     ),
   ]);
-  const companyJobs = (companyJobsRes.data ?? []).filter((x) => x.id !== job.id).slice(0, 3);
-  const similarJobs = rankSimilarJobs(job, similarRes.data ?? [], 6);
+  const companyJobs = (companyJobsRes.data ?? [])
+    .filter((x) => x.id !== job.id && isJobReady(x))
+    .slice(0, 3);
+  const similarJobs = rankSimilarJobs(
+    job,
+    (similarRes.data ?? []).filter(isJobReady),
+    6,
+  );
 
   const applyHref = job.applyUrl?.trim() || job.sourceUrl?.trim() || "";
   const jsonLdDescription = structuredText || job.description || undefined;

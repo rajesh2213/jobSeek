@@ -21,6 +21,7 @@ import {
   fetchSavedSearches,
   patchSavedSearchAlert,
   renameSavedSearch,
+  isJobReady,
   type JobItem,
   type JobsApiResponse,
   type SavedSearchItem,
@@ -466,7 +467,7 @@ export function JobsSearchClient({
           ? [urlFilters.category]
           : [],
   }));
-  const [listJobs, setListJobs] = useState<JobItem[]>(jobs);
+  const [listJobs, setListJobs] = useState<JobItem[]>(() => jobs.filter(isJobReady));
   const [listMeta, setListMeta] = useState(initialMeta);
   const [loadingMore, setLoadingMore] = useState(false);
   const [savedSearches, setSavedSearches] = useState<SavedSearchItem[]>([]);
@@ -515,13 +516,16 @@ export function JobsSearchClient({
   useEffect(() => {
     if (listServerSyncKeyRef.current !== jobListFiltersKey) {
       listServerSyncKeyRef.current = jobListFiltersKey;
-      setListJobs(jobs);
+      setListJobs(jobs.filter(isJobReady));
       setListMeta(initialMeta);
       return;
     }
     // Same search as last sync — parent likely re-rendered from RSC (e.g. `router.replace` after apply flash).
     // Do not shrink the list back to page 1; keep client-merged pages from "Load more".
-    setListJobs((prev) => (prev.length > jobs.length ? prev : jobs));
+    setListJobs((prev) => {
+      const next = jobs.filter(isJobReady);
+      return prev.length > next.length ? prev : next;
+    });
     setListMeta((prev) => {
       const prevPage = prev?.page ?? 1;
       const serverPage = initialMeta?.page ?? 1;
@@ -786,6 +790,7 @@ export function JobsSearchClient({
         const seen = new Set(prev.map((j) => j.id));
         const merged = [...prev];
         for (const j of res.data) {
+          if (!isJobReady(j)) continue;
           if (!seen.has(j.id)) {
             seen.add(j.id);
             merged.push(j);

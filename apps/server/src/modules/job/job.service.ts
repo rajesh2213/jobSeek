@@ -23,13 +23,17 @@ export interface JobListInput {
   filters?: JobDiscoveryFilters;
   /** Result ordering; default latest-first by `createdAt`. */
   sort?: "latest" | "salary_desc";
+  includeProcessing?: boolean;
 }
 
 export class JobService {
   constructor(private readonly jobRepository: JobRepository) {}
 
-  async getById(id: string): Promise<JobWithCompany | null> {
-    return this.jobRepository.findById(id);
+  async getById(
+    id: string,
+    options?: { includeProcessing?: boolean },
+  ): Promise<JobWithCompany | null> {
+    return this.jobRepository.findById(id, options);
   }
 
   /**
@@ -56,12 +60,19 @@ export class JobService {
     return this.jobRepository.listSkillAggregates();
   }
 
-  async count(input: { filters?: JobDiscoveryFilters }): Promise<number> {
-    return this.jobRepository.countCanonicalFiltered(input.filters);
+  async count(input: {
+    filters?: JobDiscoveryFilters;
+    includeProcessing?: boolean;
+  }): Promise<number> {
+    return this.jobRepository.countCanonicalFiltered(input.filters, {
+      includeProcessing: input.includeProcessing,
+    });
   }
 
   async list(input: JobListInput): Promise<PaginatedResult<JobWithCompany>> {
-    const total = await this.jobRepository.countCanonicalFiltered(input.filters);
+    const total = await this.jobRepository.countCanonicalFiltered(input.filters, {
+      includeProcessing: input.includeProcessing,
+    });
     const skip =
       typeof input.offset === "number" && input.offset >= 0
         ? input.offset
@@ -73,6 +84,7 @@ export class JobService {
       limit: input.limit,
       offset: skip,
       sort,
+      includeProcessing: input.includeProcessing,
     });
     const totalPages = Math.ceil(total / input.limit) || 1;
     const hasMore = skip + items.length < total;

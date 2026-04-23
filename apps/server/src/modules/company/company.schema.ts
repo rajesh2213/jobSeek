@@ -34,6 +34,7 @@ export const getCompanyJobsQuerySchema: FastifySchema = {
       posted: { type: "string", enum: ["24h", "3d", "1w", "1m"] },
       minSalary: { type: "integer", minimum: 0 },
       sort: { type: "string", enum: ["latest", "salary", "salary_desc"] },
+      includeProcessing: { type: "boolean" },
     },
     additionalProperties: false,
   },

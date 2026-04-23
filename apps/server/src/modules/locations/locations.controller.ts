@@ -136,10 +136,11 @@ export function registerLocationRoutes(server: FastifyInstance): void {
         return reply.send([]);
       }
 
-      const rows = await server.prisma.job.groupBy({
+      const rows = (await server.prisma.job.groupBy({
         by: ["locationCity", "locationCountry", "locationRegion"],
         where: {
           canonicalJobId: null,
+          status: "ready",
           locationCity: {
             not: null,
             contains: q,
@@ -150,7 +151,12 @@ export function registerLocationRoutes(server: FastifyInstance): void {
         _count: { id: true },
         orderBy: { _count: { id: "desc" } },
         take: CITIES_SUGGEST_LIMIT,
-      });
+      } as never)) as Array<{
+        locationCity: string | null;
+        locationCountry: string | null;
+        locationRegion: string | null;
+        _count: { id: number };
+      }>;
 
       const out: Array<{ city: string; country: string; region: string; count: number }> = rows.map(
         (r) => {
@@ -168,13 +174,17 @@ export function registerLocationRoutes(server: FastifyInstance): void {
       );
 
       if (out.length < CITIES_SUGGEST_LIMIT) {
-        const byCountry = await server.prisma.job.groupBy({
+        const byCountry = (await server.prisma.job.groupBy({
           by: ["locationCountry"],
-          where: { canonicalJobId: null, locationCountry: { not: "UNKNOWN" } },
+          where: {
+            canonicalJobId: null,
+            locationCountry: { not: "UNKNOWN" },
+            status: "ready",
+          },
           _count: { id: true },
           orderBy: { _count: { id: "desc" } },
           take: 200,
-        });
+        } as never)) as Array<{ locationCountry: string; _count: { id: number } }>;
         const codeToCount = new Map(
           byCountry.map((r) => [r.locationCountry, r._count.id] as const),
         );

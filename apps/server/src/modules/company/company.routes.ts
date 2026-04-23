@@ -139,6 +139,7 @@ export function registerCompanyRoutes(
       const sortRaw = String(q.sort ?? "latest");
       const sort: "latest" | "salary_desc" =
         sortRaw === "salary_desc" || sortRaw === "salary" ? "salary_desc" : "latest";
+      const includeProcessing = parseQueryBool(q.includeProcessing);
 
       const slug = request.params.slug;
       const exists = await companyService.getCompanyBySlug(slug);
@@ -163,6 +164,7 @@ export function registerCompanyRoutes(
             limit: effectiveLimit,
             filters: parsed,
             sort,
+            includeProcessing,
           });
           if (!bundle) {
             throw new Error("getCompanyJobs: company missing after existence check");

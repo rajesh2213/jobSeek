@@ -25,6 +25,7 @@ export const getJobsQuerySchema: FastifySchema = {
       companyId: { type: "string" },
       location: { type: "string" },
       sort: { type: "string", enum: ["latest", "salary", "salary_desc"] },
+      includeProcessing: { type: "boolean" },
     },
     additionalProperties: false,
   },

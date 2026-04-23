@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import {
   fetchCompanyJobs,
+  isJobReady,
   type CompanyDetail,
   type CompanyListItem,
   type JobItem,
@@ -121,12 +122,12 @@ export function CompanyHubClient({
     [searchParams],
   );
 
-  const [listJobs, setListJobs] = useState<JobItem[]>(initialJobs);
+  const [listJobs, setListJobs] = useState<JobItem[]>(() => initialJobs.filter(isJobReady));
   const [listMeta, setListMeta] = useState(initialMeta);
   const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
-    setListJobs(initialJobs);
+    setListJobs(initialJobs.filter(isJobReady));
     setListMeta(initialMeta);
   }, [initialJobs, initialMeta]);
 
@@ -169,6 +170,7 @@ export function CompanyHubClient({
         const seen = new Set(prev.map((j) => j.id));
         const merged = [...prev];
         for (const j of res.data) {
+          if (!isJobReady(j)) continue;
           if (!seen.has(j.id)) {
             seen.add(j.id);
             merged.push(j);
