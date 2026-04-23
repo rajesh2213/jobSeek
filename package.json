@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "dev:server": "npm run dev -w @jobseek/server",
-    "build:server": "npm run build -w @jobseek/server",
+    "build:server": "npm run build -w @jobseek/skill-constants && npm run build -w @jobseek/server",
     "start:server": "npm run start -w @jobseek/server",
     "db:generate": "npm run db:generate -w @jobseek/server",
     "db:push": "npm run db:push -w @jobseek/server",
