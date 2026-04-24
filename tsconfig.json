@@ -1,9 +1,18 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
     "paths": {
       "@prisma/client": ["./node_modules/@prisma/client"]
     }
   },
-  "include": ["apps/server/src/**/*.ts", "apps/server/scripts/**/*.ts"]
+  "include": ["apps/server/src/**/*.ts"]
 }

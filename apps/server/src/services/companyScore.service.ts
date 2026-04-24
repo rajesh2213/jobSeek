@@ -1,5 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
-import { CompanyCrawlPriority } from "@prisma/client";
+import { CompanyCrawlPriority, type PrismaClient } from "../prisma/generatedClient.js";
 import { logger } from "../utils/logger.js";
 import { getIoredis } from "../queues/job.queue.js";
 import {
@@ -11,6 +10,13 @@ import {
 const MS_48H = 48 * 60 * 60 * 1000;
 const MS_3D = 3 * 24 * 60 * 60 * 1000;
 const MS_7D = 7 * 24 * 60 * 60 * 1000;
+
+const companySelectForScore = {
+  atsType: true,
+  lastIngestionSuccessAt: true,
+  ingestionAttempts: true,
+  lastAttemptAt: true,
+} as const;
 
 function scorePendingKey(companyId: string): string {
   return `score:pending:${companyId}`;
@@ -85,12 +91,7 @@ export async function recomputeAndPersistCompanyScore(
     }),
     prisma.company.findUnique({
       where: { id: companyId },
-      select: {
-        atsType: true,
-        lastIngestionSuccessAt: true,
-        ingestionAttempts: true,
-        lastAttemptAt: true,
-      },
+      select: companySelectForScore,
     }),
   ]);
 
