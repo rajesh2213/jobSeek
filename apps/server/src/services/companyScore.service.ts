@@ -1,4 +1,9 @@
-import { CompanyCrawlPriority, type PrismaClient } from "../prisma/generatedClient.js";
+import {
+  CompanyCrawlPriority,
+  type CompanyScoreUpdatePayload,
+  type IngestionFinishedUpdate,
+  type PrismaClient,
+} from "../prisma/generatedClient.js";
 import { logger } from "../utils/logger.js";
 import { getIoredis } from "../queues/job.queue.js";
 import {
@@ -110,9 +115,10 @@ export async function recomputeAndPersistCompanyScore(
   });
   const priority = priorityFromScore(score);
 
+  const data: CompanyScoreUpdatePayload = { score, priority, canonicalJobsLast7d };
   await prisma.company.update({
     where: { id: companyId },
-    data: { score, priority, canonicalJobsLast7d },
+    data,
   });
 
   logger.debug(
@@ -125,9 +131,9 @@ export async function recomputeAndPersistCompanyScore(
 
 export async function logCompanyPriorityDistribution(prisma: PrismaClient): Promise<void> {
   const [high, medium, low] = await Promise.all([
-    prisma.company.count({ where: { priority: CompanyCrawlPriority.high } }),
-    prisma.company.count({ where: { priority: CompanyCrawlPriority.medium } }),
-    prisma.company.count({ where: { priority: CompanyCrawlPriority.low } }),
+    prisma.company.count({ where: { priority: CompanyCrawlPriority.high } as any }),
+    prisma.company.count({ where: { priority: CompanyCrawlPriority.medium } as any }),
+    prisma.company.count({ where: { priority: CompanyCrawlPriority.low } as any }),
   ]);
   const total = high + medium + low;
   logger.info(
@@ -142,13 +148,14 @@ export async function recordIngestionFinished(
   companyId: string,
   success: boolean,
 ): Promise<void> {
+  const data: IngestionFinishedUpdate = {
+    lastAttemptAt: new Date(),
+    ingestionAttempts: { increment: 1 },
+    ...(success ? { lastIngestionSuccessAt: new Date() } : {}),
+  };
   await prisma.company.update({
     where: { id: companyId },
-    data: {
-      lastAttemptAt: new Date(),
-      ingestionAttempts: { increment: 1 },
-      ...(success ? { lastIngestionSuccessAt: new Date() } : {}),
-    },
+    data,
   });
   await requestScoreRecompute(companyId);
 }
