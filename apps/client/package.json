@@ -7,7 +7,7 @@
     "dev": "node ./scripts/ensure-routes-manifest.cjs && next dev",
     "dev:3001": "node ./scripts/ensure-routes-manifest.cjs && next dev -p 3001",
     "dev:turbo": "node ./scripts/ensure-routes-manifest.cjs && next dev --turbo",
-    "build": "next build",
+    "build": "cd ../.. && npm run build -w @jobseek/skill-constants && cd apps/client && next build",
     "start": "next start",
     "test:soft": "node --import tsx --test lib/resumeScoreSoftening.test.ts"
   },
