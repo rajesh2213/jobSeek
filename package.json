@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "test -d .git && git config core.hooksPath ../.githooks 2>/dev/null; exit 0",
+    "postinstall": "test -d .git && git config core.hooksPath .githooks 2>/dev/null; exit 0",
     "dev:server": "npm run dev -w @jobseek/server",
     "build:server": "npm run build -w @jobseek/skill-constants && npm run build -w @jobseek/server",
     "start:server": "npm run start -w @jobseek/server",
@@ -21,6 +21,7 @@
     "test:all": "npm run test:all -w @jobseek/server",
     "test:ci": "npm run test:ci -w @jobseek/server",
     "debug:location-failures": "npm run debug:location-failures -w @jobseek/server",
+    "monitor:pipeline": "npm run monitor:pipeline -w @jobseek/server --",
     "seo:check-sitemap": "node scripts/check-sitemap-health.mjs",
     "generate:brand-assets": "node scripts/generate-jobloom-brand-assets.mjs"
   },

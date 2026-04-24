@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@prisma/client": ["./node_modules/@prisma/client"]
+    }
+  },
+  "include": ["apps/server/src/**/*.ts", "apps/server/scripts/**/*.ts"]
+}

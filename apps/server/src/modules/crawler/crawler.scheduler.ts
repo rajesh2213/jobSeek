@@ -7,11 +7,12 @@ import { createCompanyRepository } from "../company/company.repository.js";
 import { CompanyService } from "../company/company.service.js";
 import { createJobRepository } from "../job/job.repository.js";
 import { getJobQueue, closeJobQueue } from "../../queues/job.queue.js";
+import { logCompanyPriorityDistribution } from "../../services/companyScore.service.js";
 import { CrawlerService } from "./crawler.service.js";
 
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 
-async function runOnce(): Promise<void> {
+async function runOnce(schedulerCycle: number): Promise<void> {
   const jobQueue = getJobQueue();
   const companyRepository = createCompanyRepository(prisma);
   const companyService = new CompanyService(
@@ -21,9 +22,10 @@ async function runOnce(): Promise<void> {
 
   const crawlerService = new CrawlerService(companyService, jobQueue);
 
-  const stats = await crawlerService.enqueueGreenhouseCompanyCrawls();
-  const companiesProcessed =
-    stats.companiesScanned - stats.skippedDueToRecentCrawl;
+  await logCompanyPriorityDistribution(prisma);
+
+  const stats = await crawlerService.enqueueGreenhouseCompanyCrawls(new Date(), schedulerCycle);
+  const companiesProcessed = stats.companiesScanned - stats.skippedDueToRecentCrawl;
   const jobsPerMinute = stats.jobsEnqueued / 5;
   logger.info(
     {
@@ -31,16 +33,10 @@ async function runOnce(): Promise<void> {
       companies_scanned: stats.companiesScanned,
       jobs_enqueued: stats.jobsEnqueued,
       skipped_due_to_recent_crawl: stats.skippedDueToRecentCrawl,
-    },
-    "Scheduler run completed",
-  );
-  logger.info(
-    {
-      event: "ingestion_rate",
       jobs_per_minute: Number(jobsPerMinute.toFixed(2)),
       companies_processed: companiesProcessed,
     },
-    "Scheduler ingestion rate",
+    "Scheduler run completed",
   );
 }
 
@@ -50,14 +46,16 @@ async function main(): Promise<void> {
 
   logger.info({ event: "crawl_scheduler_start" }, "Crawler scheduler starting");
 
+  let schedulerCycle = 0;
   try {
-    await runOnce();
+    await runOnce(schedulerCycle);
   } catch (err) {
     logger.error(err, "Crawler scheduler initial run failed");
   }
 
   const interval = setInterval(() => {
-    void runOnce().catch((err) => {
+    schedulerCycle += 1;
+    void runOnce(schedulerCycle).catch((err) => {
       logger.error({ event: "crawl_scheduler_run_failed", err }, "Crawler scheduler run failed");
     });
   }, TEN_MINUTES_MS);

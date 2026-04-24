@@ -10,6 +10,7 @@ import {
   JOB_QUEUE_NAME,
   closeJobQueue,
 } from "../queues/job.queue.js";
+import { getCompanyScoreQueue, closeCompanyScoreQueue } from "../queues/companyScore.queue.js";
 import { assertWorkerProcessEnv } from "../infrastructure/env/validateWorkerEnv.js";
 import { registerWorkerShutdown } from "../utils/workerShutdown.js";
 import { CompanyService } from "../modules/company/company.service.js";
@@ -35,6 +36,8 @@ import { isSupportedAtsType, type AtsType } from "../modules/ats/ats.interface.j
 import { createAtsCrawlerStandard } from "../modules/ats/AtsCrawlerStandard.js";
 import { enrichCanonicalJobParsedDescription } from "../modules/ai/jobDescriptionEnrichment.js";
 import { takeAndResetParseStartsInWindow } from "../modules/ai/ai.service.js";
+import { shouldEnqueueJob } from "../services/recentJobSeen.service.js";
+import { recordIngestionFinished } from "../services/companyScore.service.js";
 import { hostname } from "node:os";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -233,6 +236,7 @@ async function start(): Promise<void> {
   );
   const jobService = new JobService(jobRepository);
   const queue = getJobQueue();
+  getCompanyScoreQueue();
   const crawlCounters = new Map<string, CrawlSummaryCounters>();
 
   let processJobCompletions = 0;
@@ -289,6 +293,7 @@ async function start(): Promise<void> {
           atsBoardToken: atsBoardTokenFromPayload,
         } = payload;
 
+        let ingestionCompanyId: string | null = null;
         try {
           const company =
             companyIdFromPayload
@@ -372,6 +377,8 @@ async function start(): Promise<void> {
             }
           }
 
+          ingestionCompanyId = resolvedCompanyId;
+
           logger.info(
             {
               event: "crawl_start",
@@ -423,10 +430,27 @@ async function start(): Promise<void> {
           );
 
           let enqueueFailures = 0;
+          let recentDuplicateSkips = 0;
           for (let i = 0; i < normalizedJobs.length; i += PROCESS_JOB_ADD_CHUNK) {
             const batch = normalizedJobs.slice(i, i + PROCESS_JOB_ADD_CHUNK);
             const results = await Promise.allSettled(
-              batch.map((j) => queue.add(PROCESS_JOB, j)),
+              batch.map(async (j) => {
+                const shouldEnqueue = await shouldEnqueueJob(j.sourceUrl);
+                if (!shouldEnqueue) {
+                  recentDuplicateSkips += 1;
+                  logger.debug(
+                    {
+                      event: "job_skipped_recent_duplicate",
+                      companyId: resolvedCompanyId,
+                      atsType: resolvedAtsType,
+                      sourceUrl: j.sourceUrl,
+                    },
+                    "job_skipped_recent_duplicate",
+                  );
+                  return;
+                }
+                await queue.add(PROCESS_JOB, j);
+              }),
             );
             for (let k = 0; k < results.length; k++) {
               const r = results[k]!;
@@ -456,10 +480,19 @@ async function start(): Promise<void> {
                 jobs_fetched: 0,
                 jobs_inserted: 0,
                 jobs_updated: jobsUpdated,
+              recent_duplicate_skips: recentDuplicateSkips,
                 failures: enqueueFailures,
               },
               "Company crawl completed",
             );
+            try {
+              await recordIngestionFinished(prisma, resolvedCompanyId, true);
+            } catch (recErr) {
+              logger.warn(
+                { event: "ingestion_metrics_record_failed", companyId: resolvedCompanyId, err: recErr },
+                "ingestion_metrics_record_failed",
+              );
+            }
             return;
           }
 
@@ -469,7 +502,29 @@ async function start(): Promise<void> {
             jobsUpdated,
             failures: enqueueFailures,
           });
+          try {
+            await recordIngestionFinished(prisma, resolvedCompanyId, true);
+          } catch (recErr) {
+            logger.warn(
+              { event: "ingestion_metrics_record_failed", companyId: resolvedCompanyId, err: recErr },
+              "ingestion_metrics_record_failed",
+            );
+          }
         } catch (err) {
+          if (ingestionCompanyId) {
+            try {
+              await recordIngestionFinished(prisma, ingestionCompanyId, false);
+            } catch (recErr) {
+              logger.warn(
+                {
+                  event: "ingestion_metrics_record_failed",
+                  companyId: ingestionCompanyId,
+                  err: recErr,
+                },
+                "ingestion_metrics_record_failed",
+              );
+            }
+          }
           const errorType = classifyCrawlError(err);
           logger.error(
             {
@@ -678,7 +733,7 @@ async function start(): Promise<void> {
 
   registerWorkerShutdown({
     worker,
-    closeQueues: [closeJobQueue],
+    closeQueues: [closeJobQueue, closeCompanyScoreQueue],
     prismaDisconnect: () => prisma.$disconnect(),
   });
 }

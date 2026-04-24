@@ -4,6 +4,7 @@ import { prisma } from "../infrastructure/db/prisma.js";
 import { logger } from "../utils/logger.js";
 import { CompanyStatus } from "@prisma/client";
 import { getRedisConnection } from "../queues/job.queue.js";
+import { getCompanyScoreQueue, closeCompanyScoreQueue } from "../queues/companyScore.queue.js";
 import {
   getIngestAtsEndpointQueue,
   closeIngestAtsEndpointQueue,
@@ -31,8 +32,9 @@ import { enrichCanonicalJobParsedDescription } from "../modules/ai/jobDescriptio
 import { asyncPool } from "../utils/asyncPool.js";
 import { chunkArray } from "../utils/chunkArray.js";
 import type { NormalizedJob } from "../modules/crawler/crawler.types.js";
+import { recordIngestionFinished } from "../services/companyScore.service.js";
 
-/** Skip ingest fetchJobs if a prior ingest run just updated lastCrawledAt (reduces back-to-back duplicate crawls). */
+// Avoid back-to-back fetches when lastCrawledAt was just set.
 const MIN_MS_SINCE_LAST_CRAWL_FOR_INGEST = Math.floor(2.5 * 60 * 1000);
 
 type AtsIngestErrorKind = "network_error" | "parser_error" | "crawler_error";
@@ -105,10 +107,10 @@ async function start(): Promise<void> {
   const endpointService = createAtsEndpointService(prisma);
 
   getIngestAtsEndpointQueue();
+  getCompanyScoreQueue();
 
   const parsePoolConcurrency = clampPoolSize("ATS_PARSE_CONCURRENCY", "3", 4);
   const ingestPoolConcurrencyRaw = clampPoolSize("ATS_POOL_INGEST_CONCURRENCY", "3", 4);
-  /** Ingest pressure should not exceed parse (downstream enrich + shared MAX_IN_FLIGHT_PARSE). */
   const ingestPoolConcurrency = Math.min(ingestPoolConcurrencyRaw, parsePoolConcurrency);
   const parseChunkSize = Math.max(10, Math.min(500, Number(process.env.ATS_PARSE_CHUNK_SIZE ?? "100") || 100));
   const bullConcurrency = Math.max(1, Math.min(4, Number(process.env.ATS_ENDPOINT_WORKER_CONCURRENCY ?? "1") || 1));
@@ -236,6 +238,18 @@ async function start(): Promise<void> {
           "ats_ingestion_failed",
         );
         await endpointService.markFailure(endpointId);
+        try {
+          await recordIngestionFinished(prisma, resolvedCompanyId, false);
+        } catch (recErr) {
+          logger.warn(
+            {
+              event: "ingestion_metrics_record_failed",
+              companyId: resolvedCompanyId,
+              err: recErr,
+            },
+            "ingestion_metrics_record_failed",
+          );
+        }
         throw err;
       }
 
@@ -360,6 +374,19 @@ async function start(): Promise<void> {
         },
         "ats_ingestion_completed",
       );
+
+      try {
+        await recordIngestionFinished(prisma, resolvedCompanyId, failures === 0);
+      } catch (recErr) {
+        logger.warn(
+          {
+            event: "ingestion_metrics_record_failed",
+            companyId: resolvedCompanyId,
+            err: recErr,
+          },
+          "ingestion_metrics_record_failed",
+        );
+      }
     },
     { connection: getRedisConnection(), concurrency: bullConcurrency },
   );
@@ -387,7 +414,7 @@ async function start(): Promise<void> {
 
   registerWorkerShutdown({
     worker,
-    closeQueues: [closeIngestAtsEndpointQueue],
+    closeQueues: [closeIngestAtsEndpointQueue, closeCompanyScoreQueue],
     prismaDisconnect: () => prisma.$disconnect(),
   });
 }

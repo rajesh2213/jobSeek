@@ -15,23 +15,38 @@ enum CompanyStatus {
   failed
 }
 
+enum CompanyCrawlPriority {
+  high
+  medium
+  low
+}
+
 model Company {
-  id                  String         @id @default(uuid())
+  id                  String                @id @default(uuid())
   name                String
-  slug                String         @unique
-  domain              String?        @unique
+  slug                String                @unique
+  domain              String?               @unique
   logoUrl             String?
   careersUrl          String?
   atsBoardToken       String?
   atsType             String?
-  status              CompanyStatus  @default(raw)
+  status              CompanyStatus         @default(raw)
   discoverySource     String?
-  enrichmentAttempts  Int            @default(0)
+  enrichmentAttempts  Int                   @default(0)
   lastCrawledAt         DateTime?
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
+  score                 Int                   @default(0)
+  priority              CompanyCrawlPriority  @default(low)
+  lastIngestionSuccessAt DateTime?
+  ingestionAttempts     Int                   @default(0)
+  lastAttemptAt         DateTime?
+  canonicalJobsLast7d   Int                   @default(0)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
   jobs                  Job[]
   atsEndpoints          AtsEndpoint[]
+
+  @@index([priority, score])
+  @@index([lastAttemptAt])
 }
 
 model AtsEndpoint {
