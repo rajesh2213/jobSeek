@@ -1,0 +1,14 @@
+[Unit]
+Description=JobSeek Company Score Worker (Bull company-score / SCORE_RECOMPUTE)
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/jobSeek
+EnvironmentFile=/home/ubuntu/jobSeek/.env
+ExecStart=/usr/bin/npm run worker:score -w @jobseek/server
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
