@@ -1,0 +1,8 @@
+#!/bin/sh
+# Strip any agent "Made-with: Cursor" line if a hook run sees it (e.g. local CLI).
+# Note: In Cursor, `git` is not always used — prefer /usr/bin/git for commits (see .cursor/rules).
+f=$1
+[ -f "$f" ] || exit 0
+tmp=$(mktemp)
+tr -d '\r' < "$f" | sed '/^Made-with: Cursor[[:space:]]*$/d' > "$tmp" && mv "$tmp" "$f"
+exit 0

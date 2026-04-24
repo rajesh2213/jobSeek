@@ -6,6 +6,7 @@
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "test -d .git && git config core.hooksPath ../.githooks 2>/dev/null; exit 0",
     "dev:server": "npm run dev -w @jobseek/server",
     "build:server": "npm run build -w @jobseek/skill-constants && npm run build -w @jobseek/server",
     "start:server": "npm run start -w @jobseek/server",
