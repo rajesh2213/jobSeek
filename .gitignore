@@ -56,3 +56,10 @@ apps/client/.clerk/
 # GitHub rejects files >100MB — keep locally or use Git LFS / object storage
 **/*.safetensors
 apps/server/src/modules/seeding/data/Wellfound_Final.csv
+
+# Local bulk exports (keep on disk; do not commit or overwrite on sync)
+data/company-dataset/Wellfound_final
+data/company-dataset/Wellfound_final/
+apps/server/data/company-dataset/Wellfound_final
+apps/server/data/company-dataset/Wellfound_final/
+apps/server/data/company-datasets/Wellfound_Final.csv
