@@ -1,15 +1,12 @@
 ---
-description: Avoid Cursor tool trailers on git commit messages
+description: Use system git for commits so messages are not auto-appended
 alwaysApply: true
 ---
 
 # Git in this project
 
-**Use the real binary for commits and anything that can write commit messages** so Cursor does not append a `Made-with: Cursor` trailer to commits:
+**Use the system binary for anything that can write a commit object** (in Cursor agent shells, a bare `git` can add an extra last line to the message):
 
-- Prefer `/usr/bin/git` (or `command -v git` to a system path) over bare `git` for:
-  - `commit`, `commit --amend`, `rebase` (if it opens commits), `cherry-pick` with `-e`, and similar.
+- Prefer `/usr/bin/git` (or a known system path) over `git` for `commit`, `commit --amend`, `rebase` / `cherry-pick` with `-e`, and similar.
 
-Shell aliases or a repo script are fine; the point is: **do not rely on a `git` that might be instrumented in agent shells.**
-
-The repo also installs a `commit-msg` hook under `.githooks/` (via `core.hooksPath` and `postinstall`); that hook strips the trailer if it appears.
+The repo’s `core.hooksPath` and `postinstall` wire `.githooks/commit-msg` to remove that footer if it is present.
