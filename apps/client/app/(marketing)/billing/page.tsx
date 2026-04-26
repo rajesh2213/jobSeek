@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPageShell } from "../../../components/legal/LegalPageShell";
-import { getSiteOperator, getSupportEmail } from "../../../lib/siteIdentity";
+import { getSupportEmail, LEGAL_LAST_UPDATED } from "../../../lib/siteIdentity";
 
 export const metadata: Metadata = {
   title: "Billing & refunds | JobLoom",
@@ -8,58 +8,86 @@ export const metadata: Metadata = {
 };
 
 export default function BillingPage() {
-  const operator = getSiteOperator();
   const support = getSupportEmail();
 
   return (
     <LegalPageShell
       title="Billing, cancellation, and refunds"
-      description={`Last updated: ${new Date().toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" })}. Template — have qualified counsel review before reliance.`}
+      description={`Last updated: ${LEGAL_LAST_UPDATED}.`}
     >
       <p>
-        This page describes how paid plans for {operator}&apos;s JobLoom product (&quot;Pro&quot; or similar) work at a high level. The
-        checkout screen and third-party billing portal may contain additional details.
+        This page explains how <strong>paid</strong> plans for JobLoom (for example, &quot;Pro&quot; or a similarly named plan)
+        work. Your <a href="/terms">Terms of Service</a> and <a href="/privacy">Privacy Policy</a> also apply. More detail on
+        charges, tax, and payment support may appear at <strong>checkout</strong> and in documentation from the{" "}
+        <strong>third-party payment provider</strong> (which may act as <strong>Merchant of Record</strong> for your purchase).
       </p>
 
-      <h2>1. Subscription</h2>
+      <h2>1. Subscription; billing period</h2>
       <p>
-        Pro is a subscription service billed in advance for the interval you choose (for example, monthly or annual). Unless
-        stated otherwise at purchase, subscriptions renew automatically until you cancel.
+        Paid access is a <strong>subscription</strong> billed in <strong>advance</strong> for the period you select (for example,{" "}
+        <strong>monthly</strong> or <strong>annual</strong>). The price, currency, and billing interval are shown before you
+        complete payment. Payment is processed by our <strong>third-party payment provider</strong>, not by us directly; your
+        bank or card statement may list the provider&apos;s name. The provider may handle invoicing, tax collection, and
+        first-line payment questions under its own terms.
+      </p>
+      <p>
+        <strong>Subscriptions renew automatically at the end of each billing period unless you cancel</strong> before the
+        renewal date (or, where your payment provider offers a different cut-off, as stated at checkout or in the
+        provider&apos;s terms). <strong>Auto-renewal</strong> means a new term is charged without a separate sign-up for each
+        period until you cancel.
       </p>
 
       <h2>2. Cancellation</h2>
       <p>
-        You can cancel at any time using the account or billing controls we provide (including the payment provider&apos;s customer
-        portal where applicable). When you cancel, you generally keep access to paid features until the end of the billing period
-        you already paid for. After that, your account moves to the free tier limits described on our pricing page.
+        You may <strong>cancel at any time</strong> through the <strong>subscription or billing controls</strong> we or our
+        payment provider make available (for example, a <strong>customer or billing portal</strong> linked from your account,
+        your receipt, or the provider&apos;s site). <strong>Canceling stops renewal</strong>—it does not retroactively refund the
+        current period unless a refund is required by law, offered by the payment provider, or agreed by us in writing.
+      </p>
+      <p>
+        After you cancel, you generally <strong>keep access to paid features until the end of the period you have already
+        paid for</strong>. When that period ends, your access moves to the <strong>free tier</strong> limits described on our
+        pricing page. If you have trouble locating cancellation controls, contact us using the information below and include
+        the email on your account.
       </p>
 
       <h2>3. Refunds</h2>
       <p>
-        Refund eligibility may depend on applicable law, the rules of our payment processor, and what was shown to you at
-        checkout. If you believe you were charged in error or have a statutory right of withdrawal in your jurisdiction, contact
-        us promptly with your account email and transaction details. Where a refund is granted, access to paid features may end
-        when the refund is processed.
+        <strong>Refund rules depend on</strong> applicable law, the terms shown at <strong>purchase</strong>, and the policies
+        of the <strong>third-party payment provider</strong> (including the Merchant of Record, where applicable). We do not
+        guarantee a refund for change of mind or partial use of a period. If you were charged in error, you believe a renewal
+        was not authorized, or you have a <strong>statutory cooling-off or withdrawal</strong> right in your location, contact
+        us promptly with your account email and, if you have one, a transaction or receipt reference. You may also use any
+        dispute or support channel offered at checkout. If a refund is issued, <strong>paid access may end</strong> when the
+        refund is processed.
       </p>
 
       <h2>4. Price changes</h2>
       <p>
-        We may change prices or plans. Where required, we will give advance notice and, if you do not agree, you may cancel before
-        the new price takes effect for your renewal.
+        We may change prices or plans. Where required by law, we will give <strong>advance notice</strong> and, if you do not
+        agree, you may <strong>cancel before the new price applies</strong> to your next renewal.
       </p>
 
       <h2>5. Taxes</h2>
-      <p>Applicable taxes may be added to your total as shown at checkout, depending on your location and law.</p>
+      <p>Applicable <strong>taxes</strong> may be added to your total as shown at checkout, depending on your location and law.</p>
 
-      <h2>6. Contact</h2>
+      <h2>6. Account termination</h2>
       <p>
-        Billing questions:{" "}
+        We may suspend or terminate the Service for serious breach of our terms or for legal, security, or fraud reasons, as
+        described in the <a href="/terms">Terms of Service</a>. You may close your account through available account or
+        sign-in settings; <strong>terminating the account</strong> may not by itself delete all personal data; see the{" "}
+        <a href="/privacy">Privacy Policy</a> for deletion.
+      </p>
+
+      <h2>7. Contact</h2>
+      <p>
+        Billing and subscription help:{" "}
         {support ? (
           <a href={`mailto:${support}`} className="font-medium text-brand hover:underline">
             {support}
           </a>
         ) : (
-          <>use the contact method published on this website when available.</>
+          <>the contact method published on this website.</>
         )}
       </p>
     </LegalPageShell>

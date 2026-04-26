@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPageShell } from "../../../components/legal/LegalPageShell";
-import {
-  getGoverningLawJurisdiction,
-  getSiteOperator,
-  getSupportEmail,
-} from "../../../lib/siteIdentity";
+import { getGoverningLawJurisdiction, getSupportEmail, LEGAL_LAST_UPDATED } from "../../../lib/siteIdentity";
 
 export const metadata: Metadata = {
   title: "Terms of Service | JobLoom",
@@ -12,33 +8,33 @@ export const metadata: Metadata = {
 };
 
 export default function TermsPage() {
-  const operator = getSiteOperator();
   const support = getSupportEmail();
   const law = getGoverningLawJurisdiction();
 
   return (
     <LegalPageShell
       title="Terms of Service"
-      description={`Last updated: ${new Date().toLocaleDateString("en-GB", { year: "numeric", month: "long", day: "numeric" })}. Template — have qualified counsel review before reliance.`}
+      description={`Last updated: ${LEGAL_LAST_UPDATED}.`}
     >
       <p>
         These Terms of Service (&quot;Terms&quot;) govern your access to and use of the websites, applications, and services
-        offered by {operator} (&quot;we,&quot; &quot;us,&quot; or &quot;JobLoom&quot;) (collectively, the &quot;Service&quot;). By creating an account,
-        subscribing, or using the Service, you agree to these Terms.
+        offered by JobLoom (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) (collectively, the &quot;Service&quot;). By
+        creating an account, subscribing, or using the Service, you agree to these Terms.
       </p>
 
       <h2>1. The Service</h2>
       <p>
-        JobLoom provides job search tools, including aggregated job listings, filters, account features, optional resume-related
-        features, and optional browser extension functionality (&quot;Smart Apply&quot;). Features may change over time. We do not
-        guarantee that any particular job listing will remain available, that listings are error-free, or that you will obtain
-        employment or interviews by using the Service.
+        JobLoom is a job aggregation and search tool. Depending on your plan, you may access job listings, search and filter
+        features, an account, optional resume upload and related processing, and optional features such as a browser extension
+        (&quot;Smart Apply&quot;). The mix of free and paid features is described on our site and may change. We do not guarantee
+        that any listing is complete, current, or accurate, that any role will still be open when you apply, or that you will
+        obtain employment, an interview, or any particular outcome. The Service is not a recruiting or placement service.
       </p>
 
       <h2>2. Eligibility and accounts</h2>
       <p>
-        You must provide accurate registration information. Authentication and account management may be provided by a third
-        party (such as Clerk). You are responsible for safeguarding your credentials and for activity under your account.
+        You must provide accurate registration information. Authentication and account management may be provided by a
+        third-party sign-in service. You are responsible for safeguarding your credentials and for activity under your account.
       </p>
 
       <h2>3. Acceptable use</h2>
@@ -53,29 +49,39 @@ export default function TermsPage() {
 
       <h2>4. Subscriptions and billing</h2>
       <p>
-        Paid plans are billed by {operator} through a third-party payment processor. Fees, renewal terms, and taxes (if any) are
-        presented at checkout. By subscribing, you authorize charges in accordance with the plan you select. If your payment
-        fails, we may suspend paid features until payment succeeds.
+        Certain features require a paid subscription. Payments for subscriptions are processed by a <strong>third-party payment
+        provider</strong> that may act as the <strong>Merchant of Record</strong>. This means the payment provider may handle
+        billing, invoicing, tax collection, and certain aspects of refunds and first-line payment support, as described at
+        checkout, in your receipt, and in the provider&apos;s terms. We receive the information we need to activate, renew, and
+        manage your access to paid features. Fees, billing period (for example, monthly or annual), and taxes are shown at
+        purchase.
+      </p>
+      <p>
+        <strong>Subscriptions renew automatically</strong> at the end of each billing period <strong>unless you cancel</strong>{" "}
+        prior to renewal, as described in our <a href="/billing">Billing, cancellation, and refunds</a> page and at checkout. By
+        subscribing, you authorize recurring charges through the third-party payment provider in line with the plan you select.
+        If a payment fails, we may suspend paid features until payment succeeds or the subscription ends.
       </p>
 
       <h2>5. Cancellation</h2>
       <p>
-        You may cancel a subscription in accordance with the billing portal or account controls we provide. When you cancel,
-        you typically retain access through the end of the period you already paid for, unless stated otherwise at purchase.
-        See also our <a href="/billing">Billing &amp; refunds</a> page.
+        You may cancel a subscription through the account or subscription controls we provide, including any billing or
+        customer portal made available by the third-party payment provider. When you cancel, you generally retain access to
+        paid features <strong>until the end of the period you have already paid for</strong>, unless otherwise stated at
+        purchase. See our <a href="/billing">Billing, cancellation, and refunds</a> page.
       </p>
 
       <h2>6. AI-assisted and extension features</h2>
       <p>
         Some features may generate suggestions or draft text using automated or AI-assisted methods. Output may be inaccurate or
         incomplete. <strong>You are solely responsible</strong> for reviewing, editing, and submitting applications and for the
-        accuracy of information you provide to employers. Nothing generated by the Service constitutes legal, career, or
-        professional advice.
+        accuracy of information you provide to employers. Nothing generated by the Service constitutes legal, career, tax, or
+        professional advice, or any promise of employment or compensation.
       </p>
       <p>
-        The Smart Apply extension may interact with third-party career sites to help fill forms based on your profile. You must
-        review every submission. The extension may request broad site access to function; see our <a href="/privacy">Privacy Policy</a>{" "}
-        for more detail.
+        The Smart Apply extension may interact with third-party career sites to help fill forms from your profile. You must
+        review every submission. The extension may request broad site access to function; see our{" "}
+        <a href="/privacy">Privacy Policy</a> for more detail.
       </p>
 
       <h2>7. Intellectual property</h2>
@@ -87,18 +93,20 @@ export default function TermsPage() {
 
       <h2>8. Disclaimers</h2>
       <p>
-        THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE.&quot; TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE DISCLAIM ALL
-        WARRANTIES, WHETHER EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+        THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE.&quot; TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE
+        DISCLAIM ALL WARRANTIES, WHETHER EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
         NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED OR ERROR-FREE.
       </p>
 
       <h2>9. Limitation of liability</h2>
       <p>
-        TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT WILL {operator.toUpperCase()} OR ITS SUPPLIERS BE LIABLE FOR ANY
-        INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS, DATA, GOODWILL, OR BUSINESS
-        OPPORTUNITY, ARISING OUT OF OR RELATED TO THE SERVICE OR THESE TERMS. OUR AGGREGATE LIABILITY FOR ALL CLAIMS RELATING TO
-        THE SERVICE WILL NOT EXCEED THE GREATER OF (A) THE AMOUNTS YOU PAID US FOR THE SERVICE IN THE TWELVE MONTHS BEFORE THE
-        CLAIM OR (B) FIFTY U.S. DOLLARS (OR THE EQUIVALENT IN LOCAL CURRENCY), EXCEPT WHERE PROHIBITED BY LAW.
+        TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT WILL WE OR OUR SUPPLIERS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+        SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS, DATA, GOODWILL, OR BUSINESS OPPORTUNITY, ARISING
+        OUT OF OR RELATED TO THE SERVICE OR THESE TERMS. OUR AGGREGATE LIABILITY FOR ALL CLAIMS RELATING TO THE SERVICE WILL
+        NOT EXCEED THE GREATER OF (A) THE <strong>FEES PAID FOR THE SERVICE</strong> IN THE TWELVE MONTHS BEFORE THE CLAIM OR
+        (B) FIFTY U.S. DOLLARS (OR THE EQUIVALENT IN LOCAL CURRENCY), EXCEPT WHERE PROHIBITED BY LAW. &quot;FEES PAID FOR THE
+        SERVICE&quot; INCLUDES AMOUNTS PROCESSED BY A THIRD-PARTY PAYMENT PROVIDER IN CONNECTION WITH YOUR SUBSCRIPTION, TO THE
+        EXTENT THOSE AMOUNTS RELATE TO YOUR ACCESS TO THE SERVICE.
       </p>
 
       <h2>10. Indemnity</h2>
@@ -111,20 +119,23 @@ export default function TermsPage() {
       <h2>11. Changes</h2>
       <p>
         We may modify the Service or these Terms. If we make material changes, we will provide notice as appropriate (for
-        example, by posting an updated date or email where we have your address). Continued use after changes become effective
-        constitutes acceptance of the revised Terms.
+        example, by posting an updated date or contacting you at the email on your account). Continued use after changes become
+        effective constitutes acceptance of the revised Terms.
       </p>
 
-      <h2>12. Termination</h2>
+      <h2>12. Termination; data</h2>
       <p>
-        We may suspend or terminate access to the Service if you materially breach these Terms or if we must do so to comply with
-        law or protect the Service or other users.
+        We may suspend or terminate access to the Service if you materially breach these Terms, if we are required to do so by
+        law, or to protect the Service or other users. You may stop using the Service at any time. You may also request
+        deletion of your personal information or your account; see our <a href="/privacy">Privacy Policy</a> for how to make a
+        request, subject to legal exceptions. Provisions of these Terms that by their nature should survive will survive
+        termination.
       </p>
 
       <h2>13. Governing law</h2>
       <p>
-        These Terms are governed by the laws of {law}, excluding conflict-of-law rules that would apply another jurisdiction&apos;s
-        laws, except where mandatory consumer protections apply.
+        These Terms are governed by the laws of {law}, excluding conflict-of-law rules that would apply another
+        jurisdiction&apos;s laws, except where mandatory consumer protections apply.
       </p>
 
       <h2>14. Contact</h2>
@@ -135,7 +146,7 @@ export default function TermsPage() {
             {support}
           </a>
         ) : (
-          <>use the contact method published on this website when available.</>
+          <>the contact method published on this website.</>
         )}
       </p>
     </LegalPageShell>
