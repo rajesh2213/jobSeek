@@ -7,12 +7,21 @@ import { enrichDedupInput } from "../utils/jobTaxonomyEnricher.js";
 import { isSameJob, stringSimilarity } from "../utils/jobSimilarity.js";
 import { recomputeCanonical } from "./jobCanonical.service.js";
 import { logger } from "../utils/logger.js";
+import { normalizeJobUrl } from "../utils/normalizeJobUrl.js";
 import {
   getJobDedupMetricsSnapshot,
   recordIngestionOutcome,
 } from "./jobMetrics.service.js";
 
 export type { DedupJobInput } from "../modules/crawler/crawler.types.js";
+
+const URL_IDENTITY_LOG_FIRST = 200;
+let urlIdentityLogCount = 0;
+function shouldLogUrlIdentityCheck(): boolean {
+  urlIdentityLogCount += 1;
+  if (urlIdentityLogCount <= URL_IDENTITY_LOG_FIRST) return true;
+  return Math.random() < 0.01;
+}
 
 /**
  * Build v2 fingerprint from normalized job + company domain (cross-ATS stable).
@@ -56,7 +65,19 @@ export async function deduplicateAndInsert(
   repo: JobRepository,
   raw: NormalizedJob & { companyDomain: string },
 ): Promise<{ canonical: Job; inserted: boolean }> {
-  const input = enrichDedupInput(raw);
+  const rawSourceUrl = String(raw.sourceUrl).trim();
+  const normalizedSourceUrl = normalizeJobUrl(rawSourceUrl);
+  if (shouldLogUrlIdentityCheck()) {
+    logger.info(
+      {
+        event: "url_identity_check",
+        raw: rawSourceUrl,
+        normalized: normalizedSourceUrl,
+      },
+      "url_identity_check",
+    );
+  }
+  const input = enrichDedupInput({ ...raw, sourceUrl: normalizedSourceUrl });
   const { fingerprint, version: fingerprintVersion } = fingerprintFromNormalized(input);
 
   const existingByUrl = await repo.findBySourceUrl(input.sourceUrl);

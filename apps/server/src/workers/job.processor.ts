@@ -37,6 +37,7 @@ import { createAtsCrawlerStandard } from "../modules/ats/AtsCrawlerStandard.js";
 import { enrichCanonicalJobParsedDescription } from "../modules/ai/jobDescriptionEnrichment.js";
 import { takeAndResetParseStartsInWindow } from "../modules/ai/ai.service.js";
 import { shouldEnqueueJob } from "../services/recentJobSeen.service.js";
+import { normalizeJobUrl } from "../utils/normalizeJobUrl.js";
 import { recordIngestionFinished } from "../services/companyScore.service.js";
 import { hostname } from "node:os";
 
@@ -157,7 +158,7 @@ function validateNormalizedJob(data: unknown): NormalizedJob | null {
     location,
     isRemote,
     source: source as AtsType,
-    sourceUrl,
+    sourceUrl: normalizeJobUrl(sourceUrl.trim()),
     applyUrl,
     postedAt,
     companyId,
@@ -423,7 +424,9 @@ async function start(): Promise<void> {
             "Parsed ATS job list",
           );
 
-          const sourceUrls = normalizedJobs.map((job) => job.sourceUrl);
+          const sourceUrls = normalizedJobs.map((job) =>
+            normalizeJobUrl(String(job.sourceUrl).trim()),
+          );
           const jobsUpdated = await jobService.touchLastSeenBySourceUrls(
             sourceUrls,
             new Date(),
@@ -435,21 +438,22 @@ async function start(): Promise<void> {
             const batch = normalizedJobs.slice(i, i + PROCESS_JOB_ADD_CHUNK);
             const results = await Promise.allSettled(
               batch.map(async (j) => {
-                const shouldEnqueue = await shouldEnqueueJob(j.sourceUrl);
+                const normalizedUrl = normalizeJobUrl(String(j.sourceUrl).trim());
+                const shouldEnqueue = await shouldEnqueueJob(normalizedUrl);
                 if (!shouldEnqueue) {
                   recentDuplicateSkips += 1;
-                  logger.debug(
+                  logger.info(
                     {
                       event: "job_skipped_recent_duplicate",
                       companyId: resolvedCompanyId,
                       atsType: resolvedAtsType,
-                      sourceUrl: j.sourceUrl,
+                      sourceUrl: normalizedUrl,
                     },
                     "job_skipped_recent_duplicate",
                   );
                   return;
                 }
-                await queue.add(PROCESS_JOB, j);
+                await queue.add(PROCESS_JOB, { ...j, sourceUrl: normalizedUrl });
               }),
             );
             for (let k = 0; k < results.length; k++) {
