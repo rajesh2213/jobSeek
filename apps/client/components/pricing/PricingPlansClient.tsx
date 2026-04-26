@@ -3,6 +3,11 @@
 import { SignInButton, useAuth } from "@clerk/nextjs";
 import { useCallback, useState } from "react";
 import { API_BASE_URL } from "../../lib/api";
+import {
+  PRO_ANNUAL_BILLED_YEAR_LABEL,
+  PRO_ANNUAL_SAVE_VS_MONTHLY_PERCENT,
+  PRO_ANNUAL_USD_PER_MONTH,
+} from "../../lib/pricingDisplay";
 import { CREAM_TINT, CORAL, PRO_FEATURES } from "./pricingCopy";
 
 const ANNUAL_VARIANT_ID = process.env.NEXT_PUBLIC_LS_PRO_ANNUAL_VARIANT_ID?.trim() ?? "";
@@ -125,16 +130,17 @@ export function PricingPlansClient() {
           <p className="mt-1 text-sm text-ink-muted">Best value for serious searchers</p>
           <div className="mt-6">
             <p className="font-sans text-4xl font-extrabold tabular-nums tracking-tight text-ink">
-              $3.99<span className="text-xl font-bold text-ink-muted">/mo</span>
+              ${PRO_ANNUAL_USD_PER_MONTH.toFixed(2)}
+              <span className="text-xl font-bold text-ink-muted">/mo</span>
             </p>
             <p className="mt-2 text-sm text-ink-muted">
-              billed <span className="font-semibold text-ink">$47.88/year</span>
+              billed <span className="font-semibold text-ink">{PRO_ANNUAL_BILLED_YEAR_LABEL}</span>
             </p>
             <span
               className="mt-2 inline-block rounded-md px-2.5 py-1 text-xs font-bold text-white"
               style={{ backgroundColor: CORAL }}
             >
-              SAVE 20%
+              SAVE {PRO_ANNUAL_SAVE_VS_MONTHLY_PERCENT}%
             </span>
           </div>
           <ul className="mt-6 flex flex-1 flex-col gap-3 text-sm text-ink">

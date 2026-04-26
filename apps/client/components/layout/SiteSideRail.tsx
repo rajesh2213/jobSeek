@@ -6,6 +6,7 @@ import { useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "../../lib/cn";
 import { useApplications } from "../../lib/applicationsContext";
+import { signInWithNext } from "../../lib/signInUrl";
 
 /** Collapsed width; expands on hover (inactive) or when active. */
 const W_COLLAPSED = "w-[136px]";
@@ -84,7 +85,7 @@ export function SiteSideRail() {
         router.push(path);
         return;
       }
-      router.push(`/sign-in?redirect_url=${encodeURIComponent(path)}`);
+      router.push(signInWithNext(path));
     },
     [authLoaded, isSignedIn, router],
   );

@@ -55,7 +55,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${dmSans.variable} ${instrumentSerif.variable}`}>
       <body className="min-h-screen font-sans">
-        <ClerkProvider afterSignOutUrl="/jobs">
+        <ClerkProvider
+          afterSignOutUrl="/jobs"
+          signInUrl="/sign-in"
+          signUpUrl="/sign-up"
+        >
           <AppProviders>
             <RouteLoader />
             <div className="relative min-h-screen">{children}</div>

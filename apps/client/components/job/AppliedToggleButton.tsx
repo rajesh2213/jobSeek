@@ -4,6 +4,7 @@ import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useApplications } from "../../lib/applicationsContext";
+import { signInWithNext } from "../../lib/signInUrl";
 import { cn } from "../../lib/cn";
 import { buttonClassName } from "../ui/Button";
 import type { AccentTone } from "../ui/types";
@@ -30,10 +31,8 @@ export function AppliedToggleButton({
   const onToggle = async () => {
     if (pending) return;
     if (!isSignedIn) {
-      const redirect = encodeURIComponent(
-        `${window.location.pathname}${window.location.search}`,
-      );
-      router.push(`/sign-in?redirect_url=${redirect}`);
+      const returnTo = `${window.location.pathname}${window.location.search}`;
+      router.push(signInWithNext(returnTo));
       return;
     }
     setPending(true);

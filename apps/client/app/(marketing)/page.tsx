@@ -14,7 +14,8 @@ import {
 } from "framer-motion";
 import GuidedHookDemo from "../../components/GuidedHookDemo";
 import { HERO_JOB_INDEX_TOTAL, SHOW_LANDING_TESTIMONIALS } from "../../lib/landingPublic";
-import { PLAN_LIMITS } from "../../lib/planLimits";
+import { FREE_DAILY_JOB_POST_VIEWS, FREE_DISCOVERY } from "../../lib/planLimits";
+import { PRO_ANNUAL_USD_PER_MONTH } from "../../lib/pricingDisplay";
 
 const sectionReveal = {
   initial: { opacity: 0, y: 20 },
@@ -561,7 +562,12 @@ function PricingSection() {
             <p className="text-sm font-semibold">Free</p>
             <p className="mt-1 text-4xl font-bold">$0</p>
             <ul className="mt-3 space-y-1.5 text-sm text-ink/75">
-              <li>• {PLAN_LIMITS.free.dailyJobViews}/day (UTC)</li>
+              <li>
+                • List: {FREE_DISCOVERY.searches} filtered searches (
+                {FREE_DISCOVERY.jobsPerSearch} jobs each), then{" "}
+                {FREE_DISCOVERY.previewRows}-row preview — UTC
+              </li>
+              <li>• Full job posts: {FREE_DAILY_JOB_POST_VIEWS}/day (UTC)</li>
               <li className="text-ink/45">✕ No AI resume match</li>
               <li className="text-ink/45">✕ No Smart Apply</li>
               <li className="text-ink/45">✕ No email job alerts</li>
@@ -602,14 +608,15 @@ function PricingSection() {
             >
               Most popular
             </motion.span>
-            <p className="text-sm font-semibold">Pro Annual</p>
-            <p className="mt-1 text-4xl font-bold">$4/mo</p>
+            <p className="text-sm font-semibold">Pro</p>
+            <p className="mt-1 text-4xl font-bold">
+              ${PRO_ANNUAL_USD_PER_MONTH.toFixed(2)}/mo
+            </p>
             <ul className="mt-3 space-y-1.5 text-sm text-ink/80">
-              <li>• Unlimited job browsing</li>
+              <li>• Unlimited jobs browsing</li>
               <li>• AI resume match (score + gaps)</li>
               <li>• Smart Apply</li>
               <li>• Email job alerts on saved searches</li>
-              <li>• Early access to new JobLoom features</li>
             </ul>
             <p className="mt-3 text-xs font-semibold text-brand">Never miss a role. Never lose track.</p>
           </motion.div>

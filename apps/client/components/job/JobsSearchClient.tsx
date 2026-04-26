@@ -27,13 +27,14 @@ import {
   type SavedSearchItem,
 } from "../../lib/api";
 import { useAccountPlan } from "../../lib/useAccountPlan";
-import { FREE_DISCOVERY_PREVIEW_JOB_ROWS } from "../../lib/planLimits";
+import { FREE_DISCOVERY, FREE_DISCOVERY_PREVIEW_JOB_ROWS } from "../../lib/planLimits";
 import {
   parseJobFiltersFromSearch,
   filtersToSearchParams,
   hasActiveJobFilters,
   type JobFilters,
 } from "../../lib/slug-parser";
+import { signInWithNext } from "../../lib/signInUrl";
 import { Container } from "../ui/Container";
 import { Button } from "../ui/Button";
 import { SortSegmented } from "../ui/SortSegmented";
@@ -88,9 +89,6 @@ function discoverySurfaceFromPathname(pathname: string): "browse" | "seo" {
   if (pathname.startsWith("/jobs/")) return "seo";
   return "browse";
 }
-
-const FREE_DISCOVERY_SEARCHES_CAP = 2;
-const FREE_DISCOVERY_JOBS_PER_SEARCH = 10;
 
 function quotaDivider() {
   return (
@@ -187,11 +185,11 @@ function FreeDiscoveryQuotaStrip({
         <>
           <DiscoveryMeterCell
             label="Searches left"
-            secondary={`×${FREE_DISCOVERY_JOBS_PER_SEARCH} jobs per search`}
+            secondary={`×${FREE_DISCOVERY.jobsPerSearch} jobs per search`}
           >
             <span className="text-brand tabular-nums">{rem}</span>
             <span className="text-ink/35"> / </span>
-            <span className="tabular-nums">{FREE_DISCOVERY_SEARCHES_CAP}</span>
+            <span className="tabular-nums">{FREE_DISCOVERY.searches}</span>
           </DiscoveryMeterCell>
           {quotaDivider()}
           <DiscoveryMeterCell label="Now showing" accent>
@@ -238,10 +236,10 @@ function FreeDiscoveryQuotaStrip({
             <p className="font-sans text-xs font-bold tabular-nums leading-none tracking-wide text-ink">
               <span className="text-brand">{rem}</span>
               <span className="text-ink/35"> / </span>
-              <span>{FREE_DISCOVERY_SEARCHES_CAP}</span>
+              <span>{FREE_DISCOVERY.searches}</span>
             </p>
             <p className="text-[10px] font-semibold leading-tight tracking-wide text-ink/45">
-              ×{FREE_DISCOVERY_JOBS_PER_SEARCH} jobs per search
+              ×{FREE_DISCOVERY.jobsPerSearch} jobs per search
             </p>
           </div>
           <div
@@ -630,7 +628,7 @@ export function JobsSearchClient({
         router.push(path);
         return;
       }
-      router.push(`/sign-in?redirect_url=${encodeURIComponent(path)}`);
+      router.push(signInWithNext(path));
     },
     [authLoaded, isSignedIn, router],
   );
@@ -824,8 +822,7 @@ export function JobsSearchClient({
 
   const onSaveSearch = useCallback(async () => {
     if (!isSignedIn) {
-      const redirect = encodeURIComponent(canonicalQuery);
-      router.push(`/sign-in?redirect_url=${redirect}`);
+      router.push(signInWithNext(canonicalQuery));
       return;
     }
 

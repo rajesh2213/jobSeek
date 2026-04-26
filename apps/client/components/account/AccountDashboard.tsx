@@ -11,6 +11,7 @@ import {
   type UserMeResponse,
 } from "../../lib/api";
 import { isPro as isPaidPlan, PLAN_LIMITS } from "../../lib/planLimits";
+import { signInWithNext } from "../../lib/signInUrl";
 import { useResume } from "../../lib/resumeContext";
 import { ResumeUploadModal } from "../resume/ResumeUploadModal";
 import {
@@ -142,7 +143,7 @@ export function AccountDashboard() {
   const pct = isPro || limit <= 0 ? 0 : Math.round((usedDisplay / limit) * 100);
   const smartApplyHref = isSignedIn
     ? "/smart-apply"
-    : `/sign-in?redirect_url=${encodeURIComponent("/smart-apply")}`;
+    : signInWithNext("/smart-apply");
 
   const primary = user?.emailAddresses?.find((e) => e.id === user?.primaryEmailAddressId) ??
     user?.emailAddresses?.[0];

@@ -10,7 +10,6 @@ export const PRO_FEATURES = [
   "⚡ Smart Apply (Chrome extension) — unlimited auto-fill for standard ATS fields (name, contact, experience, etc.)",
   `AI-written answers for open-ended fields — up to ${PLAN_LIMITS.pro.smartApplyJobs} job applications per day (UTC); resets at midnight UTC (not a per-question cap)`,
   "Job alerts — email when new roles match a saved search (5 or 10 new jobs threshold · instant delivery)",
-  "Early access to new JobLoom features",
 ] as const;
 
 export const FAQ = [
@@ -25,9 +24,5 @@ export const FAQ = [
   {
     q: "Is there a free trial?",
     a: "You can explore the product on the free tier first. Pro unlocks unlimited browsing, resume insights, Smart Apply, and job alerts as soon as you subscribe.",
-  },
-  {
-    q: "How does early access work?",
-    a: "Pro members get first access to new JobLoom features and experiments before they roll out to everyone.",
   },
 ] as const;

@@ -3,23 +3,33 @@
 import { SignIn } from "@clerk/nextjs";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-
-function isSafePath(path: string): path is `/${string}` {
-  return path.startsWith("/") && !path.startsWith("//");
-}
+import { Suspense, useEffect, useState } from "react";
+import { returnPathFromSearchParams, signUpWithNext } from "../../lib/signInUrl";
 
 function SignInBody() {
   const sp = useSearchParams();
-  const raw = sp.get("redirect_url");
-  const after =
-    raw && isSafePath(decodeURIComponent(raw)) ? decodeURIComponent(raw) : "/jobs";
+  const returnPath = returnPathFromSearchParams((k) => sp.get(k));
+  const [forceUrl, setForceUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setForceUrl(new URL(returnPath, window.location.origin).href);
+  }, [returnPath]);
+
+  if (forceUrl == null) {
+    return (
+      <p className="text-sm text-ink-muted" role="status">
+        Loading sign-in…
+      </p>
+    );
+  }
 
   return (
     <SignIn
-      signUpUrl="/sign-up"
-      forceRedirectUrl={after}
-      fallbackRedirectUrl={after}
+      key={forceUrl}
+      signUpUrl={signUpWithNext(returnPath)}
+      forceRedirectUrl={forceUrl}
+      fallbackRedirectUrl={forceUrl}
     />
   );
 }

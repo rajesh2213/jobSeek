@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PricingPlansClient } from "../../../components/pricing/PricingPlansClient";
 import { FAQ } from "../../../components/pricing/pricingCopy";
-import { PLAN_LIMITS } from "../../../lib/planLimits";
+import { FREE_DAILY_JOB_POST_VIEWS, FREE_DISCOVERY, PLAN_LIMITS } from "../../../lib/planLimits";
 
 export default function PricingPage() {
   return (
@@ -33,8 +33,18 @@ export default function PricingPage() {
               </thead>
               <tbody className="text-ink/90">
                 <tr className="border-b border-line">
-                  <td className="px-4 py-3">Jobs per day</td>
-                  <td className="px-4 py-3 text-ink-muted">{PLAN_LIMITS.free.dailyJobViews}/day (UTC)</td>
+                  <td className="px-4 py-3">Filtered job search (list)</td>
+                  <td className="px-4 py-3 text-ink-muted">
+                    {FREE_DISCOVERY.searches}×{FREE_DISCOVERY.jobsPerSearch} full results, then{" "}
+                    {FREE_DISCOVERY.previewRows}-row preview · resets UTC
+                  </td>
+                  <td className="px-4 py-3 font-medium text-ink">Unlimited</td>
+                </tr>
+                <tr className="border-b border-line">
+                  <td className="px-4 py-3">Full job post views</td>
+                  <td className="px-4 py-3 text-ink-muted">
+                    {FREE_DAILY_JOB_POST_VIEWS}/day (UTC)
+                  </td>
                   <td className="px-4 py-3 font-medium text-ink">Unlimited</td>
                 </tr>
                 <tr className="border-b border-line">
@@ -59,13 +69,8 @@ export default function PricingPage() {
                   <td className="px-4 py-3 font-medium text-ink">3</td>
                   <td className="px-4 py-3 font-medium text-ink">3</td>
                 </tr>
-                <tr className="border-b border-line">
-                  <td className="px-4 py-3">Email job alerts</td>
-                  <td className="px-4 py-3 text-ink-muted">—</td>
-                  <td className="px-4 py-3 font-medium text-ink">✓</td>
-                </tr>
                 <tr>
-                  <td className="px-4 py-3">Early access</td>
+                  <td className="px-4 py-3">Email job alerts</td>
                   <td className="px-4 py-3 text-ink-muted">—</td>
                   <td className="px-4 py-3 font-medium text-ink">✓</td>
                 </tr>
