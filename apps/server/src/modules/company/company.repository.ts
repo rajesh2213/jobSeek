@@ -158,7 +158,12 @@ export function createCompanyRepository(prisma: PrismaClient) {
           atsBoardToken: { not: null },
           status: CompanyStatus.ready,
         },
-        orderBy: { name: "asc" },
+        // Hint for index reads; final order is set in CrawlerService (sort + shuffle + slice).
+        orderBy: [
+          { score: "desc" },
+          { lastCrawledAt: { sort: "asc", nulls: "first" } },
+          { name: "asc" },
+        ],
       });
     },
 
@@ -169,7 +174,11 @@ export function createCompanyRepository(prisma: PrismaClient) {
           atsBoardToken: { not: null },
           status: CompanyStatus.ready,
         },
-        orderBy: { name: "asc" },
+        orderBy: [
+          { score: "desc" },
+          { lastCrawledAt: { sort: "asc", nulls: "first" } },
+          { name: "asc" },
+        ],
       });
     },
 

@@ -13,6 +13,56 @@ import {
 
 const SCHEDULER_CHUNK_SIZE = 100;
 const MAX_COMPANIES_PER_RUN_PER_ATS = 500;
+/** Shuffle only the leading slice of a sorted list (roughly top 20–30%) to reduce fixed ordering. */
+const SHUFFLE_TOP_FRACTION = 0.3;
+
+/**
+ * Order crawl candidates: higher score, then less-recently crawled (nulls = never, then oldest),
+ * then lower recent-job volume (explore “empty” companies), then name.
+ * Uses `canonicalJobsLast7d` (persisted) as a proxy for per-company job volume.
+ */
+function compareCrawlSelection(a: Company, b: Company): number {
+  if (b.score !== a.score) return b.score - a.score;
+
+  const aLast = a.lastCrawledAt ? new Date(a.lastCrawledAt).getTime() : 0;
+  const bLast = b.lastCrawledAt ? new Date(b.lastCrawledAt).getTime() : 0;
+  if (aLast !== bLast) return aLast - bLast;
+
+  const aJobs = a.canonicalJobsLast7d;
+  const bJobs = b.canonicalJobsLast7d;
+  if (aJobs !== bJobs) return aJobs - bJobs;
+
+  return a.name.localeCompare(b.name);
+}
+
+function fisherYatesShuffleInPlace<T>(arr: T[]): void {
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = arr[i]!;
+    arr[i] = arr[j]!;
+    arr[j] = t;
+  }
+}
+
+/**
+ * Full sort, then lightly shuffle the top `SHUFFLE_TOP_FRACTION` of the list, then return.
+ * Used for per-ATS cap and the global inter-ATS pass.
+ */
+function sortShuffleTopFraction(all: Company[]): Company[] {
+  if (all.length === 0) return [];
+  const sorted = [...all].sort(compareCrawlSelection);
+  const rawTop = Math.floor(sorted.length * SHUFFLE_TOP_FRACTION);
+  const topN = Math.min(sorted.length, Math.max(sorted.length > 0 ? 1 : 0, rawTop));
+  if (topN === 0) return sorted;
+  const head = sorted.slice(0, topN);
+  const tail = sorted.slice(topN);
+  fisherYatesShuffleInPlace(head);
+  return [...head, ...tail];
+}
+
+function takeCrawlablePerAts(atsCompanies: Company[], max: number): Company[] {
+  return sortShuffleTopFraction(atsCompanies).slice(0, max);
+}
 
 const COOLDOWN_BY_PRIORITY_MS: Record<CompanyCrawlPriority, number> = {
   [CompanyCrawlPriority.high]: 5 * 60 * 1000,
@@ -54,16 +104,24 @@ export class CrawlerService {
       CRAWLABLE_ATS_TYPES.map((atsType) =>
         this.companyService
           .listCrawlableByAtsType(atsType)
-          .then((companies) => companies.slice(0, MAX_COMPANIES_PER_RUN_PER_ATS)),
+          .then((crawlable) => takeCrawlablePerAts(crawlable, MAX_COMPANIES_PER_RUN_PER_ATS)),
       ),
     );
-    const companies = companiesByAts
-      .flat()
-      .sort((a, b) => {
-        const ds = b.score - a.score;
-        if (ds !== 0) return ds;
-        return a.name.localeCompare(b.name);
-      });
+    const companies = sortShuffleTopFraction(companiesByAts.flat());
+
+    logger.info(
+      {
+        event: "company_selection_sample",
+        selected: companies.slice(0, 10).map((c) => ({
+          name: c.name,
+          score: c.score,
+          lastCrawledAt: c.lastCrawledAt,
+          // Proxy for “job count” when selecting for exploration; schema has no aggregate jobCount.
+          jobCount: c.canonicalJobsLast7d,
+        })),
+      },
+      "company_selection_sample",
+    );
 
     const stats: SchedulerRunStats = {
       companiesScanned: companies.length,
