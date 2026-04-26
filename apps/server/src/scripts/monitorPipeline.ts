@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
 import { loadRootEnv } from "../infrastructure/env/loadEnv.js";
+import { getMonitorPipelineJournalSince } from "../utils/monitorJournalSince.js";
 
 type QueueTrend = "increasing" | "decreasing" | "stable";
 type SystemState = "healthy" | "degraded" | "idle";
@@ -34,6 +35,8 @@ type EventLog = {
   hit?: boolean;
   jobsPerMinApprox?: number;
   wait?: number;
+  /** Enqueue-time Redis `job:seen` skip (`recentJobSeen.service` dedupe_decision). */
+  seen?: boolean;
 };
 
 function safeJsonParse<T>(raw: string): T | null {
@@ -63,8 +66,9 @@ function round(value: number, digits = 4): number {
 }
 
 function parseJournalEvents(): EventLog[] {
+  const since = getMonitorPipelineJournalSince();
   const out = execSync(
-    'journalctl -u jobseek-worker -u jobseek-worker-2 --since "10 min ago" -o json --no-pager',
+    `journalctl -u jobseek-worker -u jobseek-worker-2 --since "${since}" -o json --no-pager`,
     { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 },
   );
   const events: EventLog[] = [];
@@ -155,7 +159,10 @@ function computeReport(events: EventLog[]): Report {
   const duplicateCount = events.filter((e) => e.event === "job_duplicate_sourceUrl").length;
   const insertedCount = events.filter((e) => e.event === "job_inserted").length;
   const canonicalCreatedCount = events.filter((e) => e.event === "job_canonical_created").length;
-  const skippedRecentCount = events.filter((e) => e.event === "job_skipped_recent_duplicate").length;
+  /** Matches `recentJobSeen.service` INFO `dedupe_decision` (avoid double-count with `job_skipped_recent_duplicate`). */
+  const skippedRecentCount = events.filter(
+    (e) => e.event === "dedupe_decision" && e.seen === true,
+  ).length;
 
   const jobsPerMin = avg(jobsPerMinSamples);
   const parseCallsPerMin = parseLatencies.length / 10;
