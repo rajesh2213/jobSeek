@@ -11,6 +11,7 @@ import { getStartupsDataset } from "../src/modules/seeding/datasets/startups.dat
 import { getGithubDataset } from "../src/modules/seeding/datasets/github.dataset.js";
 import { getEnterpriseDataset } from "../src/modules/seeding/datasets/enterprise.dataset.js";
 import { getExtendedDataset } from "../src/modules/seeding/datasets/extended.dataset.js";
+import { cleanCompanyInput } from "../src/utils/companyDataCleaner.js";
 
 function normalizeNameKey(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ");
@@ -105,15 +106,34 @@ async function main(): Promise<void> {
     ...extendedDataset,
   ];
 
+  const totalProcessed = raw.length;
+  let invalidCount = 0;
   let validationSkipped = 0;
   const validated: SeedCompany[] = [];
   for (const c of raw) {
-    if (isTooGenericName(c.name)) {
+    const cleaned = cleanCompanyInput({
+      name: c.name,
+      website: c.domain,
+    });
+    if (!cleaned.valid) {
+      invalidCount += 1;
+      continue;
+    }
+    if (isTooGenericName(cleaned.name)) {
       validationSkipped += 1;
       continue;
     }
-    validated.push(c);
+    validated.push({ name: cleaned.name, domain: cleaned.domain });
   }
+
+  logger.info(
+    {
+      event: "company_cleaning_summary",
+      invalidCount,
+      totalProcessed,
+    },
+    "Company input cleaning (TS seed)",
+  );
 
   if (validationSkipped > 0) {
     logger.info(

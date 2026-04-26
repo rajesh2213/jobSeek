@@ -14,13 +14,51 @@ import {
   ENRICH_PRIORITY_DATASET_SEED,
   getEnrichCompanyQueue,
 } from "../src/queues/enrich-company.queue.js";
+import { cleanCompanyInput } from "../src/utils/companyDataCleaner.js";
+import { canonicalCompanyNameKey } from "../src/utils/companyNameCanonical.js";
+import {
+  ensureBulkHintsLoaded,
+  getBulkCompanyHint,
+} from "../src/utils/companyBulkHints.js";
+import { shouldRejectForCsvFallback } from "../src/utils/csvFallbackNameFilter.js";
 
 const BATCH_SIZE = 100;
 const BATCH_DELAY_MS = 250;
 
+function readMaxFallbackInserts(): number {
+  const raw = process.env.CSV_MAX_FALLBACK_INSERTS;
+  if (raw === undefined || raw.trim() === "") return 1000;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 0) return 1000;
+  return n;
+}
+
+function readNonnegativeInt(name: string, defaultValue: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === "") return defaultValue;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 0) return defaultValue;
+  return n;
+}
+
+/**
+ * If set, only process the first N data rows (after `CSV_SEED_SKIP_DATA_ROWS` trim). Omit for full file.
+ */
+function readMaxDataRows(): number | null {
+  const raw = process.env.CSV_SEED_MAX_ROWS;
+  if (raw === undefined || raw.trim() === "") return null;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
+const MAX_FALLBACK_INSERTS = readMaxFallbackInserts();
+
 /** Preferred drop-in path; repo may only ship Wellfound export under seeding/data. */
 const CSV_DEFAULT_CANDIDATES = [
   ["data", "company-datasets", "companies.csv"],
+  ["data", "company-datasets", "companies-01.csv"],
+  ["data", "company-datasets", "companies-02.csv"],
   ["src", "modules", "seeding", "data", "Wellfound_Final.csv"],
 ] as const;
 
@@ -86,19 +124,6 @@ function findColumnIndex(headers: string[], want: string): number {
   const target = want.trim().toLowerCase();
   const idx = headers.findIndex((h) => h.trim().toLowerCase() === target);
   return idx;
-}
-
-function extractHostname(websiteRaw: string | undefined): string | null {
-  if (!websiteRaw?.trim()) return null;
-  const trimmed = websiteRaw.trim();
-  try {
-    const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-    const host = new URL(withProtocol).hostname.toLowerCase();
-    if (!host) return null;
-    return host.startsWith("www.") ? host.slice(4) : host;
-  } catch {
-    return null;
-  }
 }
 
 async function ensureUniqueSlug(base: string): Promise<string> {
@@ -167,18 +192,56 @@ async function main(): Promise<void> {
     rows.push({ name, website: website || undefined });
   }
 
-  const totalRows = rows.length;
+  const sourceDataRows = rows.length;
+  const skipDataRows = readNonnegativeInt("CSV_SEED_SKIP_DATA_ROWS", 0);
+  const maxDataRows = readMaxDataRows();
+  const skippedByEnv = Math.min(skipDataRows, sourceDataRows);
+  const afterSkip = rows.slice(skippedByEnv);
+  const workRows =
+    maxDataRows == null ? afterSkip : afterSkip.slice(0, Math.max(0, maxDataRows));
+  if (workRows.length === 0) {
+    logger.error(
+      {
+        event: "csv_seed_no_rows",
+        sourceDataRows,
+        csvSeedSkipDataRows: skippedByEnv,
+        csvSeedMaxRows: maxDataRows,
+      },
+      "No CSV data rows to process after CSV_SEED_SKIP_DATA_ROWS / CSV_SEED_MAX_ROWS",
+    );
+    process.exit(1);
+  }
+
+  const totalRows = workRows.length;
+  const totalProcessed = workRows.length;
+
+  const existingRows = await prisma.company.findMany({ select: { name: true } });
+  const existingCanonicalKeys = new Set<string>();
+  for (const r of existingRows) {
+    const k = canonicalCompanyNameKey(r.name);
+    if (k) existingCanonicalKeys.add(k);
+  }
+  ensureBulkHintsLoaded();
+
   let inserted = 0;
   let skippedDuplicates = 0;
-  let missingDomainCount = 0;
   let emptyNameSkipped = 0;
+  /** All rows where `cleanCompanyInput` failed (any reason). */
+  let invalidCount = 0;
+  let invalidNameNoFallback = 0;
+  let fallbackInserted = 0;
+  let fallbackSkippedDuplicate = 0;
+  let fallbackSkippedDomainOrHint = 0;
+  let fallbackSkippedLimit = 0;
+  let fallbackSkippedNamePolicy = 0;
+  let fallbackErrors = 0;
 
   const companyRepo = createCompanyRepository(prisma);
   const companyService = new CompanyService(companyRepo, createJobRepository(prisma));
   const enrichQueue = getEnrichCompanyQueue();
 
-  for (let b = 0; b < rows.length; b += BATCH_SIZE) {
-    const batch = rows.slice(b, b + BATCH_SIZE);
+  for (let b = 0; b < workRows.length; b += BATCH_SIZE) {
+    const batch = workRows.slice(b, b + BATCH_SIZE);
     for (const row of batch) {
       const name = normalizeNameKey(row.name);
       if (!name) {
@@ -186,35 +249,105 @@ async function main(): Promise<void> {
         continue;
       }
 
-      const domainRaw = extractHostname(row.website);
-      const domain = domainRaw ? normalizeDomain(domainRaw) ?? null : null;
-      if (!domain) {
-        missingDomainCount += 1;
-      }
+      const cleaned = cleanCompanyInput({
+        name: row.name,
+        website: row.website,
+      });
 
-      if (domain) {
-        const byDomain = await companyRepo.findByDomain(domain);
-        if (byDomain) {
-          skippedDuplicates += 1;
+      if (!cleaned.valid) {
+        invalidCount += 1;
+        if (cleaned.reason === "invalid_name") {
+          invalidNameNoFallback += 1;
           continue;
         }
+
+        if (fallbackInserted >= MAX_FALLBACK_INSERTS) {
+          fallbackSkippedLimit += 1;
+          continue;
+        }
+
+        const cKey = canonicalCompanyNameKey(name);
+        if (cKey && existingCanonicalKeys.has(cKey)) {
+          fallbackSkippedDuplicate += 1;
+          continue;
+        }
+
+        const hint = getBulkCompanyHint(name);
+        if (hint?.domain) {
+          const hintDom = normalizeDomain(hint.domain) ?? hint.domain;
+          const byHintDomain = await companyRepo.findByDomain(hintDom);
+          if (byHintDomain) {
+            fallbackSkippedDomainOrHint += 1;
+            continue;
+          }
+        }
+
+        if (await companyRepo.findByName(name)) {
+          fallbackSkippedDuplicate += 1;
+          continue;
+        }
+
+        const namePolicy = shouldRejectForCsvFallback(name);
+        if (namePolicy.reject) {
+          fallbackSkippedNamePolicy += 1;
+          continue;
+        }
+
+        try {
+          const company = await companyRepo.createRawCompany({
+            name,
+            domain: null,
+            discoverySource: "csv_seed_fallback",
+          });
+          await companyService.enqueueCompanyEnrichment(company.id, company.name, {
+            priority: ENRICH_PRIORITY_DATASET_SEED,
+            jobId: `enrich-${company.id}`,
+          });
+          fallbackInserted += 1;
+          if (cKey) existingCanonicalKeys.add(cKey);
+        } catch (err) {
+          fallbackErrors += 1;
+          logger.warn(
+            {
+              event: "csv_seed_fallback_failed",
+              name,
+              err,
+              error: err instanceof Error ? err.message : String(err),
+            },
+            "csv_seed_fallback_failed",
+          );
+        }
+        continue;
       }
 
-      const byName = await companyRepo.findByName(name);
-      if (byName) {
+      const normalizedName = normalizeNameKey(cleaned.name);
+      const domain = normalizeDomain(cleaned.domain) ?? cleaned.domain;
+      const cKey = canonicalCompanyNameKey(normalizedName);
+      if (cKey && existingCanonicalKeys.has(cKey)) {
         skippedDuplicates += 1;
         continue;
       }
 
-      const baseSlug = slugifyCompanyName(name);
+      const byDomain = await companyRepo.findByDomain(domain);
+      if (byDomain) {
+        skippedDuplicates += 1;
+        continue;
+      }
+
+      if (await companyRepo.findByName(normalizedName)) {
+        skippedDuplicates += 1;
+        continue;
+      }
+
+      const baseSlug = slugifyCompanyName(normalizedName);
       const slug = await ensureUniqueSlug(baseSlug);
 
       const company = await prisma.company.create({
         data: {
-          name,
+          name: normalizedName,
           slug,
           domain,
-          careersUrl: domain ? `https://${domain}/careers` : null,
+          careersUrl: `https://${domain}/careers`,
           atsType: null,
           atsBoardToken: null,
           status: CompanyStatus.raw,
@@ -223,6 +356,7 @@ async function main(): Promise<void> {
       });
 
       inserted += 1;
+      if (cKey) existingCanonicalKeys.add(cKey);
       try {
         await companyService.enqueueCompanyEnrichment(company.id, company.name, {
           priority: ENRICH_PRIORITY_DATASET_SEED,
@@ -236,27 +370,93 @@ async function main(): Promise<void> {
       }
     }
 
-    if (b + BATCH_SIZE < rows.length) {
+    if (b + BATCH_SIZE < workRows.length) {
       await delay(BATCH_DELAY_MS);
     }
   }
 
-  await enrichQueue.close();
+  const newCompanyRows = inserted + fallbackInserted;
 
   logger.info(
     {
       event: "csv_seed_summary",
       csvPath,
+      sourceDataRows,
+      csvSeedSkipDataRows: skippedByEnv,
+      csvSeedMaxRows: maxDataRows,
       totalRows,
+      totalProcessed,
       inserted,
       skippedDuplicates,
-      missingDomainCount,
       emptyNameSkipped,
+      invalidCount,
+      invalidNameNoFallback,
+      fallbackInserted,
+      newCompanyRows,
+      MAX_FALLBACK_INSERTS,
+      fallbackSkippedDuplicate,
+      fallbackSkippedDomainOrHint,
+      fallbackSkippedLimit,
+      fallbackSkippedNamePolicy,
+      fallbackErrors,
     },
     "CSV company seed completed",
   );
 
-  await prisma.$disconnect();
+  const failIfNoNew =
+    process.env.CSV_SEED_FAIL_IF_NO_NEW === "1" || process.env.CSV_SEED_FAIL_IF_NO_NEW === "true";
+  if (failIfNoNew && newCompanyRows === 0) {
+    logger.error(
+      {
+        event: "csv_seed_no_new_inserts",
+        path: csvPath,
+        inserted,
+        fallbackInserted,
+        hint: "All rows were skipped or invalid. Try CSV_SEED_SKIP_DATA_ROWS=250 to take a different slice, or a fresh export.",
+      },
+      "No new company rows; aborting so chained tools (e.g. smoke) do not run on an empty seed",
+    );
+  }
+
+  const closeTimeoutMs = readNonnegativeInt("CSV_ENRICH_QUEUE_CLOSE_TIMEOUT_MS", 10_000);
+  try {
+    await Promise.race([
+      enrichQueue.close(),
+      new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error(`enrich queue close timed out after ${closeTimeoutMs}ms`)),
+          closeTimeoutMs,
+        );
+      }),
+    ]);
+  } catch (err) {
+    logger.warn(
+      { event: "enrich_queue_close_timeout", err, closeTimeoutMs },
+      "enrichQueue.close() timed out; exit continues so downstream scripts (e.g. smoke) can run",
+    );
+  }
+
+  const disconnectTimeoutMs = readNonnegativeInt("CSV_PRISMA_DISCONNECT_TIMEOUT_MS", 15_000);
+  try {
+    await Promise.race([
+      prisma.$disconnect(),
+      new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error(`prisma.$disconnect() timed out after ${disconnectTimeoutMs}ms`)),
+          disconnectTimeoutMs,
+        );
+      }),
+    ]);
+  } catch (err) {
+    logger.warn(
+      { event: "prisma_disconnect_timeout", err, disconnectTimeoutMs },
+      "prisma.$disconnect() timed out; process exit continues for chained tools",
+    );
+  }
+
+  // Bull/Redis may otherwise keep the event loop alive and block `seed:csv && smoke` chains.
+  const exitCode = failIfNoNew && newCompanyRows === 0 ? 3 : 0;
+  process.exit(exitCode);
 }
 
 void main().catch(async (err) => {
