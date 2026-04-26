@@ -1,0 +1,14 @@
+[Unit]
+Description=JobSeek Job Alerts Scheduler
+After=network.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/jobSeek
+EnvironmentFile=/home/ubuntu/jobSeek/.env
+ExecStart=/usr/bin/npm run scheduler:job-alerts -w @jobseek/server
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

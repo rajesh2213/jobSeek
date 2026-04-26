@@ -1,0 +1,15 @@
+[Unit]
+Description=JobSeek Job Alerts Worker
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/jobSeek
+EnvironmentFile=/home/ubuntu/jobSeek/.env
+ExecStart=/usr/bin/npm run worker:job-alerts -w @jobseek/server
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
