@@ -26,6 +26,14 @@ const PARSE_CACHE_KEY_PREFIX = "parse:v1";
 /** Short-term marker (separate from long-term v1 value TTL): another worker may skip HTTP if v1 is still present. */
 const PARSE_BURST_KEY_PREFIX = "parse:burst:recent";
 
+const CACHE_IDENTITY_LOG_FIRST = 200;
+let cacheIdentityLogCount = 0;
+function shouldLogCacheIdentityCheck(): boolean {
+  cacheIdentityLogCount += 1;
+  if (cacheIdentityLogCount <= CACHE_IDENTITY_LOG_FIRST) return true;
+  return Math.random() < 0.01;
+}
+
 let parseStartsInWindow = 0;
 
 /**
@@ -152,20 +160,30 @@ export function computeParseConfidence(parsed: ParsedJobDescriptionAI): number {
 }
 
 /**
- * Text identity for cache keys: not raw preprocessed "joined"; stable across case/whitespace.
- * Used for hashing only (GET/SET use the same material via `cacheKeyV1(description)`).
+ * Same text the LLM/parse service receives: preprocessed lines joined with newlines, or the trimmed
+ * original when preprocess yields no lines. Used for the v1 cache key and burst dedupe.
  */
-export function normalizeDescriptionForCacheKey(s: string): string {
-  return s
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .slice(0, 20000);
+function buildLlmParseInput(description: string): {
+  trimmed: string;
+  preprocessed: string;
+  lineCount: number;
+} {
+  const trimmed = description.trim();
+  if (!trimmed) {
+    return { trimmed: "", preprocessed: "", lineCount: 0 };
+  }
+  const lines = preprocessDescription(trimmed);
+  const preprocessed = lines.length > 0 ? lines.join("\n") : trimmed;
+  return { trimmed, preprocessed, lineCount: lines.length };
 }
 
-function cacheKeyV1(description: string): string {
-  const material = normalizeDescriptionForCacheKey(description);
-  const hash = createHash("sha256").update(material, "utf8").digest("hex");
+export function normalizeDescriptionForCacheKey(s: string): string {
+  return s.trim().replace(/\r\n/g, "\n");
+}
+
+function cacheKeyV1FromPreprocessed(preprocessed: string): string {
+  const normalized = normalizeDescriptionForCacheKey(preprocessed);
+  const hash = createHash("sha256").update(normalized, "utf8").digest("hex");
   return `${PARSE_CACHE_KEY_PREFIX}:${hash}`;
 }
 
@@ -178,7 +196,7 @@ export async function tryParseFromBurstRecent(
   options?: ParseJobDescriptionOptions,
 ): Promise<ParsedJobDescriptionAI | null> {
   if (getParseBurstRecentTtlSec() <= 0 || !parseCacheEnabled()) return null;
-  const trimmed = description.trim();
+  const { trimmed, preprocessed } = buildLlmParseInput(description);
   if (!trimmed) return null;
 
   let redis: ReturnType<typeof getIoredis>;
@@ -188,7 +206,7 @@ export async function tryParseFromBurstRecent(
     return null;
   }
 
-  const v1key = cacheKeyV1(trimmed);
+  const v1key = cacheKeyV1FromPreprocessed(preprocessed);
   const hash = v1key.slice(v1key.lastIndexOf(":") + 1);
   const burstKey = `${PARSE_BURST_KEY_PREFIX}:${hash}`;
 
@@ -379,10 +397,29 @@ export async function parseJobDescriptionAI(
   client: AxiosInstance = createClient(),
   options?: ParseJobDescriptionOptions,
 ): Promise<ParsedJobDescriptionAI | null> {
-  const trimmed = description.trim();
+  const { trimmed, preprocessed, lineCount } = buildLlmParseInput(description);
   if (!trimmed) return null;
 
-  const key = cacheKeyV1(description);
+  const key = cacheKeyV1FromPreprocessed(preprocessed);
+  logger.info(
+    {
+      event: "cache_key_debug",
+      jobId: options?.canonicalJobId ?? null,
+      key,
+      length: preprocessed.length,
+    },
+    "cache_key_debug",
+  );
+  if (shouldLogCacheIdentityCheck()) {
+    logger.info(
+      {
+        event: "cache_identity_check",
+        key,
+        preview: preprocessed.slice(0, 100),
+      },
+      "cache_identity_check",
+    );
+  }
 
   if (parseCacheEnabled()) {
     let cacheHit: boolean | null = null;
@@ -442,16 +479,12 @@ export async function parseJobDescriptionAI(
     }
   }
 
-  const lines = preprocessDescription(trimmed);
-  const joined = lines.length > 0 ? lines.join("\n") : trimmed;
-  const lineCount = lines.length;
-
   let data: unknown;
   const httpStart = Date.now();
   try {
     data = await parseInFlight.use(async () => {
       parseStartsInWindow += 1;
-      return await postJobDescriptionParse(joined, client);
+      return await postJobDescriptionParse(preprocessed, client);
     });
   } catch (err) {
     logParseFailure("http_error", { err });
@@ -464,7 +497,7 @@ export async function parseJobDescriptionAI(
         event: "ai_parse_latency",
         durationMs: Date.now() - httpStart,
         lineCount,
-        descriptionCharCount: joined.length,
+        descriptionCharCount: preprocessed.length,
       },
       "ai_parse_latency",
     );
@@ -475,7 +508,7 @@ export async function parseJobDescriptionAI(
       event: "ai_parse_latency",
       durationMs: Date.now() - httpStart,
       lineCount,
-      descriptionCharCount: joined.length,
+      descriptionCharCount: preprocessed.length,
     },
     "ai_parse_latency",
   );

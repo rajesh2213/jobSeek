@@ -24,7 +24,7 @@ import { extractWorkdayToken } from "../modules/discovery/extractors/workday.ext
 import { logger } from "../utils/logger.js";
 import { fetchCareersHtml } from "../utils/fetchCareersHtml.js";
 import { resolveCompanyLogoUrl } from "../utils/companyLogo.js";
-import { resolveDomain } from "../utils/resolveDomain.js";
+import { resolveDomainWithSource } from "../utils/resolveDomain.js";
 import { getBulkCompanyHint } from "../utils/companyBulkHints.js";
 import { getJobQueue } from "../queues/job.queue.js";
 import {
@@ -245,7 +245,27 @@ export async function processEnrichCompany(
   try {
     if (!domain) {
       try {
-        domain = await resolveDomain(prisma, company.name, companyId);
+        const t0 = performance.now();
+        const { domain: resolved, source } = await resolveDomainWithSource(
+          prisma,
+          company.name,
+          companyId,
+        );
+        const durationMs = Math.round(performance.now() - t0);
+        domain = resolved;
+        const success = domain !== null;
+        const outcome = {
+          event: "domain_resolution_outcome" as const,
+          companyId,
+          companyName: company.name,
+          source,
+          success,
+          durationMs,
+        };
+        logger.debug(outcome, "domain_resolution_outcome");
+        if (process.env.LOG_DOMAIN_RESOLUTION === "1") {
+          logger.info(outcome, "domain_resolution_outcome");
+        }
       } catch (err) {
         if (isTransientEnrichmentError(err)) throw err;
         logger.warn({ event: "domain_resolve_error", companyId, err }, "domain_resolve_error");
