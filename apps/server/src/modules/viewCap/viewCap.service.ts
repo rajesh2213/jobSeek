@@ -3,7 +3,9 @@ import type { PrismaClient } from "@prisma/client";
 import type { Redis } from "ioredis";
 import { resolveProPlan } from "../../utils/userPlan.js";
 
-export const FREE_DAILY_JOB_VIEWS = 10;
+/** Free tier: max full job post opens per UTC day (align with list discovery cap). */
+export const FREE_DAILY_JOBS = 20;
+export const FREE_DAILY_JOB_VIEWS = FREE_DAILY_JOBS;
 
 /** Seconds from `from` until next UTC midnight. */
 export function secondsUntilUtcMidnight(from = new Date()): number {

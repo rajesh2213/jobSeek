@@ -3,6 +3,7 @@ import type { Redis } from "ioredis";
 import { createHash } from "node:crypto";
 import {
   ensureUserJobViewsDayReset,
+  FREE_DAILY_JOBS,
   nextUtcMidnight,
   secondsUntilUtcMidnight,
 } from "./viewCap.service.js";
@@ -14,7 +15,12 @@ export type DiscoveryCapContext = {
 };
 
 export const FREE_DISCOVERY_SEARCHES = 2;
-export const FREE_DISCOVERY_ROWS_PER_SEARCH = 10;
+/** 2× this many full list rows; matches `FREE_DAILY_JOBS` (20). */
+export const FREE_DISCOVERY_ROWS_PER_SEARCH = FREE_DAILY_JOBS / FREE_DISCOVERY_SEARCHES;
+/**
+ * Extra list rows for programmatic SEO job-list pages so visitors see a few more
+ * roles (internal; not part of the main “2×10” product story for browse).
+ */
 export const FREE_DISCOVERY_BONUS_ROWS = 5;
 /** Teaser rows when fully capped (preview mode). */
 export const DISCOVERY_PREVIEW_ROWS = 2;

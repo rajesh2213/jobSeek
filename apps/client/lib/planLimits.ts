@@ -1,10 +1,15 @@
 /**
- * List / discovery metering — keep in sync with
- * `apps/server/src/modules/viewCap/discoveryCap.ts` and `jobListCap.ts`.
+ * Free tier daily job allowance — keep in sync with
+ * `apps/server/src/modules/viewCap/viewCap.service.ts` (`FREE_DAILY_JOBS`) and
+ * `discoveryCap.ts` / `jobListCap.ts` (2×10 list cap before preview).
  */
+export const FREE_DAILY_JOBS = 20;
+
+const _FREE_DISCOVERY_SEARCHES = 2;
 export const FREE_DISCOVERY = {
-  searches: 2,
-  jobsPerSearch: 10,
+  searches: _FREE_DISCOVERY_SEARCHES,
+  /** `searches × jobsPerSearch` = `FREE_DAILY_JOBS` (20). */
+  jobsPerSearch: FREE_DAILY_JOBS / _FREE_DISCOVERY_SEARCHES,
   /** Teaser rows after daily discovery is exhausted. */
   previewRows: 2,
 } as const;
@@ -12,16 +17,12 @@ export const FREE_DISCOVERY = {
 /** @deprecated use FREE_DISCOVERY.previewRows */
 export const FREE_DISCOVERY_PREVIEW_JOB_ROWS = FREE_DISCOVERY.previewRows;
 
-/**
- * Full job post (GET /jobs/:id) views per UTC day — keep in sync with
- * `viewCap.service.ts` `FREE_DAILY_JOB_VIEWS`.
- */
-export const FREE_DAILY_JOB_POST_VIEWS = 10;
+/** Full job post opens per UTC day — same pool size as list cap (20). */
+export const FREE_DAILY_JOB_POST_VIEWS = FREE_DAILY_JOBS;
 
 export const PLAN_LIMITS = {
   free: {
-    /** Job **detail** opens per day (not the same as list discovery). */
-    dailyJobViews: FREE_DAILY_JOB_POST_VIEWS,
+    dailyJobViews: FREE_DAILY_JOBS,
     smartApplyJobs: 0,
     savedSearches: 3,
   },

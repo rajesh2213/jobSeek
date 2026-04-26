@@ -14,8 +14,8 @@ import {
 } from "framer-motion";
 import GuidedHookDemo from "../../components/GuidedHookDemo";
 import { HERO_JOB_INDEX_TOTAL, SHOW_LANDING_TESTIMONIALS } from "../../lib/landingPublic";
-import { FREE_DAILY_JOB_POST_VIEWS, FREE_DISCOVERY } from "../../lib/planLimits";
 import { PRO_ANNUAL_USD_PER_MONTH } from "../../lib/pricingDisplay";
+import { FREE_DAILY_JOBS } from "../../lib/planLimits";
 
 const sectionReveal = {
   initial: { opacity: 0, y: 20 },
@@ -503,12 +503,10 @@ function SocialProofSection() {
 
 function PricingSection() {
   const ref = useRef<HTMLElement | null>(null);
-  const proCardRef = useRef<HTMLDivElement | null>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start 110%", "end 28%"],
   });
-  const isProInView = useInView(proCardRef, { amount: 0.55 });
   const sectionY = mapRange(scrollYProgress, 0, 0.14, 86, 0);
   const sectionOpacity = mapRange(scrollYProgress, 0, 0.11, 0, 1);
   const pricingWrapY = useTransform(scrollYProgress, [0, 0.14, 0.78, 1], [86, 0, 0, 52]);
@@ -521,9 +519,7 @@ function PricingSection() {
   const freeY = mapRange(scrollYProgress, 0.01, 0.22, 32, 0);
 
   const proOpacity = mapRange(scrollYProgress, 0.01, 0.14, 0, 1);
-  const proScale = useTransform(scrollYProgress, [0.01, 0.14, 0.5], [1.07, 1.02, 1.045]);
   const proY = mapRange(scrollYProgress, 0.01, 0.14, 22, 0);
-  const proGlow = useTransform(scrollYProgress, [0.16, 0.5, 0.86], [0.14, 0.24, 0.17]);
 
   const ctaMx = useMotionValue(0);
   const ctaMy = useMotionValue(0);
@@ -562,12 +558,7 @@ function PricingSection() {
             <p className="text-sm font-semibold">Free</p>
             <p className="mt-1 text-4xl font-bold">$0</p>
             <ul className="mt-3 space-y-1.5 text-sm text-ink/75">
-              <li>
-                • List: {FREE_DISCOVERY.searches} filtered searches (
-                {FREE_DISCOVERY.jobsPerSearch} jobs each), then{" "}
-                {FREE_DISCOVERY.previewRows}-row preview — UTC
-              </li>
-              <li>• Full job posts: {FREE_DAILY_JOB_POST_VIEWS}/day (UTC)</li>
+              <li>• Explore jobs — {FREE_DAILY_JOBS} jobs per day (midnight UTC)</li>
               <li className="text-ink/45">✕ No AI resume match</li>
               <li className="text-ink/45">✕ No Smart Apply</li>
               <li className="text-ink/45">✕ No email job alerts</li>
@@ -575,40 +566,18 @@ function PricingSection() {
             <p className="mt-3 text-xs font-medium text-ink/55">Limited daily views — you may miss roles</p>
           </motion.div>
           <motion.div
-            ref={proCardRef}
-            style={{
-              opacity: proOpacity,
-              y: proY,
-              scale: proScale,
-              boxShadow: useTransform(
-                proGlow,
-                (g) => `0 8px 30px rgba(232,83,58,0.15), 0 0 0 1px rgba(232,83,58,${g})`,
-              ),
-            }}
+            style={{ opacity: proOpacity, y: proY }}
             whileHover={{
-              scale: 1.045,
+              scale: 1.02,
               boxShadow: "0 12px 38px rgba(232,83,58,0.24), 0 0 0 1px rgba(232,83,58,0.2)",
             }}
-            animate={
-              isProInView
-                ? { borderColor: ["rgba(232,83,58,0.62)", "rgba(232,83,58,0.86)", "rgba(232,83,58,0.62)"] }
-                : { borderColor: "rgba(232,83,58,0.62)" }
-            }
-            transition={
-              isProInView
-                ? { duration: 4.2, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" }
-                : { duration: 0.25, ease: "easeOut" }
-            }
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
             className="relative rounded-2xl border-2 border-brand bg-white p-5 shadow-[0_8px_30px_rgba(232,83,58,0.15)]"
           >
-            <motion.span
-              animate={isProInView ? { y: [0, -2, 0] } : { y: 0 }}
-              transition={isProInView ? { duration: 2.4, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
-              className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase text-white"
-            >
+            <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase text-white">
               Most popular
-            </motion.span>
-            <p className="text-sm font-semibold">Pro</p>
+            </span>
+            <p className="text-sm font-semibold">Pro Annual</p>
             <p className="mt-1 text-4xl font-bold">
               ${PRO_ANNUAL_USD_PER_MONTH.toFixed(2)}/mo
             </p>

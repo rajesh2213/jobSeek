@@ -124,7 +124,8 @@ function bonusBatchRemaining(
 
 /**
  * Shared metering for any paginated job list (discovery `/jobs`, company-scoped lists, etc.).
- * Free tier: 2 searches × up to 10 rows (page-1 debits when `discoveryDebit`), optional bonus batch of 5 on SEO surfaces only, then preview.
+ * Free tier: 2 searches × up to 10 rows (20 full list rows; page-1 debits when `discoveryDebit`);
+ * optional +5 on SEO (`surface=seo`) when bonus not yet used; then preview.
  */
 export async function runMeteredJobsList<T>(
   prisma: PrismaClient,
@@ -183,7 +184,8 @@ export async function runMeteredJobsList<T>(
 
   const dctx = discoveryCtx(capCtx);
   let disc = await getDiscoveryListState(prisma, redis, dctx);
-  const bonusOn = isDiscoveryBonusFiveEnabled();
+  const bonusOn =
+    isDiscoveryBonusFiveEnabled() && FREE_DISCOVERY_BONUS_ROWS > 0;
   const bonusEligible = bonusOn && bonusSurface === "seo";
 
   const fullyExhausted =

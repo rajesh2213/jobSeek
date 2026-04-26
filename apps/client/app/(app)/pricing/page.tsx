@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PricingPlansClient } from "../../../components/pricing/PricingPlansClient";
 import { FAQ } from "../../../components/pricing/pricingCopy";
-import { FREE_DAILY_JOB_POST_VIEWS, FREE_DISCOVERY, PLAN_LIMITS } from "../../../lib/planLimits";
+import { FREE_DAILY_JOBS, PLAN_LIMITS } from "../../../lib/planLimits";
 
 export default function PricingPage() {
   return (
@@ -33,17 +33,9 @@ export default function PricingPage() {
               </thead>
               <tbody className="text-ink/90">
                 <tr className="border-b border-line">
-                  <td className="px-4 py-3">Filtered job search (list)</td>
+                  <td className="px-4 py-3">Explore jobs</td>
                   <td className="px-4 py-3 text-ink-muted">
-                    {FREE_DISCOVERY.searches}×{FREE_DISCOVERY.jobsPerSearch} full results, then{" "}
-                    {FREE_DISCOVERY.previewRows}-row preview · resets UTC
-                  </td>
-                  <td className="px-4 py-3 font-medium text-ink">Unlimited</td>
-                </tr>
-                <tr className="border-b border-line">
-                  <td className="px-4 py-3">Full job post views</td>
-                  <td className="px-4 py-3 text-ink-muted">
-                    {FREE_DAILY_JOB_POST_VIEWS}/day (UTC)
+                    {`${FREE_DAILY_JOBS} jobs per day`}
                   </td>
                   <td className="px-4 py-3 font-medium text-ink">Unlimited</td>
                 </tr>
@@ -76,6 +68,7 @@ export default function PricingPage() {
                 </tr>
               </tbody>
             </table>
+            <p className="mt-3 text-center text-xs text-ink/55">Free limits reset at midnight UTC.</p>
           </div>
         </div>
 
