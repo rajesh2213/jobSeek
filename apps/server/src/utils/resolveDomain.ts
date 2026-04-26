@@ -113,28 +113,42 @@ async function probeHeuristicHosts(companyName: string): Promise<string | null> 
   return null;
 }
 
+export type DomainResolutionSource = "bulk_hint" | "seed_dataset" | "db" | "guess" | "none";
+
 /**
  * Resolve hostname (no scheme): bulk CSV (12k+) → seed datasets → DB match → name.com / name.io / …
  */
-export async function resolveDomain(
+export async function resolveDomainWithSource(
   prisma: PrismaClient,
   companyName: string,
   excludeCompanyId: string,
-): Promise<string | null> {
+): Promise<{ domain: string | null; source: DomainResolutionSource }> {
   const key = normalizeNameKey(companyName);
-  if (!key) return null;
+  if (!key) return { domain: null, source: "none" };
 
   const fromBulk = getBulkCompanyHint(companyName)?.domain;
-  if (fromBulk) return fromBulk;
+  if (fromBulk) return { domain: fromBulk, source: "bulk_hint" };
 
   let fromSeed = getSeedDomainMap().get(key);
   if (!fromSeed) {
     fromSeed = getSeedDomainMap().get(canonicalCompanyNameKey(companyName));
   }
-  if (fromSeed) return fromSeed;
+  if (fromSeed) return { domain: fromSeed, source: "seed_dataset" };
 
   const fromDb = await resolveDomainFromDb(prisma, companyName, excludeCompanyId);
-  if (fromDb) return fromDb;
+  if (fromDb) return { domain: fromDb, source: "db" };
 
-  return probeHeuristicHosts(companyName);
+  const fromGuess = await probeHeuristicHosts(companyName);
+  if (fromGuess) return { domain: fromGuess, source: "guess" };
+
+  return { domain: null, source: "none" };
+}
+
+export async function resolveDomain(
+  prisma: PrismaClient,
+  companyName: string,
+  excludeCompanyId: string,
+): Promise<string | null> {
+  const { domain } = await resolveDomainWithSource(prisma, companyName, excludeCompanyId);
+  return domain;
 }
