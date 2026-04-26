@@ -95,6 +95,8 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
   const isAppliedFlash = flashAppliedJobId === job.id;
   const logo = job.company.logoUrl?.trim();
   const initial = job.company.name.slice(0, 1).toUpperCase();
+  const locationText = jobCardPinLocationText(job);
+  const showLocation = locationText !== "Location TBD";
   const titleHover =
     accent === "teal"
       ? "group-hover:text-teal"
@@ -207,9 +209,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
                   </Link>
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-snug">
-                  <span className="min-w-0 text-black/50">
-                    📍 {jobCardPinLocationText(job)}
-                  </span>
+                  {showLocation ? <span className="min-w-0 text-black/50">📍 {locationText}</span> : null}
                   <WorkTypeOutlinePill job={job} className="shrink-0" />
                 </div>
                 {tags.length > 0 ? (
@@ -374,9 +374,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
             </Link>
           </p>
           <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-snug">
-            <span className="min-w-0 text-black/50">
-              📍 {jobCardPinLocationText(job)}
-            </span>
+            {showLocation ? <span className="min-w-0 text-black/50">📍 {locationText}</span> : null}
             <WorkTypeOutlinePill job={job} className="shrink-0" />
           </div>
 

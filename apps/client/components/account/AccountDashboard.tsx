@@ -34,13 +34,17 @@ function formatRelativeTime(iso: string): string {
 const clerkAppearance = {
   variables: { colorPrimary: "#E8533A" },
   elements: {
+    cardBox: {
+      width: "100%",
+      maxWidth: "100%",
+    },
     card: {
       boxShadow: "none",
       border: "1px solid rgba(0,0,0,0.08)",
       width: "100%",
       maxWidth: "100%",
     },
-    rootBox: { width: "100%", maxWidth: "100%" },
+    rootBox: { width: "100%", maxWidth: "100%", margin: "0" },
     // Hiding the navbar breaks Clerk’s two-column layout and clips the main column on the left.
     scrollBox: {
       width: "100%",
@@ -419,7 +423,7 @@ export function AccountDashboard() {
 
       <div
         id="jobseek-clerk-profile"
-        className="w-full min-w-0 rounded-2xl border border-line bg-surface shadow-card ring-1 ring-ink/5"
+        className="w-full min-w-0"
       >
         <UserProfile routing="hash" appearance={clerkAppearance} />
       </div>
