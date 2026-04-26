@@ -546,13 +546,6 @@ export function buildDiscoveryWhereSql(
   return Prisma.join(parts, " AND ");
 }
 
-function buildSalaryOrderBy(): Prisma.JobOrderByWithRelationInput[] {
-  return [
-    { salaryMin: { sort: "desc", nulls: "last" } },
-    { createdAt: "desc" },
-  ];
-}
-
 export function createJobRepository(prisma: PrismaClient) {
   function buildBaseJobData(input: DedupJobInput) {
     const now = new Date();
@@ -758,16 +751,26 @@ export function createJobRepository(prisma: PrismaClient) {
         return jobs as JobWithCompany[];
       }
 
-      const rows = await prisma.job.findMany({
-        where: buildDiscoveryWhere(options.filters, {
-          includeProcessing: options.includeProcessing ?? false,
-        }),
-        include: { company: companyInclude },
-        orderBy: buildSalaryOrderBy(),
-        take: options.limit,
-        skip: options.offset,
+      // Salary: same filter SQL as "latest" (avoids Prisma `where` + `orderBy` nulls issues), then
+      // `ORDER BY salary NULLS LAST` (Postgres) so unknown salaries sort after high floors.
+      const whereSql = buildDiscoveryWhereSql(options.filters, {
+        includeProcessing: options.includeProcessing ?? false,
       });
-      return rows as JobWithCompany[];
+      const idRows = await prisma.$queryRaw<{ id: string }[]>`
+        SELECT j.id FROM "Job" j
+        WHERE ${whereSql}
+        ORDER BY j."salaryMin" DESC NULLS LAST, j."createdAt" DESC
+        LIMIT ${options.limit} OFFSET ${options.offset}
+      `;
+      const ids = idRows.map((r) => r.id);
+      if (ids.length === 0) return [];
+      const jobs = await prisma.job.findMany({
+        where: { id: { in: ids } },
+        include: { company: companyInclude },
+      });
+      const order = new Map(ids.map((id, i) => [id, i]));
+      jobs.sort((a, b) => (order.get(a.id)! - order.get(b.id)!));
+      return jobs as JobWithCompany[];
     },
 
     async findById(
