@@ -63,8 +63,8 @@ function ensureSidebarRoot(): HTMLElement {
     }
     if (shadow) {
       const reset = document.createElement("style");
+      /** System font stacks only in UI components — no third-party font requests. */
       reset.textContent = `
-        @import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap");
         :host { all: initial; }
         *, *::before, *::after { box-sizing: border-box; }
       `;

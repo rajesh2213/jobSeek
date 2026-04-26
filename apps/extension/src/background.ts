@@ -1,7 +1,7 @@
 import { compositeFieldId, parseCompositeFieldId } from "./lib/frameIds";
 import { isLikelyAtsPage } from "./lib/atsDetection";
-
-const DEFAULT_API = "https://jobseek-server.up.railway.app";
+import { isAllowedApiPath } from "./lib/allowedApiPaths";
+import { getDefaultApiBase, isProductionExtensionBuild, resolveApiBaseFromStorage } from "./config";
 
 type ApiRequestMessage = {
   type: "API_REQUEST";
@@ -306,8 +306,36 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     void (async () => {
       try {
         const req = msg as ApiRequestMessage;
+        if (!isAllowedApiPath(req.path)) {
+          sendResponse({ ok: false, status: 0, error: "Invalid API path" });
+          return;
+        }
         const storage = await getStorage(["apiBase", "authToken"]);
-        const apiBase = (storage.apiBase as string | undefined) ?? DEFAULT_API;
+        const apiBase = resolveApiBaseFromStorage(
+          storage.apiBase as string | undefined,
+          getDefaultApiBase(),
+        );
+        const baseTrim = apiBase.replace(/\/+$/, "");
+        let requestUrl: string;
+        let u: URL;
+        try {
+          const baseUrl = new URL(baseTrim);
+          u = new URL(req.path, baseUrl);
+          if (u.origin !== baseUrl.origin) {
+            sendResponse({ ok: false, status: 0, error: "Invalid API URL" });
+            return;
+          }
+          requestUrl = u.toString();
+        } catch {
+          sendResponse({ ok: false, status: 0, error: "Invalid API URL" });
+          return;
+        }
+        const isHttps = u.protocol === "https:";
+        const isDevHttp = u.protocol === "http:" && !isProductionExtensionBuild();
+        if (!isHttps && !isDevHttp) {
+          sendResponse({ ok: false, status: 0, error: "API requests must use HTTPS" });
+          return;
+        }
         const authToken = (storage.authToken as string | undefined) ?? null;
         if (req.auth !== false && !authToken) {
           sendResponse({ ok: false, status: 401, error: "Not authenticated" });
@@ -319,7 +347,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (req.auth !== false && authToken) {
           headers.Authorization = `Bearer ${authToken}`;
         }
-        const res = await fetch(`${apiBase}${req.path}`, {
+        const res = await fetch(requestUrl, {
           method: req.method ?? "GET",
           headers,
           body: req.body,

@@ -13,5 +13,5 @@ export const brand = "#E87A5D";
 export const textMuted = "#9a3412";
 export const textStrong = "#7c2d12";
 
-export const fontDisplay = '"Instrument Serif", Georgia, "Times New Roman", serif';
+export const fontDisplay = 'ui-serif, Georgia, "Times New Roman", serif';
 export const fontSans = 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';

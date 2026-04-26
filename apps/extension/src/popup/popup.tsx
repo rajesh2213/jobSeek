@@ -464,7 +464,7 @@ function Popup() {
           Sign in →
         </button>
         <p style={{ marginTop: 12, fontSize: 11, color: "#888" }}>
-          Paste your Clerk session token in extension storage key `authToken` (dev).
+          After signing in on jobseek.app, return here to use Smart Apply.
         </p>
       </div>
     );

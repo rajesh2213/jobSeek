@@ -1,9 +1,12 @@
-const DEFAULT_API = "https://jobseek-server.up.railway.app";
+import { getDefaultApiBase, resolveApiBaseFromStorage } from "../config";
+import { API_PATHS } from "./allowedApiPaths";
 
 async function getApiBase(): Promise<string> {
   return new Promise((resolve) => {
     chrome.storage.local.get(["apiBase"], (r) => {
-      resolve((r.apiBase as string | undefined) ?? DEFAULT_API);
+      resolve(
+        resolveApiBaseFromStorage(r.apiBase as string | undefined, getDefaultApiBase()),
+      );
     });
   });
 }
@@ -101,7 +104,7 @@ export async function fetchApplyProfile() {
   const token = await getToken();
   if (!token) return null;
   const res = await proxyApiRequest<Record<string, unknown>>({
-    path: "/account/apply-profile",
+    path: API_PATHS.applyProfile,
     auth: true,
     responseType: "json",
   });
@@ -121,7 +124,7 @@ export async function fetchSmartApplyStatus() {
     profileComplete: boolean;
     profileCompletionPct: number;
   }>({
-    path: "/account/smart-apply/status",
+    path: API_PATHS.smartApplyStatus,
     auth: true,
     responseType: "json",
   });
@@ -164,7 +167,7 @@ export async function batchAnswer(params: {
     jobsLimit: number;
     resetAt?: string;
   }>({
-    path: "/account/smart-apply/batch-answer",
+    path: API_PATHS.smartApplyBatchAnswer,
     method: "POST",
     auth: true,
     responseType: "json",
@@ -202,7 +205,7 @@ export async function postSmartApplyEvent(
   const [base, token] = await Promise.all([getApiBase(), getToken()]);
   if (!token) return;
   await proxyApiRequest({
-    path: "/account/smart-apply/events",
+    path: API_PATHS.smartApplyEvents,
     method: "POST",
     auth: true,
     responseType: "json",
@@ -222,7 +225,7 @@ export async function fetchResumeFile(): Promise<{
   const [base, token] = await Promise.all([getApiBase(), getToken()]);
   if (!token) return null;
   const res = await proxyApiRequest<ArrayBuffer>({
-    path: "/account/resume/download",
+    path: API_PATHS.resumeDownload,
     auth: true,
     responseType: "arrayBuffer",
   });
@@ -245,7 +248,7 @@ export async function markApplied(jobId: string) {
   const [base, token] = await Promise.all([getApiBase(), getToken()]);
   if (!token) return;
   await proxyApiRequest({
-    path: "/applications",
+    path: API_PATHS.applications,
     method: "POST",
     auth: true,
     responseType: "json",

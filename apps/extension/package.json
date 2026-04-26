@@ -4,11 +4,16 @@
   "private": true,
   "scripts": {
     "build": "webpack --mode production",
+    "build:ext": "sh -c 'rm -rf dist && webpack --mode production'",
+    "zip:ext": "node scripts/zip-ext.mjs",
+    "check:ext": "node scripts/check-ext.mjs",
     "build:analyze": "cross-env ANALYZE=1 webpack --mode production",
     "dev": "webpack --mode development --watch",
     "test:unit": "node --import tsx --test tests/unit/atsDetection.test.ts"
   },
   "devDependencies": {
+    "archiver": "^7.0.1",
+    "terser-webpack-plugin": "^5.3.10",
     "cross-env": "^7.0.3",
     "@types/chrome": "^0.0.268",
     "@types/node": "^22.9.0",
