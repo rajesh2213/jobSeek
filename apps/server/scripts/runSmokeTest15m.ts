@@ -1,5 +1,7 @@
 /**
  * 15×60s smoke test: journal samples + Prisma + monitor:pipeline, then final report JSON.
+ * Also samples discovery + ATS discovery units (if installed): jobseek-discovery-worker,
+ * jobseek-discovery-scheduler, jobseek-ats-discovery-worker, jobseek-ats-discovery-scheduler.
  *
  * Run from monorepo root:
  *   cd jobSeek && env -u NODE_ENV CSV_SEED_LOG_PATH=/tmp/csv_seed_500.log npx tsx apps/server/scripts/runSmokeTest15m.ts
@@ -7,7 +9,7 @@
  * Note: csv_seed_summary appears in seed:csv stdout, not in jobseek-api/worker journal.
  * Env: SMOKE_TEST_TICKS (default 15), SMOKE_TEST_INTERVAL_SEC (default 60). For 10×1m: SMOKE_TEST_TICKS=10
  */
-import { execSync } from "node:child_process";
+import { execSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +35,7 @@ const INTERVAL_MS = readPositiveIntEnv("SMOKE_TEST_INTERVAL_SEC", 60) * 1000;
 const DEDUPE_SIGNAL_THRESHOLD = 0.3;
 
 const JOBSEEK_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const APPS_SERVER = path.join(JOBSEEK_ROOT, "apps/server");
 
 function jctl(units: string[], since: string): string {
   const u = units.map((x) => `-u ${x}`).join(" ");
@@ -69,6 +72,14 @@ type TickSample = {
   worker_parse_cache_5m: number;
   worker_queue_wait_samples: number[] | null;
   scheduler_priority_dist_5m: number;
+  /** Discovery worker: company source lines in tick window. */
+  discovery_companies_found_5m: number;
+  /** Discovery scheduler: run summary / start lines in tick window. */
+  discovery_summary_5m: number;
+  /** ATS discovery worker: endpoint discovery attempts in tick window. */
+  ats_discovery_attempt_5m: number;
+  /** ATS discovery scheduler: enqueue / start lines in tick window. */
+  ats_discovery_scheduler_signal_5m: number;
   /** Pipeline monitor snapshot for this tick (entire-run health uses aggregates of these). */
   monitor: MonitorSnapshot | null;
 };
@@ -79,6 +90,10 @@ function collectTick(tick: number): TickSample {
   const w5 = jctl(["jobseek-worker", "jobseek-worker-2"], tickSince);
   const e5 = jctl(["jobseek-enrich"], tickSince);
   const s5 = jctl(["jobseek-scheduler"], tickSince);
+  const dW = jctl(["jobseek-discovery-worker"], tickSince);
+  const dS = jctl(["jobseek-discovery-scheduler"], tickSince);
+  const aW = jctl(["jobseek-ats-discovery-worker"], tickSince);
+  const aS = jctl(["jobseek-ats-discovery-scheduler"], tickSince);
 
   let waitSamples: number[] | null = null;
   try {
@@ -109,20 +124,48 @@ function collectTick(tick: number): TickSample {
     worker_parse_cache_5m: countSubstr(w5, "parse_cache"),
     worker_queue_wait_samples: waitSamples,
     scheduler_priority_dist_5m: countSubstr(s5, "company_priority_distribution"),
+    discovery_companies_found_5m: countSubstr(dW, "companies_found"),
+    discovery_summary_5m: countSubstr(dS, "discovery_summary") + countSubstr(dS, "discovery_start"),
+    ats_discovery_attempt_5m: countSubstr(aW, "ats_endpoint_discovery_attempt"),
+    ats_discovery_scheduler_signal_5m:
+      countSubstr(aS, "ats_discovery_scheduler_enqueued") + countSubstr(aS, "ats_discovery_scheduler_started"),
     monitor: monParsedTick,
   };
 }
 
 function runMonitorPipeline(): string {
-  try {
-    return execSync("npm run monitor:pipeline -w @jobseek/server 2>&1", {
-      cwd: JOBSEEK_ROOT,
-      encoding: "utf-8",
-      maxBuffer: 4 * 1024 * 1024,
-    });
-  } catch (e) {
-    return `monitor_pipeline_error: ${String(e)}`;
+  const opts = {
+    encoding: "utf-8" as const,
+    maxBuffer: 4 * 1024 * 1024,
+    env: process.env,
+  };
+
+  // Prefer direct `tsx` (no npm parent); avoids exit-code quirks and captures stderr on failure.
+  const direct = spawnSync("npx", ["tsx", "src/scripts/monitorPipeline.ts"], {
+    ...opts,
+    cwd: APPS_SERVER,
+  });
+  const directOut = `${direct.stdout ?? ""}${direct.stderr ?? ""}`.trim();
+  if (direct.status === 0 && directOut !== "") {
+    return directOut;
   }
+
+  const viaNpm = spawnSync("npm", ["run", "monitor:pipeline", "-w", "@jobseek/server"], {
+    ...opts,
+    cwd: JOBSEEK_ROOT,
+  });
+  const npmOut = `${viaNpm.stdout ?? ""}${viaNpm.stderr ?? ""}`.trim();
+  if (viaNpm.status === 0 && npmOut !== "") {
+    return npmOut;
+  }
+
+  return [
+    "monitor_pipeline_invoke_error",
+    `direct_tsx: exit=${direct.status} stderr_head=${(direct.stderr ?? "").slice(0, 2000)}`,
+    `via_npm: exit=${viaNpm.status} stderr_head=${(viaNpm.stderr ?? "").slice(0, 2000)}`,
+    `direct_stdout_head=${(direct.stdout ?? "").slice(0, 2000)}`,
+    `npm_combined_head=${npmOut.slice(0, 2000)}`,
+  ].join("\n");
 }
 
 type SeedLogMetrics = {
@@ -192,6 +235,32 @@ async function dbSnapshot() {
 }
 
 function parseMonitorJson(raw: string): MonitorSnapshot | null {
+  const startPretty = raw.indexOf('{\n  "jobs_per_min"');
+  const startOneLine = raw.indexOf('{"jobs_per_min"');
+  const start =
+    startPretty >= 0 ? startPretty : startOneLine >= 0 ? startOneLine : -1;
+  if (start >= 0) {
+    let depth = 0;
+    let end = -1;
+    for (let i = start; i < raw.length; i += 1) {
+      const c = raw[i]!;
+      if (c === "{") depth += 1;
+      else if (c === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          end = i + 1;
+          break;
+        }
+      }
+    }
+    if (end > start) {
+      try {
+        return JSON.parse(raw.slice(start, end)) as MonitorSnapshot;
+      } catch {
+        /* fall through */
+      }
+    }
+  }
   const m = raw.match(/\{[\s\S]*\}/);
   if (!m) return null;
   try {
@@ -301,6 +370,10 @@ async function main(): Promise<void> {
   const en15 = jctl(["jobseek-enrich"], cumulativeSince);
   const w15 = jctl(["jobseek-worker", "jobseek-worker-2"], cumulativeSince);
   const api5 = jctl(["jobseek-api", "jobseek-worker"], tickSince);
+  const dw15 = jctl(["jobseek-discovery-worker"], cumulativeSince);
+  const ds15 = jctl(["jobseek-discovery-scheduler"], cumulativeSince);
+  const atsW15 = jctl(["jobseek-ats-discovery-worker"], cumulativeSince);
+  const atsS15 = jctl(["jobseek-ats-discovery-scheduler"], cumulativeSince);
 
   const journal_cumulative_15m = {
     domain_resolved: countSubstr(en15, "domain_resolved"),
@@ -309,6 +382,18 @@ async function main(): Promise<void> {
     parse_cache_lines: countSubstr(w15, "parse_cache"),
     parse_cache_hit_true: w15.includes('"hit":true'),
     parse_cache_hit_false: w15.includes('"hit":false'),
+    discovery: {
+      worker_companies_found: countSubstr(dw15, "companies_found"),
+      worker_source_fetch_complete: countSubstr(dw15, "source_fetch_complete"),
+      scheduler_discovery_summary: countSubstr(ds15, "discovery_summary"),
+      scheduler_discovery_start: countSubstr(ds15, "discovery_start"),
+    },
+    ats_discovery: {
+      worker_attempts: countSubstr(atsW15, "ats_endpoint_discovery_attempt"),
+      worker_boot: countSubstr(atsW15, "ats_discovery_worker_started"),
+      scheduler_enqueued: countSubstr(atsS15, "ats_discovery_scheduler_enqueued"),
+      scheduler_boot: countSubstr(atsS15, "ats_discovery_scheduler_started"),
+    },
   };
 
   /** Final snapshot for debug only; health uses aggregates over all ticks (see aggregated_metrics). */
@@ -343,6 +428,14 @@ async function main(): Promise<void> {
   const queueHealthy =
     lastWaits.length < 2 ? true : lastWaits[lastWaits.length - 1]! <= (lastWaits[0] ?? 0) * 1.5;
 
+  const d = journal_cumulative_15m.discovery;
+  const a = journal_cumulative_15m.ats_discovery;
+  const discoveryWorkerSignaled =
+    d.worker_companies_found > 0 || d.worker_source_fetch_complete > 0;
+  const discoverySchedulerSignaled = d.scheduler_discovery_summary > 0 || d.scheduler_discovery_start > 0;
+  const atsDiscoveryWorkerSignaled = a.worker_attempts > 0 || a.worker_boot > 0;
+  const atsDiscoverySchedulerSignaled = a.scheduler_enqueued > 0 || a.scheduler_boot > 0;
+
   const sys = systemStateFromAggregates(agg.maxParseCalls, agg.avgDuplicateRatio);
   const cleanerFromLog = (seedLog?.invalidCount ?? 0) > 0;
   const final_smoke_test_json: Record<string, boolean | string> = {
@@ -357,6 +450,11 @@ async function main(): Promise<void> {
     scheduler_active: schedulerActive,
     output_generation: db.top_companies.length > 0,
     system_state: sys,
+    // true when journald shows discovery activity in MONITOR_PIPELINE_JOURNAL_SINCE (false if units missing / idle)
+    discovery_worker_signaled: discoveryWorkerSignaled,
+    discovery_scheduler_signaled: discoverySchedulerSignaled,
+    ats_discovery_worker_signaled: atsDiscoveryWorkerSignaled,
+    ats_discovery_scheduler_signaled: atsDiscoverySchedulerSignaled,
   };
 
   const report = {

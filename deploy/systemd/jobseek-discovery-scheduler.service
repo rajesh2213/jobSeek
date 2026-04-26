@@ -1,0 +1,14 @@
+[Unit]
+Description=JobSeek Discovery Scheduler
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/jobSeek
+EnvironmentFile=/home/ubuntu/jobSeek/.env
+ExecStart=/usr/bin/npm run discovery:scheduler -w @jobseek/server
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
