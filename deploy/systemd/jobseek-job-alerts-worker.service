@@ -7,6 +7,7 @@ Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/jobSeek
 EnvironmentFile=/home/ubuntu/jobSeek/.env
+Environment=WORKER_NAME=jobseek-job-alerts-worker
 ExecStart=/usr/bin/npm run worker:job-alerts -w @jobseek/server
 Restart=always
 RestartSec=5

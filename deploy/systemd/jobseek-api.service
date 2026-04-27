@@ -6,6 +6,7 @@ After=network.target
 User=ubuntu
 WorkingDirectory=/home/ubuntu/jobSeek
 EnvironmentFile=/home/ubuntu/jobSeek/.env
+Environment=WORKER_NAME=jobseek-api
 ExecStart=/usr/bin/npm run start:server
 Restart=always
 RestartSec=5

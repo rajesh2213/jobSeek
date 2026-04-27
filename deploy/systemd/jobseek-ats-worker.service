@@ -8,6 +8,7 @@ WorkingDirectory=/home/ubuntu/jobSeek
 ExecStart=/usr/bin/npm run worker:ats-endpoint -w @jobseek/server
 Restart=always
 Environment=NODE_ENV=production
+Environment=WORKER_NAME=jobseek-ats-worker
 
 [Install]
 WantedBy=multi-user.target

@@ -6,6 +6,7 @@ After=network.target
 User=ubuntu
 WorkingDirectory=/home/ubuntu/jobSeek
 EnvironmentFile=/home/ubuntu/jobSeek/.env
+Environment=WORKER_NAME=jobseek-ats-discovery-worker
 ExecStart=/usr/bin/npm run worker:ats-discovery -w @jobseek/server
 Restart=always
 RestartSec=5

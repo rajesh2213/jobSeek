@@ -5,6 +5,7 @@ After=network.target
 [Service]
 User=ubuntu
 WorkingDirectory=/home/ubuntu/jobSeek/apps/inference
+Environment=WORKER_NAME=jobseek-inference
 ExecStart=/home/ubuntu/jobSeek/apps/inference/.venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8001
 Restart=always
 RestartSec=5

@@ -7,6 +7,7 @@ Type=oneshot
 User=ubuntu
 WorkingDirectory=/home/ubuntu/jobSeek
 EnvironmentFile=/home/ubuntu/jobSeek/.env
+Environment=WORKER_NAME=jobseek-job-alerts-scheduler
 ExecStart=/usr/bin/npm run scheduler:job-alerts -w @jobseek/server
 RemainAfterExit=yes
 
