@@ -58,7 +58,9 @@ async function enqueuePrioritizedIngests(): Promise<void> {
     orderBy: [{ score: "desc" }, { successCount: "desc" }, { lastCrawledAt: "asc" }],
     take: poolLimit,
   });
-  const queryMetrics = logQueryMetrics("atsEndpoint.scheduler.findMany", pool, 256);
+  const queryMetrics = logQueryMetrics("atsEndpoint.scheduler.findMany", pool, 256, {
+    countTowardEgress: false,
+  });
 
   pool.sort((a, b) => getEndpointPriority(b) - getEndpointPriority(a));
   let adaptiveBatchSize = baseBatchSize;

@@ -107,6 +107,19 @@ export function registerJobRoutes(
         },
       );
 
+      const rowsReturned = out.items.length;
+      const estBytes = rowsReturned * 1100;
+      request.log.info(
+        {
+          event: "api_request_metrics",
+          route: "/jobs",
+          method: "GET",
+          rowsReturned,
+          estimatedKB: Number((estBytes / 1024).toFixed(2)),
+        },
+        "api_jobs_list_metrics",
+      );
+
       return reply.send({
         data: out.items.map((j) =>
           toJobPublicJson(j as unknown as JobWithCompanyRow),

@@ -1,7 +1,13 @@
 import { logger } from "./logger.js";
+import { trackEgress } from "./egressTracker.js";
 
 const DEFAULT_WARN_ROW_THRESHOLD = 100;
 const DEFAULT_WARN_KB_THRESHOLD = 200;
+
+export type LogQueryMetricsOptions = {
+  /** When false, does not add to `egress_hourly` (use for named metrics that duplicate Prisma middleware). */
+  countTowardEgress?: boolean;
+};
 
 export type QueryMetricsResult = {
   readRows: number;
@@ -12,8 +18,18 @@ export function logQueryMetrics<T>(
   name: string,
   rows: T[],
   avgRowBytes = 1000,
-  updatedRows?: number,
+  updatedRowsOrOptions?: number | LogQueryMetricsOptions,
+  options?: LogQueryMetricsOptions,
 ): QueryMetricsResult {
+  let updatedRows: number | undefined;
+  let countTowardEgress = true;
+  if (typeof updatedRowsOrOptions === "number") {
+    updatedRows = updatedRowsOrOptions;
+    if (options?.countTowardEgress === false) countTowardEgress = false;
+  } else if (updatedRowsOrOptions && typeof updatedRowsOrOptions === "object") {
+    if (updatedRowsOrOptions.countTowardEgress === false) countTowardEgress = false;
+  }
+
   const rowCount = rows.length;
   const estimatedKB = (rowCount * avgRowBytes) / 1024;
   logger.info(
@@ -28,6 +44,10 @@ export function logQueryMetrics<T>(
     },
     "query_metrics",
   );
+
+  if (countTowardEgress) {
+    trackEgress(estimatedKB, { source: "manual" });
+  }
 
   if (rowCount > DEFAULT_WARN_ROW_THRESHOLD || estimatedKB > DEFAULT_WARN_KB_THRESHOLD) {
     logger.warn(

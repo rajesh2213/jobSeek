@@ -436,7 +436,9 @@ async function discoverFromSerp(batchSize: number): Promise<void> {
     take,
     select: SERP_DISCOVERY_SELECT,
   });
-  const queryMetrics = logQueryMetrics("atsDiscovery.discoverFromSerp.findMany", rows, 350);
+  const queryMetrics = logQueryMetrics("atsDiscovery.discoverFromSerp.findMany", rows, 350, {
+    countTowardEgress: false,
+  });
   lastSerpEstimatedKb = queryMetrics.estimatedKB;
 
   const roiFirst = ["greenhouse", "lever"];
@@ -611,7 +613,9 @@ async function discoverFromJobs(batchSize: number): Promise<void> {
   });
   const jobOrder = new Map(jobIds.map((id, idx) => [id, idx]));
   jobs.sort((a, b) => (jobOrder.get(a.id) ?? 0) - (jobOrder.get(b.id) ?? 0));
-  const queryMetrics = logQueryMetrics("atsDiscovery.discoverFromJobs.findMany", jobs, 600);
+  const queryMetrics = logQueryMetrics("atsDiscovery.discoverFromJobs.findMany", jobs, 600, {
+    countTowardEgress: false,
+  });
   lastJobsEstimatedKb = queryMetrics.estimatedKB;
 
   const processedJobIds: string[] = [];
@@ -748,7 +752,9 @@ async function validateEndpointsBatch(batchSize: number, priorityBand: "high" | 
     take: Math.min(100, take * 5),
     select: ATS_VALIDATE_SELECT,
   });
-  logQueryMetrics(`atsDiscovery.validate.findMany.${priorityBand}`, pool, 450);
+  logQueryMetrics(`atsDiscovery.validate.findMany.${priorityBand}`, pool, 450, {
+    countTowardEgress: false,
+  });
 
   const nowMs = Date.now();
   const eligible = pool.filter((ep) => {

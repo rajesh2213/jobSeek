@@ -6,6 +6,7 @@ import { registerRoutes } from "./routes/index.js";
 import cors from "@fastify/cors";
 import fastifyRawBody from "fastify-raw-body";
 import { getIoredis } from "../queues/job.queue.js";
+import { registerApiRequestMetrics } from "../utils/apiRequestMetrics.js";
 
 export async function buildServer() {
   const server = Fastify({
@@ -78,6 +79,8 @@ export async function buildServer() {
       "global_rate_limit_store_memory",
     );
   }
+
+  registerApiRequestMetrics(server);
 
   server.setErrorHandler((error: FastifyError, _request, reply) => {
     const statusCode = error.statusCode ?? 500;

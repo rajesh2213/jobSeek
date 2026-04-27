@@ -1,6 +1,7 @@
 import { PrismaClient } from "../../prisma/generatedClient.js";
 import { loadRootEnv } from "../env/loadEnv.js";
 import { logger } from "../../utils/logger.js";
+import { registerPrismaReadInstrumentation } from "../../utils/prismaInstrumentation.js";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
@@ -14,6 +15,9 @@ export const prisma =
         ? ["query", "error", "warn"]
         : ["error"],
   });
+
+/** Outer middleware: read egress + slow-query timing applies to the full round-trip. */
+registerPrismaReadInstrumentation(prisma);
 
 const prismaSlowQueryMs = Number(process.env.PRISMA_SLOW_QUERY_MS ?? "0");
 if (prismaSlowQueryMs > 0) {
