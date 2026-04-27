@@ -6,7 +6,7 @@
 
 | Area | Path / notes |
 |------|--------------|
-| Manifest | `manifest.json` (MV3) |
+| Manifest | `manifest.json` (MV3). **Chrome Web Store:** the `description` field must be **≤132 characters** (same limit as the store “short description”); `check:ext` enforces this on `dist/manifest.json`. |
 | Build | Webpack 5, TypeScript, React (popup bundle) |
 | Background | `src/background.ts` → `dist/background.js` (service worker) |
 | Content | `src/content.ts` → `dist/content.js` (`all_frames: true` for iframe-heavy ATS) |

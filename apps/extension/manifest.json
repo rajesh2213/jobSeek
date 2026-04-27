@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "JobLoom",
   "version": "1.0.0",
-  "description": "Auto-fill job applications using your JobLoom profile. You review and submit. Click the extension icon to open the in-page sidebar on supported application pages.",
+  "description": "Fill job applications from your JobLoom profile; you review and submit. Toolbar icon opens the in-page sidebar on supported pages.",
   "icons": {
     "16": "assets/icon-16.png",
     "32": "assets/icon-32.png",

@@ -62,8 +62,12 @@ if (!existsSync(manPath)) {
     }
     if (typeof m.description !== "string" || m.description.length < 10) {
       fail("description should be at least 10 characters");
+    } else if (m.description.length > 132) {
+      fail(
+        `manifest description must be ≤132 characters (Chrome Web Store limit); got ${m.description.length}`,
+      );
     } else {
-      pass("description present");
+      pass(`description present (${m.description.length}/132 chars)`);
     }
     const mtext = read(manPath);
     if (mtext.includes("localhost") || mtext.includes("127.0.0.1")) {
