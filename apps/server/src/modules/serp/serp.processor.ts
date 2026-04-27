@@ -19,6 +19,7 @@ import { getRedisConnection } from "../../queues/job.queue.js";
 import { assertWorkerProcessEnv } from "../../infrastructure/env/validateWorkerEnv.js";
 import { registerWorkerShutdown } from "../../utils/workerShutdown.js";
 import { recordSerpQueryPipelineTotals } from "../../services/atsPipelineCounters.service.js";
+import { logQueryMetrics } from "../../utils/queryMetrics.js";
 
 const DEFAULT_MAX_QUERIES_PER_RUN = 8;
 const DEFAULT_MAX_QUERIES_DEBUG = 3;
@@ -28,6 +29,8 @@ const QUERY_DELAY_MS = 800;
 const SERP_SKIP_QUERY_KEY_PREFIX = "serp:skip_query:";
 const DEFAULT_DEDUP_SKIP_RATIO = 0.8;
 const DEFAULT_SKIP_QUERY_TTL_SECONDS = 604800; // 7 days
+const SERP_SEEN_URL_KEY_PREFIX = "serp:seen_url:";
+const DEFAULT_SEEN_URL_TTL_SECONDS = 90 * 24 * 60 * 60; // 90 days
 
 function getSerpRedis(): Redis {
   return getRedisConnection() as unknown as Redis;
@@ -36,6 +39,11 @@ function getSerpRedis(): Redis {
 function serpQuerySkipRedisKey(query: string): string {
   const hash = createHash("sha256").update(query, "utf8").digest("hex");
   return `${SERP_SKIP_QUERY_KEY_PREFIX}${hash}`;
+}
+
+function serpSeenUrlRedisKey(url: string): string {
+  const hash = createHash("sha256").update(url, "utf8").digest("hex");
+  return `${SERP_SEEN_URL_KEY_PREFIX}${hash}`;
 }
 
 function getDedupSkipRatioThreshold(): number {
@@ -50,6 +58,13 @@ function getSkipQueryTtlSeconds(): number {
   if (raw === undefined || raw === "") return DEFAULT_SKIP_QUERY_TTL_SECONDS;
   const n = Number.parseInt(raw, 10);
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_SKIP_QUERY_TTL_SECONDS;
+}
+
+function getSeenUrlTtlSeconds(): number {
+  const raw = process.env.SERP_SEEN_URL_TTL_SECONDS?.trim();
+  if (raw === undefined || raw === "") return DEFAULT_SEEN_URL_TTL_SECONDS;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_SEEN_URL_TTL_SECONDS;
 }
 
 function getMaxQueriesPerRun(): number {
@@ -518,12 +533,17 @@ async function runSerpBatch(): Promise<void> {
       }
 
       const filteredOut = cleaned.length - highSignal.length;
+      logQueryMetrics("serp.processor.highSignalCandidates", highSignal, 320);
 
-      const existing = await prisma.serpResult.findMany({
-        where: { url: { in: highSignal.map((x) => x.url) } },
-        select: { url: true },
-      });
-      const existingSet = new Set(existing.map((x) => x.url));
+      const redis = getSerpRedis();
+      const seenKeys = highSignal.map((row) => serpSeenUrlRedisKey(row.url));
+      const seenValues = seenKeys.length > 0 ? await redis.mget(seenKeys) : [];
+      const existingSet = new Set<string>();
+      for (let idx = 0; idx < seenValues.length; idx += 1) {
+        if (seenValues[idx] != null) existingSet.add(highSignal[idx]!.url);
+      }
+      logQueryMetrics("serp.processor.redis.mget", seenKeys, 64);
+
       for (const row of highSignal) {
         if (existingSet.has(row.url)) {
           logger.info(
@@ -539,6 +559,7 @@ async function runSerpBatch(): Promise<void> {
       }
       const deduped = highSignal.filter((x) => existingSet.has(x.url)).length;
       const toInsert = highSignal.filter((x) => !existingSet.has(x.url));
+      logQueryMetrics("serp.processor.toInsert", toInsert, 320);
 
       if (toInsert.length > 0) {
         await prisma.serpResult.createMany({
@@ -554,6 +575,12 @@ async function runSerpBatch(): Promise<void> {
             rank: r.rank,
           })),
         });
+        const ttlSeconds = getSeenUrlTtlSeconds();
+        const writePipeline = redis.pipeline();
+        for (const row of toInsert) {
+          writePipeline.set(serpSeenUrlRedisKey(row.url), "1", "EX", ttlSeconds);
+        }
+        await writePipeline.exec();
       }
 
       const dedupRatio = totalResults > 0 ? deduped / totalResults : 0;

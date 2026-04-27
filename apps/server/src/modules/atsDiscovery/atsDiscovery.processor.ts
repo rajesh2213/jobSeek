@@ -33,6 +33,11 @@ import {
   recordDiscoveryPersistence,
   recordValidationPipeline,
 } from "../../services/atsPipelineCounters.service.js";
+import {
+  assertRequiredSelect,
+  logEfficiencyMetrics,
+  logQueryMetrics,
+} from "../../utils/queryMetrics.js";
 
 const atsEndpointLifecycle = createAtsEndpointService(prisma);
 
@@ -40,12 +45,59 @@ const CRAWLABLE = new Set<string>(CRAWLABLE_ATS_TYPES);
 
 const GENERIC_SLUGS = new Set(["jobs", "careers", "apply"]);
 
-const DEFAULT_BATCH = 200;
+const DEFAULT_BATCH = 100;
 const MIN_SERP_SCORE = 6;
-const JOB_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
 const JOB_DISCOVERY_SCORE = 5;
 const ACTIVATION_SCORE_THRESHOLD = 8;
 const DEFAULT_VALIDATE_BATCH = 20;
+const MIN_BATCH_SIZE = 20;
+const MAX_BATCH_SIZE = 100;
+// REQUIRED_SELECT
+const SERP_DISCOVERY_SELECT = {
+  id: true,
+  url: true,
+  score: true,
+  createdAt: true,
+  atsType: true,
+  slug: true,
+} as const;
+
+// REQUIRED_SELECT
+const JOB_DISCOVERY_SELECT = {
+  id: true,
+  companyId: true,
+  sourceUrl: true,
+  applyUrl: true,
+  lastSeenAt: true,
+  lastProcessedAt: true,
+} as const;
+
+// REQUIRED_SELECT
+const ATS_VALIDATE_SELECT = {
+  id: true,
+  type: true,
+  slug: true,
+  baseUrl: true,
+  metadata: true,
+  companyId: true,
+  companyName: true,
+  failureCount: true,
+  lastFailureAt: true,
+  score: true,
+  lastCrawledAt: true,
+} as const;
+
+let lastSerpEstimatedKb = 0;
+let lastJobsEstimatedKb = 0;
+let lastSerpEfficiency = 1;
+let lastJobsEfficiency = 1;
+
+function adaptiveTake(base: number, lastEstimatedKb: number, lastEfficiency: number): number {
+  let next = base;
+  if (lastEstimatedKb > 500 || lastEfficiency < 0.1) next = Math.floor(base / 2);
+  else if (lastEstimatedKb < 100) next = base + 20;
+  return Math.max(MIN_BATCH_SIZE, Math.min(MAX_BATCH_SIZE, next));
+}
 
 export type AtsEndpointDiscoveryCandidate = {
   type: string;
@@ -362,7 +414,16 @@ async function persistEndpointCandidate(
 }
 
 async function discoverFromSerp(batchSize: number): Promise<void> {
-  const take = Math.min(500, Math.max(100, batchSize));
+  if (lastSerpEfficiency < 0.05) {
+    logger.warn(
+      { event: "ats_discovery_serp_skipped_low_efficiency_backpressure", lastSerpEfficiency },
+      "ats_discovery_serp_skipped_low_efficiency_backpressure",
+    );
+    lastSerpEfficiency = 1;
+    return;
+  }
+  const take = adaptiveTake(Math.min(100, Math.max(25, batchSize)), lastSerpEstimatedKb, lastSerpEfficiency);
+  assertRequiredSelect("SerpResult", "atsDiscovery.discoverFromSerp.findMany", SERP_DISCOVERY_SELECT);
 
   const rows = await prisma.serpResult.findMany({
     where: {
@@ -373,14 +434,10 @@ async function discoverFromSerp(batchSize: number): Promise<void> {
     },
     orderBy: [{ score: "desc" }, { createdAt: "desc" }],
     take,
-    select: {
-      id: true,
-      url: true,
-      atsType: true,
-      slug: true,
-      score: true,
-    },
+    select: SERP_DISCOVERY_SELECT,
   });
+  const queryMetrics = logQueryMetrics("atsDiscovery.discoverFromSerp.findMany", rows, 350);
+  lastSerpEstimatedKb = queryMetrics.estimatedKB;
 
   const roiFirst = ["greenhouse", "lever"];
   rows.sort((a, b) => {
@@ -391,6 +448,8 @@ async function discoverFromSerp(batchSize: number): Promise<void> {
     return 0;
   });
 
+  let updatedRows = 0;
+  let skippedRows = 0;
   for (const row of rows) {
     const markDone = async (extra?: Record<string, unknown>) => {
       await markSerpRowDiscovered(row.id, row.url, extra ?? {});
@@ -413,6 +472,7 @@ async function discoverFromSerp(batchSize: number): Promise<void> {
         "ats_endpoint_invalid_skipped",
       );
       await markDone({ reason: "missing_ats_or_slug" });
+      skippedRows += 1;
       continue;
     }
 
@@ -433,6 +493,7 @@ async function discoverFromSerp(batchSize: number): Promise<void> {
         "ats_endpoint_invalid_skipped",
       );
       await markDone({ reason: "workday_url_rejected" });
+      skippedRows += 1;
       continue;
     }
 
@@ -460,6 +521,7 @@ async function discoverFromSerp(batchSize: number): Promise<void> {
         "ats_endpoint_invalid_skipped",
       );
       await markDone({ reason: "unresolved_candidate" });
+      skippedRows += 1;
       continue;
     }
 
@@ -486,6 +548,7 @@ async function discoverFromSerp(batchSize: number): Promise<void> {
         "ats_endpoint_invalid_skipped",
       );
       await markDone({ reason: "slug_guard" });
+      skippedRows += 1;
       continue;
     }
 
@@ -496,34 +559,66 @@ async function discoverFromSerp(batchSize: number): Promise<void> {
         url: row.url,
       });
       await markDone({ reason: "processed" });
+      updatedRows += 1;
     } catch (err) {
       logger.error(
         { event: "ats_discovery_serp_row_failed", serpResultId: row.id, url: row.url, err },
         "ats_discovery_serp_row_failed",
       );
+      skippedRows += 1;
     }
   }
+  lastSerpEfficiency = logEfficiencyMetrics({
+    name: "atsDiscovery.discoverFromSerp",
+    readRows: rows.length,
+    updatedRows,
+    skippedRows,
+  });
 }
 
 async function discoverFromJobs(batchSize: number): Promise<void> {
-  const take = Math.min(500, Math.max(50, batchSize));
-  const since = new Date(Date.now() - JOB_LOOKBACK_MS);
+  if (lastJobsEfficiency < 0.05) {
+    logger.warn(
+      { event: "ats_discovery_jobs_skipped_low_efficiency_backpressure", lastJobsEfficiency },
+      "ats_discovery_jobs_skipped_low_efficiency_backpressure",
+    );
+    lastJobsEfficiency = 1;
+    return;
+  }
+  const take = adaptiveTake(Math.min(100, Math.max(25, batchSize)), lastJobsEstimatedKb, lastJobsEfficiency);
+  const now = new Date();
+  const nowMs = now.getTime();
+  const lookbackDays = Math.max(1, Number(process.env.PROCESSING_LOOKBACK_DAYS ?? "7") || 7);
+  const lookbackSince = new Date(nowMs - lookbackDays * 24 * 60 * 60 * 1000);
+  const jobIdRows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT id
+    FROM "Job"
+    WHERE (
+      "lastProcessedAt" IS NULL
+      OR "lastSeenAt" > "lastProcessedAt"
+    )
+      AND "lastSeenAt" >= ${lookbackSince}
+    ORDER BY COALESCE("lastProcessedAt", TO_TIMESTAMP(0)) ASC, "lastSeenAt" DESC
+    LIMIT ${take}
+  `;
+  const jobIds = jobIdRows.map((row) => row.id);
+  if (jobIds.length === 0) return;
 
+  assertRequiredSelect("Job", "atsDiscovery.discoverFromJobs.findMany", JOB_DISCOVERY_SELECT);
   const jobs = await prisma.job.findMany({
-    where: {
-      OR: [{ lastSeenAt: { gte: since } }, { createdAt: { gte: since } }],
-    },
-    orderBy: [{ lastSeenAt: "desc" }, { createdAt: "desc" }],
-    take,
-    select: {
-      id: true,
-      companyId: true,
-      sourceUrl: true,
-      applyUrl: true,
-    },
+    where: { id: { in: jobIds } },
+    select: JOB_DISCOVERY_SELECT,
   });
+  const jobOrder = new Map(jobIds.map((id, idx) => [id, idx]));
+  jobs.sort((a, b) => (jobOrder.get(a.id) ?? 0) - (jobOrder.get(b.id) ?? 0));
+  const queryMetrics = logQueryMetrics("atsDiscovery.discoverFromJobs.findMany", jobs, 600);
+  lastJobsEstimatedKb = queryMetrics.estimatedKB;
 
+  const processedJobIds: string[] = [];
+  let updatedRows = 0;
+  let skippedRows = 0;
   for (const job of jobs) {
+    processedJobIds.push(job.id);
     const urls = [job.sourceUrl, job.applyUrl].filter((u): u is string => typeof u === "string" && u.trim().length > 0);
 
     let candidate: AtsEndpointDiscoveryCandidate | null = null;
@@ -559,6 +654,7 @@ async function discoverFromJobs(batchSize: number): Promise<void> {
         { event: "ats_endpoint_invalid_skipped", reason: "job_url_not_ats_board", jobId: job.id },
         "ats_endpoint_invalid_skipped",
       );
+      skippedRows += 1;
       continue;
     }
 
@@ -579,6 +675,7 @@ async function discoverFromJobs(batchSize: number): Promise<void> {
         { event: "ats_endpoint_invalid_skipped", reason: "workday_url_rejected", jobId: job.id, url: usedUrl },
         "ats_endpoint_invalid_skipped",
       );
+      skippedRows += 1;
       continue;
     }
 
@@ -606,6 +703,7 @@ async function discoverFromJobs(batchSize: number): Promise<void> {
         },
         "ats_endpoint_invalid_skipped",
       );
+      skippedRows += 1;
       continue;
     }
 
@@ -617,30 +715,40 @@ async function discoverFromJobs(batchSize: number): Promise<void> {
         jobId: job.id,
         companyId: job.companyId,
       });
+      updatedRows += 1;
     } catch (err) {
       logger.error({ event: "ats_discovery_job_row_failed", jobId: job.id, url: usedUrl, err }, "ats_discovery_job_row_failed");
+      skippedRows += 1;
     }
   }
+
+  if (processedJobIds.length > 0) {
+    await prisma.job.updateMany({
+      where: { id: { in: processedJobIds } },
+      data: { lastProcessedAt: now },
+    });
+  }
+  lastJobsEfficiency = logEfficiencyMetrics({
+    name: "atsDiscovery.discoverFromJobs",
+    readRows: jobs.length,
+    updatedRows,
+    skippedRows,
+  });
 }
 
-async function validateEndpointsBatch(batchSize: number): Promise<void> {
+async function validateEndpointsBatch(batchSize: number, priorityBand: "high" | "low" = "high"): Promise<void> {
   const take = Math.min(100, Math.max(1, batchSize));
+  assertRequiredSelect("AtsEndpoint", `atsDiscovery.validate.findMany.${priorityBand}`, ATS_VALIDATE_SELECT);
   const pool = await prisma.atsEndpoint.findMany({
-    where: { isActive: false },
-    orderBy: [{ score: "desc" }, { failureCount: "asc" }, { lastSeenAt: "desc" }],
-    take: Math.min(300, take * 5),
-    select: {
-      id: true,
-      type: true,
-      slug: true,
-      baseUrl: true,
-      metadata: true,
-      companyId: true,
-      companyName: true,
-      failureCount: true,
-      lastFailureAt: true,
+    where: {
+      isActive: false,
+      ...(priorityBand === "high" ? { score: { gte: 40 } } : { score: { lt: 40 } }),
     },
+    orderBy: [{ score: "desc" }, { failureCount: "asc" }, { lastSeenAt: "desc" }],
+    take: Math.min(100, take * 5),
+    select: ATS_VALIDATE_SELECT,
   });
+  logQueryMetrics(`atsDiscovery.validate.findMany.${priorityBand}`, pool, 450);
 
   const nowMs = Date.now();
   const eligible = pool.filter((ep) => {
@@ -649,6 +757,8 @@ async function validateEndpointsBatch(batchSize: number): Promise<void> {
   });
 
   const endpoints = eligible.slice(0, take);
+  let updatedRows = 0;
+  let skippedRows = 0;
 
   for (const ep of endpoints) {
     const atsType = ep.type as AtsType;
@@ -702,6 +812,7 @@ async function validateEndpointsBatch(batchSize: number): Promise<void> {
         },
         "ats_endpoint_validation_summary",
       );
+      skippedRows += 1;
       continue;
     }
 
@@ -729,6 +840,7 @@ async function validateEndpointsBatch(batchSize: number): Promise<void> {
         },
         "ats_endpoint_validation_passed",
       );
+      updatedRows += 1;
       logger.info(
         {
           event: "ats_endpoint_activated",
@@ -752,6 +864,7 @@ async function validateEndpointsBatch(batchSize: number): Promise<void> {
         "ats_endpoint_validation_failed",
       );
       await atsEndpointLifecycle.markFailure(ep.id);
+      skippedRows += 1;
     }
 
     recordValidationPipeline(jobs.length);
@@ -766,6 +879,12 @@ async function validateEndpointsBatch(batchSize: number): Promise<void> {
       "ats_endpoint_validation_summary",
     );
   }
+  logEfficiencyMetrics({
+    name: `atsDiscovery.validate.${priorityBand}`,
+    readRows: endpoints.length,
+    updatedRows,
+    skippedRows,
+  });
 }
 
 function isSerpPayload(data: unknown): data is DiscoverFromSerpPayload {
@@ -789,6 +908,7 @@ function isValidatePayload(data: unknown): data is ValidateEndpointPayload {
   if (typeof data !== "object" || data === null) return false;
   const o = data as Record<string, unknown>;
   if (o.batchSize !== undefined && (typeof o.batchSize !== "number" || !Number.isFinite(o.batchSize))) return false;
+  if (o.priorityBand !== undefined && o.priorityBand !== "high" && o.priorityBand !== "low") return false;
   return true;
 }
 
@@ -833,7 +953,8 @@ async function start(): Promise<void> {
       if (job.name === VALIDATE_ENDPOINT_JOB) {
         if (!isValidatePayload(job.data)) throw new Error("Invalid validate_endpoint payload");
         const batchSize = typeof job.data?.batchSize === "number" ? job.data.batchSize : DEFAULT_VALIDATE_BATCH;
-        await validateEndpointsBatch(batchSize);
+        const priorityBand = job.data?.priorityBand === "low" ? "low" : "high";
+        await validateEndpointsBatch(batchSize, priorityBand);
         return;
       }
 

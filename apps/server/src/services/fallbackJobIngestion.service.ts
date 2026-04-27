@@ -24,6 +24,7 @@ import {
   extractWellfoundListingsFromHtml,
   fetchWellfoundJobsHtml,
 } from "../modules/discovery/extractors/wellfoundJobs.extractor.js";
+import { computeJobContentHash } from "../utils/jobContentHash.js";
 
 const REMOTEOK_API = "https://remoteok.com/api";
 const MAX_REMOTEOK_JOBS_PER_COMPANY = 35;
@@ -122,7 +123,10 @@ export async function processIngestJobsFromSource(
     "fallback_ingestion_started",
   );
 
-  const company = await prisma.company.findUnique({ where: { id: companyId } });
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { id: true, name: true, domain: true, careersUrl: true },
+  });
   if (!company) {
     logger.warn({ event: "fallback_ingestion_no_company", companyId }, "fallback_ingestion_no_company");
     return;
@@ -159,13 +163,24 @@ export async function processIngestJobsFromSource(
         };
         try {
           const result = await jobService.ingestDeduplicated(normalized);
+          const newContentHash = computeJobContentHash({
+            title: normalized.title,
+            description: normalized.description,
+            applyUrl: normalized.applyUrl ?? normalized.sourceUrl,
+          });
           if (result.inserted) wellfoundInserted += 1;
-          await enrichCanonicalJobParsedDescription(
-            prisma,
-            jobRepository,
-            result.canonical.id,
-            result.inserted,
-          );
+          if (result.canonical.contentHash !== newContentHash) {
+            await enrichCanonicalJobParsedDescription(
+              prisma,
+              jobRepository,
+              result.canonical.id,
+              result.inserted,
+            );
+          }
+          await prisma.job.update({
+            where: { id: result.canonical.id },
+            data: { contentHash: newContentHash, lastProcessedAt: new Date() },
+          });
         } catch (err) {
           logger.debug(
             { event: "fallback_wellfound_row_skipped", companyId, sourceUrl, err },
@@ -233,13 +248,24 @@ export async function processIngestJobsFromSource(
 
         try {
           const result = await jobService.ingestDeduplicated(normalized);
+          const newContentHash = computeJobContentHash({
+            title: normalized.title,
+            description: normalized.description,
+            applyUrl: normalized.applyUrl ?? normalized.sourceUrl,
+          });
           if (result.inserted) remoteOkInserted += 1;
-          await enrichCanonicalJobParsedDescription(
-            prisma,
-            jobRepository,
-            result.canonical.id,
-            result.inserted,
-          );
+          if (result.canonical.contentHash !== newContentHash) {
+            await enrichCanonicalJobParsedDescription(
+              prisma,
+              jobRepository,
+              result.canonical.id,
+              result.inserted,
+            );
+          }
+          await prisma.job.update({
+            where: { id: result.canonical.id },
+            data: { contentHash: newContentHash, lastProcessedAt: new Date() },
+          });
         } catch (err) {
           logger.debug(
             { event: "fallback_remoteok_row_skipped", companyId, sourceUrl, err },

@@ -3,7 +3,7 @@ import { loadRootEnv } from "../infrastructure/env/loadEnv.js";
 import { prisma } from "../infrastructure/db/prisma.js";
 import { logger } from "../utils/logger.js";
 import { CompanyStatus } from "@prisma/client";
-import { getRedisConnection } from "../queues/job.queue.js";
+import { getIoredis, getRedisConnection } from "../queues/job.queue.js";
 import { getCompanyScoreQueue, closeCompanyScoreQueue } from "../queues/companyScore.queue.js";
 import {
   getIngestAtsEndpointQueue,
@@ -33,9 +33,26 @@ import { asyncPool } from "../utils/asyncPool.js";
 import { chunkArray } from "../utils/chunkArray.js";
 import type { NormalizedJob } from "../modules/crawler/crawler.types.js";
 import { recordIngestionFinished } from "../services/companyScore.service.js";
+import { computeJobContentHash } from "../utils/jobContentHash.js";
+import {
+  assertRequiredSelect,
+  logCacheHitMetrics,
+  logEfficiencyMetrics,
+  logQueryMetrics,
+} from "../utils/queryMetrics.js";
+import { hashedCacheKey } from "../utils/cacheKey.js";
 
 // Avoid back-to-back fetches when lastCrawledAt was just set.
 const MIN_MS_SINCE_LAST_CRAWL_FOR_INGEST = Math.floor(2.5 * 60 * 1000);
+const HASH_CACHE_NAMESPACE = "job_hash:atsWorker";
+const HASH_CACHE_TTL_SECONDS = Math.max(3600, Math.min(21600, Number(process.env.JOB_HASH_CACHE_TTL_SECONDS ?? "10800") || 10800));
+const skipNextIngestionByEndpoint = new Set<string>();
+let atsHashCacheHits = 0;
+let atsHashCacheMisses = 0;
+
+function processingLookbackDays(): number {
+  return Math.max(1, Number(process.env.PROCESSING_LOOKBACK_DAYS ?? "7") || 7);
+}
 
 type AtsIngestErrorKind = "network_error" | "parser_error" | "crawler_error";
 
@@ -105,6 +122,7 @@ async function start(): Promise<void> {
   );
   const jobService = new JobService(jobRepository);
   const endpointService = createAtsEndpointService(prisma);
+  const redis = getIoredis();
 
   getIngestAtsEndpointQueue();
   getCompanyScoreQueue();
@@ -143,6 +161,28 @@ async function start(): Promise<void> {
 
       const endpointRow = await prisma.atsEndpoint.findUnique({
         where: { id: endpointId },
+        select: {
+          id: true,
+          type: true,
+          slug: true,
+          baseUrl: true,
+          metadata: true,
+          companyId: true,
+          companyName: true,
+          lastCrawledAt: true,
+          source: true,
+        },
+      });
+      assertRequiredSelect("AtsEndpoint", "atsEndpoint.worker.findUnique", {
+        id: true,
+        type: true,
+        slug: true,
+        baseUrl: true,
+        metadata: true,
+        companyId: true,
+        companyName: true,
+        lastCrawledAt: true,
+        source: true,
       });
       if (!endpointRow) {
         logger.error(
@@ -153,6 +193,14 @@ async function start(): Promise<void> {
             err: new Error("AtsEndpoint not found"),
           },
           "ats_ingestion_failed",
+        );
+        return;
+      }
+      if (skipNextIngestionByEndpoint.has(endpointId)) {
+        skipNextIngestionByEndpoint.delete(endpointId);
+        logger.warn(
+          { event: "ats_ingestion_skipped_low_efficiency_backpressure", endpointId },
+          "ats_ingestion_skipped_low_efficiency_backpressure",
         );
         return;
       }
@@ -257,25 +305,85 @@ async function start(): Promise<void> {
         company.careersUrl,
         resolvedCompanyId,
       );
+      const seenAt = new Date();
+      const sourceUrls = normalizedJobs.map((j) => j.sourceUrl);
+      const touchedRows = await jobService.touchLastSeenBySourceUrls(sourceUrls, seenAt);
 
       let failures = 0;
       let jobsInserted = 0;
       let duplicatesSkipped = 0;
+      let unchangedSkipped = 0;
+      let updatedRows = 0;
 
-      type IngestRow = { canonicalId: string; inserted: boolean; sourceUrl: string };
+      type IngestRow = {
+        canonicalId: string;
+        inserted: boolean;
+        sourceUrl: string;
+        newContentHash: string;
+        shouldSkipParse: boolean;
+      };
 
       const ingestResults = await asyncPool(
         normalizedJobs,
         ingestPoolConcurrency,
         async (normalizedJob: NormalizedJob): Promise<IngestRow | null> => {
           try {
+            const newContentHash = computeJobContentHash({
+              title: normalizedJob.title,
+              description: normalizedJob.description,
+              applyUrl: normalizedJob.applyUrl ?? normalizedJob.sourceUrl,
+            });
+            const hashCacheKey = hashedCacheKey(HASH_CACHE_NAMESPACE, normalizedJob.sourceUrl);
+            try {
+              const cachedHash = await redis.get(hashCacheKey);
+              if (cachedHash === newContentHash) {
+                atsHashCacheHits += 1;
+                if ((atsHashCacheHits + atsHashCacheMisses) % 100 === 0) {
+                  logCacheHitMetrics({
+                    name: "atsEndpoint.worker.hashCache",
+                    hits: atsHashCacheHits,
+                    misses: atsHashCacheMisses,
+                  });
+                }
+                await redis.set(hashCacheKey, newContentHash, "EX", HASH_CACHE_TTL_SECONDS);
+                await prisma.job.updateMany({
+                  where: { sourceUrl: normalizedJob.sourceUrl },
+                  data: { lastProcessedAt: seenAt, contentHash: newContentHash },
+                });
+                unchangedSkipped += 1;
+                return null;
+              }
+              atsHashCacheMisses += 1;
+              if ((atsHashCacheHits + atsHashCacheMisses) % 100 === 0) {
+                logCacheHitMetrics({
+                  name: "atsEndpoint.worker.hashCache",
+                  hits: atsHashCacheHits,
+                  misses: atsHashCacheMisses,
+                });
+              }
+            } catch (err) {
+              logger.warn({ event: "ats_job_hash_cache_read_failed", sourceUrl: normalizedJob.sourceUrl, err }, "ats_job_hash_cache_read_failed");
+            }
             const { inserted, canonical } = await jobService.ingestDeduplicated({
               ...normalizedJob,
               companyDomain,
             });
+            const shouldSkipParse = canonical.contentHash === newContentHash;
             if (inserted) jobsInserted += 1;
+            else if (shouldSkipParse) unchangedSkipped += 1;
             else duplicatesSkipped += 1;
-            return { canonicalId: canonical.id, inserted, sourceUrl: normalizedJob.sourceUrl };
+            try {
+              await redis.set(hashCacheKey, newContentHash, "EX", HASH_CACHE_TTL_SECONDS);
+            } catch (err) {
+              logger.warn({ event: "ats_job_hash_cache_write_failed", sourceUrl: normalizedJob.sourceUrl, err }, "ats_job_hash_cache_write_failed");
+            }
+            return {
+              canonicalId: canonical.id,
+              inserted,
+              sourceUrl: normalizedJob.sourceUrl,
+              newContentHash,
+              shouldSkipParse,
+            };
           } catch (err) {
             failures += 1;
             const errorKind = classifyAtsIngestError(err);
@@ -296,8 +404,29 @@ async function start(): Promise<void> {
       );
 
       const flatIngest: IngestRow[] = ingestResults.filter((r): r is IngestRow => r !== null);
+      logQueryMetrics("atsEndpoint.worker.flatIngest", flatIngest, 450);
+      const lookbackSince = new Date(Date.now() - processingLookbackDays() * 24 * 60 * 60 * 1000);
+      const canonicalMeta = flatIngest.length
+        ? await prisma.job.findMany({
+            where: { id: { in: flatIngest.map((r) => r.canonicalId) } },
+            select: { id: true, lastSeenAt: true, lastProcessedAt: true },
+          })
+        : [];
+      assertRequiredSelect("Job", "atsEndpoint.worker.canonicalMeta.findMany", {
+        id: true,
+        lastSeenAt: true,
+        lastProcessedAt: true,
+      });
+      const canonicalMetaMap = new Map(canonicalMeta.map((row) => [row.id, row]));
+      const parseCandidates = flatIngest.filter((row) => {
+        if (row.shouldSkipParse) return false;
+        const meta = canonicalMetaMap.get(row.canonicalId);
+        if (!meta) return false;
+        if (meta.lastSeenAt < lookbackSince) return false;
+        return meta.lastProcessedAt == null || meta.lastSeenAt > meta.lastProcessedAt;
+      });
 
-      for (const chunk of chunkArray(flatIngest, parseChunkSize)) {
+      for (const chunk of chunkArray(parseCandidates, parseChunkSize)) {
         await asyncPool(chunk, parsePoolConcurrency, async (row) => {
           try {
             await enrichCanonicalJobParsedDescription(
@@ -306,6 +435,7 @@ async function start(): Promise<void> {
               row.canonicalId,
               row.inserted,
             );
+            updatedRows += 1;
           } catch (err) {
             failures += 1;
             const errorKind = classifyAtsIngestError(err);
@@ -323,6 +453,16 @@ async function start(): Promise<void> {
           }
         });
       }
+      const processedCanonicalIds = Array.from(new Set(flatIngest.map((row) => row.canonicalId)));
+      const processedAt = new Date();
+      if (processedCanonicalIds.length > 0) {
+        for (const row of flatIngest) {
+          await prisma.job.update({
+            where: { id: row.canonicalId },
+            data: { lastProcessedAt: processedAt, contentHash: row.newContentHash },
+          });
+        }
+      }
 
       recordAtsIngestionOutcome(endpointRow.source, {
         jobsFetched: normalizedJobs.length,
@@ -337,9 +477,20 @@ async function start(): Promise<void> {
           jobsFetched: normalizedJobs.length,
           jobsInserted,
           duplicatesSkipped,
+          unchangedSkipped,
+          touchedRows,
         },
         "ats_ingestion_summary",
       );
+      const efficiency = logEfficiencyMetrics({
+        name: "atsEndpoint.worker",
+        readRows: normalizedJobs.length,
+        updatedRows,
+        skippedRows: unchangedSkipped + duplicatesSkipped,
+      });
+      if (efficiency < 0.05) {
+        skipNextIngestionByEndpoint.add(endpointId);
+      }
 
       const crawlCompletedAt = new Date();
       await prisma.atsEndpoint.update({

@@ -10,13 +10,28 @@ import {
   INGEST_ATS_ENDPOINT_QUEUE_NAME,
 } from "../../queues/ats-endpoint.queue.js";
 import { getEndpointPriority } from "./atsEndpointPriority.js";
+import { assertRequiredSelect, logQueryMetrics } from "../../utils/queryMetrics.js";
 
 const MIN_INTERVAL_MS = 5 * 60 * 1000;
 const MAX_INTERVAL_MS = 8 * 60 * 1000;
 
-const POOL_LIMIT = 500;
-const BATCH_SIZE = 50;
-const MIN_CRAWL_GAP_MS = 2 * 60 * 1000;
+const DEFAULT_POOL_LIMIT = 100;
+const DEFAULT_BATCH_SIZE = 40;
+const MIN_BATCH_SIZE = 20;
+const MAX_BATCH_SIZE = 100;
+// REQUIRED_SELECT
+const ATS_ENDPOINT_SCHED_SELECT = {
+  id: true,
+  score: true,
+  successCount: true,
+  lastCrawledAt: true,
+} as const;
+
+function endpointCooldownMs(score: number): number {
+  if (score >= 80) return 5 * 60 * 1000;
+  if (score >= 40) return 30 * 60 * 1000;
+  return 2 * 60 * 60 * 1000;
+}
 
 function randomIntInclusive(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -24,27 +39,32 @@ function randomIntInclusive(min: number, max: number): number {
 
 async function enqueuePrioritizedIngests(): Promise<void> {
   const queue = getIngestAtsEndpointQueue();
-  const now = Date.now();
+  const now = new Date();
+  const nowMs = now.getTime();
+  const poolLimit = Math.max(10, Math.min(100, Number(process.env.ATS_ENDPOINT_POOL_LIMIT ?? String(DEFAULT_POOL_LIMIT)) || DEFAULT_POOL_LIMIT));
+  const baseBatchSize = Math.max(MIN_BATCH_SIZE, Math.min(MAX_BATCH_SIZE, Number(process.env.ATS_ENDPOINT_BATCH_SIZE ?? String(DEFAULT_BATCH_SIZE)) || DEFAULT_BATCH_SIZE));
+  assertRequiredSelect("AtsEndpoint", "atsEndpoint.scheduler.findMany", ATS_ENDPOINT_SCHED_SELECT);
 
   const pool = await prisma.atsEndpoint.findMany({
-    where: { isActive: true },
-    select: {
-      id: true,
-      score: true,
-      successCount: true,
-      lastCrawledAt: true,
+    where: {
+      isActive: true,
+      OR: [
+        { score: { gte: 80 }, OR: [{ lastCrawledAt: null }, { lastCrawledAt: { lt: new Date(nowMs - endpointCooldownMs(80)) } }] },
+        { score: { gte: 40, lt: 80 }, OR: [{ lastCrawledAt: null }, { lastCrawledAt: { lt: new Date(nowMs - endpointCooldownMs(40)) } }] },
+        { score: { lt: 40 }, OR: [{ lastCrawledAt: null }, { lastCrawledAt: { lt: new Date(nowMs - endpointCooldownMs(0)) } }] },
+      ],
     },
-    take: POOL_LIMIT,
+    select: ATS_ENDPOINT_SCHED_SELECT,
+    orderBy: [{ score: "desc" }, { successCount: "desc" }, { lastCrawledAt: "asc" }],
+    take: poolLimit,
   });
+  const queryMetrics = logQueryMetrics("atsEndpoint.scheduler.findMany", pool, 256);
 
-  const eligible = pool.filter((ep) => {
-    if (ep.lastCrawledAt == null) return true;
-    return now - ep.lastCrawledAt.getTime() >= MIN_CRAWL_GAP_MS;
-  });
-
-  eligible.sort((a, b) => getEndpointPriority(b) - getEndpointPriority(a));
-
-  const top = eligible.slice(0, BATCH_SIZE);
+  pool.sort((a, b) => getEndpointPriority(b) - getEndpointPriority(a));
+  let adaptiveBatchSize = baseBatchSize;
+  if (queryMetrics.estimatedKB > 500) adaptiveBatchSize = Math.max(MIN_BATCH_SIZE, Math.floor(baseBatchSize / 2));
+  else if (queryMetrics.estimatedKB < 100) adaptiveBatchSize = Math.min(MAX_BATCH_SIZE, baseBatchSize + 20);
+  const top = pool.slice(0, adaptiveBatchSize);
 
   for (let i = 0; i < top.length; i++) {
     const ep = top[i]!;
@@ -52,7 +72,7 @@ async function enqueuePrioritizedIngests(): Promise<void> {
       INGEST_ATS_ENDPOINT_JOB,
       { endpointId: ep.id },
       {
-        jobId: `sched-ingest-${ep.id}-${now}-${i}`,
+        jobId: `sched-ingest-${ep.id}`,
       },
     );
   }
@@ -62,8 +82,12 @@ async function enqueuePrioritizedIngests(): Promise<void> {
       event: "ats_endpoint_scheduler_run",
       queue: INGEST_ATS_ENDPOINT_QUEUE_NAME,
       poolSize: pool.length,
-      eligibleCount: eligible.length,
+      eligibleCount: pool.length,
       enqueued: top.length,
+      batchSize: adaptiveBatchSize,
+      baseBatchSize,
+      poolLimit,
+      estimatedKB: Number(queryMetrics.estimatedKB.toFixed(2)),
     },
     "ats_endpoint_scheduler_run",
   );

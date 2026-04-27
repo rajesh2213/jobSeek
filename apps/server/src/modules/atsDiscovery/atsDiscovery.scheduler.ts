@@ -15,9 +15,12 @@ import {
 const MIN_INTERVAL_MS = 5 * 60 * 1000;
 const MAX_INTERVAL_MS = 10 * 60 * 1000;
 
-const MIN_BATCH = 100;
-const MAX_BATCH = 200;
+const MIN_BATCH = 50;
+const MAX_BATCH = 100;
 const MAX_JITTER_MS = 2000;
+const HIGH_PRIORITY_VALIDATE_BATCH = 25;
+const LOW_PRIORITY_VALIDATE_BATCH = 8;
+const ROW_FETCH_WARN_THRESHOLD = 100;
 
 function randomIntInclusive(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -29,30 +32,37 @@ function sleepMs(ms: number): Promise<void> {
 
 async function enqueueDiscoveryBatch(): Promise<void> {
   const queue = getAtsDiscoveryQueue();
-  const ts = Date.now();
   const serpBatch = randomIntInclusive(MIN_BATCH, MAX_BATCH);
-  const jobsBatch = randomIntInclusive(MIN_BATCH, MAX_BATCH);
-  const validateBatch = randomIntInclusive(10, 25);
+  const jobsBatch = randomIntInclusive(40, 100);
+  const highPriority = randomIntInclusive(HIGH_PRIORITY_VALIDATE_BATCH - 5, HIGH_PRIORITY_VALIDATE_BATCH);
+  const lowPriority = randomIntInclusive(Math.max(1, LOW_PRIORITY_VALIDATE_BATCH - 2), LOW_PRIORITY_VALIDATE_BATCH);
 
   await sleepMs(randomIntInclusive(0, MAX_JITTER_MS));
   await queue.add(
     DISCOVER_FROM_SERP_JOB,
     { batchSize: serpBatch },
-    { jobId: `discover-serp-${ts}-${serpBatch}` },
+    { jobId: "discover-serp" },
   );
 
   await sleepMs(randomIntInclusive(0, MAX_JITTER_MS));
   await queue.add(
     DISCOVER_FROM_JOBS_JOB,
     { batchSize: jobsBatch },
-    { jobId: `discover-jobs-${ts}-${jobsBatch}` },
+    { jobId: "discover-jobs" },
   );
 
   await sleepMs(randomIntInclusive(0, MAX_JITTER_MS));
   await queue.add(
     VALIDATE_ENDPOINT_JOB,
-    { batchSize: validateBatch },
-    { jobId: `validate-endpoints-${ts}-${validateBatch}` },
+    { batchSize: highPriority, priorityBand: "high" },
+    { jobId: "validate-endpoints-high" },
+  );
+
+  await sleepMs(randomIntInclusive(0, MAX_JITTER_MS));
+  await queue.add(
+    VALIDATE_ENDPOINT_JOB,
+    { batchSize: lowPriority, priorityBand: "low" },
+    { jobId: "validate-endpoints-low" },
   );
 
   logger.info(
@@ -62,8 +72,10 @@ async function enqueueDiscoveryBatch(): Promise<void> {
       jobs: [
         { name: DISCOVER_FROM_SERP_JOB, batchSize: serpBatch },
         { name: DISCOVER_FROM_JOBS_JOB, batchSize: jobsBatch },
-        { name: VALIDATE_ENDPOINT_JOB, batchSize: validateBatch },
+        { name: VALIDATE_ENDPOINT_JOB, batchSize: highPriority, priorityBand: "high" },
+        { name: VALIDATE_ENDPOINT_JOB, batchSize: lowPriority, priorityBand: "low" },
       ],
+      rowFetchWarnThreshold: ROW_FETCH_WARN_THRESHOLD,
     },
     "ats_discovery_scheduler_enqueued",
   );

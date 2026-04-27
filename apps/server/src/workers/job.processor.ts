@@ -7,6 +7,7 @@ import { Prisma } from "@prisma/client";
 import {
   getJobQueue,
   getRedisConnection,
+  getIoredis,
   JOB_QUEUE_NAME,
   closeJobQueue,
 } from "../queues/job.queue.js";
@@ -40,6 +41,14 @@ import { shouldEnqueueJob } from "../services/recentJobSeen.service.js";
 import { normalizeJobUrl } from "../utils/normalizeJobUrl.js";
 import { recordIngestionFinished } from "../services/companyScore.service.js";
 import { hostname } from "node:os";
+import { computeJobContentHash } from "../utils/jobContentHash.js";
+import {
+  assertRequiredSelect,
+  logCacheHitMetrics,
+  logEfficiencyMetrics,
+  logQueryMetrics,
+} from "../utils/queryMetrics.js";
+import { hashedCacheKey } from "../utils/cacheKey.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -209,7 +218,35 @@ interface CrawlSummaryCounters {
   failures: number;
 }
 
-const PROCESS_JOB_ADD_CHUNK = Math.max(10, Math.min(200, Number(process.env.PROCESS_JOB_ADD_CHUNK_SIZE ?? "50") || 50));
+const PROCESS_JOB_ADD_CHUNK = Math.max(10, Math.min(100, Number(process.env.PROCESS_JOB_ADD_CHUNK_SIZE ?? "50") || 50));
+const HASH_CACHE_NAMESPACE = "job_hash:jobWorker";
+const HASH_CACHE_TTL_SECONDS = Math.max(3600, Math.min(21600, Number(process.env.JOB_HASH_CACHE_TTL_SECONDS ?? "10800") || 10800));
+// REQUIRED_SELECT
+const JOB_CANONICAL_HASH_SELECT = {
+  id: true,
+  contentHash: true,
+  lastSeenAt: true,
+  lastProcessedAt: true,
+} as const;
+
+type JobCanonicalHashRow = {
+  id: string;
+  contentHash: string | null;
+  lastSeenAt: Date;
+  lastProcessedAt: Date | null;
+};
+
+function processingLookbackDays(): number {
+  return Math.max(1, Number(process.env.PROCESSING_LOOKBACK_DAYS ?? "7") || 7);
+}
+
+function processingLookbackSince(nowMs = Date.now()): Date {
+  return new Date(nowMs - processingLookbackDays() * 24 * 60 * 60 * 1000);
+}
+
+let skipNextProcessJobForBackpressure = false;
+let jobHashCacheHits = 0;
+let jobHashCacheMisses = 0;
 
 function jobWorkerConcurrency(): number {
   const n = Number(process.env.WORKER_CONCURRENCY ?? "5");
@@ -236,6 +273,7 @@ async function start(): Promise<void> {
     jobRepository,
   );
   const jobService = new JobService(jobRepository);
+  const redis = getIoredis();
   const queue = getJobQueue();
   getCompanyScoreQueue();
   const crawlCounters = new Map<string, CrawlSummaryCounters>();
@@ -402,6 +440,7 @@ async function start(): Promise<void> {
           };
 
           const normalizedJobs = await atsAdapter.fetchJobs(endpointForAdapter as any);
+          logQueryMetrics("jobWorker.atsFetch.normalizedJobs", normalizedJobs, 900);
 
           const fetchDurationMs = Date.now() - fetchStart;
           logger.info(
@@ -563,6 +602,58 @@ async function start(): Promise<void> {
       if (bullJob.name === PROCESS_JOB) {
         const payload = validateNormalizedJob(bullJob.data);
         if (!payload) throw new Error("Invalid process-job payload");
+        if (skipNextProcessJobForBackpressure) {
+          skipNextProcessJobForBackpressure = false;
+          logger.warn(
+            { event: "job_worker_skipped_low_efficiency_backpressure", sourceUrl: payload.sourceUrl },
+            "job_worker_skipped_low_efficiency_backpressure",
+          );
+          return;
+        }
+        const newContentHash = computeJobContentHash({
+          title: payload.title,
+          description: payload.description,
+          applyUrl: payload.applyUrl ?? payload.sourceUrl,
+        });
+        const hashCacheKey = hashedCacheKey(HASH_CACHE_NAMESPACE, payload.sourceUrl);
+        try {
+          const cachedHash = await redis.get(hashCacheKey);
+          if (cachedHash === newContentHash) {
+            jobHashCacheHits += 1;
+            if ((jobHashCacheHits + jobHashCacheMisses) % 100 === 0) {
+              logCacheHitMetrics({
+                name: "jobWorker.processJob.hashCache",
+                hits: jobHashCacheHits,
+                misses: jobHashCacheMisses,
+              });
+            }
+            await redis.set(hashCacheKey, newContentHash, "EX", HASH_CACHE_TTL_SECONDS);
+            await prisma.job.updateMany({
+              where: { sourceUrl: payload.sourceUrl },
+              data: {
+                lastProcessedAt: new Date(),
+                contentHash: newContentHash,
+              } as Prisma.JobUpdateManyMutationInput,
+            });
+            logEfficiencyMetrics({
+              name: "jobWorker.processJob.cachedSkip",
+              readRows: 1,
+              updatedRows: 0,
+              skippedRows: 1,
+            });
+            return;
+          }
+          jobHashCacheMisses += 1;
+          if ((jobHashCacheHits + jobHashCacheMisses) % 100 === 0) {
+            logCacheHitMetrics({
+              name: "jobWorker.processJob.hashCache",
+              hits: jobHashCacheHits,
+              misses: jobHashCacheMisses,
+            });
+          }
+        } catch (err) {
+          logger.warn({ event: "job_hash_cache_read_failed", sourceUrl: payload.sourceUrl, err }, "job_hash_cache_read_failed");
+        }
 
         let companyNameHint = payload.companyName;
         if (!companyNameHint) {
@@ -601,12 +692,60 @@ async function start(): Promise<void> {
           throw err;
         }
 
-        await enrichCanonicalJobParsedDescription(
-          prisma,
-          jobRepository,
-          result.canonical.id,
-          result.inserted,
-        );
+        const canonicalRow = (await prisma.job.findUnique({
+          where: { id: result.canonical.id },
+          select: JOB_CANONICAL_HASH_SELECT,
+        })) as JobCanonicalHashRow | null;
+        assertRequiredSelect("Job", "jobWorker.processJob.findUnique", JOB_CANONICAL_HASH_SELECT);
+        const now = new Date();
+        const lookbackSince = processingLookbackSince(now.getTime());
+        const withinWindow =
+          canonicalRow?.lastSeenAt != null && canonicalRow.lastSeenAt >= lookbackSince;
+        const needsProcessing =
+          canonicalRow != null &&
+          (canonicalRow.lastProcessedAt == null ||
+            canonicalRow.lastSeenAt.getTime() > canonicalRow.lastProcessedAt.getTime());
+        let updatedRows = 0;
+        let skippedRows = 0;
+        if (!withinWindow || !needsProcessing || canonicalRow?.contentHash === newContentHash) {
+          await prisma.job.update({
+            where: { id: result.canonical.id },
+            data: {
+              lastProcessedAt: now,
+              contentHash: newContentHash,
+            } as Prisma.JobUpdateInput,
+          });
+          skippedRows = 1;
+        } else {
+          await enrichCanonicalJobParsedDescription(
+            prisma,
+            jobRepository,
+            result.canonical.id,
+            result.inserted,
+          );
+          await prisma.job.update({
+            where: { id: result.canonical.id },
+            data: {
+              lastProcessedAt: now,
+              contentHash: newContentHash,
+            } as Prisma.JobUpdateInput,
+          });
+          updatedRows = 1;
+        }
+        try {
+          await redis.set(hashCacheKey, newContentHash, "EX", HASH_CACHE_TTL_SECONDS);
+        } catch (err) {
+          logger.warn({ event: "job_hash_cache_write_failed", sourceUrl: payload.sourceUrl, err }, "job_hash_cache_write_failed");
+        }
+        const efficiency = logEfficiencyMetrics({
+          name: "jobWorker.processJob",
+          readRows: 1,
+          updatedRows,
+          skippedRows,
+        });
+        if (efficiency < 0.05) {
+          skipNextProcessJobForBackpressure = true;
+        }
 
         const coAfter = await companyService.findById(resolvedCompanyId);
         if (coAfter && coAfter.status !== CompanyStatus.ready) {

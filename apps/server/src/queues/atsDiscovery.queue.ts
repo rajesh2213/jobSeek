@@ -17,6 +17,7 @@ export type DiscoverFromJobsPayload = {
 
 export type ValidateEndpointPayload = {
   batchSize?: number;
+  priorityBand?: "high" | "low";
 };
 
 let atsDiscoveryQueueSingleton: Queue | null = null;

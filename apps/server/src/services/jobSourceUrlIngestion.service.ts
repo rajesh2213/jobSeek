@@ -26,6 +26,7 @@ import {
   validateJob,
 } from "../utils/jobValidation.js";
 import { applyRetryStrategies } from "../utils/jobRetryStrategies.js";
+import { computeJobContentHash } from "../utils/jobContentHash.js";
 
 const MAX_JOB_HUBS = 10;
 const MAX_CANDIDATES = 50;
@@ -76,7 +77,10 @@ export async function processIngestJobsFromSourceUrl(
     return;
   }
 
-  const company = await prisma.company.findUnique({ where: { id: companyId } });
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { id: true, name: true, domain: true, careersUrl: true },
+  });
   if (!company) {
     logger.warn({ event: "job_source_ingestion_no_company", companyId }, "job_source_ingestion_no_company");
     return;
@@ -416,12 +420,23 @@ export async function processIngestJobsFromSourceUrl(
           companyName: companyName || company.name,
           companyDomain,
         });
-        await enrichCanonicalJobParsedDescription(
-          prisma,
-          jobRepository,
-          result.canonical.id,
-          result.inserted,
-        );
+        const newContentHash = computeJobContentHash({
+          title,
+          description: descriptionText,
+          applyUrl: link,
+        });
+        if (result.canonical.contentHash !== newContentHash) {
+          await enrichCanonicalJobParsedDescription(
+            prisma,
+            jobRepository,
+            result.canonical.id,
+            result.inserted,
+          );
+        }
+        await prisma.job.update({
+          where: { id: result.canonical.id },
+          data: { contentHash: newContentHash, lastProcessedAt: new Date() },
+        });
         return result.inserted;
       } catch (err) {
         logger.debug(

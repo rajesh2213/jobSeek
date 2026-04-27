@@ -108,6 +108,10 @@ model Job {
   applyUrl           String?
   postedAt           DateTime?
   lastSeenAt         DateTime  @default(now())
+  /// Last time downstream discovery/processing consumed this job row.
+  lastProcessedAt    DateTime?
+  /// Stable hash of normalized title+description+applyUrl to skip unchanged reprocessing.
+  contentHash        String?   @db.VarChar(64)
   expiresAt          DateTime?
   isActive           Boolean   @default(true)
   fingerprint        String?
@@ -134,6 +138,8 @@ model Job {
   @@index([expiresAt])
   @@index([isActive, expiresAt])
   @@index([lastSeenAt])
+  @@index([lastProcessedAt])
+  @@index([contentHash])
   @@index([canonicalJobId, lastSeenAt])
   @@index([freshnessScore])
   @@index([sourceWeight])
