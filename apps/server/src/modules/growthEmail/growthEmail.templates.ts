@@ -1,4 +1,4 @@
-import type { GrowthEmailCampaignType } from "@prisma/client";
+import type { GrowthEmailCampaignType } from "./growthEmail.types.js";
 
 export interface GrowthEmailTemplateJob {
   id: string;

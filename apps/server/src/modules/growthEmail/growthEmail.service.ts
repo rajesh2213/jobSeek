@@ -1,7 +1,5 @@
 import type {
-  GrowthEmailCampaignType,
   PrismaClient,
-  EmailFrequency,
 } from "@prisma/client";
 import { createJobRepository } from "../job/job.repository.js";
 import { JobService } from "../job/job.service.js";
@@ -10,6 +8,7 @@ import { getGrowthEmailQueue, type GrowthEmailCampaignJobName } from "../../queu
 import { sendEmail } from "../../utils/sendEmail.js";
 import { signGrowthEmailUnsubscribeToken } from "../../utils/growthEmailToken.js";
 import { getGrowthEmailSubject, renderGrowthEmailHtml, type GrowthEmailTemplateJob } from "./growthEmail.templates.js";
+import type { GrowthEmailCampaignType, GrowthEmailFrequency } from "./growthEmail.types.js";
 
 const DEFAULT_PAGE_SIZE = 500;
 const GLOBAL_THROTTLE_MS = 24 * 60 * 60 * 1000;
@@ -35,7 +34,7 @@ function campaignToJobName(campaignType: GrowthEmailCampaignType): GrowthEmailCa
   return `growth_email_${campaignType}` as GrowthEmailCampaignJobName;
 }
 
-function frequencyForCampaign(campaignType: GrowthEmailCampaignType): EmailFrequency {
+function frequencyForCampaign(campaignType: GrowthEmailCampaignType): GrowthEmailFrequency {
   return campaignType === "weekly_digest" ? "weekly" : "daily";
 }
 

@@ -1,5 +1,5 @@
 import { Worker } from "bullmq";
-import type { GrowthEmailCampaignType } from "@prisma/client";
+import type { GrowthEmailCampaignType } from "./growthEmail.types.js";
 import { loadRootEnv } from "../../infrastructure/env/loadEnv.js";
 import { prisma } from "../../infrastructure/db/prisma.js";
 import { logger } from "../../utils/logger.js";
