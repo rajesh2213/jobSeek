@@ -12,10 +12,12 @@ export const metadata: Metadata = {
 };
 
 export default async function JobsBrowsePage() {
-  const [catAgg, skillAgg] = await Promise.all([
+  const [catResult, skillResult] = await Promise.allSettled([
     fetchJobCategories(),
     fetchJobSkills(),
   ]);
+  const catAgg = catResult.status === "fulfilled" ? catResult.value : [];
+  const skillAgg = skillResult.status === "fulfilled" ? skillResult.value : [];
   const catBySlug = new Map(catAgg.map((c) => [c.slug, c.count]));
   const topSkills = skillAgg.slice(0, 48);
 
