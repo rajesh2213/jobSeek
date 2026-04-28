@@ -5,9 +5,9 @@ import { JobsSearchClient } from "./JobsSearchClient";
 import { JobsShellSkeleton } from "./JobsShellSkeleton";
 
 const FALLBACK_RELATED_SLUGS = [
-  "engineering-react-nodejs-us-remote",
-  "sales-salesforce-us",
-  "marketing-remote",
+  "role/react-developer/location/remote",
+  "role/salesforce-specialist/location/us",
+  "role/marketing-manager/location/remote",
 ];
 
 interface Props {

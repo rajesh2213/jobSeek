@@ -52,7 +52,11 @@ export const loadJobsDiscoveryPage = cache(
         page: filters.page ?? 1,
         limit: filters.limit ?? 20,
       },
-      { token, forwardedFor },
+      {
+        token,
+        forwardedFor,
+        internalSeoSecret: process.env.INTERNAL_SEO_SECRET ?? null,
+      },
     );
   },
 );
@@ -73,7 +77,11 @@ export const loadWeeklyJobsPostedCount = cache(async (): Promise<number> => {
       limit: 1,
       sort: "latest",
     },
-    { token, forwardedFor },
+    {
+      token,
+      forwardedFor,
+      internalSeoSecret: process.env.INTERNAL_SEO_SECRET ?? null,
+    },
   );
   const total = Number(response.meta?.total ?? 0);
   return Number.isFinite(total) && total >= 0 ? Math.round(total) : 0;

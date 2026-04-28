@@ -1,4 +1,5 @@
 import Fastify, { type FastifyError } from "fastify";
+import compress from "@fastify/compress";
 import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
 import prismaPlugin from "./plugins/prisma.plugin.js";
@@ -38,8 +39,12 @@ export async function buildServer() {
       "Authorization",
       "Content-Type",
       "x-jobseek-view-cap-bypass",
+      "x-internal-seo",
+      "x-internal-seo-secret",
     ],
   });
+
+  await server.register(compress, { global: true });
 
   /**
    * Global fallback safety net. Uses Redis when `REDIS_URL` is set so limits are shared

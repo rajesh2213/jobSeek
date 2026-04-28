@@ -9,7 +9,8 @@ import { registerBillingRoutes } from "../../modules/billing/billing.controller.
 import { registerSavedSearchRoutes } from "../../modules/saved-search/savedSearch.routes.js";
 import { registerApplicationsRoutes } from "../../modules/applications/applications.routes.js";
 import { createSeoService } from "../../modules/seo/seo.service.js";
-import { registerSeoRoutes } from "../../modules/seo/seo.routes.js";
+import { registerSeoAggregationRoutes, registerSeoRoutes } from "../../modules/seo/seo.routes.js";
+import { createSeoAggregationsService } from "../../modules/seo/seoAggregations.service.js";
 import { getIoredis } from "../../queues/job.queue.js";
 
 export async function registerRoutes(server: FastifyInstance): Promise<void> {
@@ -46,7 +47,9 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   createJobController(server);
   createCompanyController(server);
   const seoService = createSeoService(server.prisma);
+  const seoAggregations = createSeoAggregationsService(server.prisma);
   registerSeoRoutes(server, seoService);
+  registerSeoAggregationRoutes(server, seoAggregations);
   registerInternalMetricsRoutes(server);
 
   const debugJobEndpointEnabled =

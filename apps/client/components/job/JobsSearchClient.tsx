@@ -32,6 +32,7 @@ import {
   parseJobFiltersFromSearch,
   filtersToSearchParams,
   hasActiveJobFilters,
+  normalizeRelatedSlugPath,
   type JobFilters,
 } from "../../lib/slug-parser";
 import { signInWithNext } from "../../lib/signInUrl";
@@ -1608,10 +1609,14 @@ export function JobsSearchClient({
           {relatedSlugs.map((slug) => (
             <Link
               key={slug}
-              href={`/jobs/${slug}`}
+              href={normalizeRelatedSlugPath(slug)}
               className="rounded-full bg-surface/90 px-4 py-2 text-sm text-ink/70 no-underline shadow-sm ring-1 ring-ink/5 transition-all hover:-translate-y-0.5 hover:text-brand hover:ring-brand/20"
             >
-              {slug.replace(/-/g, " ")}
+              {slug
+                .split("/")
+                .filter(Boolean)
+                .map((part) => part.replace(/-/g, " "))
+                .join(" ")}
             </Link>
           ))}
         </div>

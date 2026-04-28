@@ -1,11 +1,16 @@
 import type { MetadataRoute } from "next";
 import { fetchCompanies, fetchJobs, fetchSeoLandingPages } from "../lib/api";
 import { getSiteBaseUrl } from "../lib/seoSite";
+import { normalizeRelatedSlugPath } from "../lib/slug-parser";
+
+const MAX_JOB_SITEMAP_PAGES = 10000;
+const MAX_COMPANY_SITEMAP_PAGES = 500;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = getSiteBaseUrl();
   const now = new Date();
-  const bypass = process.env.JOB_LIST_VIEW_CAP_BYPASS_TOKEN ?? null;
+  const internalSeoSecret = process.env.INTERNAL_SEO_SECRET ?? null;
+  const seen = new Set<string>();
 
   const staticEntries: MetadataRoute.Sitemap = [
     { url: `${base}/`, lastModified: now },
@@ -18,12 +23,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const res = await fetchSeoLandingPages({
       minCount: 5,
-      maxSlugs: 2000,
-      viewCapBypassSecret: bypass,
+      maxSlugs: 20000,
+      internalSeoSecret,
     });
     for (const e of res.data) {
+      const normalized = normalizeRelatedSlugPath(e.slug);
+      if (normalized === "/jobs" || seen.has(normalized)) continue;
+      seen.add(normalized);
       landing.push({
-        url: `${base}/jobs/${e.slug}`,
+        url: `${base}${normalized}`,
         lastModified: now,
       });
     }
@@ -31,16 +39,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     /* sitemap still useful without programmatic slugs */
   }
 
-  let jobEntries: MetadataRoute.Sitemap = [];
+  const jobEntries: MetadataRoute.Sitemap = [];
   try {
-    const jobs = await fetchJobs(
-      { page: 1, limit: 500 },
-      { viewCapBypassSecret: bypass },
-    );
-    jobEntries = jobs.data.map((job) => ({
-      url: `${base}/job/${job.id}`,
-      lastModified: job.postedAt ? new Date(job.postedAt) : now,
-    }));
+    let page = 1;
+    const limit = 1000;
+    for (;;) {
+      const jobs = await fetchJobs(
+        { page, limit },
+        { internalSeoSecret },
+      );
+      for (const job of jobs.data) {
+        jobEntries.push({
+          url: `${base}/job/${job.id}`,
+          lastModified: job.postedAt ? new Date(job.postedAt) : now,
+        });
+      }
+      const hasMore =
+        jobs.meta?.hasMore === true ||
+        ((jobs.meta?.totalPages ?? 1) > (jobs.meta?.page ?? page));
+      if (!hasMore) break;
+      page += 1;
+      if (page > MAX_JOB_SITEMAP_PAGES) break;
+    }
   } catch {
     /* ignore */
   }
@@ -62,7 +82,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const totalPages = res.meta.totalPages ?? 1;
       if (!res.meta.hasMore || page >= totalPages) break;
       page += 1;
-      if (page > 500) break;
+      if (page > MAX_COMPANY_SITEMAP_PAGES) break;
     }
   } catch {
     /* ignore */

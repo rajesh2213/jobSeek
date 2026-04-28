@@ -9,7 +9,8 @@ import {
   parseJobDiscoveryQuery,
 } from "../../utils/taxonomyQuery.js";
 import {
-  toJobPublicJson,
+  toJobDetailJson,
+  toJobListJson,
   toJobPublicJsonOverDailyCap,
   type JobWithCompanyRow,
 } from "./job.mapper.js";
@@ -34,6 +35,28 @@ interface GetJobParams {
 
 function parseQueryBool(raw: unknown): boolean {
   return raw === true || raw === "true" || raw === "1";
+}
+
+function setApiCacheHeader(
+  reply: FastifyReply,
+  request: FastifyRequest,
+  input: { route: string; cacheable: boolean; reason: string },
+): void {
+  const value = input.cacheable
+    ? "public, max-age=30, s-maxage=30"
+    : "private, no-store";
+  reply.header("Cache-Control", value);
+  request.log.info(
+    {
+      event: "api_cache_status",
+      route: input.route,
+      method: request.method,
+      cacheStatus: input.cacheable ? "HIT_ELIGIBLE" : "BYPASS",
+      cacheControl: value,
+      reason: input.reason,
+    },
+    "api_cache_status",
+  );
 }
 
 export function registerJobRoutes(
@@ -84,6 +107,17 @@ export function registerJobRoutes(
 
       const bypassCap = isViewCapBypassRequest(request);
       const capCtx = await buildCapContextFromRequest(server.prisma, request);
+      const isAnonymous = capCtx.internalUserId == null;
+      const cacheableJobsList = isAnonymous && !discoveryDebit;
+      setApiCacheHeader(reply, request, {
+        route: "/jobs",
+        cacheable: cacheableJobsList,
+        reason: cacheableJobsList
+          ? "anonymous_non_metered_discovery"
+          : isAnonymous
+            ? "metered_or_personalized"
+            : "authenticated_request",
+      });
 
       const out = await runMeteredJobsList(
         server.prisma,
@@ -123,7 +157,7 @@ export function registerJobRoutes(
 
       return reply.send({
         data: out.items.map((j) =>
-          toJobPublicJson(j as unknown as JobWithCompanyRow),
+          toJobListJson(j as unknown as JobWithCompanyRow),
         ),
         meta: out.meta,
       });
@@ -186,7 +220,7 @@ export function registerJobRoutes(
       if (capState.unlimited) {
         const resetAt = capState.resetAt.toISOString();
         return reply.send({
-          data: toJobPublicJson(job as unknown as JobWithCompanyRow),
+          data: toJobDetailJson(job as unknown as JobWithCompanyRow),
           meta: {
             capReached: false,
             resetAt,
@@ -232,7 +266,7 @@ export function registerJobRoutes(
       const resetAt = afterCap.resetAt.toISOString();
       const remaining = afterCap.unlimited ? null : afterCap.remaining;
       return reply.send({
-        data: toJobPublicJson(job as unknown as JobWithCompanyRow),
+        data: toJobDetailJson(job as unknown as JobWithCompanyRow),
         meta: {
           capReached: false,
           remaining,

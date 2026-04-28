@@ -22,10 +22,12 @@ import { JsonLdScript } from "../../../components/seo/JsonLdScript";
 import { JobsListingFaq } from "../../../components/seo/JobsListingFaq";
 
 const FALLBACK_RELATED_SLUGS = [
-  "engineering-react-nodejs-us-remote",
-  "sales-salesforce-us",
-  "marketing-remote",
+  "role/react-developer/location/remote",
+  "role/salesforce-specialist/location/us",
+  "role/marketing-manager/location/remote",
 ];
+
+export const revalidate = 300;
 
 interface Props {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -50,6 +52,7 @@ export default async function JobsPage({ searchParams }: Props) {
     role: filters.role,
     skills: filters.skills,
     country: filters.country,
+    location: filters.location,
     isRemote: filters.isRemote,
     workType: filters.workType,
   });

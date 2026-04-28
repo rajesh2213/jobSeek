@@ -20,8 +20,8 @@ const POSTED_LABEL: Record<NonNullable<JobFilters["posted"]>, string> = {
 };
 
 export function getSeoMinJobsIndex(): number {
-  const n = parseInt(process.env.NEXT_PUBLIC_SEO_MIN_JOBS_INDEX ?? "3", 10);
-  return Number.isFinite(n) && n >= 0 ? n : 3;
+  const n = parseInt(process.env.NEXT_PUBLIC_SEO_MIN_JOBS_INDEX ?? "5", 10);
+  return Number.isFinite(n) && n >= 0 ? n : 5;
 }
 
 export function buildJobsSeo(filters: JobFilters, total?: number): {
@@ -47,10 +47,11 @@ export function buildJobsSeo(filters: JobFilters, total?: number): {
     parts.push(`· ${filters.location.trim()}`);
   }
 
-  let titleCore = parts.join(" ");
-  if (filters.sort === "salary_desc") titleCore += " (by salary)";
-  if (filters.page && filters.page > 1) titleCore += ` · Page ${filters.page}`;
-  const title = `${titleCore} | JobLoom`;
+  const titleCore = parts.join(" ");
+  const countPrefix =
+    typeof total === "number" && total >= 0 ? `${total.toLocaleString()} ` : "";
+  const pagePart = filters.page && filters.page > 1 ? ` · Page ${filters.page}` : "";
+  const title = `${countPrefix}${titleCore} Hiring Now (Updated Daily)${pagePart} | JobLoom`;
 
   const refinements: string[] = [];
   if (filters.experience) {
@@ -66,6 +67,10 @@ export function buildJobsSeo(filters: JobFilters, total?: number): {
     refinements.push(`types: ${filters.workTypes.join(", ")}`);
   }
 
+  const freshHint =
+    filters.posted && POSTED_LABEL[filters.posted]
+      ? `Freshest postings from ${POSTED_LABEL[filters.posted]}.`
+      : "Updated daily with the newest roles.";
   let description =
     filters.role || filters.skills?.length || filters.category || filters.country
       ? `Find ${remoteish ? "remote " : ""}${filters.category ? `${filters.category} ` : ""}jobs${
@@ -74,10 +79,22 @@ export function buildJobsSeo(filters: JobFilters, total?: number): {
       : "Browse jobs with category, role, skill, and country filters.";
 
   if (typeof total === "number" && total >= 0) {
-    description = `${description} ${total.toLocaleString()} open roles match this search.`;
+    description = `${description} ${total.toLocaleString()} open roles match this search. ${freshHint}`;
+  } else {
+    description = `${description} ${freshHint}`;
   }
 
   return { title, description };
+}
+
+function hasDuplicateLikeFilters(filters: JobFilters): boolean {
+  if (filters.page && filters.page > 1 && !hasActiveJobFilters({ ...filters, page: undefined })) {
+    return true;
+  }
+  if (filters.role && filters.roles && filters.roles.length === 1 && filters.roles[0] === filters.role) {
+    return false;
+  }
+  return false;
 }
 
 export function formatJobDiscoveryBreadcrumbLabel(filters: JobFilters): string {
@@ -105,7 +122,8 @@ export function jobsRouteMetadata(
   const canonical = absoluteUrl(options.canonicalPath);
   const min = getSeoMinJobsIndex();
   const indexable =
-    options.total === undefined || options.total >= min;
+    options.total === undefined ||
+    (options.total >= min && options.total > 0 && !hasDuplicateLikeFilters(filters));
 
   return {
     title,

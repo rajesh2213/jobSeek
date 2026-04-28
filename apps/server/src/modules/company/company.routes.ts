@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { toJobPublicJson, type JobWithCompanyRow } from "../job/job.mapper.js";
+import { toJobListJson, type JobWithCompanyRow } from "../job/job.mapper.js";
 import { CompanyService } from "./company.service.js";
 import { parseJobDiscoveryQuery } from "../../utils/taxonomyQuery.js";
 import type { ApiError } from "../../types/api.js";
@@ -26,6 +26,28 @@ function parseCompaniesSort(raw: unknown): CompaniesListingSort {
 
 function parseQueryBool(raw: unknown): boolean {
   return raw === true || raw === "true" || raw === "1";
+}
+
+function setApiCacheHeader(
+  reply: FastifyReply,
+  request: FastifyRequest,
+  input: { route: string; cacheable: boolean; reason: string },
+): void {
+  const value = input.cacheable
+    ? "public, max-age=30, s-maxage=30"
+    : "private, no-store";
+  reply.header("Cache-Control", value);
+  request.log.info(
+    {
+      event: "api_cache_status",
+      route: input.route,
+      method: request.method,
+      cacheStatus: input.cacheable ? "HIT_ELIGIBLE" : "BYPASS",
+      cacheControl: value,
+      reason: input.reason,
+    },
+    "api_cache_status",
+  );
 }
 
 function toCompanyListingPublicJson(row: CompanyListingRow) {
@@ -83,6 +105,12 @@ export function registerCompanyRoutes(
     "/companies",
     { schema: getCompaniesQuerySchema },
     async (request: FastifyRequest, reply: FastifyReply) => {
+      const hasAuthHeader = typeof request.headers.authorization === "string";
+      setApiCacheHeader(reply, request, {
+        route: "/companies",
+        cacheable: !hasAuthHeader,
+        reason: hasAuthHeader ? "authenticated_request" : "anonymous_public_listing",
+      });
       const q = request.query as Record<string, unknown>;
       const { page, limit } = parsePageLimit(q, { defaultLimit: 20, maxLimit: 100 });
       const search = typeof q.q === "string" ? q.q : "";
@@ -152,6 +180,11 @@ export function registerCompanyRoutes(
 
       const bypassCap = isViewCapBypassRequest(request);
       const capCtx = await buildCapContextFromRequest(server.prisma, request);
+      setApiCacheHeader(reply, request, {
+        route: "/company/:slug/jobs",
+        cacheable: false,
+        reason: "metered_company_listing",
+      });
 
       const out = await runMeteredJobsList(server.prisma, redis, capCtx, bypassCap, {
         page,
@@ -175,7 +208,7 @@ export function registerCompanyRoutes(
 
       return reply.send({
         data: out.items.map((j) =>
-          toJobPublicJson(j as unknown as JobWithCompanyRow),
+          toJobListJson(j as unknown as JobWithCompanyRow),
         ),
         meta: {
           ...out.meta,

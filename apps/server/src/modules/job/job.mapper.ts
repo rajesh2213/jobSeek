@@ -16,9 +16,44 @@ export type JobCompanyPublic = {
 export type JobWithCompanyRow = Job & { company: JobCompanyPublic };
 
 /**
- * Serialize job for JSON API: plain-text description, company logo.
+ * Shared company serializer for list/detail payloads.
  */
-export function toJobPublicJson(job: JobWithCompanyRow): Record<string, unknown> {
+function toCompanyPublic(company: JobCompanyPublic): Record<string, unknown> {
+  return {
+    id: company.id,
+    name: company.name,
+    slug: company.slug,
+    logoUrl: company.logoUrl ?? null,
+    domain: company.domain ?? null,
+    careerPage: company.careersUrl ?? null,
+    openRoles: company._count?.jobs ?? 0,
+  };
+}
+
+/**
+ * List serializer (phase 1): keep `description` for compatibility, omit heavy parsed/enriched fields.
+ */
+export function toJobListJson(job: JobWithCompanyRow): Record<string, unknown> {
+  const { company, parsedDescription: _parsedDescription, enriched: _enriched, ...rest } = job;
+  const description = cleanJobDescription(job.description);
+  const preview = buildJobPreviewLines({
+    parsedDescription: job.parsedDescription,
+    description: job.description,
+    company: job.company,
+  });
+  return {
+    ...rest,
+    description,
+    previewLines: preview.previewLines,
+    previewLinesSource: preview.previewLinesSource,
+    company: toCompanyPublic(company),
+  };
+}
+
+/**
+ * Detail serializer: full payload required for job detail UX.
+ */
+export function toJobDetailJson(job: JobWithCompanyRow): Record<string, unknown> {
   const { description, company, ...rest } = job;
   const preview = buildJobPreviewLines({
     parsedDescription: job.parsedDescription,
@@ -30,15 +65,7 @@ export function toJobPublicJson(job: JobWithCompanyRow): Record<string, unknown>
     description: cleanJobDescription(description),
     previewLines: preview.previewLines,
     previewLinesSource: preview.previewLinesSource,
-    company: {
-      id: company.id,
-      name: company.name,
-      slug: company.slug,
-      logoUrl: company.logoUrl ?? null,
-      domain: company.domain ?? null,
-      careerPage: company.careersUrl ?? null,
-      openRoles: company._count?.jobs ?? 0,
-    },
+    company: toCompanyPublic(company),
   };
 }
 
@@ -46,7 +73,7 @@ export function toJobPublicJson(job: JobWithCompanyRow): Record<string, unknown>
  * Free tier over daily cap: keep title/company/location for SEO and upgrade UX; hide body and apply targets.
  */
 export function toJobPublicJsonOverDailyCap(job: JobWithCompanyRow): Record<string, unknown> {
-  const full = toJobPublicJson(job);
+  const full = toJobDetailJson(job);
   return {
     ...full,
     description: null,
@@ -57,3 +84,8 @@ export function toJobPublicJsonOverDailyCap(job: JobWithCompanyRow): Record<stri
     sourceUrl: null,
   };
 }
+
+/**
+ * Legacy alias retained for backward compatibility while migrating call sites.
+ */
+export const toJobPublicJson = toJobDetailJson;

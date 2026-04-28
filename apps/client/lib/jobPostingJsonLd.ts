@@ -47,6 +47,8 @@ export function buildJobPostingJsonLd(
     },
     datePosted:
       job.postedAt && !Number.isNaN(Date.parse(job.postedAt)) ? job.postedAt : undefined,
+    validThrough: computeValidThrough(job.postedAt, job.createdAt),
+    employmentType: employmentType(job.workType),
     description: description || undefined,
   };
 
@@ -67,4 +69,21 @@ export function buildJobPostingJsonLd(
   }
 
   return base;
+}
+
+function employmentType(workType: string | undefined): string | undefined {
+  const t = (workType ?? "").toLowerCase();
+  if (t === "remote") return "FULL_TIME";
+  if (t === "hybrid") return "FULL_TIME";
+  if (t === "onsite") return "FULL_TIME";
+  return undefined;
+}
+
+function computeValidThrough(postedAt: string | null, createdAt: string | undefined): string | undefined {
+  const raw = postedAt ?? createdAt;
+  if (!raw) return undefined;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return undefined;
+  d.setUTCDate(d.getUTCDate() + 45);
+  return d.toISOString();
 }

@@ -299,6 +299,10 @@ export function buildDiscoveryWhere(
     options?.includeProcessing ?? filters?.includeProcessing ?? false;
   const and: Prisma.JobWhereInput[] = [
     { canonicalJobId: null },
+    { isActive: true },
+    {
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
     { role: { notIn: [...LISTING_EXCLUDED_ROLE_SLUGS] } },
   ];
   const statusFilter = readyStatusWhere(includeProcessing);
@@ -425,6 +429,8 @@ export function buildDiscoveryWhereSql(
   );
   const parts: Prisma.Sql[] = [
     Prisma.sql`j."canonicalJobId" IS NULL`,
+    Prisma.sql`j."isActive" = true`,
+    Prisma.sql`(j."expiresAt" IS NULL OR j."expiresAt" > NOW())`,
     Prisma.sql`j.role NOT IN (${excluded})`,
   ];
   const statusFilter = readyStatusSql(includeProcessing);
@@ -718,7 +724,7 @@ export function createJobRepository(prisma: PrismaClient) {
       includeProcessing?: boolean;
     }): Promise<JobWithCompany[]> {
       const sort = options.sort ?? "latest";
-      const companyInclude = {
+      const companySelect = {
         select: {
           id: true,
           name: true,
@@ -729,6 +735,35 @@ export function createJobRepository(prisma: PrismaClient) {
           _count: { select: { jobs: true } },
         },
       };
+      const listSelect = {
+        id: true,
+        title: true,
+        companyId: true,
+        country: true,
+        locationCity: true,
+        locationState: true,
+        locationCountry: true,
+        locationRegion: true,
+        category: true,
+        isRemote: true,
+        workType: true,
+        experienceLevel: true,
+        description: true,
+        source: true,
+        sourceUrl: true,
+        applyUrl: true,
+        postedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        lastSeenAt: true,
+        expiresAt: true,
+        isActive: true,
+        salaryMin: true,
+        role: true,
+        skills: true,
+        status: true,
+        company: companySelect,
+      } as const;
 
       if (sort === "latest") {
         const whereSql = buildDiscoveryWhereSql(options.filters, {
@@ -744,7 +779,7 @@ export function createJobRepository(prisma: PrismaClient) {
         if (ids.length === 0) return [];
         const jobs = await prisma.job.findMany({
           where: { id: { in: ids } },
-          include: { company: companyInclude },
+          select: listSelect,
         });
         const order = new Map(ids.map((id, i) => [id, i]));
         jobs.sort((a, b) => (order.get(a.id)! - order.get(b.id)!));
@@ -766,7 +801,7 @@ export function createJobRepository(prisma: PrismaClient) {
       if (ids.length === 0) return [];
       const jobs = await prisma.job.findMany({
         where: { id: { in: ids } },
-        include: { company: companyInclude },
+        select: listSelect,
       });
       const order = new Map(ids.map((id, i) => [id, i]));
       jobs.sort((a, b) => (order.get(a.id)! - order.get(b.id)!));

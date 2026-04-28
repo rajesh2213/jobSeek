@@ -1,0 +1,91 @@
+import type { PrismaClient } from "@prisma/client";
+import { buildDiscoveryWhereSql, type JobDiscoveryFilters } from "../job/job.repository.js";
+
+export interface SeoAggregations {
+  topSkills: Array<{ skill: string; count: number }>;
+  topCompanies: Array<{ companyId: string; name: string; count: number }>;
+  salary: { avg: number | null; min: number | null; max: number | null };
+  hiringTrend: Array<{ day: string; count: number }>;
+}
+
+export function createSeoAggregationsService(prisma: PrismaClient) {
+  async function fetchAggregations(filters: JobDiscoveryFilters): Promise<SeoAggregations> {
+    const whereSql = buildDiscoveryWhereSql(filters);
+
+    const topSkillsRows = await prisma.$queryRaw<Array<{ skill: string; count: bigint }>>`
+      SELECT LOWER(TRIM(s.skill)) AS skill, COUNT(*)::bigint AS count
+      FROM "Job" j
+      CROSS JOIN LATERAL unnest(j.skills) AS s(skill)
+      WHERE ${whereSql}
+        AND LENGTH(TRIM(s.skill)) > 1
+      GROUP BY LOWER(TRIM(s.skill))
+      ORDER BY count DESC
+      LIMIT 10
+    `;
+
+    const topCompaniesRows = await prisma.$queryRaw<
+      Array<{ companyId: string; name: string; count: bigint }>
+    >`
+      SELECT j."companyId" AS "companyId", c.name AS name, COUNT(*)::bigint AS count
+      FROM "Job" j
+      JOIN "Company" c ON c.id = j."companyId"
+      WHERE ${whereSql}
+      GROUP BY j."companyId", c.name
+      ORDER BY count DESC
+      LIMIT 10
+    `;
+
+    const salaryRows = await prisma.$queryRaw<
+      Array<{ avg: number | null; min: number | null; max: number | null }>
+    >`
+      SELECT
+        AVG(j."salaryMin")::float8 AS avg,
+        MIN(j."salaryMin")::int AS min,
+        MAX(j."salaryMin")::int AS max
+      FROM "Job" j
+      WHERE ${whereSql}
+        AND j."salaryMin" IS NOT NULL
+        AND j."salaryMin" > 0
+    `;
+
+    const trendRows = await prisma.$queryRaw<Array<{ day: string; count: bigint }>>`
+      SELECT TO_CHAR(DATE_TRUNC('day', COALESCE(j."postedAt", j."createdAt")), 'YYYY-MM-DD') AS day,
+             COUNT(*)::bigint AS count
+      FROM "Job" j
+      WHERE ${whereSql}
+        AND COALESCE(j."postedAt", j."createdAt") >= NOW() - INTERVAL '14 days'
+      GROUP BY DATE_TRUNC('day', COALESCE(j."postedAt", j."createdAt"))
+      ORDER BY DATE_TRUNC('day', COALESCE(j."postedAt", j."createdAt")) DESC
+      LIMIT 14
+    `;
+
+    const salary = salaryRows[0] ?? { avg: null, min: null, max: null };
+    return {
+      topSkills: topSkillsRows.map((r) => ({ skill: r.skill, count: Number(r.count) })),
+      topCompanies: topCompaniesRows.map((r) => ({
+        companyId: r.companyId,
+        name: r.name,
+        count: Number(r.count),
+      })),
+      salary,
+      hiringTrend: trendRows.map((r) => ({ day: r.day, count: Number(r.count) })),
+    };
+  }
+
+  async function safeFetchAggregations(filters: JobDiscoveryFilters): Promise<SeoAggregations> {
+    try {
+      return await fetchAggregations(filters);
+    } catch (_err) {
+      return {
+        topSkills: [],
+        topCompanies: [],
+        salary: { avg: null, min: null, max: null },
+        hiringTrend: [],
+      };
+    }
+  }
+
+  return { fetchAggregations, safeFetchAggregations };
+}
+
+export type SeoAggregationsService = ReturnType<typeof createSeoAggregationsService>;

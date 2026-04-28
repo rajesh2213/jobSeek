@@ -191,6 +191,28 @@ export type JobDetailFetchResult = {
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? "http://localhost:3000";
 
+function debugFastifyFetch(input: {
+  route: string;
+  url: string;
+  mode: "revalidate" | "no-store";
+  revalidateSeconds?: number;
+  cacheStatus: "HIT" | "MISS";
+}): void {
+  if (typeof window !== "undefined") return;
+  if (process.env.DEBUG_FASTIFY_FETCH !== "1") return;
+  console.info(
+    JSON.stringify({
+      event: "api_cache_status",
+      source: "ssr",
+      route: input.route,
+      url: input.url,
+      xSsrCache: input.cacheStatus,
+      mode: input.mode,
+      revalidateSeconds: input.revalidateSeconds ?? null,
+    }),
+  );
+}
+
 export interface AccountSummary {
   plan: "free" | "pro";
   jobViewsToday: number;
@@ -756,8 +778,8 @@ export async function fetchJobs(
   opts?: {
     /** Clerk session JWT for per-user view caps. */
     token?: string | null;
-    /** Server-only: must match API `JOB_LIST_VIEW_CAP_BYPASS_TOKEN` (sitemap, similar jobs, SEO). */
-    viewCapBypassSecret?: string | null;
+    /** Server-only internal SEO bypass secret (`INTERNAL_SEO_SECRET`). */
+    internalSeoSecret?: string | null;
     /** Server-side only: pass through client IP chain to API for anon caps. */
     forwardedFor?: string | null;
   },
@@ -768,15 +790,26 @@ export async function fetchJobs(
   const headers = new Headers();
   const t = opts?.token?.trim();
   if (t) headers.set("Authorization", `Bearer ${t}`);
-  const bypass = opts?.viewCapBypassSecret?.trim();
-  if (bypass) headers.set("x-jobseek-view-cap-bypass", bypass);
+  const internalSeoSecret = opts?.internalSeoSecret?.trim();
+  const internalBypass = typeof window === "undefined" && Boolean(internalSeoSecret);
+  if (internalBypass) {
+    headers.set("x-internal-seo", "true");
+    headers.set("x-internal-seo-secret", internalSeoSecret as string);
+  }
   const forwardedFor = opts?.forwardedFor?.trim();
   if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
 
   /** Metered discovery must not be cached by Next (stale caps / double-count risk). */
-  const fetchOptions: RequestInit & { next?: { revalidate?: number } } = bypass
+  const fetchOptions: RequestInit & { next?: { revalidate?: number } } = internalBypass
     ? { headers, next: { revalidate: 120 } }
     : { headers, cache: "no-store" };
+  debugFastifyFetch({
+    route: "/jobs",
+    url,
+    mode: internalBypass ? "revalidate" : "no-store",
+    revalidateSeconds: internalBypass ? 120 : undefined,
+    cacheStatus: internalBypass ? "HIT" : "MISS",
+  });
 
   const res = await fetch(url, fetchOptions);
   if (!res.ok) {
@@ -794,11 +827,11 @@ export interface SeoLandingEntry {
   count: number;
 }
 
-/** Server-side: `GET /seo/landing-pages` (requires `x-jobseek-view-cap-bypass` matching server env). */
+/** Server-side: `GET /seo/landing-pages` (requires internal SEO secret headers). */
 export async function fetchSeoLandingPages(options?: {
   minCount?: number;
   maxSlugs?: number;
-  viewCapBypassSecret?: string | null;
+  internalSeoSecret?: string | null;
 }): Promise<{ data: SeoLandingEntry[]; meta?: { minCount: number; maxSlugs: number; count: number } }> {
   const params = new URLSearchParams();
   if (options?.minCount !== undefined) params.set("minCount", String(options.minCount));
@@ -806,8 +839,11 @@ export async function fetchSeoLandingPages(options?: {
   const qs = params.toString();
   const url = `${API_BASE_URL}/seo/landing-pages${qs ? `?${qs}` : ""}`;
   const headers = new Headers();
-  const bypass = (options?.viewCapBypassSecret ?? process.env.JOB_LIST_VIEW_CAP_BYPASS_TOKEN)?.trim();
-  if (bypass) headers.set("x-jobseek-view-cap-bypass", bypass);
+  const secret = (options?.internalSeoSecret ?? process.env.INTERNAL_SEO_SECRET)?.trim();
+  if (secret && typeof window === "undefined") {
+    headers.set("x-internal-seo", "true");
+    headers.set("x-internal-seo-secret", secret);
+  }
   const res = await fetch(url, {
     headers,
     next: { revalidate: 300 },
@@ -822,6 +858,39 @@ export async function fetchSeoLandingPages(options?: {
     data: SeoLandingEntry[];
     meta?: { minCount: number; maxSlugs: number; count: number };
   };
+}
+
+export interface SeoAggregationsResponse {
+  data: {
+    topSkills: Array<{ skill: string; count: number }>;
+    topCompanies: Array<{ companyId: string; name: string; count: number }>;
+    salary: { avg: number | null; min: number | null; max: number | null };
+    hiringTrend: Array<{ day: string; count: number }>;
+  };
+}
+
+export async function fetchSeoAggregations(options: {
+  filtersSlug: string;
+  internalSeoSecret?: string | null;
+}): Promise<SeoAggregationsResponse["data"]> {
+  const secret = (options.internalSeoSecret ?? process.env.INTERNAL_SEO_SECRET)?.trim();
+  const headers = new Headers();
+  if (secret && typeof window === "undefined") {
+    headers.set("x-internal-seo", "true");
+    headers.set("x-internal-seo-secret", secret);
+  }
+  const url = `${API_BASE_URL}/seo/aggregations?filters=${encodeURIComponent(options.filtersSlug)}`;
+  const res = await fetch(url, { headers, next: { revalidate: 300 } });
+  if (!res.ok) {
+    return {
+      topSkills: [],
+      topCompanies: [],
+      salary: { avg: null, min: null, max: null },
+      hiringTrend: [],
+    };
+  }
+  const payload = (await res.json()) as SeoAggregationsResponse;
+  return payload.data;
 }
 
 export interface JobRoleSuggestion {
@@ -941,12 +1010,18 @@ export async function fetchCompanies(options: {
   if (options.remote) params.set("remote", "true");
   const qs = params.toString();
   const url = `${API_BASE_URL}/companies${qs ? `?${qs}` : ""}`;
-  const res = await fetch(
+  const isServer = typeof window === "undefined";
+  const reqInit: RequestInit & { next?: { revalidate?: number } } = isServer
+    ? { next: { revalidate: 60 } }
+    : { cache: "no-store" };
+  debugFastifyFetch({
+    route: "/companies",
     url,
-    typeof window === "undefined"
-      ? { next: { revalidate: 60 } }
-      : { cache: "no-store" },
-  );
+    mode: isServer ? "revalidate" : "no-store",
+    revalidateSeconds: isServer ? 60 : undefined,
+    cacheStatus: isServer ? "HIT" : "MISS",
+  });
+  const res = await fetch(url, reqInit);
   if (!res.ok) {
     throw new Error(`Failed to fetch companies: ${res.status}`);
   }
@@ -994,6 +1069,12 @@ export async function fetchCompanyJobs(
   if (t) headers.set("Authorization", `Bearer ${t}`);
   const forwardedFor = options.forwardedFor?.trim();
   if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
+  debugFastifyFetch({
+    route: "/company/:slug/jobs",
+    url,
+    mode: "no-store",
+    cacheStatus: "MISS",
+  });
   const res = await fetch(url, { headers, cache: "no-store" });
   if (res.status === 404) {
     return {

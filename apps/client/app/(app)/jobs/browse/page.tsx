@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { fetchJobCategories, fetchJobSkills } from "../../../../lib/api";
 import { JOB_CATEGORIES } from "../../../../lib/taxonomy";
-import { buildJobsListingUrl } from "../../../../lib/slug-parser";
+import { buildJobsListingUrl, isCanonicalListingPath } from "../../../../lib/slug-parser";
 import { Container } from "../../../../components/ui/Container";
 
 export const metadata: Metadata = {
@@ -38,6 +38,7 @@ export default async function JobsBrowsePage() {
             {JOB_CATEGORIES.filter((c) => c !== "other").map((slug) => {
               const n = catBySlug.get(slug);
               const href = buildJobsListingUrl({ category: slug });
+              if (!isCanonicalListingPath(href)) return null;
               return (
                 <Link
                   key={slug}
@@ -58,14 +59,20 @@ export default async function JobsBrowsePage() {
           <h2 className="text-xs font-bold uppercase tracking-wider text-ink/45">Top skills</h2>
           <div className="flex flex-wrap gap-2">
             {topSkills.map((s) => (
-              <Link
-                key={s.slug}
-                href={buildJobsListingUrl({ skills: [s.slug] })}
-                className="rounded-full bg-surface px-3 py-1.5 text-sm text-ink/80 no-underline ring-1 ring-ink/10 hover:text-brand"
-              >
-                {s.slug}
-                <span className="ml-1.5 text-ink/40">({s.count.toLocaleString()})</span>
-              </Link>
+              (() => {
+                const href = buildJobsListingUrl({ skills: [s.slug] });
+                if (!isCanonicalListingPath(href)) return null;
+                return (
+                  <Link
+                    key={s.slug}
+                    href={href}
+                    className="rounded-full bg-surface px-3 py-1.5 text-sm text-ink/80 no-underline ring-1 ring-ink/10 hover:text-brand"
+                  >
+                    {s.slug}
+                    <span className="ml-1.5 text-ink/40">({s.count.toLocaleString()})</span>
+                  </Link>
+                );
+              })()
             ))}
           </div>
         </section>

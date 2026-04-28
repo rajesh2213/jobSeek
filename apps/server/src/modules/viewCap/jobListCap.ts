@@ -52,6 +52,19 @@ export interface MeteredJobsListMeta {
 }
 
 export function isViewCapBypassRequest(request: FastifyRequest): boolean {
+  const internalMarker = request.headers["x-internal-seo"];
+  const internalSecret = request.headers["x-internal-seo-secret"];
+  const expectedInternalSecret = process.env.INTERNAL_SEO_SECRET?.trim();
+  if (
+    internalMarker === "true" &&
+    typeof internalSecret === "string" &&
+    Boolean(expectedInternalSecret) &&
+    internalSecret === expectedInternalSecret
+  ) {
+    return true;
+  }
+
+  // Backward-compatible bypass token support (deprecated).
   const bypassToken = process.env.JOB_LIST_VIEW_CAP_BYPASS_TOKEN?.trim();
   const bypassHeader = request.headers["x-jobseek-view-cap-bypass"];
   return (

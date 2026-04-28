@@ -34,15 +34,35 @@ export interface JobFilters {
   sort?: "latest" | "salary_desc";
 }
 
-function longestMatchFromStart(
-  slug: string,
-  candidates: readonly string[],
-): { match: string; rest: string } | null {
-  const sorted = [...candidates].sort((a, b) => b.length - a.length);
-  for (const c of sorted) {
-    if (slug === c) return { match: c, rest: "" };
-    if (slug.startsWith(`${c}-`)) return { match: c, rest: slug.slice(c.length + 1) };
-  }
+const CANONICAL_SLUG_KEYS = new Set([
+  "role",
+  "category",
+  "skill",
+  "location",
+  "work-type",
+  "experience",
+]);
+
+function toSlugToken(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120);
+}
+
+function fromExperienceSlug(v: string): JobFilters["experience"] | undefined {
+  if (v === "0-2-years") return "junior";
+  if (v === "3-5-years") return "mid";
+  if (v === "6-plus-years") return "senior";
+  return undefined;
+}
+
+function toExperienceSlug(v: JobFilters["experience"]): string | null {
+  if (v === "junior") return "0-2-years";
+  if (v === "mid") return "3-5-years";
+  if (v === "senior") return "6-plus-years";
   return null;
 }
 
@@ -242,47 +262,107 @@ export function hasActiveJobFilters(f: JobFilters): boolean {
   return p.toString().length > 0;
 }
 
-export function parseSlug(slug: string[]): JobFilters {
+function parseCanonicalSlug(slug: string[]): JobFilters | null {
+  if (slug.length === 0) return {};
+  if (slug.length % 2 !== 0) return null;
+  const filters: JobFilters = {};
+  for (let i = 0; i < slug.length; i += 2) {
+    const key = slug[i]?.trim().toLowerCase() ?? "";
+    const value = slug[i + 1]?.trim() ?? "";
+    if (!key || !value || !CANONICAL_SLUG_KEYS.has(key)) return null;
+    switch (key) {
+      case "role": {
+        const role = toSlugToken(value);
+        if (!role) return null;
+        filters.role = role;
+        filters.roles = [role];
+        break;
+      }
+      case "category": {
+        const category = toSlugToken(value);
+        if (!JOB_CATEGORIES.includes(category as (typeof JOB_CATEGORIES)[number])) return null;
+        filters.category = category;
+        break;
+      }
+      case "skill": {
+        const skill = toSlugToken(value);
+        if (!skill) return null;
+        filters.skills = [skill];
+        break;
+      }
+      case "location": {
+        const token = value.trim();
+        if (!token) return null;
+        if (token.toLowerCase() === "remote") {
+          filters.workType = "remote";
+          filters.workTypes = ["remote"];
+          filters.isRemote = true;
+          break;
+        }
+        if (/^[a-z]{2}$/i.test(token)) {
+          filters.country = token.toUpperCase();
+        } else {
+          filters.location = token.replace(/-/g, " ");
+          filters.locations = [filters.location];
+        }
+        break;
+      }
+      case "work-type": {
+        const wt = value.trim().toLowerCase();
+        if (wt !== "remote" && wt !== "onsite" && wt !== "hybrid") return null;
+        filters.workType = wt;
+        filters.workTypes = [wt];
+        if (wt === "remote") filters.isRemote = true;
+        break;
+      }
+      case "experience": {
+        const exp = fromExperienceSlug(value.trim().toLowerCase());
+        if (!exp) return null;
+        filters.experience = exp;
+        break;
+      }
+      default:
+        return null;
+    }
+  }
+  return filters;
+}
+
+function parseLegacySlug(slug: string[]): JobFilters {
   let joined = slug
     .flatMap((segment) => segment.split("-"))
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean)
     .join("-");
-
   let isRemote = false;
   if (joined.endsWith("-remote")) {
     isRemote = true;
     joined = joined.slice(0, -"-remote".length);
   }
-
   if (!joined) {
     return { isRemote: isRemote || undefined, workType: isRemote ? "remote" : undefined };
   }
-
   const segments = joined.split("-").filter(Boolean);
-  let work = joined;
   let country: string | undefined;
-
   if (segments.length > 0) {
     const last = segments[segments.length - 1]!;
     if (/^[a-z]{2}$/.test(last)) {
       country = last.toUpperCase();
-      work = segments.slice(0, -1).join("-");
+      joined = segments.slice(0, -1).join("-");
     }
   }
-
-  const catMatch = longestMatchFromStart(work, JOB_CATEGORIES);
-  if (!catMatch) {
+  const category = JOB_CATEGORIES
+    .slice()
+    .sort((a, b) => b.length - a.length)
+    .find((c) => joined === c || joined.startsWith(`${c}-`));
+  if (!category) {
     return {
       country,
       isRemote: isRemote || undefined,
       workType: isRemote ? "remote" : undefined,
     };
   }
-
-  const rest = catMatch.rest;
-  const category = catMatch.match;
-
+  const rest = joined === category ? "" : joined.slice(category.length + 1);
   const tokens = rest ? rest.split("-").filter(Boolean) : [];
   const skillSet = new Set<string>([...KNOWN_SKILL_SLUGS]);
   const skills: string[] = [];
@@ -292,7 +372,6 @@ export function parseSlug(slug: string[]): JobFilters {
     else roleParts.push(t);
   }
   const role = roleParts.length > 0 ? roleParts.join("-") : undefined;
-
   return {
     category,
     role,
@@ -303,16 +382,49 @@ export function parseSlug(slug: string[]): JobFilters {
   };
 }
 
+export function parseSlugWithMeta(slug: string[]): {
+  filters: JobFilters;
+  validCanonical: boolean;
+} {
+  const canonical = parseCanonicalSlug(slug);
+  if (canonical) {
+    return { filters: canonical, validCanonical: true };
+  }
+  return { filters: parseLegacySlug(slug), validCanonical: false };
+}
+
+export function parseSlug(slug: string[]): JobFilters {
+  return parseSlugWithMeta(slug).filters;
+}
+
 export function filtersToSlug(
-  filters: Pick<JobFilters, "role" | "skills" | "country" | "category" | "isRemote" | "workType">,
+  filters: Pick<
+    JobFilters,
+    "role" | "skills" | "country" | "category" | "isRemote" | "workType" | "location" | "experience"
+  >,
 ): string {
-  const parts: string[] = [];
-  if (filters.category) parts.push(filters.category);
-  if (filters.role) parts.push(...filters.role.split("-").filter(Boolean));
-  if (filters.skills?.length) parts.push(...[...filters.skills].sort());
-  if (filters.country) parts.push(filters.country.toLowerCase());
-  if (filters.workType === "remote" || filters.isRemote) parts.push("remote");
-  return parts.join("-");
+  const segments: string[] = [];
+  const role = filters.role ? toSlugToken(filters.role) : "";
+  if (role) segments.push("role", role);
+  const category = filters.category ? toSlugToken(filters.category) : "";
+  if (category) segments.push("category", category);
+  const skill = filters.skills?.[0] ? toSlugToken(filters.skills[0]) : "";
+  if (skill) segments.push("skill", skill);
+  if (filters.country?.trim()) {
+    segments.push("location", filters.country.trim().toLowerCase());
+  } else if (filters.location?.trim()) {
+    segments.push("location", toSlugToken(filters.location));
+  } else if (filters.workType === "remote" || filters.isRemote) {
+    segments.push("location", "remote");
+  }
+  if (filters.workType && filters.workType !== "remote") {
+    segments.push("work-type", filters.workType);
+  }
+  const experience = toExperienceSlug(filters.experience);
+  if (experience) {
+    segments.push("experience", experience);
+  }
+  return segments.join("/");
 }
 
 export function buildJobsListingUrl(filters: JobFilters): string {
@@ -324,6 +436,7 @@ export function buildJobsListingUrl(filters: JobFilters): string {
     country: filters.country,
     isRemote: filters.isRemote,
     workType: filters.workType,
+    experience: filters.experience,
   });
   if (slug) {
     return qs ? `/jobs/${slug}?${qs}` : `/jobs/${slug}`;
@@ -345,6 +458,7 @@ export function getCanonicalJobListingUrl(filters: JobFilters): string {
     country: filters.country,
     isRemote: filters.isRemote,
     workType: filters.workType,
+    experience: filters.experience,
   });
 
   if (!slug) {
@@ -369,7 +483,7 @@ export function getCanonicalJobListingUrl(filters: JobFilters): string {
   if (filters.locations?.length) {
     p.set("locations", filters.locations.join(","));
   } else if (filters.location?.trim()) {
-    p.set("location", filters.location.trim());
+    // Single location token is represented in canonical slug path.
   }
   if (filters.workTypes?.length) {
     p.set("types", filters.workTypes.map((t) => t.toUpperCase()).join(","));
@@ -377,8 +491,35 @@ export function getCanonicalJobListingUrl(filters: JobFilters): string {
   if (filters.roles && filters.roles.length > 1) {
     p.set("roles", filters.roles.join(","));
   }
+  if (filters.skills && filters.skills.length > 1) {
+    p.set("skills", filters.skills.join(","));
+  }
   if (filters.companyId) p.set("companyId", filters.companyId);
 
   const qs = p.toString();
   return qs ? `/jobs/${slug}?${qs}` : `/jobs/${slug}`;
+}
+
+export function canonicalizeSlugPath(slug: string[]): string {
+  const parsed = parseSlug(slug);
+  const canonical = getCanonicalJobListingUrl(parsed);
+  return canonical.split("?")[0] ?? "/jobs";
+}
+
+export function normalizeRelatedSlugPath(slug: string): string {
+  const clean = slug.trim().replace(/^\/+|\/+$/g, "");
+  if (!clean) return "/jobs";
+  const withoutJobs = clean.startsWith("jobs/") ? clean.slice(5) : clean;
+  return canonicalizeSlugPath(withoutJobs.split("/").filter(Boolean));
+}
+
+export function isCanonicalListingPath(path: string): boolean {
+  const clean = path.trim();
+  if (!clean.startsWith("/jobs")) return false;
+  const rest = clean.replace(/^\/jobs\/?/, "");
+  if (!rest) return true;
+  const segments = rest.split("/").filter(Boolean);
+  const parsed = parseSlugWithMeta(segments);
+  if (!parsed.validCanonical) return false;
+  return canonicalizeSlugPath(segments) === `/jobs/${segments.join("/")}`;
 }

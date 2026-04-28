@@ -1,4 +1,5 @@
 import { fetchSeoLandingPages } from "./api";
+import { normalizeRelatedSlugPath } from "./slug-parser";
 
 /**
  * Related search links for jobs listing footers. Runs in parallel with `GET /jobs` on the page.
@@ -11,14 +12,16 @@ export async function fetchJobsRelatedSlugs(opts: {
   maxSlugs?: number;
 }): Promise<string[]> {
   const { currentSlug, fallback, maxSlugs = 150 } = opts;
+  const normalizedCurrent = normalizeRelatedSlugPath(currentSlug).replace(/^\/jobs\/?/, "");
   try {
     const seo = await fetchSeoLandingPages({
       minCount: 5,
       maxSlugs,
-      viewCapBypassSecret: process.env.JOB_LIST_VIEW_CAP_BYPASS_TOKEN ?? null,
+      internalSeoSecret: process.env.INTERNAL_SEO_SECRET ?? null,
     });
     const next = seo.data
-      .filter((e) => e.slug !== currentSlug)
+      .map((e) => ({ ...e, slug: normalizeRelatedSlugPath(e.slug).replace(/^\/jobs\/?/, "") }))
+      .filter((e) => e.slug && e.slug !== normalizedCurrent)
       .sort((a, b) => b.count - a.count)
       .slice(0, 8)
       .map((e) => e.slug);

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { buildJobsListingUrl } from "../../lib/slug-parser";
+import { buildJobsListingUrl, isCanonicalListingPath } from "../../lib/slug-parser";
 import { mergeBrowseSkillQueries } from "../../lib/seoSkillTokens";
 
 const defaultSkillQueries = ["react", "typescript", "nodejs", "python"];
@@ -20,19 +20,25 @@ function BrowseGroup({
       <h3 className="text-xs font-bold uppercase tracking-wider text-ink/50">{title}</h3>
       <div className="mt-3 flex flex-wrap gap-2">
         {values.map((v) => (
-          <Link
-            key={`${title}-${v}`}
-            href={hrefBuilder(v)}
-            className="rounded-full bg-surface px-3 py-1.5 text-sm text-ink/70 no-underline ring-1 ring-ink/10 hover:text-brand"
-          >
-            {v === "US"
-              ? "United States"
-              : v === "IN"
-                ? "India"
-                : v === "DE"
-                  ? "Germany"
-                  : v.replace(/-/g, " ")}
-          </Link>
+          (() => {
+            const href = hrefBuilder(v);
+            if (!isCanonicalListingPath(href)) return null;
+            return (
+              <Link
+                key={`${title}-${v}`}
+                href={href}
+                className="rounded-full bg-surface px-3 py-1.5 text-sm text-ink/70 no-underline ring-1 ring-ink/10 hover:text-brand"
+              >
+                {v === "US"
+                  ? "United States"
+                  : v === "IN"
+                    ? "India"
+                    : v === "DE"
+                      ? "Germany"
+                      : v.replace(/-/g, " ")}
+              </Link>
+            );
+          })()
         ))}
       </div>
     </div>

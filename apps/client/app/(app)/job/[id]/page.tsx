@@ -95,7 +95,7 @@ export default async function JobDetailPage({ params }: Props) {
         limit: 20,
       },
       {
-        viewCapBypassSecret: process.env.JOB_LIST_VIEW_CAP_BYPASS_TOKEN ?? null,
+        internalSeoSecret: process.env.INTERNAL_SEO_SECRET ?? null,
         forwardedFor,
       },
     ),
