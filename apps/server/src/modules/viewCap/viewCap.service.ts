@@ -2,10 +2,7 @@ import { createHash } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import type { Redis } from "ioredis";
 import { resolveProPlan } from "../../utils/userPlan.js";
-
-/** Free tier: max full job post opens per UTC day (align with list discovery cap). */
-export const FREE_DAILY_JOBS = 20;
-export const FREE_DAILY_JOB_VIEWS = FREE_DAILY_JOBS;
+import { LIMITS } from "../../config/limits.js";
 
 /** Seconds from `from` until next UTC midnight. */
 export function secondsUntilUtcMidnight(from = new Date()): number {
@@ -87,7 +84,7 @@ export async function getJobViewCapState(
       select: { jobViewsToday: true },
     });
     const used = user?.jobViewsToday ?? 0;
-    const remaining = Math.max(0, FREE_DAILY_JOB_VIEWS - used);
+    const remaining = Math.max(0, LIMITS.FREE_TIER_DAILY_LIMIT - used);
     return { unlimited: false, remaining, resetAt };
   }
 
@@ -95,7 +92,7 @@ export async function getJobViewCapState(
   const key = anonRedisKey(ip);
   const raw = await redis.get(key);
   const used = raw ? Number.parseInt(raw, 10) || 0 : 0;
-  const remaining = Math.max(0, FREE_DAILY_JOB_VIEWS - used);
+  const remaining = Math.max(0, LIMITS.FREE_TIER_DAILY_LIMIT - used);
   return { unlimited: false, remaining, resetAt };
 }
 
@@ -115,7 +112,7 @@ export async function checkAndIncrementViewCap(
     const s = await getJobViewCapState(prisma, redis, opts);
     return {
       allowed: s.unlimited || s.remaining > 0,
-      remaining: s.unlimited ? FREE_DAILY_JOB_VIEWS : s.remaining,
+      remaining: s.unlimited ? LIMITS.FREE_TIER_DAILY_LIMIT : s.remaining,
       resetAt: s.resetAt,
       unlimited: s.unlimited,
     };
@@ -125,16 +122,16 @@ export async function checkAndIncrementViewCap(
     await ensureUserJobViewsDayReset(prisma, opts.internalUserId);
     const { pro } = await isProUser(prisma, opts.internalUserId, opts.userEmail);
     if (pro) {
-      return { allowed: true, remaining: FREE_DAILY_JOB_VIEWS, resetAt, unlimited: true };
+      return { allowed: true, remaining: LIMITS.FREE_TIER_DAILY_LIMIT, resetAt, unlimited: true };
     }
     const rows = await prisma.$queryRaw<[{ jobViewsToday: number }]>`
       UPDATE "User"
-      SET "jobViewsToday" = LEAST("jobViewsToday" + ${safeDelta}, ${FREE_DAILY_JOB_VIEWS})
+      SET "jobViewsToday" = LEAST("jobViewsToday" + ${safeDelta}, ${LIMITS.FREE_TIER_DAILY_LIMIT})
       WHERE "id" = ${opts.internalUserId}
       RETURNING "jobViewsToday"
     `;
     const next = rows[0]?.jobViewsToday ?? 0;
-    const remaining = Math.max(0, FREE_DAILY_JOB_VIEWS - next);
+    const remaining = Math.max(0, LIMITS.FREE_TIER_DAILY_LIMIT - next);
     return { allowed: true, remaining, resetAt, unlimited: false };
   }
 
@@ -145,7 +142,7 @@ export async function checkAndIncrementViewCap(
     redis,
     key,
     safeDelta,
-    FREE_DAILY_JOB_VIEWS,
+    LIMITS.FREE_TIER_DAILY_LIMIT,
     ttl,
   );
   return { allowed: true, remaining, resetAt, unlimited: false };

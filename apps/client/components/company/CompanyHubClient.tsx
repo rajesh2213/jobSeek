@@ -140,7 +140,7 @@ export function CompanyHubClient({
 
   const totalRoles = listMeta.total ?? 0;
   const canLoadMore =
-    Boolean(listMeta.viewCapUnlimited) &&
+    Boolean(listMeta) &&
     (listMeta.hasMore === true ||
       (listMeta.totalPages != null && listMeta.page < listMeta.totalPages));
 
@@ -157,7 +157,7 @@ export function CompanyHubClient({
       const nextPage = listMeta.page + 1;
       const res = await fetchCompanyJobs(slug, {
         page: nextPage,
-        limit: listMeta.limit || DEFAULT_LIMIT,
+        limit: listMeta.pageSize || DEFAULT_LIMIT,
         filters: {
           ...filterBase,
           page: undefined,
@@ -402,6 +402,11 @@ export function CompanyHubClient({
             </p>
           </div>
         )}
+        {!isPro && listMeta.limit?.warning ? (
+          <div className="mt-4 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-ink">
+            You are nearing today&apos;s limit. Upgrade for unlimited access.
+          </div>
+        ) : null}
 
         {emptyFiltered ? (
           <div
@@ -439,10 +444,13 @@ export function CompanyHubClient({
         ) : (
           <>
             {(() => {
+              const capMode = listMeta.limit?.mode ?? "hard";
+              const hardMode = capMode === "hard";
               const discoveryPhase = listMeta.discoveryPhase;
               const totalMatches = listMeta.total ?? 0;
               const showDiscoveryWall = Boolean(
                 !isPro &&
+                  hardMode &&
                   listMeta.viewCapUnlimited === false &&
                   listMeta.resetAt &&
                   listJobs.length > 0 &&
@@ -456,7 +464,7 @@ export function CompanyHubClient({
                   ? Math.max(0, listMeta.totalHidden ?? 0)
                   : Math.max(0, totalMatches - listJobs.length);
               const jobsForList =
-                discoveryPhase === "preview"
+                hardMode && discoveryPhase === "preview"
                   ? listJobs.slice(0, FREE_DISCOVERY_PREVIEW_JOB_ROWS)
                   : listJobs;
               const wallPhase =

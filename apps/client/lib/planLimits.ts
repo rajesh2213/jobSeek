@@ -1,17 +1,31 @@
-/**
- * Free tier daily job allowance — keep in sync with
- * `apps/server/src/modules/viewCap/viewCap.service.ts` (`FREE_DAILY_JOBS`) and
- * `discoveryCap.ts` / `jobListCap.ts` (2×10 list cap before preview).
- */
-export const FREE_DAILY_JOBS = 20;
+function intFromEnv(raw: string | undefined, fallback: number): number {
+  const n = Number.parseInt(raw ?? "", 10);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return n;
+}
 
-const _FREE_DISCOVERY_SEARCHES = 2;
+export const FREE_DAILY_JOBS = intFromEnv(
+  process.env.NEXT_PUBLIC_FREE_TIER_DAILY_LIMIT,
+  75,
+);
+
+const _FREE_DISCOVERY_SEARCHES = intFromEnv(
+  process.env.NEXT_PUBLIC_FREE_DISCOVERY_SEARCHES,
+  5,
+);
+const _FREE_DISCOVERY_ROWS_PER_SEARCH = intFromEnv(
+  process.env.NEXT_PUBLIC_FREE_DISCOVERY_ROWS_PER_SEARCH,
+  20,
+);
+const _FREE_DISCOVERY_PREVIEW_ROWS = intFromEnv(
+  process.env.NEXT_PUBLIC_FREE_DISCOVERY_PREVIEW_ROWS,
+  10,
+);
 export const FREE_DISCOVERY = {
   searches: _FREE_DISCOVERY_SEARCHES,
-  /** `searches × jobsPerSearch` = `FREE_DAILY_JOBS` (20). */
-  jobsPerSearch: FREE_DAILY_JOBS / _FREE_DISCOVERY_SEARCHES,
+  jobsPerSearch: _FREE_DISCOVERY_ROWS_PER_SEARCH,
   /** Teaser rows after daily discovery is exhausted. */
-  previewRows: 2,
+  previewRows: _FREE_DISCOVERY_PREVIEW_ROWS,
 } as const;
 
 /** @deprecated use FREE_DISCOVERY.previewRows */

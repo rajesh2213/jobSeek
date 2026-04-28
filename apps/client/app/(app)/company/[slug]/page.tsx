@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { auth } from "@clerk/nextjs/server";
 import {
   fetchCompanies,
@@ -65,6 +66,8 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
 
   const { getToken } = await auth();
   const token = await getToken();
+  const h = await headers();
+  const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
   const jobsResponse = await fetchCompanyJobs(slug, {
     page,
     limit,
@@ -75,11 +78,12 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
       offset: undefined,
     },
     token,
+    forwardedFor,
   });
 
   const meta = jobsResponse.meta ?? {
     page: 1,
-    limit,
+    pageSize: limit,
     total: 0,
     totalPages: 1,
     hasMore: false,

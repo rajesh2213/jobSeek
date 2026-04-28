@@ -3,10 +3,10 @@ import type { Redis } from "ioredis";
 import { createHash } from "node:crypto";
 import {
   ensureUserJobViewsDayReset,
-  FREE_DAILY_JOBS,
   nextUtcMidnight,
   secondsUntilUtcMidnight,
 } from "./viewCap.service.js";
+import { LIMITS } from "../../config/limits.js";
 
 /** Same shape as CapContext from jobListCap (avoid circular import). */
 export type DiscoveryCapContext = {
@@ -14,16 +14,12 @@ export type DiscoveryCapContext = {
   ip: string;
 };
 
-export const FREE_DISCOVERY_SEARCHES = 2;
-/** 2× this many full list rows; matches `FREE_DAILY_JOBS` (20). */
-export const FREE_DISCOVERY_ROWS_PER_SEARCH = FREE_DAILY_JOBS / FREE_DISCOVERY_SEARCHES;
-/**
- * Extra list rows for programmatic SEO job-list pages so visitors see a few more
- * roles (internal; not part of the main “2×10” product story for browse).
- */
-export const FREE_DISCOVERY_BONUS_ROWS = 5;
+export const FREE_DISCOVERY_SEARCHES = LIMITS.DISCOVERY.SEARCHES;
+export const FREE_DISCOVERY_ROWS_PER_SEARCH = LIMITS.DISCOVERY.ROWS_PER_SEARCH;
+/** Extra list rows for programmatic SEO job-list pages (env-configurable). */
+export const FREE_DISCOVERY_BONUS_ROWS = LIMITS.DISCOVERY.BONUS_ROWS;
 /** Teaser rows when fully capped (preview mode). */
-export const DISCOVERY_PREVIEW_ROWS = 2;
+export const DISCOVERY_PREVIEW_ROWS = LIMITS.DISCOVERY.PREVIEW_ROWS;
 
 /** When false, skip bonus batch (2 searches then straight to preview). */
 export function isDiscoveryBonusFiveEnabled(): boolean {

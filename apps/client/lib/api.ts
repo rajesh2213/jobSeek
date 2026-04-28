@@ -108,7 +108,7 @@ export interface JobsApiResponse {
   data: JobItem[];
   meta?: {
     page: number;
-    limit: number;
+    pageSize: number;
     total: number;
     totalCount?: number;
     totalPages: number;
@@ -123,6 +123,13 @@ export interface JobsApiResponse {
     discoveryPhase?: DiscoveryListPhase;
     discoverySearchesRemaining?: number;
     bonusBatchRemaining?: number;
+    limit?: {
+      mode: "soft" | "hard";
+      remaining: number | null;
+      resetAt: string;
+      warning: boolean;
+      isCapped: boolean;
+    };
     company?: {
       id: string;
       name: string;
@@ -161,6 +168,13 @@ export interface JobDetailCapMeta {
   remaining?: number | null;
   resetAt?: string;
   viewCapUnlimited?: boolean;
+  limit?: {
+    mode: "soft" | "hard";
+    remaining: number | null;
+    resetAt: string;
+    warning: boolean;
+    isCapped: boolean;
+  };
 }
 
 export type JobDetailFetchResult = {
@@ -744,6 +758,8 @@ export async function fetchJobs(
     token?: string | null;
     /** Server-only: must match API `JOB_LIST_VIEW_CAP_BYPASS_TOKEN` (sitemap, similar jobs, SEO). */
     viewCapBypassSecret?: string | null;
+    /** Server-side only: pass through client IP chain to API for anon caps. */
+    forwardedFor?: string | null;
   },
 ): Promise<JobsApiResponse> {
   const params = buildJobDiscoverySearchParams(filters, { includeCompanyId: true });
@@ -754,6 +770,8 @@ export async function fetchJobs(
   if (t) headers.set("Authorization", `Bearer ${t}`);
   const bypass = opts?.viewCapBypassSecret?.trim();
   if (bypass) headers.set("x-jobseek-view-cap-bypass", bypass);
+  const forwardedFor = opts?.forwardedFor?.trim();
+  if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
 
   /** Metered discovery must not be cached by Next (stale caps / double-count risk). */
   const fetchOptions: RequestInit & { next?: { revalidate?: number } } = bypass
@@ -956,6 +974,8 @@ export async function fetchCompanyJobs(
     filters?: Omit<JobFilters, "companyId">;
     /** Clerk JWT — company job lists share the same daily view cap as `/jobs`. */
     token?: string | null;
+    /** Server-side only: pass through client IP chain to API for anon caps. */
+    forwardedFor?: string | null;
   } = {},
 ): Promise<JobsApiResponse> {
   const page = options.page ?? 1;
@@ -972,11 +992,13 @@ export async function fetchCompanyJobs(
   const headers = new Headers();
   const t = options.token?.trim();
   if (t) headers.set("Authorization", `Bearer ${t}`);
+  const forwardedFor = options.forwardedFor?.trim();
+  if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
   const res = await fetch(url, { headers, cache: "no-store" });
   if (res.status === 404) {
     return {
       data: [],
-      meta: { page: 1, limit, total: 0, totalPages: 1, hasMore: false },
+      meta: { page: 1, pageSize: limit, total: 0, totalPages: 1, hasMore: false },
     };
   }
   if (!res.ok) {
@@ -991,11 +1013,13 @@ export async function fetchCompanyJobs(
 
 export async function fetchJobById(
   id: string,
-  opts?: { token?: string | null },
+  opts?: { token?: string | null; forwardedFor?: string | null },
 ): Promise<JobDetailFetchResult | null> {
   const headers = new Headers();
   const t = opts?.token?.trim();
   if (t) headers.set("Authorization", `Bearer ${t}`);
+  const forwardedFor = opts?.forwardedFor?.trim();
+  if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
   const res = await fetch(`${API_BASE_URL}/jobs/${id}`, {
     headers,
     cache: "no-store",

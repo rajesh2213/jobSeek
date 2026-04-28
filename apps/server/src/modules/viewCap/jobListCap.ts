@@ -4,6 +4,7 @@ import type { FastifyRequest } from "fastify";
 import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
 import { getJobViewCapState } from "./viewCap.service.js";
 import type { PaginatedResult } from "../../types/api.js";
+import { LIMITS, type CapMode } from "../../config/limits.js";
 import {
   DISCOVERY_PREVIEW_ROWS,
   FREE_DISCOVERY_BONUS_ROWS,
@@ -25,7 +26,8 @@ export type DiscoveryPhase = "search" | "bonus" | "preview";
 
 export interface MeteredJobsListMeta {
   page: number;
-  limit: number;
+  /** Legacy pagination size (`limit` previously). */
+  pageSize: number;
   total: number;
   totalCount: number;
   totalPages: number;
@@ -40,6 +42,13 @@ export interface MeteredJobsListMeta {
   discoveryPhase?: DiscoveryPhase;
   discoverySearchesRemaining?: number;
   bonusBatchRemaining?: number;
+  limit: {
+    mode: CapMode;
+    remaining: number | null;
+    resetAt: string;
+    warning: boolean;
+    isCapped: boolean;
+  };
 }
 
 export function isViewCapBypassRequest(request: FastifyRequest): boolean {
@@ -60,7 +69,7 @@ export function clientIp(request: FastifyRequest): string {
       : Array.isArray(xff)
         ? xff[0]
         : undefined;
-  return raw || request.socket.remoteAddress || "unknown";
+  return raw || request.ip || request.socket.remoteAddress || "unknown";
 }
 
 export async function buildCapContextFromRequest(
@@ -89,7 +98,7 @@ function metaBase(
 ): Pick<
   MeteredJobsListMeta,
   | "page"
-  | "limit"
+  | "pageSize"
   | "total"
   | "totalCount"
   | "totalPages"
@@ -103,7 +112,7 @@ function metaBase(
   const hasMore = result.hasMore ?? skip + result.items.length < result.total;
   return {
     page: result.page,
-    limit: result.limit,
+    pageSize: result.limit,
     total: result.total,
     totalCount: result.total,
     totalPages: result.totalPages,
@@ -122,10 +131,25 @@ function bonusBatchRemaining(
   return 1;
 }
 
+function limitMeta(input: {
+  mode: CapMode;
+  remaining: number | null;
+  resetAt: string;
+}): MeteredJobsListMeta["limit"] {
+  const remaining = input.remaining;
+  return {
+    mode: input.mode,
+    remaining,
+    resetAt: input.resetAt,
+    warning: typeof remaining === "number" && remaining <= 10,
+    isCapped: typeof remaining === "number" && remaining <= 0,
+  };
+}
+
 /**
  * Shared metering for any paginated job list (discovery `/jobs`, company-scoped lists, etc.).
- * Free tier: 2 searches × up to 10 rows (20 full list rows; page-1 debits when `discoveryDebit`);
- * optional +5 on SEO (`surface=seo`) when bonus not yet used; then preview.
+ * Limits are env-driven via `LIMITS.DISCOVERY`; page-1 debits when `discoveryDebit`.
+ * Bonus rows apply on SEO surface when enabled and unused.
  */
 export async function runMeteredJobsList<T>(
   prisma: PrismaClient,
@@ -162,6 +186,11 @@ export async function runMeteredJobsList<T>(
         remaining: null,
         resetAt: new Date().toISOString(),
         viewCapUnlimited: true,
+        limit: limitMeta({
+          mode: LIMITS.MODE,
+          remaining: null,
+          resetAt: new Date().toISOString(),
+        }),
       },
     };
   }
@@ -178,6 +207,11 @@ export async function runMeteredJobsList<T>(
         remaining: null,
         resetAt: capState.resetAt.toISOString(),
         viewCapUnlimited: true,
+        limit: limitMeta({
+          mode: LIMITS.MODE,
+          remaining: null,
+          resetAt: capState.resetAt.toISOString(),
+        }),
       },
     };
   }
@@ -200,7 +234,7 @@ export async function runMeteredJobsList<T>(
     resetAt: Date,
   ): MeteredJobsListMeta => ({
     page,
-    limit,
+    pageSize: limit,
     total: totalMatching,
     totalCount: totalMatching,
     totalPages: Math.ceil(totalMatching / limit) || 1,
@@ -217,11 +251,16 @@ export async function runMeteredJobsList<T>(
     discoveryPhase: "preview",
     discoverySearchesRemaining: 0,
     bonusBatchRemaining: 0,
+    limit: limitMeta({
+      mode: LIMITS.MODE,
+      remaining: 0,
+      resetAt: resetAt.toISOString(),
+    }),
   });
 
   const blockedPageMeta = (): MeteredJobsListMeta => ({
     page,
-    limit,
+    pageSize: limit,
     total: 0,
     totalCount: 0,
     totalPages: 1,
@@ -237,7 +276,60 @@ export async function runMeteredJobsList<T>(
     discoveryPhase: fullyExhausted ? "preview" : "search",
     discoverySearchesRemaining: fullyExhausted ? 0 : searchesRem,
     bonusBatchRemaining: fullyExhausted ? 0 : bonusRem,
+    limit: limitMeta({
+      mode: LIMITS.MODE,
+      remaining: fullyExhausted ? 0 : searchesRem + bonusRem,
+      resetAt: disc.resetAt.toISOString(),
+    }),
   });
+
+  if (LIMITS.MODE === "soft") {
+    if (page === 1 && discoveryDebit) {
+      if (disc.searchesUsed < FREE_DISCOVERY_SEARCHES) {
+        disc = await incrementDiscoverySearch(prisma, redis, dctx);
+      } else if (
+        bonusEligible &&
+        !disc.bonusUsed &&
+        disc.searchesUsed >= FREE_DISCOVERY_SEARCHES
+      ) {
+        await markDiscoveryBonusUsed(prisma, redis, dctx);
+        disc = await getDiscoveryListState(prisma, redis, dctx);
+      }
+    }
+
+    const searchesRemAfter = Math.max(0, FREE_DISCOVERY_SEARCHES - disc.searchesUsed);
+    const bonusRemAfter = bonusBatchRemaining(bonusOn, bonusSurface, disc);
+    const isExhaustedSoft =
+      disc.searchesUsed >= FREE_DISCOVERY_SEARCHES &&
+      (!bonusEligible || disc.bonusUsed);
+    const result = await fetchList(limit);
+    const base = metaBase(result, offset, limit);
+    const remainingSoft = searchesRemAfter + bonusRemAfter;
+    const phaseSoft: DiscoveryPhase = isExhaustedSoft
+      ? "preview"
+      : bonusEligible && disc.bonusUsed && disc.searchesUsed >= FREE_DISCOVERY_SEARCHES
+        ? "bonus"
+        : "search";
+    return {
+      items: result.items,
+      meta: {
+        ...base,
+        capReached: remainingSoft <= 0,
+        remaining: remainingSoft,
+        resetAt: disc.resetAt.toISOString(),
+        totalHidden: 0,
+        viewCapUnlimited: false,
+        discoveryPhase: phaseSoft,
+        discoverySearchesRemaining: searchesRemAfter,
+        bonusBatchRemaining: bonusRemAfter,
+        limit: limitMeta({
+          mode: LIMITS.MODE,
+          remaining: remainingSoft,
+          resetAt: disc.resetAt.toISOString(),
+        }),
+      },
+    };
+  }
 
   // Free tier: no extra pages beyond metered slices (blocks "Load more" pagination).
   if (fullyExhausted && page > 1) {
@@ -265,6 +357,11 @@ export async function runMeteredJobsList<T>(
         discoveryPhase: "preview",
         discoverySearchesRemaining: 0,
         bonusBatchRemaining: 0,
+        limit: limitMeta({
+          mode: LIMITS.MODE,
+          remaining: 0,
+          resetAt: disc.resetAt.toISOString(),
+        }),
       },
     };
   }
@@ -294,6 +391,11 @@ export async function runMeteredJobsList<T>(
         discoveryPhase: "search",
         discoverySearchesRemaining: searchesRem,
         bonusBatchRemaining: bonusRem,
+        limit: limitMeta({
+          mode: LIMITS.MODE,
+          remaining: searchesRem + bonusRem,
+          resetAt: disc.resetAt.toISOString(),
+        }),
       },
     };
   }
@@ -317,6 +419,11 @@ export async function runMeteredJobsList<T>(
         discoveryPhase: "search",
         discoverySearchesRemaining: searchesRemAfter,
         bonusBatchRemaining: bonusRemAfter,
+        limit: limitMeta({
+          mode: LIMITS.MODE,
+          remaining: searchesRemAfter + bonusRemAfter,
+          resetAt: disc.resetAt.toISOString(),
+        }),
       },
     };
   }
@@ -339,6 +446,11 @@ export async function runMeteredJobsList<T>(
         discoveryPhase: "bonus",
         discoverySearchesRemaining: 0,
         bonusBatchRemaining: 0,
+        limit: limitMeta({
+          mode: LIMITS.MODE,
+          remaining: 0,
+          resetAt: disc.resetAt.toISOString(),
+        }),
       },
     };
   }

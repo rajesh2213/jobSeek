@@ -762,11 +762,11 @@ export function JobsSearchClient({
   );
 
   const canLoadMore =
-    Boolean(listMeta?.viewCapUnlimited) &&
-    !listMeta?.capReached &&
-    listMeta &&
-    (listMeta.hasMore === true ||
-      (listMeta.totalPages != null && listMeta.page < listMeta.totalPages));
+    Boolean(
+      listMeta &&
+        (listMeta.hasMore === true ||
+          (listMeta.totalPages != null && listMeta.page < listMeta.totalPages)),
+    );
 
   const onLoadMore = useCallback(async () => {
     if (!listMeta || loadingMore || !canLoadMore) return;
@@ -779,7 +779,7 @@ export function JobsSearchClient({
         {
           ...base,
           page: nextPage,
-          limit: listMeta.limit || 20,
+          limit: listMeta.pageSize || 20,
           surface: discoverySurface,
         },
         { token },
@@ -1423,6 +1423,14 @@ export function JobsSearchClient({
               </p>
             </div>
           ) : null}
+          {!isPro && listMeta?.limit?.warning ? (
+            <div
+              role="status"
+              className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-ink"
+            >
+              You are nearing today&apos;s limit. Upgrade for unlimited access.
+            </div>
+          ) : null}
           {listMeta?.capReached &&
           !listMeta?.viewCapUnlimited &&
           !isPro &&
@@ -1486,11 +1494,14 @@ export function JobsSearchClient({
         aria-busy={isFilterPending}
       >
         {(() => {
+          const capMode = listMeta?.limit?.mode ?? "hard";
+          const hardMode = capMode === "hard";
           const totalMatches = listMeta?.total ?? 0;
           const noMatches = listJobs.length === 0 && totalMatches === 0;
           const discoveryPhase = listMeta?.discoveryPhase;
           const showDiscoveryWall = Boolean(
             !isPro &&
+              hardMode &&
               listMeta &&
               listMeta.viewCapUnlimited === false &&
               listMeta.resetAt &&
@@ -1541,7 +1552,7 @@ export function JobsSearchClient({
           }
           const capResetAt = listMeta?.resetAt;
           const jobsForList =
-            discoveryPhase === "preview"
+            hardMode && discoveryPhase === "preview"
               ? listJobs.slice(0, FREE_DISCOVERY_PREVIEW_JOB_ROWS)
               : listJobs;
           const wallPhase =

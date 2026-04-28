@@ -4,10 +4,10 @@ import { registerAccountResumeRoutes } from "./account.controller.js";
 import { registerAccountApplyProfileRoutes } from "./account.applyProfile.js";
 import {
   ensureUserJobViewsDayReset,
-  FREE_DAILY_JOB_VIEWS,
   nextUtcMidnight,
 } from "../viewCap/viewCap.service.js";
 import { resolveProPlan } from "../../utils/userPlan.js";
+import { LIMITS } from "../../config/limits.js";
 
 export function registerAccountRoutes(server: FastifyInstance): void {
   registerAccountResumeRoutes(server);
@@ -32,7 +32,7 @@ export function registerAccountRoutes(server: FastifyInstance): void {
     return reply.send({
       plan,
       jobViewsToday: row.jobViewsToday,
-      jobViewsLimit: pro ? null : FREE_DAILY_JOB_VIEWS,
+      jobViewsLimit: pro ? null : LIMITS.FREE_TIER_DAILY_LIMIT,
       resetAt: nextUtcMidnight().toISOString(),
     });
   });

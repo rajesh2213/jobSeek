@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { fetchCompanyJobs, fetchJobById, fetchJobs, isJobReady } from "../../../../lib/api";
@@ -34,7 +35,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const { getToken } = await auth();
   const token = await getToken();
-  const fetched = await fetchJobById(id, { token });
+  const h = await headers();
+  const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
+  const fetched = await fetchJobById(id, { token, forwardedFor });
   if (!fetched) {
     return { title: "Job not found | JobLoom" };
   }
@@ -62,11 +65,14 @@ export default async function JobDetailPage({ params }: Props) {
   const { id } = await params;
   const { getToken } = await auth();
   const token = await getToken();
-  const fetched = await fetchJobById(id, { token });
+  const h = await headers();
+  const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
+  const fetched = await fetchJobById(id, { token, forwardedFor });
   if (!fetched?.data?.company) notFound();
 
   const job = fetched.data;
   const detailCap = fetched.meta;
+  const nearLimitWarning = Boolean(detailCap?.limit?.warning);
   const capReached = Boolean(detailCap?.capReached);
 
   const sections = refineSectionsForDisplay(resolveJobDetailSections(job));
@@ -82,13 +88,16 @@ export default async function JobDetailPage({ params }: Props) {
   );
 
   const [companyJobsRes, similarRes] = await Promise.all([
-    fetchCompanyJobs(job.company.slug, { limit: 5, token }),
+    fetchCompanyJobs(job.company.slug, { limit: 5, token, forwardedFor }),
     fetchJobs(
       {
         category: job.category,
         limit: 20,
       },
-      { viewCapBypassSecret: process.env.JOB_LIST_VIEW_CAP_BYPASS_TOKEN ?? null },
+      {
+        viewCapBypassSecret: process.env.JOB_LIST_VIEW_CAP_BYPASS_TOKEN ?? null,
+        forwardedFor,
+      },
     ),
   ]);
   const companyJobs = (companyJobsRes.data ?? [])
@@ -117,6 +126,11 @@ export default async function JobDetailPage({ params }: Props) {
                 applyUrlLocked={capReached}
               />
               <ResumeMatchSection job={job} />
+              {nearLimitWarning ? (
+                <div className="rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-ink">
+                  You are nearing today&apos;s limit. Upgrade for unlimited access.
+                </div>
+              ) : null}
               <div className="w-full min-w-0 max-w-full space-y-0">
                 <EnrichmentPills job={job} />
                 <JobDetailSeoPills job={job} />

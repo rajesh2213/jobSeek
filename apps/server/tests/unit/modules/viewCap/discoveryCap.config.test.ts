@@ -8,13 +8,13 @@ import {
 } from "../../../../src/modules/viewCap/discoveryCap.js";
 
 describe("discovery list cap constants", () => {
-  it("free tier is 2 searches of 10 plus 5 on SEO (25 max list rows before preview)", () => {
-    assert.equal(FREE_DISCOVERY_SEARCHES, 2);
-    assert.equal(FREE_DISCOVERY_ROWS_PER_SEARCH, 10);
-    assert.equal(FREE_DISCOVERY_BONUS_ROWS, 5);
+  it("free tier defaults are env-driven (5x20 + 20 bonus)", () => {
+    assert.equal(FREE_DISCOVERY_SEARCHES, 5);
+    assert.equal(FREE_DISCOVERY_ROWS_PER_SEARCH, 20);
+    assert.equal(FREE_DISCOVERY_BONUS_ROWS, 20);
     assert.equal(
       FREE_DISCOVERY_SEARCHES * FREE_DISCOVERY_ROWS_PER_SEARCH + FREE_DISCOVERY_BONUS_ROWS,
-      25,
+      120,
     );
   });
 

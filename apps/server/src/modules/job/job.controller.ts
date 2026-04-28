@@ -26,6 +26,7 @@ import {
 } from "../viewCap/viewCap.service.js";
 import { assertJobReadRateLimit } from "../viewCap/rateLimitRedis.js";
 import { recordJobBlockedNotReady } from "../../services/jobStatusMetrics.service.js";
+import { LIMITS } from "../../config/limits.js";
 
 interface GetJobParams {
   id: string;
@@ -183,24 +184,40 @@ export function registerJobRoutes(
       const capState = await getJobViewCapState(server.prisma, redis, capCtx);
 
       if (capState.unlimited) {
+        const resetAt = capState.resetAt.toISOString();
         return reply.send({
           data: toJobPublicJson(job as unknown as JobWithCompanyRow),
           meta: {
             capReached: false,
-            resetAt: capState.resetAt.toISOString(),
+            resetAt,
             viewCapUnlimited: true,
+            limit: {
+              mode: LIMITS.MODE,
+              remaining: null,
+              resetAt,
+              warning: false,
+              isCapped: false,
+            },
           },
         });
       }
 
-      if (capState.remaining <= 0) {
+      if (LIMITS.MODE === "hard" && capState.remaining <= 0) {
+        const resetAt = capState.resetAt.toISOString();
         return reply.send({
           data: toJobPublicJsonOverDailyCap(job as unknown as JobWithCompanyRow),
           meta: {
             capReached: true,
             remaining: 0,
-            resetAt: capState.resetAt.toISOString(),
+            resetAt,
             viewCapUnlimited: false,
+            limit: {
+              mode: LIMITS.MODE,
+              remaining: 0,
+              resetAt,
+              warning: true,
+              isCapped: true,
+            },
           },
         });
       }
@@ -212,13 +229,22 @@ export function registerJobRoutes(
         1,
       );
 
+      const resetAt = afterCap.resetAt.toISOString();
+      const remaining = afterCap.unlimited ? null : afterCap.remaining;
       return reply.send({
         data: toJobPublicJson(job as unknown as JobWithCompanyRow),
         meta: {
           capReached: false,
-          remaining: afterCap.unlimited ? null : afterCap.remaining,
-          resetAt: afterCap.resetAt.toISOString(),
+          remaining,
+          resetAt,
           viewCapUnlimited: Boolean(afterCap.unlimited),
+          limit: {
+            mode: LIMITS.MODE,
+            remaining,
+            resetAt,
+            warning: typeof remaining === "number" && remaining <= 10,
+            isCapped: typeof remaining === "number" && remaining <= 0,
+          },
         },
       });
     },

@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { auth } from "@clerk/nextjs/server";
+import { headers } from "next/headers";
 import { fetchJobs, type JobsApiResponse } from "./api";
 import {
   type JobFilters,
@@ -43,13 +44,15 @@ export const loadJobsDiscoveryPage = cache(
     const filters = JSON.parse(filtersKey) as JobFilters;
     const { getToken } = await auth();
     const token = await getToken();
+    const h = await headers();
+    const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
     return fetchJobs(
       {
         ...filters,
         page: filters.page ?? 1,
         limit: filters.limit ?? 20,
       },
-      { token },
+      { token, forwardedFor },
     );
   },
 );
@@ -61,6 +64,8 @@ export const loadWeeklyJobsPostedCount = cache(async (): Promise<number> => {
 
   const { getToken } = await auth();
   const token = await getToken();
+  const h = await headers();
+  const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
   const response = await fetchJobs(
     {
       posted: "1w",
@@ -68,7 +73,7 @@ export const loadWeeklyJobsPostedCount = cache(async (): Promise<number> => {
       limit: 1,
       sort: "latest",
     },
-    { token },
+    { token, forwardedFor },
   );
   const total = Number(response.meta?.total ?? 0);
   return Number.isFinite(total) && total >= 0 ? Math.round(total) : 0;

@@ -1,6 +1,8 @@
+import { LIMITS } from "./limits.js";
+
 export const PLAN_LIMITS = {
   free: {
-    dailyJobViews: 10,
+    dailyJobViews: LIMITS.FREE_TIER_DAILY_LIMIT,
     smartApplyJobs: 0,
     savedSearches: 3,
     resumeScore: false,
