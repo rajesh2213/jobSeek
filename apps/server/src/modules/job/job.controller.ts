@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { createJobRepository } from "./job.repository.js";
+import type { JobWithCompany } from "./job.repository.js";
 import { JobService } from "./job.service.js";
 import { getJobsQuerySchema, getJobParamsSchema } from "./job.schema.js";
 import type { ApiError } from "../../types/api.js";
@@ -99,35 +100,63 @@ export function registerJobRoutes(
       request.log.debug({ filters }, "jobs_query_filters");
       const surfaceRaw = String(q.surface ?? "browse").toLowerCase();
       const bonusSurface = surfaceRaw === "seo" ? "seo" : "browse";
-      const discoveryDebit =
-        hasDiscoveryMeteringFilters(filters) || hasDiscoveryQueryIntent(q);
       const sortRaw = String(q.sort ?? "latest");
       const sort: "latest" | "salary_desc" =
         sortRaw === "salary_desc" || sortRaw === "salary" ? "salary_desc" : "latest";
       const includeProcessing = parseQueryBool(q.includeProcessing);
 
+      const discoveryDebit =
+        hasDiscoveryMeteringFilters(filters) || hasDiscoveryQueryIntent(q);
+
       const bypassCap = isViewCapBypassRequest(request);
       const capCtx = await buildCapContextFromRequest(server.prisma, request);
-      const isAnonymous = capCtx.internalUserId == null;
-      const cacheableJobsList = isAnonymous && !discoveryDebit;
-      setApiCacheHeader(reply, request, {
-        route: "/jobs",
-        cacheable: cacheableJobsList,
-        reason: cacheableJobsList
-          ? "anonymous_non_metered_discovery"
-          : isAnonymous
-            ? "metered_or_personalized"
-            : "authenticated_request",
-      });
 
-      const out = await runMeteredJobsList(
+      const hasAuthHeader = typeof request.headers.authorization === "string";
+      const isAnonymous = capCtx.internalUserId == null && !hasAuthHeader;
+
+      const isCommonFilterQuery = Boolean(
+        filters.category ||
+          (filters.skills && filters.skills.length > 0) ||
+          filters.role,
+      );
+
+      const isHeavyQuery = Boolean(
+        filters.companyId ||
+          filters.minSalary !== undefined ||
+          filters.experienceLevel ||
+          filters.postedWithin ||
+          sortRaw !== "latest",
+      );
+
+      const isDeepPagination = page > 5;
+
+      const isSafeToCache =
+        isAnonymous &&
+        isCommonFilterQuery &&
+        !isHeavyQuery &&
+        !isDeepPagination;
+
+      request.log.info(
+        {
+          event: "jobs_cache_strategy",
+          isSafeToCache,
+          isCommonFilterQuery,
+          isHeavyQuery,
+          isDeepPagination,
+        },
+        "jobs_cache_strategy",
+      );
+
+      const meteredLimit = isSafeToCache ? Math.min(limit, 50) : limit;
+
+      const out = await runMeteredJobsList<JobWithCompany>(
         server.prisma,
         redis,
         capCtx,
         bypassCap,
         {
           page,
-          limit,
+          limit: meteredLimit,
           offset,
           discoveryDebit,
           bonusSurface,
@@ -141,6 +170,47 @@ export function registerJobRoutes(
               includeProcessing,
             }),
         },
+      );
+
+      if (isSafeToCache) {
+        reply.header("Cache-Control", "public, max-age=60, s-maxage=120");
+        request.log.info(
+          {
+            event: "jobs_cache_status",
+            status: "HIT_ELIGIBLE",
+            safeToCache: true,
+          },
+          "jobs_cache_status",
+        );
+      } else {
+        const cacheableJobsList = isAnonymous && !discoveryDebit;
+        const cacheBypassReason = cacheableJobsList
+          ? "anonymous_non_metered_discovery"
+          : capCtx.internalUserId != null || hasAuthHeader
+            ? "authenticated_request"
+            : "metered_or_personalized";
+
+        setApiCacheHeader(reply, request, {
+          route: "/jobs",
+          cacheable: cacheableJobsList,
+          reason: cacheBypassReason,
+        });
+      }
+
+      request.log.info(
+        {
+          event: "jobs_metering_enforced",
+          isSafeToCache,
+          limit: meteredLimit,
+          page,
+          capApplied: Boolean(
+            discoveryDebit &&
+              page === 1 &&
+              !bypassCap &&
+              !out.meta.viewCapUnlimited,
+          ),
+        },
+        "jobs_metering_enforced",
       );
 
       const rowsReturned = out.items.length;

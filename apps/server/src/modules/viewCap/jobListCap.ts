@@ -15,6 +15,7 @@ import {
   isDiscoveryBonusFiveEnabled,
   markDiscoveryBonusUsed,
 } from "./discoveryCap.js";
+import { logger } from "../../utils/logger.js";
 
 export interface CapContext {
   internalUserId: string | null;
@@ -190,12 +191,34 @@ export async function runMeteredJobsList<T>(
     bonusSurface?: "browse" | "seo";
   },
 ): Promise<{ items: T[]; meta: MeteredJobsListMeta }> {
+  const logMeteringCheck = (input: {
+    isCapped: boolean;
+    isFreeUser: boolean;
+    isProUser: boolean;
+    capApplied: boolean;
+    limitAdjusted: boolean;
+  }): void => {
+    logger.info(
+      {
+        event: "jobs_metering_check",
+        ...input,
+      },
+      "jobs_metering_check",
+    );
+  };
   const { limit, offset, fetchList } = args;
   const page = Math.max(1, args.page);
   const discoveryDebit = args.discoveryDebit !== false;
   const bonusSurface = args.bonusSurface ?? "browse";
 
   if (bypassCap) {
+    logMeteringCheck({
+      isCapped: false,
+      isFreeUser: false,
+      isProUser: true,
+      capApplied: false,
+      limitAdjusted: false,
+    });
     const result = await fetchList(limit);
     const base = metaBase(result, offset, limit);
     return {
@@ -217,6 +240,13 @@ export async function runMeteredJobsList<T>(
 
   const capState = await getJobViewCapState(prisma, redis, capCtx);
   if (capState.unlimited) {
+    logMeteringCheck({
+      isCapped: false,
+      isFreeUser: false,
+      isProUser: true,
+      capApplied: false,
+      limitAdjusted: false,
+    });
     const result = await fetchList(limit);
     const base = metaBase(result, offset, limit);
     return {
@@ -304,6 +334,7 @@ export async function runMeteredJobsList<T>(
   });
 
   if (LIMITS.MODE === "soft") {
+    const capAppliedSoft = page === 1 && discoveryDebit;
     if (page === 1 && discoveryDebit) {
       if (disc.searchesUsed < FREE_DISCOVERY_SEARCHES) {
         disc = await incrementDiscoverySearch(prisma, redis, dctx);
@@ -325,6 +356,13 @@ export async function runMeteredJobsList<T>(
     const result = await fetchList(limit);
     const base = metaBase(result, offset, limit);
     const remainingSoft = searchesRemAfter + bonusRemAfter;
+    logMeteringCheck({
+      isCapped: remainingSoft <= 0,
+      isFreeUser: true,
+      isProUser: false,
+      capApplied: capAppliedSoft,
+      limitAdjusted: false,
+    });
     const phaseSoft: DiscoveryPhase = isExhaustedSoft
       ? "preview"
       : bonusEligible && disc.bonusUsed && disc.searchesUsed >= FREE_DISCOVERY_SEARCHES
@@ -353,6 +391,13 @@ export async function runMeteredJobsList<T>(
 
   // Free tier: no extra pages beyond metered slices (blocks "Load more" pagination).
   if (fullyExhausted && page > 1) {
+    logMeteringCheck({
+      isCapped: true,
+      isFreeUser: true,
+      isProUser: false,
+      capApplied: true,
+      limitAdjusted: true,
+    });
     return {
       items: [] as T[],
       meta: emptyPreviewMeta(0, disc.resetAt),
@@ -361,6 +406,13 @@ export async function runMeteredJobsList<T>(
 
   if (fullyExhausted && page === 1) {
     const previewLimit = Math.min(limit, DISCOVERY_PREVIEW_ROWS);
+    logMeteringCheck({
+      isCapped: true,
+      isFreeUser: true,
+      isProUser: false,
+      capApplied: true,
+      limitAdjusted: previewLimit !== limit,
+    });
     const result = await fetchList(previewLimit);
     const totalMatching = result.total;
     const base = metaBase(result, offset, limit);
@@ -387,6 +439,13 @@ export async function runMeteredJobsList<T>(
   }
 
   if (page > 1) {
+    logMeteringCheck({
+      isCapped: false,
+      isFreeUser: true,
+      isProUser: false,
+      capApplied: true,
+      limitAdjusted: true,
+    });
     return {
       items: [] as T[],
       meta: blockedPageMeta(),
@@ -397,6 +456,13 @@ export async function runMeteredJobsList<T>(
 
   if (!discoveryDebit) {
     const eff = Math.min(limit, FREE_DISCOVERY_ROWS_PER_SEARCH);
+    logMeteringCheck({
+      isCapped: false,
+      isFreeUser: true,
+      isProUser: false,
+      capApplied: false,
+      limitAdjusted: eff !== limit,
+    });
     const result = await fetchList(eff);
     const base = metaBase(result, offset, limit);
     return {
@@ -422,6 +488,13 @@ export async function runMeteredJobsList<T>(
 
   if (disc.searchesUsed < FREE_DISCOVERY_SEARCHES) {
     const eff = Math.min(limit, FREE_DISCOVERY_ROWS_PER_SEARCH);
+    logMeteringCheck({
+      isCapped: false,
+      isFreeUser: true,
+      isProUser: false,
+      capApplied: true,
+      limitAdjusted: eff !== limit,
+    });
     const result = await fetchList(eff);
     disc = await incrementDiscoverySearch(prisma, redis, dctx);
     const base = metaBase(result, offset, limit);
@@ -450,6 +523,13 @@ export async function runMeteredJobsList<T>(
 
   if (bonusEligible && !disc.bonusUsed && disc.searchesUsed >= FREE_DISCOVERY_SEARCHES) {
     const eff = Math.min(limit, FREE_DISCOVERY_BONUS_ROWS);
+    logMeteringCheck({
+      isCapped: false,
+      isFreeUser: true,
+      isProUser: false,
+      capApplied: true,
+      limitAdjusted: eff !== limit,
+    });
     const result = await fetchList(eff);
     await markDiscoveryBonusUsed(prisma, redis, dctx);
     disc = await getDiscoveryListState(prisma, redis, dctx);
