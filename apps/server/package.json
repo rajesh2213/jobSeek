@@ -31,6 +31,8 @@
     "scheduler:job-purge": "tsx src/modules/job/jobPurge.scheduler.ts",
     "worker:job-alerts": "tsx src/workers/jobAlerts.worker.ts",
     "scheduler:job-alerts": "tsx src/modules/saved-search/jobAlerts.scheduler.ts",
+    "worker:growth-email": "tsx src/modules/growthEmail/growthEmail.worker.ts",
+    "scheduler:growth-email": "tsx src/modules/growthEmail/growthEmail.scheduler.ts",
     "worker:job-status-reconcile": "tsx src/workers/jobStatusReconcile.worker.ts",
     "scheduler:job-status-reconcile": "tsx src/modules/job/jobStatusReconcile.scheduler.ts",
     "discovery:worker": "tsx src/workers/discovery.processor.ts",

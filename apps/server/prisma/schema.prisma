@@ -22,6 +22,33 @@ enum CompanyCrawlPriority {
   low
 }
 
+enum EmailFrequency {
+  daily
+  weekly
+  off
+}
+
+enum GrowthEmailCampaignType {
+  daily_digest
+  weekly_digest
+  reengagement
+  personalized
+  event_welcome
+  event_followup
+  event_saved_search_suggestions
+}
+
+enum GrowthEmailSendStatus {
+  sent
+  skipped
+  failed
+}
+
+enum EmailJobSendChannel {
+  saved_search_alert
+  growth_email
+}
+
 model Company {
   id                  String                @id @default(uuid())
   name                String
@@ -130,6 +157,7 @@ model Job {
   canonical  Job?    @relation("JobDuplicates", fields: [canonicalJobId], references: [id], onDelete: Cascade)
   duplicates Job[]   @relation("JobDuplicates")
   applications Application[]
+  emailJobSendLogs EmailJobSendLog[]
 
   @@index([title])
   @@index([companyId])
@@ -251,6 +279,71 @@ model User {
   subscription       Subscription?
   savedSearches      SavedSearch[]
   applications       Application[]
+  emailPreference    EmailPreference?
+  growthEmailSends   GrowthEmailSend[]
+  emailJobSendLogs   EmailJobSendLog[]
+}
+
+model EmailPreference {
+  id                    String         @id @default(uuid())
+  userId                String         @unique
+  user                  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketingEnabled      Boolean        @default(true)
+  frequency             EmailFrequency @default(daily)
+  source                String?        @default("signup_default")
+  lastActiveAt          DateTime?
+  lastGrowthEmailSentAt DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  @@index([marketingEnabled, frequency])
+  @@index([lastGrowthEmailSentAt])
+  @@index([lastActiveAt])
+}
+
+model EmailLead {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  source    String
+  context   Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model GrowthEmailSend {
+  id                String                  @id @default(uuid())
+  userId            String
+  user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaignType      GrowthEmailCampaignType
+  periodKey         String
+  status            GrowthEmailSendStatus   @default(sent)
+  providerMessageId String?
+  subjectUsed       String?
+  jobCountSent      Int                     @default(0)
+  sentAt            DateTime?
+  error             String?
+  createdAt         DateTime                @default(now())
+  emailJobLogs      EmailJobSendLog[]
+
+  @@unique([userId, campaignType, periodKey])
+  @@index([userId, createdAt])
+}
+
+model EmailJobSendLog {
+  id           String              @id @default(uuid())
+  userId       String
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId        String
+  job          Job                 @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  channel      EmailJobSendChannel
+  growthSendId String?
+  growthSend   GrowthEmailSend?    @relation(fields: [growthSendId], references: [id], onDelete: SetNull)
+  sentAt       DateTime            @default(now())
+  createdAt    DateTime            @default(now())
+
+  @@index([userId, sentAt])
+  @@index([userId, jobId, sentAt])
+  @@index([growthSendId])
 }
 
 model Application {

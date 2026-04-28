@@ -1,0 +1,15 @@
+[Unit]
+Description=JobSeek Growth Email Scheduler
+After=network.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/jobSeek
+EnvironmentFile=/home/ubuntu/jobSeek/.env
+Environment=WORKER_NAME=jobseek-growth-email-scheduler
+ExecStart=/usr/bin/npm run scheduler:growth-email -w @jobseek/server
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

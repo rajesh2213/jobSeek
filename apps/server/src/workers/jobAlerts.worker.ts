@@ -162,6 +162,14 @@ async function runJobAlerts(): Promise<{ processed: number; emailsSent: number }
         alertJobsSeen: 0,
       },
     });
+    await prisma.emailJobSendLog.createMany({
+      data: page.items.map((j) => ({
+        userId: row.userId,
+        jobId: j.id,
+        channel: "saved_search_alert",
+        sentAt: new Date(),
+      })),
+    });
   }
 
   return { processed: rows.length, emailsSent };

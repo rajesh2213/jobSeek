@@ -52,6 +52,13 @@ export interface MeteredJobsListMeta {
 }
 
 export function isViewCapBypassRequest(request: FastifyRequest): boolean {
+  const q = request.query as Record<string, unknown>;
+  const utmSource = typeof q?.utm_source === "string" ? q.utm_source.toLowerCase() : "";
+  const emailClick = utmSource === "email";
+  if (emailClick) {
+    return true;
+  }
+
   const internalMarker = request.headers["x-internal-seo"];
   const internalSecret = request.headers["x-internal-seo-secret"];
   const expectedInternalSecret = process.env.INTERNAL_SEO_SECRET?.trim();

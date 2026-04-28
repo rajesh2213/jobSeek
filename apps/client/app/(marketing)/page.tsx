@@ -13,6 +13,7 @@ import {
   type MotionValue,
 } from "framer-motion";
 import GuidedHookDemo from "../../components/GuidedHookDemo";
+import { EmailCaptureCard } from "../../components/email/EmailCaptureCard";
 import { HERO_JOB_INDEX_TOTAL, SHOW_LANDING_TESTIMONIALS } from "../../lib/landingPublic";
 import { PRO_ANNUAL_USD_PER_MONTH } from "../../lib/pricingDisplay";
 import { FREE_DAILY_JOBS } from "../../lib/planLimits";
@@ -215,6 +216,13 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
           <Link href="/pricing" className="rounded-full border border-ink/20 px-5 py-2.5 text-sm font-semibold text-ink/80">
             See Pro plans
           </Link>
+        </div>
+        <div className="mt-4 max-w-xl">
+          <EmailCaptureCard
+            source="homepage"
+            title="Get top jobs daily - free"
+            subtitle="High-signal roles delivered daily. Unsubscribe anytime."
+          />
         </div>
         <RotatingSignal />
       </motion.div>
@@ -695,6 +703,38 @@ function FinalUrgencySection() {
   );
 }
 
+function ExitIntentCapture() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const onMouseOut = (e: MouseEvent) => {
+      if (e.clientY > 8) return;
+      setOpen((prev) => prev || true);
+    };
+    window.addEventListener("mouseout", onMouseOut);
+    return () => window.removeEventListener("mouseout", onMouseOut);
+  }, []);
+  if (!open) return null;
+  return (
+    <div className="fixed bottom-4 right-4 z-50 w-[min(92vw,420px)] rounded-2xl border border-ink/10 bg-canvas p-3 shadow-xl">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-xs font-semibold text-ink/70">Before you go</p>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="text-xs text-ink/50 hover:text-ink"
+        >
+          close
+        </button>
+      </div>
+      <EmailCaptureCard
+        source="exit_intent"
+        title="Don't miss new jobs"
+        subtitle="Get a daily shortlist in your inbox."
+      />
+    </div>
+  );
+}
+
 export default function LandingPage() {
   const mainRef = useRef<HTMLElement | null>(null);
   const { scrollYProgress } = useScroll({
@@ -710,6 +750,7 @@ export default function LandingPage() {
       <PricingSection />
       {SHOW_LANDING_TESTIMONIALS ? <SocialProofSection /> : null}
       <FinalUrgencySection />
+      <ExitIntentCapture />
     </main>
   );
 }

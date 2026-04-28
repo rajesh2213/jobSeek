@@ -1311,3 +1311,33 @@ export async function fetchResumeSemanticMatch(
   }
   return (await res.json()) as SemanticMatchMap;
 }
+
+export async function subscribeGrowthEmail(input: {
+  email: string;
+  source: "homepage" | "job_page" | "jobs_listing" | "exit_intent" | "extension";
+  context?: { role?: string; location?: string; jobId?: string };
+  token?: string | null;
+}): Promise<{ success: boolean }> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  const t = input.token?.trim();
+  if (t) {
+    headers.Authorization = `Bearer ${t}`;
+  }
+  const res = await fetch(`${API_BASE_URL}/email/subscribe`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      email: input.email,
+      source: input.source,
+      context: input.context,
+    }),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ApiRequestError(body.error ?? "Failed to subscribe", res.status, body.code);
+  }
+  return (await res.json()) as { success: boolean };
+}

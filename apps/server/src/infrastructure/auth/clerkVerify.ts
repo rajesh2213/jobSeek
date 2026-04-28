@@ -4,6 +4,7 @@ import { decodeJwt, verifyJwt, type VerifyJwtOptions } from "@clerk/backend/jwt"
 import type { JwtPayload } from "@clerk/types";
 import type { PrismaClient } from "@prisma/client";
 import { logger } from "../../utils/logger.js";
+import { ensureEmailPreference, enqueueGrowthEmailEvent } from "../../modules/growthEmail/growthEmail.service.js";
 
 export type ClerkAuthContext = {
   clerkId: string;
@@ -134,12 +135,29 @@ export async function resolveClerkUser(
   const devBypassClerkId = devBypassClerkIdFromToken(token);
   if (devBypassClerkId) {
     const email = syntheticEmail(devBypassClerkId);
-    const user = await prisma.user.upsert({
+    const existing = await prisma.user.findUnique({
       where: { clerkId: devBypassClerkId },
-      create: { clerkId: devBypassClerkId, email },
-      update: {},
       select: { id: true },
     });
+    const user = existing
+      ? existing
+      : await prisma.user.create({
+          data: { clerkId: devBypassClerkId, email },
+          select: { id: true },
+        });
+    await ensureEmailPreference(prisma, {
+      userId: user.id,
+      source: existing ? "auth_seen" : "signup_default",
+      markActive: true,
+    });
+    if (!existing) {
+      await enqueueGrowthEmailEvent({
+        userId: user.id,
+        email,
+        campaignType: "event_welcome",
+        source: "signup",
+      });
+    }
     logger.info(
       { event: "dev_extension_auth_bypass", clerkId: devBypassClerkId },
       "Using dev extension auth bypass",
@@ -191,15 +209,36 @@ export async function resolveClerkUser(
 
   const email = emailRaw?.includes("@") ? emailRaw : syntheticEmail(sub);
 
-  const user = await prisma.user.upsert({
+  const existing = await prisma.user.findUnique({
     where: { clerkId: sub },
-    create: { clerkId: sub, email },
-    update:
-      emailRaw?.includes("@") && !emailRaw.endsWith("@users.clerk.local")
-        ? { email: emailRaw }
-        : {},
-    select: { id: true },
+    select: { id: true, email: true },
   });
+  const user = existing
+    ? await prisma.user.update({
+        where: { clerkId: sub },
+        data:
+          emailRaw?.includes("@") && !emailRaw.endsWith("@users.clerk.local")
+            ? { email: emailRaw }
+            : {},
+        select: { id: true, email: true },
+      })
+    : await prisma.user.create({
+        data: { clerkId: sub, email },
+        select: { id: true, email: true },
+      });
+  await ensureEmailPreference(prisma, {
+    userId: user.id,
+    source: existing ? "auth_seen" : "signup_default",
+    markActive: true,
+  });
+  if (!existing) {
+    await enqueueGrowthEmailEvent({
+      userId: user.id,
+      email: user.email,
+      campaignType: "event_welcome",
+      source: "signup",
+    });
+  }
 
   return {
     clerkId: sub,

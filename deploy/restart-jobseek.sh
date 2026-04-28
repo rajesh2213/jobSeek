@@ -17,6 +17,8 @@ services=(
   jobseek-discovery-worker
   jobseek-job-alerts-worker
   jobseek-job-alerts-scheduler
+  jobseek-growth-email-worker
+  jobseek-growth-email-scheduler
   jobseek-score
 )
 

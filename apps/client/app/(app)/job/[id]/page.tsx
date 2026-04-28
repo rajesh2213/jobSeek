@@ -26,6 +26,7 @@ import { SimilarJobsSection } from "../../../../components/job/SimilarJobsSectio
 import { ResumeMatchSection } from "../../../../components/resume/ResumeMatchSection";
 import { SeoFooterLinks } from "../../../../components/seo/SeoFooterLinks";
 import { UserLocalResetCaption } from "../../../../components/job/UserLocalResetCaption";
+import { EmailCaptureCard } from "../../../../components/email/EmailCaptureCard";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -181,6 +182,16 @@ export default async function JobDetailPage({ params }: Props) {
           <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
             <CompanyCard company={job.company} />
             <CompanyJobsPreview companySlug={job.company.slug} jobs={companyJobs} />
+            <EmailCaptureCard
+              source="job_page"
+              title="Get similar jobs in your inbox"
+              subtitle="Stay ahead with related opportunities and fresh openings."
+              context={{
+                role: job.role,
+                location: job.locationCountry ?? undefined,
+                jobId: job.id,
+              }}
+            />
           </aside>
         </div>
 

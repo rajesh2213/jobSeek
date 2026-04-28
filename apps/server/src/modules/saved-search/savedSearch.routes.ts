@@ -4,6 +4,7 @@ import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
 import { verifyJobAlertUnsubscribeToken } from "../../utils/jobAlertToken.js";
 import { getPlanLimits } from "../../config/plans.js";
 import { isUserPro, resolveProPlan } from "../../utils/userPlan.js";
+import { enqueueGrowthEmailEvent } from "../growthEmail/growthEmail.service.js";
 import {
   getUserSavedSearchCount,
   isValidQuery,
@@ -145,6 +146,12 @@ export function registerSavedSearchRoutes(server: FastifyInstance): void {
         name,
         query,
       },
+    });
+    await enqueueGrowthEmailEvent({
+      userId: ctx.internalUserId,
+      email: ctx.email ?? undefined,
+      campaignType: "event_saved_search_suggestions",
+      source: "saved_search_create",
     });
 
     return reply.status(201).send({

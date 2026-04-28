@@ -1,0 +1,16 @@
+[Unit]
+Description=JobSeek Growth Email Worker
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/jobSeek
+EnvironmentFile=/home/ubuntu/jobSeek/.env
+Environment=WORKER_NAME=jobseek-growth-email-worker
+ExecStart=/usr/bin/npm run worker:growth-email -w @jobseek/server
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

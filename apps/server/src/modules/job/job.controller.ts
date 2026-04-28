@@ -28,6 +28,7 @@ import {
 import { assertJobReadRateLimit } from "../viewCap/rateLimitRedis.js";
 import { recordJobBlockedNotReady } from "../../services/jobStatusMetrics.service.js";
 import { LIMITS } from "../../config/limits.js";
+import { enqueueGrowthEmailEvent } from "../growthEmail/growthEmail.service.js";
 
 interface GetJobParams {
   id: string;
@@ -265,6 +266,15 @@ export function registerJobRoutes(
 
       const resetAt = afterCap.resetAt.toISOString();
       const remaining = afterCap.unlimited ? null : afterCap.remaining;
+      if (capCtx.internalUserId) {
+        await enqueueGrowthEmailEvent({
+          userId: capCtx.internalUserId,
+          email: capCtx.userEmail ?? undefined,
+          campaignType: "event_followup",
+          jobId: job.id,
+          source: "job_detail_view",
+        });
+      }
       return reply.send({
         data: toJobDetailJson(job as unknown as JobWithCompanyRow),
         meta: {

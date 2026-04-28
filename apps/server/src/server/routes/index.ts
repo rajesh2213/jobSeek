@@ -8,6 +8,7 @@ import { registerInternalMetricsRoutes } from "../../modules/internal/internal.m
 import { registerBillingRoutes } from "../../modules/billing/billing.controller.js";
 import { registerSavedSearchRoutes } from "../../modules/saved-search/savedSearch.routes.js";
 import { registerApplicationsRoutes } from "../../modules/applications/applications.routes.js";
+import { registerGrowthEmailRoutes } from "../../modules/growthEmail/growthEmail.routes.js";
 import { createSeoService } from "../../modules/seo/seo.service.js";
 import { registerSeoAggregationRoutes, registerSeoRoutes } from "../../modules/seo/seo.routes.js";
 import { createSeoAggregationsService } from "../../modules/seo/seoAggregations.service.js";
@@ -42,6 +43,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   registerLocationRoutes(server);
   registerAccountRoutes(server);
   registerSavedSearchRoutes(server);
+  registerGrowthEmailRoutes(server);
   registerApplicationsRoutes(server);
   registerBillingRoutes(server);
   createJobController(server);
