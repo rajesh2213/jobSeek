@@ -18,9 +18,9 @@ const fixedFrame: CSSProperties = {
 
 export function FixedGetProButton() {
   const { isSignedIn } = useAuth();
-  const { isPro, isLoaded: planLoaded } = useAccountPlan();
+  const { isPro, isLoaded: planLoaded, pendingUpgrade } = useAccountPlan();
 
-  if (isSignedIn && planLoaded && isPro) {
+  if (isSignedIn && planLoaded && (isPro || pendingUpgrade)) {
     return null;
   }
 

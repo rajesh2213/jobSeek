@@ -3,6 +3,7 @@
 import { SignInButton, useAuth } from "@clerk/nextjs";
 import { useCallback, useState } from "react";
 import { API_BASE_URL } from "../../lib/api";
+import { useAccountPlan } from "../../lib/useAccountPlan";
 import {
   PRO_ANNUAL_BILLED_YEAR_LABEL,
   PRO_ANNUAL_SAVE_VS_MONTHLY_PERCENT,
@@ -19,6 +20,7 @@ const PLAN_TYPE_BY_KEY: Record<CheckoutKey, "monthly" | "yearly"> = {
 
 export function PricingPlansClient() {
   const { isSignedIn, getToken } = useAuth();
+  const { isPro, pendingUpgrade, upgradeCheckExpired, markPendingUpgrade, refresh } = useAccountPlan();
   const [busy, setBusy] = useState<null | CheckoutKey>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +50,7 @@ export function PricingPlansClient() {
           return;
         }
         if (data.approvalUrl) {
+          markPendingUpgrade();
           window.location.assign(data.approvalUrl);
           return;
         }
@@ -58,7 +61,7 @@ export function PricingPlansClient() {
         setBusy(null);
       }
     },
-    [getToken],
+    [getToken, markPendingUpgrade],
   );
 
   const PlanAction = ({
@@ -85,12 +88,12 @@ export function PricingPlansClient() {
     return (
       <button
         type="button"
-        disabled={loading}
+        disabled={loading || (pendingUpgrade && !isPro)}
         onClick={() => void startCheckout(which)}
         className="w-full rounded-xl py-3.5 text-center text-[15px] font-bold text-white transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
         style={{ backgroundColor: CORAL }}
       >
-        {loading ? "Redirecting…" : label}
+        {loading ? "Redirecting…" : pendingUpgrade && !isPro ? "Processing payment…" : label}
       </button>
     );
   };
@@ -103,6 +106,27 @@ export function PricingPlansClient() {
           role="alert"
         >
           {error}
+        </p>
+      ) : null}
+      {pendingUpgrade && !isPro ? (
+        <div className="mx-auto mt-6 max-w-lg rounded-xl border border-brand/30 bg-brand/5 px-4 py-3 text-center text-sm text-ink">
+          Payment submitted. We are confirming your subscription now.
+          {upgradeCheckExpired ? (
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={() => void refresh()}
+                className="rounded-md border border-brand px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10"
+              >
+                Refresh status
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {isPro ? (
+        <p className="mx-auto mt-6 max-w-lg rounded-xl border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-center text-sm text-emerald-900">
+          Your Pro plan is active.
         </p>
       ) : null}
 

@@ -43,7 +43,9 @@ export function createPayPalHttpClient(): InstanceType<typeof paypal.core.PayPal
     throw new Error("PAYPAL_MODE must be 'sandbox' or 'live'");
   }
   const mode: PayPalMode = modeRaw;
-  if (process.env.NODE_ENV === "production" && mode !== "live") {
+  const allowSandboxInProduction =
+    process.env.ALLOW_PAYPAL_SANDBOX_IN_PRODUCTION?.trim().toLowerCase() === "true";
+  if (process.env.NODE_ENV === "production" && mode !== "live" && !allowSandboxInProduction) {
     throw new Error("PAYPAL_MODE must be 'live' in production");
   }
   const environment =
@@ -158,7 +160,7 @@ export async function fetchPayPalSubscriptionDetails(
   const request: paypalhttp.HttpRequest = {
     path: `/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}`,
     verb: "GET",
-    headers: {},
+    headers: { "content-type": "application/json" },
     body: {},
   };
   const response = await client.execute(request);

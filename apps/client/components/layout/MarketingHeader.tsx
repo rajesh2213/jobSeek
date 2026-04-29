@@ -6,8 +6,8 @@ import { useAccountPlan } from "../../lib/useAccountPlan";
 
 export function MarketingHeader() {
   const { user, isLoaded } = useUser();
-  const { isPro, isLoaded: planLoaded } = useAccountPlan();
-  const showGetPro = !(planLoaded && isPro);
+  const { isPro, isLoaded: planLoaded, pendingUpgrade } = useAccountPlan();
+  const showGetPro = !(planLoaded && (isPro || pendingUpgrade));
   const initial =
     (user?.firstName?.[0] || user?.primaryEmailAddress?.emailAddress?.[0] || "A").toUpperCase();
 
