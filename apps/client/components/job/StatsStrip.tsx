@@ -42,6 +42,8 @@ export interface StatsStripProps {
   /** Rendered left of the stat pills on the second row (e.g. Smart Apply). */
   heroStatRowPrefix?: ReactNode;
   heroSecondRowLeading?: ReactNode;
+  /** To the right of the stats block on large screens (e.g. compact email signup). */
+  heroAside?: ReactNode;
 }
 
 export function StatsStrip({
@@ -52,6 +54,7 @@ export function StatsStrip({
   heroFirstRowLeading,
   heroStatRowPrefix,
   heroSecondRowLeading,
+  heroAside,
 }: StatsStripProps) {
   const reduceMotion = useReducedMotion();
   const countActive = !reduceMotion;
@@ -140,14 +143,28 @@ export function StatsStrip({
           },
         }}
       >
-        <div className="min-w-0 max-w-xl">{heroFirstRowLeading}</div>
-        <div className="mt-3 flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-x-6">
-          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-2.5">
-            {heroStatRowPrefix}
-            {renderPill(0)}
-            {renderPill(1)}
+        <div className="min-w-0 flex-1">
+          <div className="min-w-0 max-w-xl">{heroFirstRowLeading}</div>
+          <div className="mt-3 flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-x-6">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-2.5">
+              {heroStatRowPrefix}
+              {renderPill(0)}
+              {renderPill(1)}
+            </div>
+            <div className="flex w-full min-w-0 flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-start sm:justify-end sm:gap-x-4 sm:gap-y-2 sm:pt-0.5 md:items-center">
+              {heroAside != null ? (
+                <div
+                  key="hero-stats-email-aside"
+                  className="min-w-0 max-w-full sm:max-w-[min(100%,268px)]"
+                  role="complementary"
+                  aria-label="Email updates"
+                >
+                  {heroAside}
+                </div>
+              ) : null}
+              <div className="min-w-0 shrink-0">{heroSecondRowLeading}</div>
+            </div>
           </div>
-          <div className="min-w-0 shrink-0 sm:pt-0.5">{heroSecondRowLeading}</div>
         </div>
       </motion.div>
     );

@@ -13,10 +13,17 @@ import { createSeoService } from "../../modules/seo/seo.service.js";
 import { registerSeoAggregationRoutes, registerSeoRoutes } from "../../modules/seo/seo.routes.js";
 import { createSeoAggregationsService } from "../../modules/seo/seoAggregations.service.js";
 import { getIoredis } from "../../queues/job.queue.js";
+import { LIMITS } from "../../config/limits.js";
 
 export async function registerRoutes(server: FastifyInstance): Promise<void> {
   server.get("/health", async (_request, reply) => {
-    return reply.send({ status: "ok", timestamp: new Date().toISOString() });
+    return reply.send({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      /** Effective discovery cap mode for this process (`LIMITS.MODE`). */
+      capMode: LIMITS.MODE,
+      capModeEnv: process.env.CAP_MODE?.trim() || null,
+    });
   });
 
   if (process.env.ENABLE_READINESS_PROBE?.trim() === "true") {

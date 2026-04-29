@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useApplications } from "../../lib/applicationsContext";
 import { signInWithNext } from "../../lib/signInUrl";
+import { signalProgrammaticNavigation } from "../layout/RouteLoader";
 import { cn } from "../../lib/cn";
 import { buttonClassName } from "../ui/Button";
 import type { AccentTone } from "../ui/types";
@@ -32,7 +33,9 @@ export function AppliedToggleButton({
     if (pending) return;
     if (!isSignedIn) {
       const returnTo = `${window.location.pathname}${window.location.search}`;
-      router.push(signInWithNext(returnTo));
+      const dest = signInWithNext(returnTo);
+      signalProgrammaticNavigation(dest);
+      router.push(dest);
       return;
     }
     setPending(true);

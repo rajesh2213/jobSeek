@@ -10,6 +10,7 @@ import {
   type CompaniesSort,
 } from "../../lib/api";
 import { cn } from "../../lib/cn";
+import { signalProgrammaticNavigation } from "../layout/RouteLoader";
 import { useAccountPlan } from "../../lib/useAccountPlan";
 import { Button } from "../ui/Button";
 import { Input, inputBaseClass } from "../ui/Input";
@@ -109,7 +110,9 @@ export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) 
       if (nh) p.set("hiring", "true");
       if (nr) p.set("remote", "true");
       const qs = p.toString();
-      router.push(qs ? `/companies?${qs}` : "/companies");
+      const href = qs ? `/companies?${qs}` : "/companies";
+      signalProgrammaticNavigation(href);
+      router.push(href);
     },
     [q, sort, hiring, remote, router],
   );

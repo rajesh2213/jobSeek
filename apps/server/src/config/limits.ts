@@ -1,4 +1,9 @@
+import { loadRootEnv } from "../infrastructure/env/loadEnv.js";
+
 export type CapMode = "soft" | "hard";
+
+// Ensure env is loaded before LIMITS is computed at module evaluation time.
+loadRootEnv();
 
 function toPositiveInt(raw: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(raw ?? "", 10);

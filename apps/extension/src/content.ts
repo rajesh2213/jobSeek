@@ -5,6 +5,7 @@ import { fillAIAnswersWithFallback, fillStandardFields, undoLastFill } from "./l
 import type { ApplyProfile } from "./lib/formFiller";
 import { postSmartApplyEvent } from "./lib/api";
 import { SidebarApp } from "./ui/SidebarApp";
+import { SIDEBAR_PANEL_WIDTH_PX } from "./ui/uiMotion";
 import { getSidebarState, patchSidebarState } from "./ui/store";
 import { isLikelyAtsPage } from "./lib/atsDetection";
 
@@ -43,7 +44,7 @@ function ensureSidebarRoot(): HTMLElement {
     right: "0",
     left: "auto",
     bottom: "auto",
-    width: "420px",
+    width: `${SIDEBAR_PANEL_WIDTH_PX}px`,
     height: "100vh",
     zIndex: "2147483647",
     pointerEvents: "none",

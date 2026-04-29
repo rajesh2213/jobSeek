@@ -10,9 +10,7 @@ import {
   textMuted,
   textStrong,
 } from "./smartApplyTheme";
-
-const ease = "cubic-bezier(0.33, 0.86, 0.36, 1)";
-const duration = "340ms";
+import { SIDEBAR_TRANSITION } from "./uiMotion";
 
 /** Full-height peek: fixed to the viewport’s right edge; never transformed */
 const PEEK_RAIL_W = 32;
@@ -41,7 +39,7 @@ export function FloatingTrigger(props: { open: boolean; onClick: () => void }) {
     boxShadow: peekShadowInset,
     zIndex: Z_PEEK,
     opacity: hidden ? 0 : active ? 1 : 0,
-    transition: `opacity ${duration} ${ease}`,
+    transition: `opacity ${SIDEBAR_TRANSITION}`,
     pointerEvents: "none",
     transform: "none",
   };
@@ -57,7 +55,7 @@ export function FloatingTrigger(props: { open: boolean; onClick: () => void }) {
     top: "clamp(140px, 22vh, 240px)",
     zIndex: Z_TAB,
     opacity: hidden ? 0 : 1,
-    transition: `opacity 220ms ease`,
+    transition: `opacity ${SIDEBAR_TRANSITION}`,
     pointerEvents: hidden ? "none" : "auto",
   };
 
@@ -69,17 +67,17 @@ export function FloatingTrigger(props: { open: boolean; onClick: () => void }) {
     background: panelBgDeep,
     color: textStrong,
     borderRadius: "14px 0 0 14px",
-    padding: "12px 14px 14px 16px",
-    minWidth: 72,
+    padding: "10px 12px 10px 14px",
+    minWidth: 140,
     boxShadow: active
       ? "-8px 6px 28px rgba(124, 45, 18, 0.14)"
       : "-4px 4px 20px rgba(124, 45, 18, 0.1)",
     cursor: "pointer",
-    transition: `transform ${duration} ${ease}, box-shadow ${duration} ${ease}`,
+    transition: `transform ${SIDEBAR_TRANSITION}, box-shadow ${SIDEBAR_TRANSITION}`,
     display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-start",
-    justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
     gap: 8,
     WebkitFontSmoothing: "antialiased",
     textAlign: "left",
@@ -102,11 +100,12 @@ export function FloatingTrigger(props: { open: boolean; onClick: () => void }) {
             alt="JobLoom"
             style={{
               display: "block",
-              height: 42,
+              height: 28,
               width: "auto",
-              maxWidth: 220,
+              maxWidth: 120,
               objectFit: "contain",
               objectPosition: "left center",
+              flexShrink: 0,
             }}
           />
           <div

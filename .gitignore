@@ -65,3 +65,5 @@ apps/server/data/company-dataset/Wellfound_final/
 apps/server/data/company-datasets/Wellfound_Final.csv
 # Local dataset shards / smoke CSVs (keep on disk; do not commit)
 apps/server/data/company-datasets/companies-*.csv
+# Generated chunks (optional; re-run split:company-csv locally)
+apps/server/data/company-datasets/split/

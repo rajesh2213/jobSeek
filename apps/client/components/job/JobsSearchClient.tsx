@@ -36,6 +36,7 @@ import {
   type JobFilters,
 } from "../../lib/slug-parser";
 import { signInWithNext } from "../../lib/signInUrl";
+import { signalProgrammaticNavigation } from "../layout/RouteLoader";
 import { Container } from "../ui/Container";
 import { Button } from "../ui/Button";
 import { SortSegmented } from "../ui/SortSegmented";
@@ -55,6 +56,7 @@ import {
   getUserLocalTimeZoneLabel,
 } from "../../lib/userLocalResetTime";
 import { UserLocalResetCaption } from "./UserLocalResetCaption";
+import { JobsListingEmailCapturePopup } from "./JobsListingEmailCapturePopup";
 
 const TimeAdvantageSimulator = dynamic(
   () => import("./TimeAdvantageSimulator").then((m) => m.TimeAdvantageSimulator),
@@ -141,6 +143,40 @@ function DiscoveryMeterCell({
   );
 }
 
+/** Locale + TZ strings must not run during SSR — Node locale/TZ differs from the browser and causes hydration mismatches. */
+function DiscoveryQuotaResetAtPanel({ resetAt }: { resetAt: string }) {
+  const [{ resetDateTime, resetTz }, setSnapshot] = useState({
+    resetDateTime: "",
+    resetTz: "",
+  });
+
+  useEffect(() => {
+    setSnapshot({
+      resetDateTime: formatUserLocalResetDateTime(resetAt),
+      resetTz: getUserLocalTimeZoneLabel(resetAt),
+    });
+  }, [resetAt]);
+
+  const showTz = Boolean(resetTz.trim());
+
+  return (
+    <div className="flex min-w-0 max-w-[14rem] flex-col justify-center gap-1 px-3 py-2.5 sm:max-w-[18rem] sm:px-3.5">
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink/45">
+        Resets
+        {showTz ? (
+          <span className="font-bold normal-case text-ink/50">
+            {" "}
+            ({resetTz})
+          </span>
+        ) : null}
+      </p>
+      <p className="break-words font-sans text-xs font-bold leading-snug tracking-wide text-ink/70">
+        {resetDateTime.trim() ? resetDateTime : "\u00a0"}
+      </p>
+    </div>
+  );
+}
+
 function FreeDiscoveryQuotaStrip({
   listMeta,
 }: {
@@ -152,8 +188,6 @@ function FreeDiscoveryQuotaStrip({
     listMeta.discoveryPhase === "preview" || listMeta.capReached;
   const rem = Math.max(0, listMeta.remaining ?? 0);
   const resetAt = listMeta.resetAt;
-  const resetDateTime = resetAt ? formatUserLocalResetDateTime(resetAt) : null;
-  const resetTz = resetAt ? getUserLocalTimeZoneLabel(resetAt) : "";
 
   const shell = cn(
     "inline-flex max-w-full items-stretch overflow-x-auto rounded-2xl border border-ink/[0.07] text-ink",
@@ -179,26 +213,10 @@ function FreeDiscoveryQuotaStrip({
           <DiscoveryMeterCell label="Now showing" accent>
             Preview ×{FREE_DISCOVERY_PREVIEW_JOB_ROWS}
           </DiscoveryMeterCell>
-          {resetDateTime ? (
+          {resetAt ? (
             <>
               {quotaDivider()}
-              <div
-                className="flex min-w-0 max-w-[14rem] flex-col justify-center gap-1 px-3 py-2.5 sm:max-w-[18rem] sm:px-3.5"
-                suppressHydrationWarning
-              >
-                <p className="text-xs font-semibold uppercase tracking-wide text-ink/45">
-                  Resets
-                  {resetTz ? (
-                    <span className="font-bold normal-case text-ink/50">
-                      {" "}
-                      ({resetTz})
-                    </span>
-                  ) : null}
-                </p>
-                <p className="break-words font-sans text-xs font-bold leading-snug tracking-wide text-ink/70">
-                  {resetDateTime}
-                </p>
-              </div>
+              <DiscoveryQuotaResetAtPanel resetAt={resetAt} />
             </>
           ) : null}
         </>
@@ -206,7 +224,7 @@ function FreeDiscoveryQuotaStrip({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:gap-x-4 sm:px-3.5 sm:pr-4">
           <div className="flex min-w-0 flex-col gap-0.5">
             <p className="text-xs font-semibold uppercase tracking-wide text-ink/45">
-              Jobs left today
+              Free views left today
             </p>
             <p className="font-sans text-xs font-bold tabular-nums leading-none tracking-wide text-ink">
               <span className="text-brand">{rem}</span>
@@ -585,11 +603,9 @@ export function JobsSearchClient({
   const navigateProtected = useCallback(
     (path: string) => {
       if (!authLoaded) return;
-      if (isSignedIn) {
-        router.push(path);
-        return;
-      }
-      router.push(signInWithNext(path));
+      const dest = isSignedIn ? path : signInWithNext(path);
+      signalProgrammaticNavigation(dest);
+      router.push(dest);
     },
     [authLoaded, isSignedIn, router],
   );
@@ -722,12 +738,19 @@ export function JobsSearchClient({
     [uiFilters, urlFilters, navigate],
   );
 
-  const canLoadMore =
-    Boolean(
-      listMeta &&
-        (listMeta.hasMore === true ||
-          (listMeta.totalPages != null && listMeta.page < listMeta.totalPages)),
-    );
+  const hasMoreByPagination = Boolean(
+    listMeta &&
+      (listMeta.hasMore === true ||
+        (listMeta.totalPages != null && listMeta.page < listMeta.totalPages)),
+  );
+  const meteredLoadBlocked = Boolean(
+    listMeta &&
+      listMeta.viewCapUnlimited === false &&
+      (listMeta.capReached === true ||
+        listMeta.discoveryPhase === "preview" ||
+        (typeof listMeta.remaining === "number" && listMeta.remaining <= 0)),
+  );
+  const canLoadMore = hasMoreByPagination && !meteredLoadBlocked;
 
   const onLoadMore = useCallback(async () => {
     if (!listMeta || loadingMore || !canLoadMore) return;
@@ -783,7 +806,9 @@ export function JobsSearchClient({
 
   const onSaveSearch = useCallback(async () => {
     if (!isSignedIn) {
-      router.push(signInWithNext(canonicalQuery));
+      const dest = signInWithNext(canonicalQuery);
+      signalProgrammaticNavigation(dest);
+      router.push(dest);
       return;
     }
 
@@ -1094,7 +1119,10 @@ export function JobsSearchClient({
                     <button
                       type="button"
                       onClick={() =>
-                        startFilterTransition(() => router.push(saved.query))
+                        startFilterTransition(() => {
+                          signalProgrammaticNavigation(saved.query);
+                          router.push(saved.query);
+                        })
                       }
                       aria-current={isActiveSaved ? "page" : undefined}
                       className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
@@ -1427,14 +1455,16 @@ export function JobsSearchClient({
         aria-busy={isFilterPending}
       >
         {(() => {
-          const capMode = listMeta?.limit?.mode ?? "hard";
-          const hardMode = capMode === "hard";
+          const isPreviewPhase = listMeta?.discoveryPhase === "preview";
+          const isCapped = listMeta?.capReached === true;
+          const meteredAccess = listMeta?.viewCapUnlimited === false;
+          const enforceWallUi = Boolean(meteredAccess && (isCapped || isPreviewPhase));
           const totalMatches = listMeta?.total ?? 0;
           const noMatches = listJobs.length === 0 && totalMatches === 0;
           const discoveryPhase = listMeta?.discoveryPhase;
           const showDiscoveryWall = Boolean(
             !isPro &&
-              hardMode &&
+              enforceWallUi &&
               listMeta &&
               listMeta.viewCapUnlimited === false &&
               listMeta.resetAt &&
@@ -1484,7 +1514,7 @@ export function JobsSearchClient({
           }
           const capResetAt = listMeta?.resetAt;
           const jobsForList =
-            hardMode && discoveryPhase === "preview"
+            isPreviewPhase
               ? listJobs.slice(0, FREE_DISCOVERY_PREVIEW_JOB_ROWS)
               : listJobs;
           const wallPhase = discoveryPhase === "preview" ? "preview" : "search";
@@ -1555,6 +1585,8 @@ export function JobsSearchClient({
           </Link>
         </p>
       </Container>
+
+      <JobsListingEmailCapturePopup />
     </div>
   );
 }

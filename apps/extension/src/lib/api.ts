@@ -132,6 +132,9 @@ export async function fetchSmartApplyStatus() {
   return res.data ?? null;
 }
 
+/** Non-null payload from `/account/smart-apply/status` (for sidebar / store). */
+export type SmartApplyStatusSnapshot = NonNullable<Awaited<ReturnType<typeof fetchSmartApplyStatus>>>;
+
 export type SmartApplyBatchQuestionKind = "structured" | "free_text";
 
 export type SmartApplyPreferenceOverrides = {

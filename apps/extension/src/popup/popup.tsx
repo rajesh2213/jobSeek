@@ -12,7 +12,7 @@ import { isLikelyAtsPage } from "../lib/atsDetection";
 import { extensionLogoPrimUrl } from "../lib/extensionAssets";
 
 const CORAL = "#E8533A";
-const SITE = "https://jobseek.app";
+const SITE = "https://jobloom.tech";
 
 type Phase = "idle" | "filling" | "generating" | "review" | "done" | "error";
 
@@ -439,12 +439,22 @@ function Popup() {
   if (!token) {
     return (
       <div style={{ padding: 20, textAlign: "center" }}>
-        <img
-          src={extensionLogoPrimUrl()}
-          alt=""
-          style={{ height: 48, width: "auto", margin: "0 auto 10px", display: "block", objectFit: "contain" }}
-        />
-        <p style={{ margin: "0 0 12px", fontWeight: 700 }}>JobLoom Smart Apply</p>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            marginBottom: 12,
+          }}
+        >
+          <img
+            src={extensionLogoPrimUrl()}
+            alt=""
+            style={{ height: 40, width: "auto", maxWidth: "58%", objectFit: "contain", flexShrink: 0 }}
+          />
+          <p style={{ margin: 0, fontWeight: 800, fontSize: 15, textAlign: "left" }}>Smart Apply</p>
+        </div>
         <p style={{ margin: "0 0 16px", fontSize: 13, color: "#555" }}>
           Sign in to JobLoom to use Smart Apply
         </p>
@@ -464,7 +474,7 @@ function Popup() {
           Sign in →
         </button>
         <p style={{ marginTop: 12, fontSize: 11, color: "#888" }}>
-          After signing in on jobseek.app, return here to use Smart Apply.
+          After signing in on jobloom.tech, return here to use Smart Apply.
         </p>
       </div>
     );
@@ -473,7 +483,14 @@ function Popup() {
   if (!isAts) {
     return (
       <div style={{ padding: 16 }}>
-        <p style={{ margin: 0, fontWeight: 800, fontSize: 14 }}>Smart Apply</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+          <img
+            src={extensionLogoPrimUrl()}
+            alt=""
+            style={{ height: 36, width: "auto", maxWidth: "55%", objectFit: "contain", flexShrink: 0 }}
+          />
+          <p style={{ margin: 0, fontWeight: 800, fontSize: 14 }}>Smart Apply</p>
+        </div>
         <p style={{ margin: "8px 0", fontSize: 13, color: "#555" }}>Ready to fill forms</p>
         <p style={{ margin: "0 0 12px", fontSize: 12, color: "#777" }}>
           Navigate to a job application page (Greenhouse, Lever, Workday, Ashby, ...).
@@ -525,13 +542,29 @@ function Popup() {
 
   return (
     <div style={{ padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-        <img
-          src={extensionLogoPrimUrl()}
-          alt=""
-          style={{ height: 36, width: "auto", objectFit: "contain" }}
-        />
-        <span style={{ fontWeight: 800 }}>Smart Apply</span>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 8,
+          marginBottom: 8,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: "1 1 auto" }}>
+          <img
+            src={extensionLogoPrimUrl()}
+            alt=""
+            style={{
+              height: 36,
+              width: "auto",
+              maxWidth: 200,
+              objectFit: "contain",
+              flexShrink: 1,
+            }}
+          />
+          <span style={{ fontWeight: 800, whiteSpace: "nowrap", flexShrink: 0 }}>Smart Apply</span>
+        </div>
         <span
           style={{
             fontSize: 10,
@@ -540,6 +573,7 @@ function Popup() {
             color: "#92400e",
             padding: "2px 6px",
             borderRadius: 4,
+            flexShrink: 0,
           }}
         >
           JobLoom Smart Apply

@@ -85,43 +85,6 @@ function RotatingSignal() {
   );
 }
 
-function InsiderStrip() {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start end", "end start"],
-  });
-  const firstX = mapRange(scrollYProgress, 0.08, 0.3, 0, -190);
-  const firstOpacity = mapRange(scrollYProgress, 0.08, 0.3, 1, 0);
-  const secondX = mapRange(scrollYProgress, 0.08, 0.3, 190, 0);
-  const secondOpacity = mapRange(scrollYProgress, 0.08, 0.3, 0, 1);
-  return (
-    <motion.div
-      ref={ref}
-      {...sectionReveal}
-      className="mx-auto w-full max-w-6xl px-4 sm:px-6"
-    >
-      <div className="relative min-h-[52px] overflow-hidden rounded-xl border border-ink/8 bg-white/45 px-5 py-3 text-center">
-        <motion.p className="text-[13px] font-medium text-ink/55" style={{ x: firstX, opacity: firstOpacity }}>
-          Most candidates apply too late.{" "}
-          <span className="font-semibold text-ink/75">
-            The first 50 applicants get 60% of interviews.
-          </span>
-        </motion.p>
-        <motion.p
-          className="absolute inset-x-5 top-3 text-[13px] font-medium text-ink/55"
-          style={{ x: secondX, opacity: secondOpacity }}
-        >
-          Fast applicants get seen first.{" "}
-          <span className="font-semibold text-ink/75">
-            Everyone else gets filtered out.
-          </span>
-        </motion.p>
-      </div>
-    </motion.div>
-  );
-}
-
 function HeroSection({ progress }: { progress: MotionValue<number> }) {
   const heroScale = mapRange(progress, 0, 0.16, 1, 0.95);
   const heroY = mapRange(progress, 0, 0.16, 0, -28);
@@ -222,6 +185,7 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
             source="homepage"
             title="Get top jobs daily - free"
             subtitle="High-signal roles delivered daily. Unsubscribe anytime."
+            className="rounded-2xl border border-ink/10 bg-white/70 p-2.5 [&_p:nth-of-type(2)]:mt-0.5 [&_form]:mt-2 [&_form]:gap-1.5 [&_input]:py-1.5 [&_button]:py-1.5"
           />
         </div>
         <RotatingSignal />
@@ -705,22 +669,28 @@ function FinalUrgencySection() {
 
 function ExitIntentCapture() {
   const [open, setOpen] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   useEffect(() => {
+    if (dismissed) return;
     const onMouseOut = (e: MouseEvent) => {
+      if (dismissed) return;
       if (e.clientY > 8) return;
       setOpen((prev) => prev || true);
     };
     window.addEventListener("mouseout", onMouseOut);
     return () => window.removeEventListener("mouseout", onMouseOut);
-  }, []);
+  }, [dismissed]);
   if (!open) return null;
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-[min(92vw,420px)] rounded-2xl border border-ink/10 bg-canvas p-3 shadow-xl">
+    <div className="fixed right-4 top-20 z-50 w-[min(92vw,420px)] rounded-2xl border border-ink/10 bg-canvas p-3 shadow-xl">
       <div className="mb-2 flex items-center justify-between">
         <p className="text-xs font-semibold text-ink/70">Before you go</p>
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={() => {
+            setDismissed(true);
+            setOpen(false);
+          }}
           className="text-xs text-ink/50 hover:text-ink"
         >
           close
@@ -730,6 +700,10 @@ function ExitIntentCapture() {
         source="exit_intent"
         title="Don't miss new jobs"
         subtitle="Get a daily shortlist in your inbox."
+        onSubscribeSuccess={() => {
+          setDismissed(true);
+          window.setTimeout(() => setOpen(false), 2400);
+        }}
       />
     </div>
   );
@@ -744,7 +718,6 @@ export default function LandingPage() {
   return (
     <main ref={mainRef} className="relative min-h-screen bg-canvas pt-6 text-ink lg:pl-0">
       <HeroSection progress={scrollYProgress} />
-      <InsiderStrip />
       <PainSection />
       <SolutionSection />
       <PricingSection />

@@ -1,3 +1,4 @@
+import type { SmartApplyStatusSnapshot } from "../lib/api";
 import type { ApplyProfile, ResumeFilePayload } from "../lib/formFiller";
 import type { DetectedField } from "../lib/fieldDetector";
 
@@ -30,6 +31,12 @@ export type SidebarState = {
   fields: FieldState[];
   detectedFields: DetectedField[];
   profile: ApplyProfile | null;
+  /** Loaded from GET `/account/smart-apply/status` when opening ATS sidebar. */
+  smartApplyStatus: SmartApplyStatusSnapshot | null;
+  /** `null` until `chrome.storage.local` is read (`authToken`). */
+  hasAuthToken: boolean | null;
+  /** `true` after the first profile + status fetch for this ATS session finishes. */
+  accountDataLoaded: boolean;
   resumeFile: ResumeFilePayload | null;
   progress: { completed: number; total: number };
   error: string | null;
@@ -94,6 +101,9 @@ const state: SidebarState = {
   fields: [],
   detectedFields: [],
   profile: null,
+  smartApplyStatus: null,
+  hasAuthToken: null,
+  accountDataLoaded: false,
   resumeFile: null,
   progress: { completed: 0, total: 0 },
   error: null,

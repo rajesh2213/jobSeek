@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ApplyProfile } from "../lib/formFiller";
-import { fetchApplyProfile, fetchResumeFile } from "../lib/api";
+import { fetchApplyProfile, fetchResumeFile, fetchSmartApplyStatus } from "../lib/api";
 import { batchAnswer } from "../lib/api";
 import { highlightField } from "../lib/autofill/highlight";
 import { FloatingTrigger } from "./FloatingTrigger";
@@ -15,6 +15,7 @@ import {
   type FieldState,
 } from "./store";
 import type { DetectedField } from "../lib/fieldDetector";
+import { SIDEBAR_PANEL_WIDTH_PX, SIDEBAR_TRANSITION } from "./uiMotion";
 
 function sendRuntime<T>(msg: object): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -77,6 +78,25 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
     return subscribeSidebarState(() => setState({ ...getSidebarState() }));
   }, []);
 
+  /** Keep sidebar in sync when the user signs in from the popup or another tab. */
+  useEffect(() => {
+    const syncAuth = () => {
+      chrome.storage.local.get(["authToken"], (r) => {
+        patchSidebarState({ hasAuthToken: Boolean(r.authToken as string | undefined) });
+      });
+    };
+    syncAuth();
+    const onChanged = (
+      changes: Record<string, chrome.storage.StorageChange>,
+      area: chrome.storage.AreaName,
+    ) => {
+      if (area !== "local" || changes.authToken === undefined) return;
+      syncAuth();
+    };
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => chrome.storage.onChanged.removeListener(onChanged);
+  }, []);
+
   useEffect(() => {
     patchSidebarState({ atsDetected: props.isAtsPage, isVisible: props.isAtsPage });
     if (!props.isAtsPage) return;
@@ -91,11 +111,16 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
       } catch {
         // ignore
       }
-      const raw = await fetchApplyProfile();
-      const resumeFile = await fetchResumeFile();
+      const [raw, resumeFile, smartApplyStatus] = await Promise.all([
+        fetchApplyProfile(),
+        fetchResumeFile(),
+        fetchSmartApplyStatus(),
+      ]);
       patchSidebarState({
         profile: mapProfile(raw),
         resumeFile,
+        smartApplyStatus,
+        accountDataLoaded: true,
       });
     };
     void refresh();
@@ -121,23 +146,49 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
     return () => observer.disconnect();
   }, [props.isAtsPage]);
 
+  /** Re-fetch profile and usage when the panel opens so values update after signing in elsewhere. */
+  useEffect(() => {
+    if (!state.atsDetected || !state.isOpen) return;
+    let cancelled = false;
+    void (async () => {
+      const [raw, resumeFile, smartApplyStatus] = await Promise.all([
+        fetchApplyProfile(),
+        fetchResumeFile(),
+        fetchSmartApplyStatus(),
+      ]);
+      if (cancelled) return;
+      patchSidebarState({
+        profile: mapProfile(raw),
+        resumeFile,
+        smartApplyStatus,
+        accountDataLoaded: true,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [state.isOpen, state.atsDetected]);
+
   useEffect(() => {
     if (!state.atsDetected) return;
     const html = document.documentElement;
-    const body = document.body;
-    const prevHtmlTransition = html.style.transition;
-    const prevBodyTransition = body.style.transition;
-    const prevBodyTransform = body.style.transform;
-    const prevBodyTransformOrigin = body.style.transformOrigin;
-    body.style.transition = "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)";
-    html.style.transition = "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)";
-    body.style.transformOrigin = "center center";
-    body.style.transform = state.isOpen ? "translateX(-56px)" : "";
+    const prevPaddingRight = html.style.paddingRight;
+    const prevOverflowX = html.style.overflowX;
+    const prevTransition = html.style.transition;
+
+    html.style.transition = `padding-right ${SIDEBAR_TRANSITION}`;
+    if (state.isOpen) {
+      html.style.paddingRight = `${SIDEBAR_PANEL_WIDTH_PX}px`;
+      html.style.overflowX = "hidden";
+    } else {
+      html.style.paddingRight = "";
+      html.style.overflowX = "";
+    }
+
     return () => {
-      html.style.transition = prevHtmlTransition;
-      body.style.transition = prevBodyTransition;
-      body.style.transform = prevBodyTransform;
-      body.style.transformOrigin = prevBodyTransformOrigin;
+      html.style.transition = prevTransition;
+      html.style.paddingRight = prevPaddingRight;
+      html.style.overflowX = prevOverflowX;
     };
   }, [state.isOpen, state.atsDetected]);
 
@@ -159,9 +210,17 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
     if (current.isRunning) return;
     if (!current.profile) {
       try {
-        const raw = await fetchApplyProfile();
-        const resumeFile = await fetchResumeFile();
-        patchSidebarState({ profile: mapProfile(raw), resumeFile });
+        const [raw, resumeFile, smartApplyStatus] = await Promise.all([
+          fetchApplyProfile(),
+          fetchResumeFile(),
+          fetchSmartApplyStatus(),
+        ]);
+        patchSidebarState({
+          profile: mapProfile(raw),
+          resumeFile,
+          smartApplyStatus,
+          accountDataLoaded: true,
+        });
       } catch (error) {
         patchSidebarState({
           error: error instanceof Error ? error.message : "Could not load Smart Apply profile",
@@ -176,10 +235,17 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
     }
     if (!current.resumeFile) {
       try {
-        const raw = await fetchApplyProfile();
-        patchSidebarState({ profile: mapProfile(raw) });
-        const resumeFile = await fetchResumeFile();
-        patchSidebarState({ resumeFile });
+        const [raw, resumeFile, smartApplyStatus] = await Promise.all([
+          fetchApplyProfile(),
+          fetchResumeFile(),
+          fetchSmartApplyStatus(),
+        ]);
+        patchSidebarState({
+          profile: mapProfile(raw),
+          resumeFile,
+          smartApplyStatus,
+          accountDataLoaded: true,
+        });
       } catch (error) {
         patchSidebarState({
           error: error instanceof Error ? error.message : "Could not load resume file",
@@ -195,6 +261,18 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
         patchSidebarState({ error: noBytesHint });
         return;
       }
+    }
+    current = getSidebarState();
+    const saPre = current.smartApplyStatus;
+    if (saPre && saPre.profileComplete === false) {
+      patchSidebarState({ error: "Complete your profile in JobLoom first (Smart Apply page)." });
+      return;
+    }
+    if (saPre && typeof saPre.jobsRemaining === "number" && saPre.jobsRemaining <= 0) {
+      patchSidebarState({
+        error: `Daily Smart Apply limit reached. Resets at ${saPre.resetsAt ?? ""}`,
+      });
+      return;
     }
     await rescanFields();
     const total = getSidebarState().detectedFields.length;

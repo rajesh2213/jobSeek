@@ -16,6 +16,7 @@ import {
 } from "../../lib/api";
 import { accentFromId } from "../../lib/accent";
 import { cn } from "../../lib/cn";
+import { signalProgrammaticNavigation } from "../layout/RouteLoader";
 import {
   filtersToCompanyHubSearchParams,
   filtersToSearchParams,
@@ -133,7 +134,9 @@ export function CompanyHubClient({
 
   const navigateHub = useCallback(
     (next: Omit<JobFilters, "companyId">) => {
-      router.push(buildCompanyHubPath(slug, next));
+      const href = buildCompanyHubPath(slug, next);
+      signalProgrammaticNavigation(href);
+      router.push(href);
     },
     [router, slug],
   );

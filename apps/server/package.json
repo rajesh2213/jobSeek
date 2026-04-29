@@ -40,6 +40,7 @@
     "verify:ats-endpoint": "tsx src/scripts/verifyAtsEndpoint.ts",
     "seed": "tsx scripts/seed.companies.ts",
     "seed:csv": "tsx scripts/seedCompaniesFromCSV.ts",
+    "split:company-csv": "node --import tsx scripts/splitCompanyDatasetCsv.ts",
     "reset:fresh": "tsx scripts/reset.fresh.ts",
     "metrics": "tsx src/scripts/metrics.snapshot.ts",
     "metrics:ats": "tsx src/scripts/ats.metrics.snapshot.ts",

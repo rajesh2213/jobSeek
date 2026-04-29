@@ -22,8 +22,9 @@ export function jobAlertEmailHtml(params: {
   searchUrl: string;
   manageUrl: string;
   unsubscribeUrl: string;
+  brandLogoUrl: string;
 }): string {
-  const { userName, searchName, jobCount, jobs, searchUrl, manageUrl, unsubscribeUrl } = params;
+  const { userName, searchName, jobCount, jobs, searchUrl, manageUrl, unsubscribeUrl, brandLogoUrl } = params;
   const coral = "#E8533A";
   const cream = "#F4EFE6";
   const cardBg = "#ffffff";
@@ -57,7 +58,16 @@ export function jobAlertEmailHtml(params: {
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:${cardBg};border-radius:16px;overflow:hidden;border:1px solid rgba(0,0,0,0.06);">
           <tr>
             <td style="padding:24px 24px 8px;">
-              <p style="margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:0.08em;color:${coral};text-transform:uppercase;">JobSeek</p>
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 8px;">
+                <tr>
+                  <td style="vertical-align:middle;padding-right:8px;">
+                    <img src="${esc(brandLogoUrl)}" alt="JobLoom logo" width="22" height="22" style="display:block;border:0;outline:none;text-decoration:none;border-radius:6px;" />
+                  </td>
+                  <td style="vertical-align:middle;">
+                    <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.08em;color:${coral};text-transform:uppercase;">JobLoom</p>
+                  </td>
+                </tr>
+              </table>
               <h1 style="margin:0;font-size:20px;font-weight:600;color:#1a1a1a;">Hi ${esc(userName)}</h1>
               <p style="margin:12px 0 0;font-size:15px;line-height:1.5;color:#444;">
                 ${jobCount} new job${jobCount === 1 ? "" : "s"} match your saved search &ldquo;${esc(searchName)}&rdquo;.

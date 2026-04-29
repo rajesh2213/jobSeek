@@ -47,7 +47,7 @@ function campaignLabel(campaignType: GrowthEmailCampaignType): string {
     case "reengagement":
       return "You may have missed these opportunities";
     case "event_welcome":
-      return "Welcome to JobSeek. Here are jobs to start with.";
+      return "Welcome to JobLoom. Here are jobs to start with.";
     case "event_followup":
       return "More opportunities similar to your recent view";
     case "event_saved_search_suggestions":
@@ -249,6 +249,7 @@ export async function runGrowthEmailCampaign(params: {
       ctaUrl: `${clientPublicUrl().replace(/\/$/, "")}/jobs`,
       managePreferencesUrl: `${clientPublicUrl().replace(/\/$/, "")}/saved-searches`,
       unsubscribeUrl: `${apiPublicUrl().replace(/\/$/, "")}/growth-email/unsubscribe?token=${encodeURIComponent(token)}`,
+      brandLogoUrl: `${clientPublicUrl().replace(/\/$/, "")}/brand/jobloom-logo-prim.png`,
     });
 
     const send = await sendEmail({

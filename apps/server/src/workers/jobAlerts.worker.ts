@@ -138,6 +138,7 @@ async function runJobAlerts(): Promise<{ processed: number; emailsSent: number }
       searchUrl,
       manageUrl,
       unsubscribeUrl,
+      brandLogoUrl: `${clientBase}/brand/jobloom-logo-prim.png`,
     });
 
     const send = await sendJobAlertEmail({

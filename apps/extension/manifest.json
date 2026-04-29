@@ -31,5 +31,11 @@
       "48": "assets/icon-48.png",
       "128": "assets/icon-128.png"
     }
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/logo-prim.png", "assets/icon-16.png", "assets/icon-32.png", "assets/icon-48.png", "assets/icon-128.png"],
+      "matches": ["https://*/*", "http://*/*"]
+    }
+  ]
 }

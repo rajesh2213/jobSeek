@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "../../lib/cn";
 import { useApplications } from "../../lib/applicationsContext";
 import { signInWithNext } from "../../lib/signInUrl";
+import { signalProgrammaticNavigation } from "./RouteLoader";
 
 /** Collapsed width; expands on hover (inactive) or when active. */
 const W_COLLAPSED = "w-[136px]";
@@ -81,11 +82,9 @@ export function SiteSideRail() {
   const goProtected = useCallback(
     (path: string) => {
       if (!authLoaded) return;
-      if (isSignedIn) {
-        router.push(path);
-        return;
-      }
-      router.push(signInWithNext(path));
+      const dest = isSignedIn ? path : signInWithNext(path);
+      signalProgrammaticNavigation(dest);
+      router.push(dest);
     },
     [authLoaded, isSignedIn, router],
   );

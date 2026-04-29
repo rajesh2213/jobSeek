@@ -1,0 +1,5 @@
+export const SIDEBAR_PANEL_WIDTH_PX = 420;
+
+export const SIDEBAR_TRANSITION_MS = 220;
+export const SIDEBAR_TRANSITION_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
+export const SIDEBAR_TRANSITION = `${SIDEBAR_TRANSITION_MS}ms ${SIDEBAR_TRANSITION_EASE}`;

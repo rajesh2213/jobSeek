@@ -1,7 +1,5 @@
 /**
- * User-local copy for “quota resets at …” lines. Uses the browser’s time zone
- * (the user’s region) instead of a fixed UTC label or a raw offset like "GMT+5:30"
- * from {@link Intl} `timeZoneName: "short"`.
+ * User-local copy for “quota resets at …” lines.
  */
 
 /** Wall-clock time in the user’s local time zone. */
@@ -18,14 +16,13 @@ export function formatUserLocalResetDateTime(iso: string): string {
 }
 
 /**
- * A regional / named zone (e.g. "India Standard Time", "Eastern Time"), not
- * a numeric GMT offset, when the engine supports it.
+ * Prefer short timezone labels (e.g. "IST", "EST", "PDT").
  */
 export function getUserLocalTimeZoneLabel(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
 
-  for (const timeZoneName of ["longGeneric", "long"] as const) {
+  for (const timeZoneName of ["short", "shortGeneric"] as const) {
     try {
       const part = new Intl.DateTimeFormat(undefined, { timeZoneName })
         .formatToParts(d)
@@ -37,7 +34,7 @@ export function getUserLocalTimeZoneLabel(iso: string): string {
     }
   }
 
-  return Intl.DateTimeFormat().resolvedOptions().timeZone.replace(/_/g, " ");
+  return "";
 }
 
 /** Single line for toasts / API errors: local time + regional zone name. */

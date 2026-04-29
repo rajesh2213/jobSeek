@@ -12,14 +12,17 @@ export interface TimeAdvantageSimulatorProps {
   jobsPostedThisWeek?: number;
   /** Shown to the left of the LinkedIn / jobs-this-week pills (e.g. Smart Apply). */
   statRowPrefix?: ReactNode;
+  /** Optional compact block to the right of the stats strip (e.g. email signup). */
+  heroAside?: ReactNode;
 }
 
 /**
- * Jobs page hero — full-width headline; subline on one row; “Stay early” + both stat pills on the next.
+ * Jobs page hero — full-width headline; stats strip + optional aside (email capture) on the next block.
  */
 export function TimeAdvantageSimulator({
   jobsPostedThisWeek,
   statRowPrefix,
+  heroAside,
 }: TimeAdvantageSimulatorProps) {
   const prefersReducedMotion = useReducedMotion();
 
@@ -51,6 +54,7 @@ export function TimeAdvantageSimulator({
           variant="hero-split"
           jobsPostedThisWeek={jobsPostedThisWeek}
           className="mb-0 mt-4"
+          heroAside={heroAside}
           heroStatRowPrefix={statRowPrefix}
           heroFirstRowLeading={
             <p className="min-w-0 max-w-2xl shrink-0 text-[15px] leading-snug text-ink/55 sm:max-w-none sm:text-base">
