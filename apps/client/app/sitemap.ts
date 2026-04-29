@@ -46,7 +46,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     for (;;) {
       const jobs = await fetchJobs(
         { page, limit },
-        { internalSeoSecret },
+        { internalSeoSecret, ssrPage: "sitemap" },
       );
       for (const job of jobs.data) {
         jobEntries.push({
@@ -70,7 +70,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     let page = 1;
     const limit = 100;
     for (;;) {
-      const res = await fetchCompanies({ page, limit, sort: "jobs" });
+      const res = await fetchCompanies({ page, limit, sort: "jobs", ssrPage: "sitemap" });
       for (const c of res.data) {
         if ((c.jobCount ?? 0) >= 1) {
           companyEntries.push({

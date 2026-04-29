@@ -782,6 +782,8 @@ export async function fetchJobs(
     internalSeoSecret?: string | null;
     /** Server-side only: pass through client IP chain to API for anon caps. */
     forwardedFor?: string | null;
+    /** Server-side callsite label for SSR attribution. */
+    ssrPage?: string;
   },
 ): Promise<JobsApiResponse> {
   const params = buildJobDiscoverySearchParams(filters, { includeCompanyId: true });
@@ -798,6 +800,10 @@ export async function fetchJobs(
   }
   const forwardedFor = opts?.forwardedFor?.trim();
   if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
+  if (typeof window === "undefined") {
+    headers.set("x-ssr-origin", "next-server");
+    headers.set("x-ssr-page", opts?.ssrPage?.trim() || "jobs");
+  }
 
   /** Metered discovery must not be cached by Next (stale caps / double-count risk). */
   const fetchOptions: RequestInit & { next?: { revalidate?: number } } = internalBypass
@@ -1000,6 +1006,8 @@ export async function fetchCompanies(options: {
   sort?: CompaniesSort;
   hiring?: boolean;
   remote?: boolean;
+  /** Server-side callsite label for SSR attribution. */
+  ssrPage?: string;
 } = {}): Promise<CompaniesApiResponse> {
   const params = new URLSearchParams();
   if (options.page) params.set("page", String(options.page));
@@ -1011,9 +1019,14 @@ export async function fetchCompanies(options: {
   const qs = params.toString();
   const url = `${API_BASE_URL}/companies${qs ? `?${qs}` : ""}`;
   const isServer = typeof window === "undefined";
+  const headers = new Headers();
+  if (isServer) {
+    headers.set("x-ssr-origin", "next-server");
+    headers.set("x-ssr-page", options.ssrPage?.trim() || "companies");
+  }
   const reqInit: RequestInit & { next?: { revalidate?: number } } = isServer
-    ? { next: { revalidate: 60 } }
-    : { cache: "no-store" };
+    ? { headers, next: { revalidate: 60 } }
+    : { headers, cache: "no-store" };
   debugFastifyFetch({
     route: "/companies",
     url,
@@ -1051,6 +1064,8 @@ export async function fetchCompanyJobs(
     token?: string | null;
     /** Server-side only: pass through client IP chain to API for anon caps. */
     forwardedFor?: string | null;
+    /** Server-side callsite label for SSR attribution. */
+    ssrPage?: string;
   } = {},
 ): Promise<JobsApiResponse> {
   const page = options.page ?? 1;
@@ -1069,6 +1084,10 @@ export async function fetchCompanyJobs(
   if (t) headers.set("Authorization", `Bearer ${t}`);
   const forwardedFor = options.forwardedFor?.trim();
   if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
+  if (typeof window === "undefined") {
+    headers.set("x-ssr-origin", "next-server");
+    headers.set("x-ssr-page", options.ssrPage?.trim() || "company");
+  }
   debugFastifyFetch({
     route: "/company/:slug/jobs",
     url,
