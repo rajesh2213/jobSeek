@@ -455,7 +455,6 @@ export function CompanyHubClient({
                   listMeta.resetAt &&
                   listJobs.length > 0 &&
                   (discoveryPhase === "search" ||
-                    discoveryPhase === "bonus" ||
                     discoveryPhase === "preview" ||
                     discoveryPhase === undefined),
               );
@@ -467,12 +466,7 @@ export function CompanyHubClient({
                 hardMode && discoveryPhase === "preview"
                   ? listJobs.slice(0, FREE_DISCOVERY_PREVIEW_JOB_ROWS)
                   : listJobs;
-              const wallPhase =
-                discoveryPhase === "bonus"
-                  ? "bonus"
-                  : discoveryPhase === "preview"
-                    ? "preview"
-                    : "search";
+              const wallPhase = discoveryPhase === "preview" ? "preview" : "search";
               return (
                 <>
                   <section className="mt-8 flex flex-col gap-5" aria-label="Open roles">

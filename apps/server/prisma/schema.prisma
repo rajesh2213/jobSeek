@@ -225,9 +225,6 @@ model User {
   stripeCustomerId   String?        @unique
   jobViewsToday      Int            @default(0)
   jobViewsResetAt    DateTime       @default(now())
-  /// Discovery list (GET /jobs): 0–2 "searches" per UTC day, then optional bonus batch.
-  discoverySearchesToday Int      @default(0)
-  discoveryBonusFiveUsed Boolean  @default(false)
   resumeText           String?      // parsed plain text
   resumeFileKey        String?      // object storage key for resume bytes
   resumeFileName       String?      // original filename

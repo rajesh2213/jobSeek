@@ -14,11 +14,11 @@ export function JobsListingFaq() {
           </dd>
         </div>
         <div>
-          <dt className="font-semibold text-ink">How do free discovery searches and limits work?</dt>
+          <dt className="font-semibold text-ink">How do free browsing limits work?</dt>
           <dd className="mt-1">
-            On Free you get up to two discovery searches per day. Each search shows up to ten roles that match
-            your filters. After that allowance is used, you only see a short preview of the list (the rest stays
-            blurred) until your quota resets, or you can upgrade to Pro for unlimited browsing and the full live
+            Free includes a shared daily budget for job list rows across job search and company pages.
+            After the daily budget is used, page 1 shows only a short preview of each list and the rest
+            stays blurred until reset, or you can upgrade to Pro for unlimited browsing and the full live
             list.
           </dd>
         </div>

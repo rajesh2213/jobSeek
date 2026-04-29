@@ -102,7 +102,7 @@ export function isJobReady(job: Pick<JobItem, "status" | "parsedDescription">): 
   return job.parsedDescription != null;
 }
 
-export type DiscoveryListPhase = "search" | "bonus" | "preview";
+export type DiscoveryListPhase = "search" | "preview";
 
 export interface JobsApiResponse {
   data: JobItem[];
@@ -121,8 +121,6 @@ export interface JobsApiResponse {
     viewCapUnlimited?: boolean;
     /** Free-tier discovery list metering (from GET /jobs meta). */
     discoveryPhase?: DiscoveryListPhase;
-    discoverySearchesRemaining?: number;
-    bonusBatchRemaining?: number;
     limit?: {
       mode: "soft" | "hard";
       remaining: number | null;

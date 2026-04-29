@@ -189,8 +189,6 @@ export function registerCompanyRoutes(
       const out = await runMeteredJobsList(server.prisma, redis, capCtx, bypassCap, {
         page,
         limit,
-        discoveryDebit: true,
-        bonusSurface: "browse",
         fetchList: async (effectiveLimit) => {
           const bundle = await companyService.getCompanyJobs(slug, {
             page,

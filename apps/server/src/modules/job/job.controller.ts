@@ -4,11 +4,7 @@ import type { JobWithCompany } from "./job.repository.js";
 import { JobService } from "./job.service.js";
 import { getJobsQuerySchema, getJobParamsSchema } from "./job.schema.js";
 import type { ApiError } from "../../types/api.js";
-import {
-  hasDiscoveryMeteringFilters,
-  hasDiscoveryQueryIntent,
-  parseJobDiscoveryQuery,
-} from "../../utils/taxonomyQuery.js";
+import { parseJobDiscoveryQuery } from "../../utils/taxonomyQuery.js";
 import {
   toJobDetailJson,
   toJobListJson,
@@ -98,15 +94,10 @@ export function registerJobRoutes(
 
       const filters = parseJobDiscoveryQuery(q);
       request.log.debug({ filters }, "jobs_query_filters");
-      const surfaceRaw = String(q.surface ?? "browse").toLowerCase();
-      const bonusSurface = surfaceRaw === "seo" ? "seo" : "browse";
       const sortRaw = String(q.sort ?? "latest");
       const sort: "latest" | "salary_desc" =
         sortRaw === "salary_desc" || sortRaw === "salary" ? "salary_desc" : "latest";
       const includeProcessing = parseQueryBool(q.includeProcessing);
-
-      const discoveryDebit =
-        hasDiscoveryMeteringFilters(filters) || hasDiscoveryQueryIntent(q);
 
       const bypassCap = isViewCapBypassRequest(request);
       const capCtx = await buildCapContextFromRequest(server.prisma, request);
@@ -158,8 +149,6 @@ export function registerJobRoutes(
           page,
           limit: meteredLimit,
           offset,
-          discoveryDebit,
-          bonusSurface,
           fetchList: (effectiveLimit) =>
             jobService.list({
               page,
@@ -183,9 +172,9 @@ export function registerJobRoutes(
           "jobs_cache_status",
         );
       } else {
-        const cacheableJobsList = isAnonymous && !discoveryDebit;
+        const cacheableJobsList = false;
         const cacheBypassReason = cacheableJobsList
-          ? "anonymous_non_metered_discovery"
+          ? "anonymous_public_listing"
           : capCtx.internalUserId != null || hasAuthHeader
             ? "authenticated_request"
             : "metered_or_personalized";
@@ -204,10 +193,7 @@ export function registerJobRoutes(
           limit: meteredLimit,
           page,
           capApplied: Boolean(
-            discoveryDebit &&
-              page === 1 &&
-              !bypassCap &&
-              !out.meta.viewCapUnlimited,
+            !bypassCap && !out.meta.viewCapUnlimited,
           ),
         },
         "jobs_metering_enforced",

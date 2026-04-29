@@ -143,40 +143,26 @@ function DiscoveryMeterCell({
 
 function FreeDiscoveryQuotaStrip({
   listMeta,
-  urlFilters,
 }: {
   listMeta: NonNullable<JobsApiResponse["meta"]>;
-  urlFilters: JobFilters;
 }) {
   if (listMeta.viewCapUnlimited !== false) return null;
 
   const isPreview =
     listMeta.discoveryPhase === "preview" || listMeta.capReached;
-  const isBonus = listMeta.discoveryPhase === "bonus";
-  const rem = listMeta.discoverySearchesRemaining ?? 0;
+  const rem = Math.max(0, listMeta.remaining ?? 0);
   const resetAt = listMeta.resetAt;
   const resetDateTime = resetAt ? formatUserLocalResetDateTime(resetAt) : null;
   const resetTz = resetAt ? getUserLocalTimeZoneLabel(resetAt) : "";
-
-  const noDebitHint =
-    !hasActiveJobFilters(urlFilters) && !isPreview && !isBonus
-      ? "Add filters or change sort to use a discovery credit"
-      : undefined;
 
   const shell = cn(
     "inline-flex max-w-full items-stretch overflow-x-auto rounded-2xl border border-ink/[0.07] text-ink",
     "bg-gradient-to-br from-white via-[#fffaf8] to-[#f3f0ea]",
     "shadow-[0_16px_50px_-28px_rgba(0,0,0,0.12)] ring-1 ring-black/[0.03]",
-    noDebitHint && "ring-amber-400/25",
   );
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      title={noDebitHint}
-      className={shell}
-    >
+    <div role="status" aria-live="polite" className={shell}>
       <div className="flex shrink-0 flex-col justify-center border-r border-ink/[0.06] bg-white/40 px-3 py-2.5 sm:px-3.5">
         <p className="text-xs font-bold uppercase tracking-[0.14em] text-ink/38">
           Free
@@ -184,13 +170,10 @@ function FreeDiscoveryQuotaStrip({
       </div>
       {isPreview ? (
         <>
-          <DiscoveryMeterCell
-            label="Searches left"
-            secondary={`×${FREE_DISCOVERY.jobsPerSearch} jobs per search`}
-          >
+          <DiscoveryMeterCell label="Jobs left today">
             <span className="text-brand tabular-nums">{rem}</span>
             <span className="text-ink/35"> / </span>
-            <span className="tabular-nums">{FREE_DISCOVERY.searches}</span>
+            <span className="tabular-nums">{FREE_DISCOVERY.dailyJobs}</span>
           </DiscoveryMeterCell>
           {quotaDivider()}
           <DiscoveryMeterCell label="Now showing" accent>
@@ -219,28 +202,16 @@ function FreeDiscoveryQuotaStrip({
             </>
           ) : null}
         </>
-      ) : isBonus ? (
-        <div className="flex items-baseline gap-2 px-3 py-2.5 sm:px-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink/45">
-            Last batch
-          </p>
-          <span className="font-sans text-xs font-bold tabular-nums tracking-wide text-ink">
-            +5 roles
-          </span>
-        </div>
       ) : (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:gap-x-4 sm:px-3.5 sm:pr-4">
           <div className="flex min-w-0 flex-col gap-0.5">
             <p className="text-xs font-semibold uppercase tracking-wide text-ink/45">
-              Searches left
+              Jobs left today
             </p>
             <p className="font-sans text-xs font-bold tabular-nums leading-none tracking-wide text-ink">
               <span className="text-brand">{rem}</span>
               <span className="text-ink/35"> / </span>
-              <span>{FREE_DISCOVERY.searches}</span>
-            </p>
-            <p className="text-[10px] font-semibold leading-tight tracking-wide text-ink/45">
-              ×{FREE_DISCOVERY.jobsPerSearch} jobs per search
+              <span>{FREE_DISCOVERY.dailyJobs}</span>
             </p>
           </div>
           <div
@@ -255,17 +226,6 @@ function FreeDiscoveryQuotaStrip({
               {FREE_DISCOVERY_PREVIEW_JOB_ROWS} preview
             </p>
           </div>
-          {listMeta.bonusBatchRemaining === 1 ? (
-            <>
-              <div
-                className="hidden h-8 w-px bg-ink/[0.08] lg:block"
-                aria-hidden
-              />
-              <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">
-                +5 on SEO hubs
-              </p>
-            </>
-          ) : null}
         </div>
       )}
     </div>
@@ -1349,7 +1309,7 @@ export function JobsSearchClient({
             </div>
             <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:shrink-0 sm:gap-3">
               {!isPro && listMeta && listMeta.viewCapUnlimited === false ? (
-                <FreeDiscoveryQuotaStrip listMeta={listMeta} urlFilters={urlFilters} />
+                <FreeDiscoveryQuotaStrip listMeta={listMeta} />
               ) : null}
               <div className="min-w-0 sm:min-w-[220px]">
                 <SortSegmented
@@ -1396,34 +1356,6 @@ export function JobsSearchClient({
             </p>
           ) : null}
           <FilterChips filters={urlFilters} onRemoveChip={onRemoveChip} />
-          {!isPro &&
-          !listMeta?.viewCapUnlimited &&
-          listMeta?.bonusBatchRemaining === 1 &&
-          listMeta?.discoverySearchesRemaining === 0 &&
-          listMeta?.discoveryPhase === "search" ? (
-            <div
-              role="status"
-              className="mt-3 rounded-xl border border-teal/30 bg-teal/10 px-4 py-3 text-sm text-ink"
-            >
-              <p className="font-semibold text-ink">One short batch left today</p>
-              <p className="mt-1 text-xs leading-relaxed text-ink/75">
-                Run one more search (same or new filters) to see up to{" "}
-                <span className="font-semibold">5 more roles</span> — your last free
-                glimpse before the paywall.
-              </p>
-            </div>
-          ) : null}
-          {listMeta?.discoveryPhase === "bonus" && !isPro && !listMeta?.viewCapUnlimited ? (
-            <div
-              role="status"
-              className="mt-3 rounded-xl border border-brand/25 bg-brand/5 px-4 py-3 text-sm text-ink"
-            >
-              <p className="font-semibold text-ink">Last free batch for today</p>
-              <p className="mt-1 text-xs text-ink/75">
-                Up to 5 roles below. Upgrade for unlimited browsing tomorrow.
-              </p>
-            </div>
-          ) : null}
           {!isPro && listMeta?.limit?.warning ? (
             <div
               role="status"
@@ -1509,7 +1441,6 @@ export function JobsSearchClient({
               !noMatches &&
               listJobs.length > 0 &&
               (discoveryPhase === "search" ||
-                discoveryPhase === "bonus" ||
                 discoveryPhase === "preview" ||
                 discoveryPhase === undefined),
           );
@@ -1556,12 +1487,7 @@ export function JobsSearchClient({
             hardMode && discoveryPhase === "preview"
               ? listJobs.slice(0, FREE_DISCOVERY_PREVIEW_JOB_ROWS)
               : listJobs;
-          const wallPhase =
-            discoveryPhase === "bonus"
-              ? "bonus"
-              : discoveryPhase === "preview"
-                ? "preview"
-                : "search";
+          const wallPhase = discoveryPhase === "preview" ? "preview" : "search";
           return (
             <>
               {listJobs.length > 0 ? (

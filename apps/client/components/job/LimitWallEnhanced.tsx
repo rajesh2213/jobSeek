@@ -153,7 +153,7 @@ function LockIconCoral({ size = 28 }: { size?: number }) {
   );
 }
 
-export type DiscoveryWallPhase = "search" | "bonus" | "preview";
+export type DiscoveryWallPhase = "search" | "preview";
 
 interface Props {
   resetAt: string;
@@ -252,16 +252,12 @@ export function LimitWallEnhanced({
   const headline =
     phase === "preview"
       ? "You're out of free discovery for today"
-      : phase === "bonus"
-        ? "Last free batch — still a capped slice"
-        : "Most matches are still hidden on Free";
+      : "Most matches are still hidden on Free";
 
   const subcopy =
     phase === "preview"
       ? "Only a tiny preview stays visible above — the rest of the list stays blurred until you upgrade or your limit resets."
-      : phase === "bonus"
-        ? "Up to five roles in this batch. Pro unlocks the full list and live updates."
-        : "You're browsing a short slice of what exists. Pro shows the full list as it changes.";
+      : "You're browsing a short slice of what exists. Pro shows the full list as it changes.";
 
   return (
     <div

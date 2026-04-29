@@ -9,21 +9,12 @@ export const FREE_DAILY_JOBS = intFromEnv(
   75,
 );
 
-const _FREE_DISCOVERY_SEARCHES = intFromEnv(
-  process.env.NEXT_PUBLIC_FREE_DISCOVERY_SEARCHES,
-  5,
-);
-const _FREE_DISCOVERY_ROWS_PER_SEARCH = intFromEnv(
-  process.env.NEXT_PUBLIC_FREE_DISCOVERY_ROWS_PER_SEARCH,
-  20,
-);
 const _FREE_DISCOVERY_PREVIEW_ROWS = intFromEnv(
   process.env.NEXT_PUBLIC_FREE_DISCOVERY_PREVIEW_ROWS,
   10,
 );
 export const FREE_DISCOVERY = {
-  searches: _FREE_DISCOVERY_SEARCHES,
-  jobsPerSearch: _FREE_DISCOVERY_ROWS_PER_SEARCH,
+  dailyJobs: FREE_DAILY_JOBS,
   /** Teaser rows after daily discovery is exhausted. */
   previewRows: _FREE_DISCOVERY_PREVIEW_ROWS,
 } as const;
@@ -31,7 +22,7 @@ export const FREE_DISCOVERY = {
 /** @deprecated use FREE_DISCOVERY.previewRows */
 export const FREE_DISCOVERY_PREVIEW_JOB_ROWS = FREE_DISCOVERY.previewRows;
 
-/** Full job post opens per UTC day — same pool size as list cap (20). */
+/** Full job post opens per UTC day — same pool size as list cap. */
 export const FREE_DAILY_JOB_POST_VIEWS = FREE_DAILY_JOBS;
 
 export const PLAN_LIMITS = {

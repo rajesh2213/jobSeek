@@ -2,19 +2,10 @@ import type { PrismaClient } from "@prisma/client";
 import type { Redis } from "ioredis";
 import type { FastifyRequest } from "fastify";
 import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
-import { getJobViewCapState } from "./viewCap.service.js";
+import { checkAndIncrementViewCap, getJobViewCapState } from "./viewCap.service.js";
 import type { PaginatedResult } from "../../types/api.js";
 import { LIMITS, type CapMode } from "../../config/limits.js";
-import {
-  DISCOVERY_PREVIEW_ROWS,
-  FREE_DISCOVERY_BONUS_ROWS,
-  FREE_DISCOVERY_ROWS_PER_SEARCH,
-  FREE_DISCOVERY_SEARCHES,
-  getDiscoveryListState,
-  incrementDiscoverySearch,
-  isDiscoveryBonusFiveEnabled,
-  markDiscoveryBonusUsed,
-} from "./discoveryCap.js";
+import { DISCOVERY_PREVIEW_ROWS } from "./discoveryCap.js";
 import { logger } from "../../utils/logger.js";
 
 export interface CapContext {
@@ -23,7 +14,7 @@ export interface CapContext {
   userEmail: string | null;
 }
 
-export type DiscoveryPhase = "search" | "bonus" | "preview";
+export type DiscoveryPhase = "search" | "preview";
 
 export interface MeteredJobsListMeta {
   page: number;
@@ -41,8 +32,6 @@ export interface MeteredJobsListMeta {
   viewCapUnlimited: boolean;
   /** Free-tier discovery metering (omit when Pro / bypass). */
   discoveryPhase?: DiscoveryPhase;
-  discoverySearchesRemaining?: number;
-  bonusBatchRemaining?: number;
   limit: {
     mode: CapMode;
     remaining: number | null;
@@ -105,13 +94,6 @@ export async function buildCapContextFromRequest(
   };
 }
 
-function discoveryCtx(capCtx: CapContext) {
-  return {
-    internalUserId: capCtx.internalUserId,
-    ip: capCtx.ip,
-  };
-}
-
 function metaBase(
   result: PaginatedResult<unknown>,
   offset: number | undefined,
@@ -142,16 +124,6 @@ function metaBase(
   };
 }
 
-function bonusBatchRemaining(
-  bonusOn: boolean,
-  bonusSurface: "browse" | "seo",
-  disc: Awaited<ReturnType<typeof getDiscoveryListState>>,
-): number {
-  if (!bonusOn || bonusSurface !== "seo") return 0;
-  if (disc.searchesUsed < FREE_DISCOVERY_SEARCHES || disc.bonusUsed) return 0;
-  return 1;
-}
-
 function limitMeta(input: {
   mode: CapMode;
   remaining: number | null;
@@ -169,8 +141,8 @@ function limitMeta(input: {
 
 /**
  * Shared metering for any paginated job list (discovery `/jobs`, company-scoped lists, etc.).
- * Limits are env-driven via `LIMITS.DISCOVERY`; page-1 debits when `discoveryDebit`.
- * Bonus rows apply on SEO surface when enabled and unused.
+ * Free tier uses a single UTC-daily row budget (`FREE_TIER_DAILY_LIMIT`) across all list pages.
+ * After exhaustion in hard mode: page 1 returns preview rows, page 2+ is blocked.
  */
 export async function runMeteredJobsList<T>(
   prisma: PrismaClient,
@@ -182,13 +154,6 @@ export async function runMeteredJobsList<T>(
     offset?: number;
     page: number;
     fetchList: (effectiveLimit: number) => Promise<PaginatedResult<T>>;
-    /**
-     * When false, page-1 does not consume a discovery search (unfiltered `/jobs` landing).
-     * Company hubs should pass true so scoped lists always meter.
-     */
-    discoveryDebit?: boolean;
-    /** Bonus 5-row batch applies only on programmatic SEO slug pages (`surface=seo`). */
-    bonusSurface?: "browse" | "seo";
   },
 ): Promise<{ items: T[]; meta: MeteredJobsListMeta }> {
   const logMeteringCheck = (input: {
@@ -208,8 +173,6 @@ export async function runMeteredJobsList<T>(
   };
   const { limit, offset, fetchList } = args;
   const page = Math.max(1, args.page);
-  const discoveryDebit = args.discoveryDebit !== false;
-  const bonusSurface = args.bonusSurface ?? "browse";
 
   if (bypassCap) {
     logMeteringCheck({
@@ -266,22 +229,9 @@ export async function runMeteredJobsList<T>(
     };
   }
 
-  const dctx = discoveryCtx(capCtx);
-  let disc = await getDiscoveryListState(prisma, redis, dctx);
-  const bonusOn =
-    isDiscoveryBonusFiveEnabled() && FREE_DISCOVERY_BONUS_ROWS > 0;
-  const bonusEligible = bonusOn && bonusSurface === "seo";
-
-  const fullyExhausted =
-    disc.searchesUsed >= FREE_DISCOVERY_SEARCHES &&
-    (!bonusEligible || disc.bonusUsed);
-
-  const searchesRem = Math.max(0, FREE_DISCOVERY_SEARCHES - disc.searchesUsed);
-  const bonusRem = bonusBatchRemaining(bonusOn, bonusSurface, disc);
-
   const emptyPreviewMeta = (
     totalMatching: number,
-    resetAt: Date,
+    resetAtIso: string,
   ): MeteredJobsListMeta => ({
     page,
     pageSize: limit,
@@ -295,20 +245,18 @@ export async function runMeteredJobsList<T>(
     hasMore: false,
     capReached: true,
     remaining: 0,
-    resetAt: resetAt.toISOString(),
+    resetAt: resetAtIso,
     totalHidden: Math.max(0, totalMatching - DISCOVERY_PREVIEW_ROWS),
     viewCapUnlimited: false,
     discoveryPhase: "preview",
-    discoverySearchesRemaining: 0,
-    bonusBatchRemaining: 0,
     limit: limitMeta({
       mode: LIMITS.MODE,
       remaining: 0,
-      resetAt: resetAt.toISOString(),
+      resetAt: resetAtIso,
     }),
   });
 
-  const blockedPageMeta = (): MeteredJobsListMeta => ({
+  const blockedPageMeta = (remaining: number): MeteredJobsListMeta => ({
     page,
     pageSize: limit,
     total: 0,
@@ -319,78 +267,51 @@ export async function runMeteredJobsList<T>(
         ? offset
         : (page - 1) * limit,
     hasMore: false,
-    capReached: fullyExhausted,
-    remaining: fullyExhausted ? 0 : searchesRem + bonusRem,
-    resetAt: disc.resetAt.toISOString(),
+    capReached: remaining <= 0,
+    remaining: Math.max(0, remaining),
+    resetAt: capState.resetAt.toISOString(),
     viewCapUnlimited: false,
-    discoveryPhase: fullyExhausted ? "preview" : "search",
-    discoverySearchesRemaining: fullyExhausted ? 0 : searchesRem,
-    bonusBatchRemaining: fullyExhausted ? 0 : bonusRem,
+    discoveryPhase: remaining <= 0 ? "preview" : "search",
     limit: limitMeta({
       mode: LIMITS.MODE,
-      remaining: fullyExhausted ? 0 : searchesRem + bonusRem,
-      resetAt: disc.resetAt.toISOString(),
+      remaining: Math.max(0, remaining),
+      resetAt: capState.resetAt.toISOString(),
     }),
   });
 
   if (LIMITS.MODE === "soft") {
-    const capAppliedSoft = page === 1 && discoveryDebit;
-    if (page === 1 && discoveryDebit) {
-      if (disc.searchesUsed < FREE_DISCOVERY_SEARCHES) {
-        disc = await incrementDiscoverySearch(prisma, redis, dctx);
-      } else if (
-        bonusEligible &&
-        !disc.bonusUsed &&
-        disc.searchesUsed >= FREE_DISCOVERY_SEARCHES
-      ) {
-        await markDiscoveryBonusUsed(prisma, redis, dctx);
-        disc = await getDiscoveryListState(prisma, redis, dctx);
-      }
-    }
-
-    const searchesRemAfter = Math.max(0, FREE_DISCOVERY_SEARCHES - disc.searchesUsed);
-    const bonusRemAfter = bonusBatchRemaining(bonusOn, bonusSurface, disc);
-    const isExhaustedSoft =
-      disc.searchesUsed >= FREE_DISCOVERY_SEARCHES &&
-      (!bonusEligible || disc.bonusUsed);
     const result = await fetchList(limit);
+    const debit = await checkAndIncrementViewCap(prisma, redis, capCtx, result.items.length);
     const base = metaBase(result, offset, limit);
-    const remainingSoft = searchesRemAfter + bonusRemAfter;
+    const remainingSoft = Math.max(0, debit.remaining);
     logMeteringCheck({
       isCapped: remainingSoft <= 0,
       isFreeUser: true,
       isProUser: false,
-      capApplied: capAppliedSoft,
+      capApplied: result.items.length > 0,
       limitAdjusted: false,
     });
-    const phaseSoft: DiscoveryPhase = isExhaustedSoft
-      ? "preview"
-      : bonusEligible && disc.bonusUsed && disc.searchesUsed >= FREE_DISCOVERY_SEARCHES
-        ? "bonus"
-        : "search";
     return {
       items: result.items,
       meta: {
         ...base,
         capReached: remainingSoft <= 0,
         remaining: remainingSoft,
-        resetAt: disc.resetAt.toISOString(),
+        resetAt: debit.resetAt.toISOString(),
         totalHidden: 0,
         viewCapUnlimited: false,
-        discoveryPhase: phaseSoft,
-        discoverySearchesRemaining: searchesRemAfter,
-        bonusBatchRemaining: bonusRemAfter,
+        discoveryPhase: "search",
         limit: limitMeta({
           mode: LIMITS.MODE,
           remaining: remainingSoft,
-          resetAt: disc.resetAt.toISOString(),
+          resetAt: debit.resetAt.toISOString(),
         }),
       },
     };
   }
 
-  // Free tier: no extra pages beyond metered slices (blocks "Load more" pagination).
-  if (fullyExhausted && page > 1) {
+  // Hard mode: after exhaustion, block page 2+.
+  if (capState.remaining <= 0 && page > 1) {
     logMeteringCheck({
       isCapped: true,
       isFreeUser: true,
@@ -400,11 +321,12 @@ export async function runMeteredJobsList<T>(
     });
     return {
       items: [] as T[],
-      meta: emptyPreviewMeta(0, disc.resetAt),
+      meta: emptyPreviewMeta(0, capState.resetAt.toISOString()),
     };
   }
 
-  if (fullyExhausted && page === 1) {
+  // Hard mode: after exhaustion, keep page 1 preview.
+  if (capState.remaining <= 0 && page === 1) {
     const previewLimit = Math.min(limit, DISCOVERY_PREVIEW_ROWS);
     logMeteringCheck({
       isCapped: true,
@@ -423,139 +345,57 @@ export async function runMeteredJobsList<T>(
         hasMore: false,
         capReached: true,
         remaining: 0,
-        resetAt: disc.resetAt.toISOString(),
+        resetAt: capState.resetAt.toISOString(),
         totalHidden: Math.max(0, totalMatching - DISCOVERY_PREVIEW_ROWS),
         viewCapUnlimited: false,
         discoveryPhase: "preview",
-        discoverySearchesRemaining: 0,
-        bonusBatchRemaining: 0,
         limit: limitMeta({
           mode: LIMITS.MODE,
           remaining: 0,
-          resetAt: disc.resetAt.toISOString(),
+          resetAt: capState.resetAt.toISOString(),
         }),
       },
     };
   }
 
-  if (page > 1) {
+  // Hard mode + remaining budget: every returned row decrements the same daily pool.
+  const effectiveLimit = Math.min(limit, Math.max(0, capState.remaining));
+  if (effectiveLimit <= 0) {
     logMeteringCheck({
-      isCapped: false,
+      isCapped: true,
       isFreeUser: true,
       isProUser: false,
       capApplied: true,
       limitAdjusted: true,
     });
-    return {
-      items: [] as T[],
-      meta: blockedPageMeta(),
-    };
+    return { items: [] as T[], meta: blockedPageMeta(0) };
   }
 
-  // Page 1 only below.
-
-  if (!discoveryDebit) {
-    const eff = Math.min(limit, FREE_DISCOVERY_ROWS_PER_SEARCH);
-    logMeteringCheck({
-      isCapped: false,
-      isFreeUser: true,
-      isProUser: false,
-      capApplied: false,
-      limitAdjusted: eff !== limit,
-    });
-    const result = await fetchList(eff);
-    const base = metaBase(result, offset, limit);
-    return {
-      items: result.items,
-      meta: {
-        ...base,
-        hasMore: false,
-        capReached: false,
-        remaining: searchesRem + bonusRem,
-        resetAt: disc.resetAt.toISOString(),
-        viewCapUnlimited: false,
-        discoveryPhase: "search",
-        discoverySearchesRemaining: searchesRem,
-        bonusBatchRemaining: bonusRem,
-        limit: limitMeta({
-          mode: LIMITS.MODE,
-          remaining: searchesRem + bonusRem,
-          resetAt: disc.resetAt.toISOString(),
-        }),
-      },
-    };
-  }
-
-  if (disc.searchesUsed < FREE_DISCOVERY_SEARCHES) {
-    const eff = Math.min(limit, FREE_DISCOVERY_ROWS_PER_SEARCH);
-    logMeteringCheck({
-      isCapped: false,
-      isFreeUser: true,
-      isProUser: false,
-      capApplied: true,
-      limitAdjusted: eff !== limit,
-    });
-    const result = await fetchList(eff);
-    disc = await incrementDiscoverySearch(prisma, redis, dctx);
-    const base = metaBase(result, offset, limit);
-    const searchesRemAfter = Math.max(0, FREE_DISCOVERY_SEARCHES - disc.searchesUsed);
-    const bonusRemAfter = bonusBatchRemaining(bonusOn, bonusSurface, disc);
-    return {
-      items: result.items,
-      meta: {
-        ...base,
-        hasMore: false,
-        capReached: false,
-        remaining: searchesRemAfter + bonusRemAfter,
-        resetAt: disc.resetAt.toISOString(),
-        viewCapUnlimited: false,
-        discoveryPhase: "search",
-        discoverySearchesRemaining: searchesRemAfter,
-        bonusBatchRemaining: bonusRemAfter,
-        limit: limitMeta({
-          mode: LIMITS.MODE,
-          remaining: searchesRemAfter + bonusRemAfter,
-          resetAt: disc.resetAt.toISOString(),
-        }),
-      },
-    };
-  }
-
-  if (bonusEligible && !disc.bonusUsed && disc.searchesUsed >= FREE_DISCOVERY_SEARCHES) {
-    const eff = Math.min(limit, FREE_DISCOVERY_BONUS_ROWS);
-    logMeteringCheck({
-      isCapped: false,
-      isFreeUser: true,
-      isProUser: false,
-      capApplied: true,
-      limitAdjusted: eff !== limit,
-    });
-    const result = await fetchList(eff);
-    await markDiscoveryBonusUsed(prisma, redis, dctx);
-    disc = await getDiscoveryListState(prisma, redis, dctx);
-    const base = metaBase(result, offset, limit);
-    return {
-      items: result.items,
-      meta: {
-        ...base,
-        hasMore: false,
-        capReached: false,
-        remaining: 0,
-        resetAt: disc.resetAt.toISOString(),
-        viewCapUnlimited: false,
-        discoveryPhase: "bonus",
-        discoverySearchesRemaining: 0,
-        bonusBatchRemaining: 0,
-        limit: limitMeta({
-          mode: LIMITS.MODE,
-          remaining: 0,
-          resetAt: disc.resetAt.toISOString(),
-        }),
-      },
-    };
-  }
-
-  throw new Error(
-    "runMeteredJobsList: unreachable discovery state — check discovery branches",
-  );
+  const result = await fetchList(effectiveLimit);
+  const debit = await checkAndIncrementViewCap(prisma, redis, capCtx, result.items.length);
+  const remainingAfter = Math.max(0, debit.remaining);
+  const base = metaBase(result, offset, limit);
+  logMeteringCheck({
+    isCapped: remainingAfter <= 0,
+    isFreeUser: true,
+    isProUser: false,
+    capApplied: result.items.length > 0,
+    limitAdjusted: effectiveLimit !== limit,
+  });
+  return {
+    items: result.items,
+    meta: {
+      ...base,
+      capReached: remainingAfter <= 0,
+      remaining: remainingAfter,
+      resetAt: debit.resetAt.toISOString(),
+      viewCapUnlimited: false,
+      discoveryPhase: "search",
+      limit: limitMeta({
+        mode: LIMITS.MODE,
+        remaining: remainingAfter,
+        resetAt: debit.resetAt.toISOString(),
+      }),
+    },
+  };
 }

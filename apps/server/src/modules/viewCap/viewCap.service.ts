@@ -56,8 +56,6 @@ export async function ensureUserJobViewsDayReset(
       data: {
         jobViewsToday: 0,
         jobViewsResetAt: new Date(),
-        discoverySearchesToday: 0,
-        discoveryBonusFiveUsed: false,
       },
     });
   }
