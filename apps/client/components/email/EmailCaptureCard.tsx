@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useUser } from "@clerk/nextjs";
 import { subscribeGrowthEmail } from "../../lib/api";
 
 export function EmailCaptureCard(props: {
@@ -10,10 +11,18 @@ export function EmailCaptureCard(props: {
   context?: { role?: string; location?: string; jobId?: string };
   className?: string;
 }) {
+  const { isLoaded, isSignedIn, user } = useUser();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  const signedInWithEmail = Boolean(
+    isSignedIn && (user?.primaryEmailAddress?.emailAddress || (user?.emailAddresses?.length ?? 0) > 0),
+  );
+  if (!isLoaded || signedInWithEmail) {
+    return null;
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
