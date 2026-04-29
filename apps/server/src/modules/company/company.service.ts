@@ -216,7 +216,22 @@ export class CompanyService {
   ): Promise<{ company: Company; jobs: PaginatedResult<JobWithCompany> } | null> {
     const company = await this.companyRepository.findBySlug(slug);
     if (!company) return null;
+    return this.getCompanyJobsForCompany(company, input);
+  }
 
+  /**
+   * Company row already resolved — avoids a second findBySlug when the route validated existence.
+   */
+  async getCompanyJobsForCompany(
+    company: Company,
+    input: {
+      page: number;
+      limit: number;
+      filters?: Omit<JobDiscoveryFilters, "companyId">;
+      sort?: "latest" | "salary_desc";
+      includeProcessing?: boolean;
+    },
+  ): Promise<{ company: Company; jobs: PaginatedResult<JobWithCompany> }> {
     const filters: JobDiscoveryFilters = {
       ...(input.filters ?? {}),
       companyId: company.id,

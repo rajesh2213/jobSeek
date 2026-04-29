@@ -61,7 +61,10 @@ export const loadJobsDiscoveryPage = cache(
   },
 );
 
-/** Real weekly posted jobs count used by jobs hero stats strip. */
+/**
+ * Weekly hero metric (`posted=1w`, global count) — distinct from discovery `meta.total`
+ * (filtered slice). Two GET /jobs calls remain intentional unless API exposes a combined field.
+ */
 export const loadWeeklyJobsPostedCount = cache(async (): Promise<number> => {
   const override = weeklyJobsPostedOverride();
   if (override !== null) return override;
@@ -86,3 +89,18 @@ export const loadWeeklyJobsPostedCount = cache(async (): Promise<number> => {
   const total = Number(response.meta?.total ?? 0);
   return Number.isFinite(total) && total >= 0 ? Math.round(total) : 0;
 });
+
+/**
+ * Convenience wrapper only — still performs two HTTP GET `/jobs` calls (discovery vs weekly metric).
+ * Does not reduce egress vs Promise.all inline; paired with related-slugs fetch separately on the page.
+ */
+export async function loadJobsListingPageBundle(filtersKey: string): Promise<{
+  discovery: JobsApiResponse;
+  weeklyJobsPosted: number;
+}> {
+  const [discovery, weeklyJobsPosted] = await Promise.all([
+    loadJobsDiscoveryPage(filtersKey),
+    loadWeeklyJobsPostedCount(),
+  ]);
+  return { discovery, weeklyJobsPosted };
+}

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import {
   loadJobsDiscoveryPage,
-  loadWeeklyJobsPostedCount,
+  loadJobsListingPageBundle,
   stableJobFiltersKey,
 } from "../../../lib/jobsPageData";
 import { fetchJobsRelatedSlugs } from "../../../lib/jobsRelatedSlugs";
@@ -57,10 +57,9 @@ export default async function JobsPage({ searchParams }: Props) {
     workType: filters.workType,
   });
 
-  const [response, relatedSlugs, weeklyJobsPosted] = await Promise.all([
-    loadJobsDiscoveryPage(filtersKey),
+  const [{ discovery: response, weeklyJobsPosted }, relatedSlugs] = await Promise.all([
+    loadJobsListingPageBundle(filtersKey),
     fetchJobsRelatedSlugs({ currentSlug, fallback: FALLBACK_RELATED_SLUGS }),
-    loadWeeklyJobsPostedCount(),
   ]);
 
   const total = response.meta?.total ?? 0;

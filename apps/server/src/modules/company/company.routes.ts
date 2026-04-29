@@ -190,16 +190,13 @@ export function registerCompanyRoutes(
         page,
         limit,
         fetchList: async (effectiveLimit) => {
-          const bundle = await companyService.getCompanyJobs(slug, {
+          const bundle = await companyService.getCompanyJobsForCompany(exists, {
             page,
             limit: effectiveLimit,
             filters: parsed,
             sort,
             includeProcessing,
           });
-          if (!bundle) {
-            throw new Error("getCompanyJobs: company missing after existence check");
-          }
           return bundle.jobs;
         },
       });

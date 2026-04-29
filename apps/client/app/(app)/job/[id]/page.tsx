@@ -3,7 +3,13 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
-import { fetchCompanyJobs, fetchJobById, fetchJobs, isJobReady } from "../../../../lib/api";
+import {
+  fetchCompanyJobs,
+  fetchJobs,
+  isJobReady,
+  type JobsApiResponse,
+} from "../../../../lib/api";
+import { resolveJobDetail } from "../../../../lib/loadJobDetailSsr";
 import { buildJobPostingJsonLd } from "../../../../lib/jobPostingJsonLd";
 import { absoluteUrl } from "../../../../lib/seoSite";
 import {
@@ -34,11 +40,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const { getToken } = await auth();
-  const token = await getToken();
-  const h = await headers();
-  const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
-  const fetched = await fetchJobById(id, { token, forwardedFor });
+  const fetched = await resolveJobDetail(id, "metadata");
   if (!fetched) {
     return { title: "Job not found | JobLoom" };
   }
@@ -68,7 +70,7 @@ export default async function JobDetailPage({ params }: Props) {
   const token = await getToken();
   const h = await headers();
   const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
-  const fetched = await fetchJobById(id, { token, forwardedFor });
+  const fetched = await resolveJobDetail(id, "page");
   if (!fetched?.data?.company) notFound();
 
   const job = fetched.data;
@@ -88,18 +90,32 @@ export default async function JobDetailPage({ params }: Props) {
     10,
   );
 
+  const categoryForSimilar =
+    typeof job.category === "string" && job.category.trim().length > 0
+      ? job.category.trim()
+      : null;
+
+  const emptySimilar: JobsApiResponse = { data: [] };
   const [companyJobsRes, similarRes] = await Promise.all([
-    fetchCompanyJobs(job.company.slug, { limit: 5, token, forwardedFor }),
-    fetchJobs(
-      {
-        category: job.category,
-        limit: 20,
-      },
-      {
-        internalSeoSecret: process.env.INTERNAL_SEO_SECRET ?? null,
-        forwardedFor,
-      },
-    ),
+    fetchCompanyJobs(job.company.slug, {
+      limit: 5,
+      token,
+      forwardedFor,
+      ssrPage: "job-detail",
+    }),
+    categoryForSimilar
+      ? fetchJobs(
+          {
+            category: categoryForSimilar,
+            limit: 20,
+          },
+          {
+            internalSeoSecret: process.env.INTERNAL_SEO_SECRET ?? null,
+            forwardedFor,
+            ssrPage: "job-detail-similar",
+          },
+        )
+      : Promise.resolve(emptySimilar),
   ]);
   const companyJobs = (companyJobsRes.data ?? [])
     .filter((x) => x.id !== job.id && isJobReady(x))
