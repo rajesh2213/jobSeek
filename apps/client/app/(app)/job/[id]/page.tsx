@@ -3,12 +3,11 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
+import { isJobReady, type JobsApiResponse } from "../../../../lib/api";
 import {
-  fetchCompanyJobs,
-  fetchJobs,
-  isJobReady,
-  type JobsApiResponse,
-} from "../../../../lib/api";
+  getCompanyJobsUnified,
+  listJobsUnified,
+} from "../../../../lib/serverApi";
 import { resolveJobDetail } from "../../../../lib/loadJobDetailSsr";
 import { buildJobPostingJsonLd } from "../../../../lib/jobPostingJsonLd";
 import { absoluteUrl } from "../../../../lib/seoSite";
@@ -97,14 +96,14 @@ export default async function JobDetailPage({ params }: Props) {
 
   const emptySimilar: JobsApiResponse = { data: [] };
   const [companyJobsRes, similarRes] = await Promise.all([
-    fetchCompanyJobs(job.company.slug, {
+    getCompanyJobsUnified(job.company.slug, {
       limit: 5,
       token,
       forwardedFor,
       ssrPage: "job-detail",
     }),
     categoryForSimilar
-      ? fetchJobs(
+      ? listJobsUnified(
           {
             category: categoryForSimilar,
             limit: 20,

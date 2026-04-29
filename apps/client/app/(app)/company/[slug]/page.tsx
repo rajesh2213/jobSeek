@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@clerk/nextjs/server";
-import { fetchCompanies, fetchCompanyJobs } from "../../../../lib/api";
+import { fetchCompanies } from "../../../../lib/api";
+import { getCompanyJobsUnified } from "../../../../lib/serverApi";
 import { resolveCompanyDetail } from "../../../../lib/loadCompanyDetailSsr";
 import { buildBreadcrumbListJsonLd } from "../../../../lib/seo";
 import { absoluteUrl } from "../../../../lib/seoSite";
@@ -65,7 +66,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
   const token = await getToken();
   const h = await headers();
   const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
-  const jobsResponse = await fetchCompanyJobs(slug, {
+  const jobsResponse = await getCompanyJobsUnified(slug, {
     page,
     limit,
     filters: {

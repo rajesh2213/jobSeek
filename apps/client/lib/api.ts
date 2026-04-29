@@ -771,6 +771,21 @@ function buildJobDiscoverySearchParams(
   return params;
 }
 
+/** Maps JobFilters into Fastify GET /jobs query keys (SSR unified parity with HTTP routes). */
+export function jobFiltersToDiscoveryQueryRecord(
+  filters: JobFilters,
+  opts?: { includeCompanyId?: boolean },
+): Record<string, unknown> {
+  const params = buildJobDiscoverySearchParams(filters, {
+    includeCompanyId: opts?.includeCompanyId !== false,
+  });
+  const q: Record<string, unknown> = {};
+  params.forEach((value, key) => {
+    q[key] = value;
+  });
+  return q;
+}
+
 export async function fetchJobs(
   filters: JobFilters = {},
   opts?: {

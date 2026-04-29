@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { auth } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
-import { fetchJobById } from "./api";
+import { getJobByIdUnified } from "./serverApi";
 
 function logJobDedupe(payload: Record<string, unknown>): void {
   if (process.env.DEBUG_SSR_DEDUPE !== "1") return;
@@ -17,7 +17,7 @@ export const loadJobDetailCached = cache(async (id: string) => {
   const token = await getToken();
   const h = await headers();
   const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
-  const result = await fetchJobById(id, { token, forwardedFor });
+  const result = await getJobByIdUnified(id, { token, forwardedFor });
   logJobDedupe({
     event: "job_detail_dedupe_check",
     phase: "fetch_completed",

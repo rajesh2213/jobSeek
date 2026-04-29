@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./shared/job.shared": "./src/shared/job.shared.ts",
+    "./shared/company.shared": "./src/shared/company.shared.ts"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "npx tsc",

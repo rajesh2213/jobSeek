@@ -1,16 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { toJobListJson, type JobWithCompanyRow } from "../job/job.mapper.js";
 import { CompanyService } from "./company.service.js";
-import { parseJobDiscoveryQuery } from "../../utils/taxonomyQuery.js";
 import type { ApiError } from "../../types/api.js";
-import { getIoredis } from "../../queues/job.queue.js";
-import {
-  runMeteredJobsList,
-  clientIp,
-  isViewCapBypassRequest,
-  buildCapContextFromRequest,
-} from "../viewCap/jobListCap.js";
-import { assertJobReadRateLimit } from "../viewCap/rateLimitRedis.js";
+import { executeMeteredCompanyJobsHttpParity } from "../../shared/company.shared.js";
 import {
   createCompanyBodySchema,
   getCompaniesQuerySchema,
@@ -148,27 +139,7 @@ export function registerCompanyRoutes(
       request: FastifyRequest<{ Params: CompanySlugParams }>,
       reply: FastifyReply,
     ) => {
-      const redis = getIoredis();
-      const ip = clientIp(request);
-      const rl = await assertJobReadRateLimit(redis, ip);
-      if (!rl.ok) {
-        return reply.status(429).send({
-          error: "Too many requests",
-          code: "RATE_LIMIT",
-        } satisfies ApiError);
-      }
-
       const q = request.query as Record<string, unknown>;
-      const { page, limit } = parsePageLimit(q, { defaultLimit: 50, maxLimit: 100 });
-      const filterQuery = { ...q, page: undefined, limit: undefined };
-      const parsed = parseJobDiscoveryQuery(filterQuery);
-      delete parsed.companyId;
-
-      const sortRaw = String(q.sort ?? "latest");
-      const sort: "latest" | "salary_desc" =
-        sortRaw === "salary_desc" || sortRaw === "salary" ? "salary_desc" : "latest";
-      const includeProcessing = parseQueryBool(q.includeProcessing);
-
       const slug = request.params.slug;
       const exists = await companyService.getCompanyBySlug(slug);
       if (!exists) {
@@ -178,43 +149,24 @@ export function registerCompanyRoutes(
         } satisfies ApiError);
       }
 
-      const bypassCap = isViewCapBypassRequest(request);
-      const capCtx = await buildCapContextFromRequest(server.prisma, request);
+      const result = await executeMeteredCompanyJobsHttpParity({
+        companyService,
+        company: exists,
+        query: q,
+        headers: request.headers as Record<string, string | string[] | undefined>,
+      });
+
+      if (result.status === 429) {
+        return reply.status(429).send(result.body);
+      }
+
       setApiCacheHeader(reply, request, {
         route: "/company/:slug/jobs",
         cacheable: false,
         reason: "metered_company_listing",
       });
 
-      const out = await runMeteredJobsList(server.prisma, redis, capCtx, bypassCap, {
-        page,
-        limit,
-        fetchList: async (effectiveLimit) => {
-          const bundle = await companyService.getCompanyJobsForCompany(exists, {
-            page,
-            limit: effectiveLimit,
-            filters: parsed,
-            sort,
-            includeProcessing,
-          });
-          return bundle.jobs;
-        },
-      });
-
-      return reply.send({
-        data: out.items.map((j) =>
-          toJobListJson(j as unknown as JobWithCompanyRow),
-        ),
-        meta: {
-          ...out.meta,
-          company: {
-            id: exists.id,
-            name: exists.name,
-            slug: exists.slug,
-            domain: exists.domain,
-          },
-        },
-      });
+      return reply.send(result.payload);
     },
   );
 

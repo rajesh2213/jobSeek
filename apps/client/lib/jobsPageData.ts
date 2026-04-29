@@ -1,7 +1,8 @@
 import { cache } from "react";
 import { auth } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
-import { fetchJobs, type JobsApiResponse } from "./api";
+import type { JobsApiResponse } from "./api";
+import { listJobsUnified } from "./serverApi";
 import {
   type JobFilters,
   MAX_JOB_FILTER_QUERY_TOKENS,
@@ -46,7 +47,7 @@ export const loadJobsDiscoveryPage = cache(
     const token = await getToken();
     const h = await headers();
     const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
-    return fetchJobs(
+    return listJobsUnified(
       {
         ...filters,
         page: filters.page ?? 1,
@@ -73,7 +74,7 @@ export const loadWeeklyJobsPostedCount = cache(async (): Promise<number> => {
   const token = await getToken();
   const h = await headers();
   const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
-  const response = await fetchJobs(
+  const response = await listJobsUnified(
     {
       posted: "1w",
       page: 1,
@@ -91,8 +92,8 @@ export const loadWeeklyJobsPostedCount = cache(async (): Promise<number> => {
 });
 
 /**
- * Convenience wrapper only — still performs two HTTP GET `/jobs` calls (discovery vs weekly metric).
- * Does not reduce egress vs Promise.all inline; paired with related-slugs fetch separately on the page.
+ * Convenience wrapper — discovery + weekly remain two logical `/jobs` queries (SSR uses shared DB parity,
+ * not Fastify HTTP). Paired with related-slugs fetch separately on the page.
  */
 export async function loadJobsListingPageBundle(filtersKey: string): Promise<{
   discovery: JobsApiResponse;

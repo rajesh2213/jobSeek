@@ -41,16 +41,28 @@ export interface MeteredJobsListMeta {
   };
 }
 
-export function isViewCapBypassRequest(request: FastifyRequest): boolean {
-  const q = request.query as Record<string, unknown>;
-  const utmSource = typeof q?.utm_source === "string" ? q.utm_source.toLowerCase() : "";
+function headerFirst(
+  v: string | string[] | undefined,
+): string | undefined {
+  if (typeof v === "string") return v;
+  if (Array.isArray(v) && typeof v[0] === "string") return v[0];
+  return undefined;
+}
+
+/** Same bypass rules as HTTP handlers — usable from SSR unified callers without FastifyRequest. */
+export function isViewCapBypassFromParts(
+  headers: Record<string, string | string[] | undefined>,
+  query: Record<string, unknown>,
+): boolean {
+  const utmSource =
+    typeof query?.utm_source === "string" ? query.utm_source.toLowerCase() : "";
   const emailClick = utmSource === "email";
   if (emailClick) {
     return true;
   }
 
-  const internalMarker = request.headers["x-internal-seo"];
-  const internalSecret = request.headers["x-internal-seo-secret"];
+  const internalMarker = headerFirst(headers["x-internal-seo"]);
+  const internalSecret = headerFirst(headers["x-internal-seo-secret"]);
   const expectedInternalSecret = process.env.INTERNAL_SEO_SECRET?.trim();
   if (
     internalMarker === "true" &&
@@ -61,13 +73,19 @@ export function isViewCapBypassRequest(request: FastifyRequest): boolean {
     return true;
   }
 
-  // Backward-compatible bypass token support (deprecated).
   const bypassToken = process.env.JOB_LIST_VIEW_CAP_BYPASS_TOKEN?.trim();
-  const bypassHeader = request.headers["x-jobseek-view-cap-bypass"];
+  const bypassHeader = headerFirst(headers["x-jobseek-view-cap-bypass"]);
   return (
     Boolean(bypassToken) &&
     typeof bypassHeader === "string" &&
     bypassHeader === bypassToken
+  );
+}
+
+export function isViewCapBypassRequest(request: FastifyRequest): boolean {
+  return isViewCapBypassFromParts(
+    request.headers as Record<string, string | string[] | undefined>,
+    request.query as Record<string, unknown>,
   );
 }
 
@@ -82,16 +100,48 @@ export function clientIp(request: FastifyRequest): string {
   return raw || request.ip || request.socket.remoteAddress || "unknown";
 }
 
+function headerAuthorization(request: FastifyRequest): string | undefined {
+  const a = request.headers.authorization;
+  return typeof a === "string" ? a : undefined;
+}
+
+/** SSR / unified callers — same cap identity as HTTP when forwarding Authorization + XFF. */
+export async function buildCapContextFromAuthorizationForwarded(
+  prisma: PrismaClient,
+  authorization: string | undefined,
+  forwardedFor: string | null | undefined,
+  fallbackIp?: string,
+): Promise<CapContext> {
+  const clerk = await resolveClerkUser(prisma, authorization);
+  const raw =
+    typeof forwardedFor === "string"
+      ? forwardedFor.split(",")[0]?.trim()
+      : undefined;
+  const ip = raw ?? fallbackIp ?? "unknown";
+  return {
+    internalUserId: clerk?.internalUserId ?? null,
+    ip,
+    userEmail: clerk?.email ?? null,
+  };
+}
+
 export async function buildCapContextFromRequest(
   prisma: PrismaClient,
   request: FastifyRequest,
 ): Promise<CapContext> {
-  const clerk = await resolveClerkUser(prisma, request.headers.authorization);
-  return {
-    internalUserId: clerk?.internalUserId ?? null,
-    ip: clientIp(request),
-    userEmail: clerk?.email ?? null,
-  };
+  const forwarded =
+    typeof request.headers["x-forwarded-for"] === "string"
+      ? request.headers["x-forwarded-for"]
+      : Array.isArray(request.headers["x-forwarded-for"])
+        ? request.headers["x-forwarded-for"][0]
+        : undefined;
+  const fallbackIp = request.ip ?? request.socket.remoteAddress ?? undefined;
+  return buildCapContextFromAuthorizationForwarded(
+    prisma,
+    headerAuthorization(request),
+    forwarded ?? null,
+    fallbackIp,
+  );
 }
 
 function metaBase(
