@@ -1,0 +1,184 @@
+import paypal from "@paypal/checkout-server-sdk";
+import paypalhttp from "@paypal/paypalhttp";
+
+export type BillingPlanType = "monthly" | "yearly";
+type PayPalMode = "sandbox" | "live";
+export type VerifyPayPalWebhookResult = {
+  verificationStatus: string;
+  verified: boolean;
+};
+export type PayPalSubscriptionDetails = {
+  id: string;
+  status: string;
+  nextBillingTime: Date | null;
+  customId: string | null;
+};
+const VERIFY_TIMEOUT_MS = 3000;
+const VERIFY_MAX_ATTEMPTS = 3; // initial + 2 retries
+
+function readRequiredEnv(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`${name} is required`);
+  }
+  return value;
+}
+
+export function getPayPalPlanId(planType: BillingPlanType): string {
+  if (planType === "monthly") {
+    return readRequiredEnv("PAYPAL_PLAN_ID_MONTHLY");
+  }
+  return readRequiredEnv("PAYPAL_PLAN_ID_YEARLY");
+}
+
+export function getPayPalWebhookId(): string {
+  return readRequiredEnv("PAYPAL_WEBHOOK_ID");
+}
+
+export function createPayPalHttpClient(): InstanceType<typeof paypal.core.PayPalHttpClient> {
+  const clientId = readRequiredEnv("PAYPAL_CLIENT_ID");
+  const clientSecret = readRequiredEnv("PAYPAL_CLIENT_SECRET");
+  const modeRaw = process.env.PAYPAL_MODE?.trim().toLowerCase();
+  if (modeRaw !== "sandbox" && modeRaw !== "live") {
+    throw new Error("PAYPAL_MODE must be 'sandbox' or 'live'");
+  }
+  const mode: PayPalMode = modeRaw;
+  if (process.env.NODE_ENV === "production" && mode !== "live") {
+    throw new Error("PAYPAL_MODE must be 'live' in production");
+  }
+  const environment =
+    mode === "live"
+      ? new paypal.core.LiveEnvironment(clientId, clientSecret)
+      : new paypal.core.SandboxEnvironment(clientId, clientSecret);
+  return new paypal.core.PayPalHttpClient(environment);
+}
+
+export async function verifyPayPalWebhook(
+  headers: Record<string, string | undefined>,
+  body: unknown,
+): Promise<VerifyPayPalWebhookResult> {
+  const requiredHeaders = [
+    "paypal-auth-algo",
+    "paypal-cert-url",
+    "paypal-transmission-id",
+    "paypal-transmission-sig",
+    "paypal-transmission-time",
+  ] as const;
+  for (const header of requiredHeaders) {
+    const value = headers[header]?.trim();
+    if (!value) {
+      return { verificationStatus: "MISSING_HEADERS", verified: false };
+    }
+  }
+
+  const webhookId = getPayPalWebhookId();
+  const client = createPayPalHttpClient();
+  const request: paypalhttp.HttpRequest = {
+    path: "/v1/notifications/verify-webhook-signature",
+    verb: "POST",
+    headers: { "content-type": "application/json" },
+    body: {
+      auth_algo: headers["paypal-auth-algo"],
+      cert_url: headers["paypal-cert-url"],
+      transmission_id: headers["paypal-transmission-id"],
+      transmission_sig: headers["paypal-transmission-sig"],
+      transmission_time: headers["paypal-transmission-time"],
+      webhook_id: webhookId,
+      webhook_event: body,
+    },
+  };
+
+  const response = await executeWithTimeoutAndNetworkRetry(client, request, {
+    timeoutMs: VERIFY_TIMEOUT_MS,
+    maxAttempts: VERIFY_MAX_ATTEMPTS,
+  });
+  const verificationStatus =
+    (response.result as { verification_status?: string }).verification_status ?? "UNKNOWN";
+  return {
+    verificationStatus,
+    verified: verificationStatus === "SUCCESS",
+  };
+}
+
+function isRetryableNetworkError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const code = (err as { code?: unknown }).code;
+  if (typeof code === "string") {
+    return [
+      "ETIMEDOUT",
+      "ECONNRESET",
+      "ENOTFOUND",
+      "EAI_AGAIN",
+      "ECONNREFUSED",
+      "UND_ERR_CONNECT_TIMEOUT",
+      "UND_ERR_HEADERS_TIMEOUT",
+      "UND_ERR_SOCKET",
+      "ABORT_ERR",
+    ].includes(code);
+  }
+  return false;
+}
+
+async function executeWithTimeoutAndNetworkRetry(
+  client: InstanceType<typeof paypal.core.PayPalHttpClient>,
+  request: paypalhttp.HttpRequest,
+  options: { timeoutMs: number; maxAttempts: number },
+) {
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= options.maxAttempts; attempt += 1) {
+    try {
+      const response = await Promise.race([
+        client.execute(request),
+        new Promise<never>((_, reject) => {
+          const timeoutErr = new Error(`PayPal request timed out after ${options.timeoutMs}ms`) as Error & {
+            code?: string;
+          };
+          timeoutErr.code = "ETIMEDOUT";
+          setTimeout(() => reject(timeoutErr), options.timeoutMs);
+        }),
+      ]);
+      return response;
+    } catch (err) {
+      lastError = err;
+      if (!isRetryableNetworkError(err)) {
+        throw err;
+      }
+      if (attempt >= options.maxAttempts) {
+        break;
+      }
+    }
+  }
+  throw lastError;
+}
+
+export async function fetchPayPalSubscriptionDetails(
+  subscriptionId: string,
+): Promise<PayPalSubscriptionDetails | null> {
+  const client = createPayPalHttpClient();
+  const request: paypalhttp.HttpRequest = {
+    path: `/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}`,
+    verb: "GET",
+    headers: {},
+    body: {},
+  };
+  const response = await client.execute(request);
+  const result = response.result as {
+    id?: string;
+    status?: string;
+    billing_info?: { next_billing_time?: string };
+  };
+  if (!result.id) return null;
+  const nextRaw = result.billing_info?.next_billing_time;
+  const nextBillingTime =
+    typeof nextRaw === "string" && nextRaw.trim() && !Number.isNaN(new Date(nextRaw).getTime())
+      ? new Date(nextRaw)
+      : null;
+  return {
+    id: result.id,
+    status: result.status ?? "UNKNOWN",
+    nextBillingTime,
+    customId: typeof (result as { custom_id?: unknown }).custom_id === "string"
+      ? (result as { custom_id: string }).custom_id
+      : null,
+  };
+}

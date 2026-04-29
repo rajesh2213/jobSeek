@@ -370,13 +370,24 @@ model Subscription {
   id                   String   @id @default(uuid())
   userId               String   @unique
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  stripeCustomerId     String   @unique
-  stripePriceId        String
-  stripeSubscriptionId String   @unique
+  provider             String   @default("paypal")
+  paypalId             String?  @unique
+  stripeCustomerId     String?  @unique
+  stripePriceId        String?
+  stripeSubscriptionId String?  @unique
   status               String // "active" | "canceled" | "past_due"
   currentPeriodEnd     DateTime
+  graceEndsAt          DateTime?
+  lastEventAt          DateTime?
+  lastEventType        String?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+}
+
+model ProcessedWebhookEvent {
+  id        String   @id @default(uuid())
+  eventId   String   @unique
+  createdAt DateTime @default(now())
 }
 
 model SavedSearch {

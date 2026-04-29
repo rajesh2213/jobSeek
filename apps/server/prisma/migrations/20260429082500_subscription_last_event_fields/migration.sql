@@ -1,0 +1,3 @@
+ALTER TABLE "Subscription"
+ADD COLUMN IF NOT EXISTS "lastEventAt" TIMESTAMP(3),
+ADD COLUMN IF NOT EXISTS "lastEventType" TEXT;

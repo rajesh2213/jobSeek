@@ -10,14 +10,11 @@ import {
 } from "../../lib/pricingDisplay";
 import { CREAM_TINT, CORAL, PRO_FEATURES } from "./pricingCopy";
 
-const ANNUAL_VARIANT_ID = process.env.NEXT_PUBLIC_LS_PRO_ANNUAL_VARIANT_ID?.trim() ?? "";
-const MONTHLY_VARIANT_ID = process.env.NEXT_PUBLIC_LS_PRO_MONTHLY_VARIANT_ID?.trim() ?? "";
-
 type CheckoutKey = "pro_annual" | "pro_monthly";
 
-const VARIANT_BY_KEY: Record<CheckoutKey, string> = {
-  pro_annual: ANNUAL_VARIANT_ID,
-  pro_monthly: MONTHLY_VARIANT_ID,
+const PLAN_TYPE_BY_KEY: Record<CheckoutKey, "monthly" | "yearly"> = {
+  pro_annual: "yearly",
+  pro_monthly: "monthly",
 };
 
 export function PricingPlansClient() {
@@ -28,11 +25,6 @@ export function PricingPlansClient() {
   const startCheckout = useCallback(
     async (which: CheckoutKey) => {
       setError(null);
-      const variantId = VARIANT_BY_KEY[which];
-      if (!variantId) {
-        setError("Pricing is not configured. Add payment variant IDs to your environment.");
-        return;
-      }
       setBusy(which);
       try {
         const token = await getToken();
@@ -41,25 +33,25 @@ export function PricingPlansClient() {
           setBusy(null);
           return;
         }
-        const res = await fetch(`${API_BASE_URL}/billing/create-checkout`, {
+        const res = await fetch(`${API_BASE_URL}/billing/paypal/create-subscription`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ variantId }),
+          body: JSON.stringify({ planType: PLAN_TYPE_BY_KEY[which] }),
         });
-        const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+        const data = (await res.json().catch(() => ({}))) as { approvalUrl?: string; error?: string };
         if (!res.ok) {
           setError(data.error ?? "Could not start checkout. Try again.");
           setBusy(null);
           return;
         }
-        if (data.url) {
-          window.location.assign(data.url);
+        if (data.approvalUrl) {
+          window.location.assign(data.approvalUrl);
           return;
         }
-        setError("No checkout URL returned.");
+        setError("No approval URL returned.");
       } catch {
         setError("Network error. Check your connection and API URL.");
       } finally {
@@ -77,7 +69,6 @@ export function PricingPlansClient() {
     label: string;
   }) => {
     const loading = busy === which;
-    const configured = Boolean(VARIANT_BY_KEY[which]);
     if (!isSignedIn) {
       return (
         <SignInButton mode="modal" forceRedirectUrl="/pricing">
@@ -94,7 +85,7 @@ export function PricingPlansClient() {
     return (
       <button
         type="button"
-        disabled={loading || !configured}
+        disabled={loading}
         onClick={() => void startCheckout(which)}
         className="w-full rounded-xl py-3.5 text-center text-[15px] font-bold text-white transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
         style={{ backgroundColor: CORAL }}

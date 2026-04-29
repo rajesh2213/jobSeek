@@ -70,7 +70,7 @@
     "@fastify/multipart": "^8.3.0",
     "@fastify/rate-limit": "^9.1.0",
     "@jobseek/skill-constants": "*",
-    "@lemonsqueezy/lemonsqueezy.js": "^4.0.0",
+    "@paypal/checkout-server-sdk": "^1.0.3",
     "@prisma/client": "^5.22.0",
     "axios": "^1.14.0",
     "bullmq": "^5.71.0",
@@ -89,6 +89,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
+    "@types/paypal__checkout-server-sdk": "^1.0.8",
     "@types/pdf-parse": "^1.1.4",
     "prisma": "^5.22.0",
     "tsx": "^4.19.2",

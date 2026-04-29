@@ -1,288 +1,253 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import { createCheckout, lemonSqueezySetup } from "@lemonsqueezy/lemonsqueezy.js";
+import paypalhttp from "@paypal/paypalhttp";
 import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
-import { batchTransactionOptionsDefault } from "../../infrastructure/db/prismaTransactionOptions.js";
+import {
+  createPayPalHttpClient,
+  fetchPayPalSubscriptionDetails,
+  getPayPalPlanId,
+  verifyPayPalWebhook,
+  type BillingPlanType,
+} from "./paypal.client.js";
+import { applyPayPalSubscriptionEvent, statusFromPayPalEvent } from "./billing.service.js";
 
-type LsWebhookPayload = {
-  meta?: {
-    event_name?: string;
-    custom_data?: Record<string, string | number | boolean | null | undefined>;
-  };
-  data?: {
-    type?: string;
-    id?: string | number;
-    attributes?: {
-      store_id?: number;
-      customer_id?: number;
-      variant_id?: number;
-      status?: string;
-      renews_at?: string | null;
-      ends_at?: string | null;
+type PayPalSubscriptionCreateBody = {
+  planType?: BillingPlanType;
+};
+
+type PayPalSubscriptionLink = {
+  rel?: string;
+  href?: string;
+};
+
+type PayPalWebhookEvent = {
+  id?: string;
+  create_time?: string;
+  event_type?: string;
+  resource?: {
+    id?: string;
+    custom_id?: string;
+    billing_info?: {
+      next_billing_time?: string;
     };
   };
 };
 
-function ensureLemonSqueezy(): boolean {
-  const apiKey = process.env.LEMONSQUEEZY_API_KEY?.trim();
-  if (!apiKey) return false;
-  lemonSqueezySetup({ apiKey });
-  return true;
+function parsePlanType(value: unknown): BillingPlanType | null {
+  if (value === "monthly" || value === "yearly") return value;
+  return null;
 }
 
-function allowedVariantIds(): Set<string> {
-  const annual = process.env.LEMONSQUEEZY_PRO_ANNUAL_VARIANT_ID?.trim();
-  const monthly = process.env.LEMONSQUEEZY_PRO_MONTHLY_VARIANT_ID?.trim();
-  const set = new Set<string>();
-  if (annual) set.add(annual);
-  if (monthly) set.add(monthly);
-  return set;
-}
-
-/** All paid Lemon Squeezy variants map to Pro (legacy Pro+ product IDs are no longer sold). */
-function planFromVariantId(_variantId: string): "pro" {
-  return "pro";
-}
-
-function mapLsSubscriptionStatus(lsStatus: string | undefined): string {
-  switch (lsStatus) {
-    case "on_trial":
-    case "active":
-    case "paused":
-      return "active";
-    case "past_due":
-    case "unpaid":
-      return "past_due";
-    case "cancelled":
-    case "expired":
-      return "canceled";
-    default:
-      return "active";
+function nextPeriodEndFromEvent(event: PayPalWebhookEvent): Date {
+  const nextBillingTime = event.resource?.billing_info?.next_billing_time;
+  if (typeof nextBillingTime === "string" && nextBillingTime.trim()) {
+    const parsed = new Date(nextBillingTime);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
   }
-}
-
-function currentPeriodEndFromAttrs(attrs: NonNullable<LsWebhookPayload["data"]>["attributes"]): Date {
-  if (!attrs) return new Date();
-  if (attrs.ends_at) return new Date(attrs.ends_at);
-  if (attrs.renews_at) return new Date(attrs.renews_at);
   return new Date();
 }
 
-function clerkIdFromMeta(meta: LsWebhookPayload["meta"]): string | null {
-  const raw = meta?.custom_data?.clerk_id;
-  if (raw === undefined || raw === null) return null;
-  const s = String(raw).trim();
-  return s.length > 0 ? s : null;
+function paypalHeaders(headers: Record<string, unknown>): Record<string, string | undefined> {
+  const read = (name: string): string | undefined => {
+    const value = headers[name] ?? headers[name.toLowerCase()];
+    if (typeof value === "string") return value;
+    return undefined;
+  };
+  return {
+    "paypal-auth-algo": read("paypal-auth-algo"),
+    "paypal-cert-url": read("paypal-cert-url"),
+    "paypal-transmission-id": read("paypal-transmission-id"),
+    "paypal-transmission-sig": read("paypal-transmission-sig"),
+    "paypal-transmission-time": read("paypal-transmission-time"),
+  };
 }
 
-function verifyLsSignature(secret: string, raw: Buffer, signatureHeader: string | undefined): boolean {
-  if (typeof signatureHeader !== "string" || !signatureHeader) return false;
-  const expected = createHmac("sha256", secret).update(raw).digest("hex");
-  const received = signatureHeader.trim();
-  if (expected.length !== received.length) return false;
-  try {
-    return timingSafeEqual(Buffer.from(expected, "utf8"), Buffer.from(received, "utf8"));
-  } catch {
-    return false;
+function shouldVerboseLog(): boolean {
+  return process.env.PAYPAL_BILLING_VERBOSE_LOGS?.trim() === "true";
+}
+
+function isInternalBillingAuthorized(authorizationHeader: unknown): boolean {
+  const token = process.env.INTERNAL_METRICS_TOKEN?.trim();
+  if (!token) {
+    return process.env.NODE_ENV !== "production";
   }
+  return authorizationHeader === `Bearer ${token}`;
 }
 
-async function upsertProSubscription(
-  prisma: FastifyInstance["prisma"],
-  params: {
-    clerkId: string;
-    lsSubscriptionId: string;
-    customerId: string;
-    variantId: string;
-    status: string;
-    currentPeriodEnd: Date;
-  },
-): Promise<void> {
-  const user = await prisma.user.findUnique({ where: { clerkId: params.clerkId } });
-  if (!user) return;
+function mapPayPalSubscriptionStatus(status: string): "active" | "canceled" | "past_due" {
+  const normalized = status.trim().toUpperCase();
+  if (normalized === "ACTIVE") return "active";
+  if (normalized === "SUSPENDED") return "canceled";
+  if (normalized === "CANCELLED") return "canceled";
+  if (normalized === "EXPIRED") return "canceled";
+  if (normalized === "APPROVAL_PENDING") return "past_due";
+  return "past_due";
+}
 
-  const plan = planFromVariantId(params.variantId);
+const billingMetrics = {
+  "paypal.webhook.received": 0,
+  "paypal.webhook.verified": 0,
+  "paypal.webhook.failed_verification": 0,
+  "paypal.subscription.activated": 0,
+  "paypal.subscription.cancelled": 0,
+  "paypal.subscription.suspended": 0,
+  "paypal.subscription.failed": 0,
+};
 
-  await prisma.$transaction(
-    async (tx) => {
-      await tx.subscription.upsert({
-        where: { userId: user.id },
-        create: {
-          userId: user.id,
-          stripeCustomerId: params.customerId,
-          stripePriceId: params.variantId,
-          stripeSubscriptionId: params.lsSubscriptionId,
-          status: params.status,
-          currentPeriodEnd: params.currentPeriodEnd,
-        },
-        update: {
-          stripeCustomerId: params.customerId,
-          stripePriceId: params.variantId,
-          stripeSubscriptionId: params.lsSubscriptionId,
-          status: params.status,
-          currentPeriodEnd: params.currentPeriodEnd,
-        },
-      });
-      await tx.user.update({
-        where: { id: user.id },
-        data: { plan, stripeCustomerId: params.customerId },
-      });
-    },
-    { ...batchTransactionOptionsDefault },
-  );
+function incrementMetric(name: keyof typeof billingMetrics): number {
+  billingMetrics[name] += 1;
+  return billingMetrics[name];
 }
 
 export function registerBillingRoutes(server: FastifyInstance): void {
-  const lsKey = process.env.LEMONSQUEEZY_API_KEY?.trim();
-  if (lsKey) {
-    lemonSqueezySetup({ apiKey: lsKey });
-  }
-
   server.post(
-    "/billing/webhook",
+    "/billing/paypal/webhook",
     {
       config: { rawBody: true },
     },
     async (request, reply) => {
-      const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET?.trim();
-      if (!secret) {
-        return reply.status(500).send({ error: "Webhook not configured" });
-      }
-
-      const raw = request.rawBody;
-      if (!Buffer.isBuffer(raw)) {
-        server.log.error("Lemon Squeezy webhook: rawBody missing or not a buffer");
-        return reply.status(400).send({ error: "Invalid body" });
-      }
-
-      const sig = request.headers["x-signature"];
-      if (!verifyLsSignature(secret, raw, typeof sig === "string" ? sig : undefined)) {
-        server.log.warn("Lemon Squeezy webhook signature verification failed");
-        return reply.status(400).send({ error: "Invalid signature" });
-      }
-
-      let payload: LsWebhookPayload;
       try {
-        payload = JSON.parse(raw.toString("utf8")) as LsWebhookPayload;
-      } catch {
-        return reply.status(400).send({ error: "Invalid JSON" });
-      }
+        const raw = request.rawBody;
+        if (!Buffer.isBuffer(raw)) {
+          server.log.error({ hasRawBody: !!raw }, "PayPal webhook missing raw body");
+          return reply.status(400).send({ error: "Invalid webhook body" });
+        }
+        let event: PayPalWebhookEvent;
+        try {
+          event = JSON.parse(raw.toString("utf8")) as PayPalWebhookEvent;
+        } catch {
+          return reply.status(400).send({ error: "Invalid JSON" });
+        }
 
-      const eventName =
-        (typeof request.headers["x-event-name"] === "string" && request.headers["x-event-name"]) ||
-        payload.meta?.event_name ||
-        "";
+        const paypalId = event.resource?.id?.trim() ?? null;
+        const userId = event.resource?.custom_id?.trim() ?? null;
+        const eventId = event.id?.trim() ?? null;
+        const eventType = event.event_type ?? "";
+        incrementMetric("paypal.webhook.received");
 
-      try {
-        switch (eventName) {
-          case "order_created": {
-            break;
+        const verification = await verifyPayPalWebhook(
+          paypalHeaders(request.headers as Record<string, unknown>),
+          event,
+        );
+        server.log.info({
+          msg: "paypal_webhook_received",
+          eventId,
+          eventType,
+          paypalId,
+          userId,
+          verification_status: verification.verificationStatus,
+        });
+        if (!verification.verified) {
+          incrementMetric("paypal.webhook.failed_verification");
+          server.log.warn(
+            {
+              msg: "paypal_webhook_verification_failed",
+              eventId,
+              eventType,
+              paypalId,
+              userId,
+              verification_status: verification.verificationStatus,
+            },
+            "PayPal webhook signature verification failed",
+          );
+          return reply.status(400).send({ error: "Invalid webhook signature" });
+        }
+        incrementMetric("paypal.webhook.verified");
+
+        const normalizedStatus = statusFromPayPalEvent(eventType);
+        if (!normalizedStatus) {
+          return reply.send({ received: true, ignored: true });
+        }
+
+        if (!event.resource) {
+          server.log.warn({ eventId, eventType }, "PayPal webhook missing resource");
+          return reply.send({ received: true, ignored: true, reason: "MISSING_RESOURCE" });
+        }
+        if (!paypalId) {
+          server.log.warn({ eventId, eventType, userId }, "PayPal webhook missing resource.id");
+          return reply.send({ received: true, ignored: true, reason: "MISSING_PAYPAL_ID" });
+        }
+        if (!userId) {
+          server.log.error({ eventId, eventType, paypalId }, "PayPal webhook missing custom_id");
+          return reply.send({ received: true, ignored: true, reason: "MISSING_USER_ID" });
+        }
+
+        const user = await server.prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true },
+        });
+        if (!user) {
+          server.log.error({ eventId, eventType, paypalId, userId }, "PayPal webhook user not found");
+          return reply.send({ received: true, ignored: true, reason: "USER_NOT_FOUND" });
+        }
+
+        let periodEnd = nextPeriodEndFromEvent(event);
+        if (
+          eventType === "BILLING.SUBSCRIPTION.ACTIVATED" ||
+          eventType === "BILLING.SUBSCRIPTION.RE-ACTIVATED"
+        ) {
+          const details = await fetchPayPalSubscriptionDetails(paypalId);
+          if (details?.nextBillingTime) {
+            periodEnd = details.nextBillingTime;
           }
-          case "subscription_created": {
-            const attrs = payload.data?.attributes;
-            const subId = payload.data?.id;
-            if (!attrs || subId === undefined || subId === null) break;
+        }
 
-            const clerkId = clerkIdFromMeta(payload.meta);
-            if (!clerkId) {
-              server.log.warn("subscription_created: missing meta.custom_data.clerk_id");
-              break;
-            }
-
-            const lsSubscriptionId = String(subId);
-            const customerId = String(attrs.customer_id ?? "");
-            const variantId = String(attrs.variant_id ?? "");
-            const status = mapLsSubscriptionStatus(attrs.status);
-            const currentPeriodEnd = currentPeriodEndFromAttrs(attrs);
-
-            await upsertProSubscription(server.prisma, {
-              clerkId,
-              lsSubscriptionId,
-              customerId,
-              variantId,
-              status,
-              currentPeriodEnd,
-            });
-            break;
-          }
-          case "subscription_updated": {
-            const attrs = payload.data?.attributes;
-            const subId = payload.data?.id;
-            if (!attrs || subId === undefined || subId === null) break;
-
-            const lsSubscriptionId = String(subId);
-            const status = mapLsSubscriptionStatus(attrs.status);
-            const currentPeriodEnd = currentPeriodEndFromAttrs(attrs);
-            const variantId = String(attrs.variant_id ?? "");
-            const customerId = String(attrs.customer_id ?? "");
-
-            const existing = await server.prisma.subscription.findUnique({
-              where: { stripeSubscriptionId: lsSubscriptionId },
-            });
-
-            if (existing) {
-              const plan = variantId ? planFromVariantId(variantId) : undefined;
-              await server.prisma.subscription.update({
-                where: { stripeSubscriptionId: lsSubscriptionId },
-                data: {
-                  status,
-                  currentPeriodEnd,
-                  ...(variantId ? { stripePriceId: variantId } : {}),
-                  ...(customerId ? { stripeCustomerId: customerId } : {}),
-                },
-              });
-              if (plan) {
-                await server.prisma.user.update({
-                  where: { id: existing.userId },
-                  data: { plan },
-                });
-              }
-              break;
-            }
-
-            const clerkId = clerkIdFromMeta(payload.meta);
-            if (!clerkId) break;
-
-            await upsertProSubscription(server.prisma, {
-              clerkId,
-              lsSubscriptionId,
-              customerId,
-              variantId,
-              status,
-              currentPeriodEnd,
-            });
-            break;
-          }
-          case "subscription_cancelled": {
-            const subId = payload.data?.id;
-            if (subId === undefined || subId === null) break;
-
-            const lsSubscriptionId = String(subId);
-            const row = await server.prisma.subscription.findUnique({
-              where: { stripeSubscriptionId: lsSubscriptionId },
-            });
-            if (!row) break;
-
-            await server.prisma.$transaction(
-              async (tx) => {
-                await tx.user.update({
-                  where: { id: row.userId },
-                  data: { plan: "free" },
-                });
-                await tx.subscription.update({
-                  where: { id: row.id },
-                  data: { status: "canceled" },
-                });
-              },
-              { ...batchTransactionOptionsDefault },
-            );
-            break;
-          }
-          default:
-            break;
+        const applied = await applyPayPalSubscriptionEvent(server, {
+          eventId,
+          eventType,
+          eventAt:
+            typeof event.create_time === "string" && !Number.isNaN(new Date(event.create_time).getTime())
+              ? new Date(event.create_time)
+              : new Date(),
+          userId,
+          paypalId,
+          status: normalizedStatus,
+          currentPeriodEnd: periodEnd,
+        });
+        if (!applied.applied) {
+          return reply.send({ received: true, deduped: true });
+        }
+        if (eventType === "BILLING.SUBSCRIPTION.ACTIVATED" || eventType === "BILLING.SUBSCRIPTION.RE-ACTIVATED") {
+          incrementMetric("paypal.subscription.activated");
+        } else if (eventType === "BILLING.SUBSCRIPTION.CANCELLED") {
+          incrementMetric("paypal.subscription.cancelled");
+        } else if (eventType === "BILLING.SUBSCRIPTION.SUSPENDED") {
+          incrementMetric("paypal.subscription.suspended");
+        } else if (eventType === "BILLING.SUBSCRIPTION.PAYMENT.FAILED") {
+          incrementMetric("paypal.subscription.failed");
+        }
+        if (shouldVerboseLog()) {
+          server.log.info({
+            msg: "paypal_webhook_applied",
+            eventId,
+            eventType,
+            paypalId,
+            userId,
+            status: normalizedStatus,
+          });
         }
       } catch (err) {
-        server.log.error({ err, eventName }, "Lemon Squeezy webhook handler error");
+        const raw = request.rawBody;
+        const event =
+          Buffer.isBuffer(raw)
+            ? (() => {
+                try {
+                  return JSON.parse(raw.toString("utf8")) as PayPalWebhookEvent;
+                } catch {
+                  return undefined;
+                }
+              })()
+            : undefined;
+        const payload =
+          event && typeof event === "object"
+            ? {
+                id: event.id,
+                event_type: event.event_type,
+                resource: event.resource
+                  ? { id: event.resource.id, custom_id: event.resource.custom_id }
+                  : undefined,
+              }
+            : undefined;
+        server.log.error({ err, payload }, "PayPal webhook handler error");
         return reply.status(500).send({ error: "Webhook handler failed" });
       }
 
@@ -290,77 +255,110 @@ export function registerBillingRoutes(server: FastifyInstance): void {
     },
   );
 
-  server.post<{ Body: { variantId?: string } }>("/billing/create-checkout", async (request, reply) => {
-    const ctx = await resolveClerkUser(server.prisma, request.headers.authorization);
-    if (!ctx) {
-      return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
-    }
+  server.post<{ Body: PayPalSubscriptionCreateBody }>(
+    "/billing/paypal/create-subscription",
+    async (request, reply) => {
+      const ctx = await resolveClerkUser(server.prisma, request.headers.authorization);
+      if (!ctx) {
+        return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+      }
+      if (!ctx.internalUserId?.trim()) {
+        server.log.error({ clerkId: ctx.clerkId }, "Missing internal user id for PayPal subscription create");
+        return reply.status(400).send({ error: "User mapping missing", code: "USER_MAPPING_MISSING" });
+      }
 
-    const variantIdRaw =
-      typeof request.body?.variantId === "string" ? request.body.variantId.trim() : "";
-    const allowed = allowedVariantIds();
-    if (!variantIdRaw || allowed.size === 0 || !allowed.has(variantIdRaw)) {
-      return reply.status(400).send({ error: "Invalid variantId", code: "INVALID_VARIANT" });
-    }
+      const planType = parsePlanType(request.body?.planType);
+      if (!planType) {
+        return reply.status(400).send({ error: "Invalid planType", code: "INVALID_PLAN_TYPE" });
+      }
 
-    const clientUrl =
-      process.env.CLIENT_URL?.trim() ||
-      process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-      "";
-    if (!clientUrl) {
-      return reply.status(500).send({
-        error: "CLIENT_URL or NEXT_PUBLIC_SITE_URL is required for checkout redirects",
-        code: "MISSING_CLIENT_URL",
-      });
-    }
-    const base = clientUrl.replace(/\/$/, "");
+      try {
+        const client = createPayPalHttpClient();
+        const planId = getPayPalPlanId(planType);
+        const createRequest = {
+          plan_id: planId,
+          custom_id: ctx.internalUserId.trim(),
+          start_time: new Date(Date.now() + 60_000).toISOString(),
+          application_context: {
+            brand_name: "JobLoom",
+            user_action: "SUBSCRIBE_NOW",
+            shipping_preference: "NO_SHIPPING",
+          },
+        };
 
-    const storeIdRaw = process.env.LEMONSQUEEZY_STORE_ID?.trim();
-    if (!storeIdRaw) {
-      return reply.status(503).send({ error: "Billing not configured", code: "BILLING_DISABLED" });
-    }
+        type CreateSubscriptionResponse = {
+          links?: PayPalSubscriptionLink[];
+        };
 
-    if (!ensureLemonSqueezy()) {
-      return reply.status(503).send({ error: "Billing not configured", code: "BILLING_DISABLED" });
-    }
+        const requestForClient: paypalhttp.HttpRequest = {
+          path: "/v1/billing/subscriptions",
+          verb: "POST",
+          headers: { "content-type": "application/json" },
+          body: createRequest,
+        };
 
-    const user = await server.prisma.user.findUnique({ where: { id: ctx.internalUserId } });
-    if (!user) {
-      return reply.status(404).send({ error: "User not found", code: "USER_NOT_FOUND" });
-    }
+        const response = await client.execute(requestForClient);
+        const result = response.result as CreateSubscriptionResponse;
+        const approvalUrl = result.links?.find((link) => link.rel === "approve")?.href;
 
-    const emailForCheckout =
-      ctx.email?.includes("@") && !ctx.email.endsWith("@users.clerk.local")
-        ? ctx.email
-        : user.email;
+        if (!approvalUrl) {
+          server.log.error({ paypalResult: result }, "PayPal approval URL missing");
+          return reply.status(502).send({ error: "Approval URL missing", code: "APPROVAL_URL_MISSING" });
+        }
 
-    const variantNum = Number.parseInt(variantIdRaw, 10);
-    const enabledVariants = Number.isFinite(variantNum) ? [variantNum] : undefined;
+        return reply.send({ approvalUrl });
+      } catch (err) {
+        server.log.error({ err, planType }, "PayPal create-subscription failed");
+        return reply.status(502).send({ error: "Checkout provider error", code: "CHECKOUT_FAILED" });
+      }
+    },
+  );
 
-    const { data, error } = await createCheckout(storeIdRaw, variantIdRaw, {
-      checkoutData: {
-        email: emailForCheckout,
-        custom: { clerk_id: ctx.clerkId },
-      },
-      productOptions: {
-        ...(enabledVariants ? { enabledVariants } : {}),
-        redirectUrl: `${base}/account?upgraded=true`,
-      },
-      checkoutOptions: {
-        discount: true,
-      },
-    });
+  server.post<{ Params: { subscriptionId: string } }>(
+    "/internal/paypal/reconcile/:subscriptionId",
+    async (request, reply) => {
+      if (!isInternalBillingAuthorized(request.headers.authorization)) {
+        return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+      }
+      const subscriptionId = request.params.subscriptionId?.trim();
+      if (!subscriptionId) {
+        return reply.status(400).send({ error: "Missing subscriptionId", code: "INVALID_SUBSCRIPTION_ID" });
+      }
 
-    if (error) {
-      server.log.error({ err: error }, "Lemon Squeezy createCheckout failed");
-      return reply.status(502).send({ error: "Checkout provider error", code: "CHECKOUT_FAILED" });
-    }
+      try {
+        const details = await fetchPayPalSubscriptionDetails(subscriptionId);
+        if (!details) {
+          return reply.status(404).send({ error: "Subscription not found in PayPal", code: "NOT_FOUND" });
+        }
+        const userId = details.customId?.trim();
+        if (!userId) {
+          return reply.status(400).send({ error: "Subscription missing custom_id", code: "MISSING_CUSTOM_ID" });
+        }
+        const user = await server.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+        if (!user) {
+          return reply.status(404).send({ error: "User not found", code: "USER_NOT_FOUND" });
+        }
 
-    const url = data?.data?.attributes?.url;
-    if (!url) {
-      return reply.status(500).send({ error: "Checkout URL missing", code: "CHECKOUT_URL" });
-    }
+        const result = await applyPayPalSubscriptionEvent(server, {
+          eventType: "INTERNAL.RECONCILE",
+          eventAt: new Date(),
+          paypalId: details.id,
+          userId,
+          status: mapPayPalSubscriptionStatus(details.status),
+          currentPeriodEnd: details.nextBillingTime ?? new Date(),
+        });
 
-    return reply.send({ url });
-  });
+        return reply.send({
+          reconciled: true,
+          applied: result.applied,
+          subscriptionId: details.id,
+          status: details.status,
+          userId,
+        });
+      } catch (err) {
+        server.log.error({ err, subscriptionId }, "PayPal internal reconcile failed");
+        return reply.status(500).send({ error: "Reconcile failed", code: "RECONCILE_FAILED" });
+      }
+    },
+  );
 }
