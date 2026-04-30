@@ -30,6 +30,11 @@ function anonRedisKey(ip: string): string {
   return `viewcap:anon:${hashIp(ip)}`;
 }
 
+/** Redis key for signed-out daily job-row cap (ops / reset scripts). */
+export function viewCapAnonRedisKey(ip: string): string {
+  return anonRedisKey(ip);
+}
+
 async function isProUser(
   prisma: PrismaClient,
   userId: string,

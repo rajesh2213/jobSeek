@@ -233,10 +233,19 @@ function FreeDiscoveryQuotaStrip({
       </div>
       {showPreviewBadge ? (
         <>
-          <DiscoveryMeterCell label="Jobs left today">
-            <span className="text-brand tabular-nums">{rem === null ? "—" : rem}</span>
-            <span className="text-ink/35"> / </span>
-            <span className="tabular-nums">{FREE_DISCOVERY.dailyJobs}</span>
+          <DiscoveryMeterCell label="Browse quota left today">
+            <span className="tabular-nums text-ink">
+              {rem === null ? (
+                "—"
+              ) : (
+                <>
+                  <span className="text-brand tabular-nums">{rem}</span>
+                  <span className="text-ink/45"> of </span>
+                  <span className="tabular-nums">{FREE_DISCOVERY.dailyJobs}</span>
+                  <span className="text-ink/35"> remaining</span>
+                </>
+              )}
+            </span>
           </DiscoveryMeterCell>
           {quotaDivider()}
           <DiscoveryMeterCell label="Now showing" accent>
@@ -256,9 +265,16 @@ function FreeDiscoveryQuotaStrip({
               Free views left today
             </p>
             <p className="font-sans text-xs font-bold tabular-nums leading-none tracking-wide text-ink">
-              <span className="text-brand">{rem === null ? "—" : rem}</span>
-              <span className="text-ink/35"> / </span>
-              <span>{FREE_DISCOVERY.dailyJobs}</span>
+              {rem === null ? (
+                "—"
+              ) : (
+                <>
+                  <span className="text-brand">{rem}</span>
+                  <span className="text-ink/45"> of </span>
+                  <span>{FREE_DISCOVERY.dailyJobs}</span>
+                  <span className="text-ink/35"> remaining</span>
+                </>
+              )}
             </p>
           </div>
           <div
