@@ -186,8 +186,30 @@ export type JobDetailFetchResult = {
  * the API on another `PORT` and set `NEXT_PUBLIC_API_BASE_URL` (and `API_BASE_URL`
  * for SSR) to that origin, e.g. `http://127.0.0.1:3000`.
  */
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? "http://localhost:3000";
+function resolveApiBaseUrl(): string {
+  const raw =
+    process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? "http://localhost:3000";
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  if (typeof window !== "undefined") return trimmed;
+  try {
+    const u = new URL(trimmed);
+    const host = u.hostname.toLowerCase();
+    if (u.protocol === "https:" && (host === "jobloom.tech" || host === "www.jobloom.tech")) {
+      return "https://api.jobloom.tech";
+    }
+  } catch {
+    // Keep original value; downstream fetch will surface the error.
+  }
+  return trimmed;
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
+
+function withServerTimeout(input: RequestInit): RequestInit {
+  if (typeof window !== "undefined") return input;
+  const signal = AbortSignal.timeout(8000);
+  return { ...input, signal };
+}
 
 function debugFastifyFetch(input: {
   route: string;
@@ -830,7 +852,7 @@ export async function fetchJobs(
     cacheStatus: internalBypass ? "HIT" : "MISS",
   });
 
-  const res = await fetch(url, fetchOptions);
+  const res = await fetch(url, withServerTimeout(fetchOptions));
   if (!res.ok) {
     throw new Error(`Failed to fetch jobs: ${res.status} ${res.statusText}`);
   }
@@ -1055,9 +1077,10 @@ export async function fetchCompanies(options: {
 }
 
 export async function fetchCompanyBySlug(slug: string): Promise<CompanyDetail | null> {
-  const res = await fetch(`${API_BASE_URL}/company/${encodeURIComponent(slug)}`, {
-    next: { revalidate: 120 },
-  });
+  const res = await fetch(
+    `${API_BASE_URL}/company/${encodeURIComponent(slug)}`,
+    withServerTimeout({ next: { revalidate: 120 } }),
+  );
   if (res.status === 404) return null;
   if (!res.ok) {
     throw new Error(`Failed to fetch company: ${res.status}`);
@@ -1107,7 +1130,7 @@ export async function fetchCompanyJobs(
     mode: "no-store",
     cacheStatus: "MISS",
   });
-  const res = await fetch(url, { headers, cache: "no-store" });
+  const res = await fetch(url, withServerTimeout({ headers, cache: "no-store" }));
   if (res.status === 404) {
     return {
       data: [],
@@ -1133,10 +1156,13 @@ export async function fetchJobById(
   if (t) headers.set("Authorization", `Bearer ${t}`);
   const forwardedFor = opts?.forwardedFor?.trim();
   if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
-  const res = await fetch(`${API_BASE_URL}/jobs/${id}`, {
-    headers,
-    cache: "no-store",
-  });
+  const res = await fetch(
+    `${API_BASE_URL}/jobs/${id}`,
+    withServerTimeout({
+      headers,
+      cache: "no-store",
+    }),
+  );
   if (res.status === 404) return null;
   if (!res.ok) {
     throw new Error(`Failed to fetch job ${id}: ${res.status} ${res.statusText}`);
