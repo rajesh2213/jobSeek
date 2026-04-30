@@ -1,11 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { headers } from "next/headers";
-import { auth } from "@clerk/nextjs/server";
 import {
-  fetchCompanies,
   fetchCompanyBySlug,
-  fetchCompanyJobs,
 } from "../../../../lib/api";
 import { buildBreadcrumbListJsonLd } from "../../../../lib/seo";
 import { absoluteUrl } from "../../../../lib/seoSite";
@@ -57,42 +53,18 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
 
   const parsed = parseJobFiltersFromSearch(searchRecord(sp));
   const { companyId: _cid, ...hubFilters } = parsed;
-
-  const page = Math.max(1, hubFilters.page ?? 1);
   const limit =
     hubFilters.limit && hubFilters.limit >= 1 && hubFilters.limit <= 100
       ? hubFilters.limit
       : HUB_LIMIT;
 
-  const { getToken } = await auth();
-  const token = await getToken();
-  const h = await headers();
-  const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
-  const jobsResponse = await fetchCompanyJobs(slug, {
-    page,
-    limit,
-    filters: {
-      ...hubFilters,
-      page: undefined,
-      limit: undefined,
-      offset: undefined,
-    },
-    token,
-    forwardedFor,
-  });
-
-  const meta = jobsResponse.meta ?? {
+  const meta = {
     page: 1,
     pageSize: limit,
     total: 0,
     totalPages: 1,
     hasMore: false,
   };
-
-  const companiesRes = await fetchCompanies({ limit: 12, sort: "jobs" });
-  const relatedCompanies = companiesRes.data
-    .filter((c) => c.slug !== slug)
-    .slice(0, 6);
 
   return (
     <>
@@ -115,9 +87,9 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
       <CompanyHubPage
         company={company}
         slug={slug}
-        initialJobs={jobsResponse.data}
+        initialJobs={[]}
         initialMeta={meta}
-        relatedCompanies={relatedCompanies}
+        relatedCompanies={[]}
       />
     </>
   );

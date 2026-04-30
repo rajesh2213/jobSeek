@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
-import { fetchCompanyJobs, fetchJobById, fetchJobs, isJobReady } from "../../../../lib/api";
+import { fetchJobById } from "../../../../lib/api";
 import { buildJobPostingJsonLd } from "../../../../lib/jobPostingJsonLd";
 import { absoluteUrl } from "../../../../lib/seoSite";
 import {
@@ -11,7 +11,6 @@ import {
   resolveJobDetailSections,
   sectionsPlainTextForSeo,
 } from "../../../../lib/resolveJobDetailSections";
-import { rankSimilarJobs } from "../../../../lib/similarJobsRank";
 import { filterSkillPillsForDisplay } from "../../../../lib/jobDisplay";
 import { mergeBrowseSkillQueries, tokensFromRequirementLines } from "../../../../lib/seoSkillTokens";
 import { Container } from "../../../../components/ui/Container";
@@ -21,8 +20,10 @@ import { EnrichmentPills } from "../../../../components/job/EnrichmentPills";
 import { JobDetailSeoPills } from "../../../../components/job/JobDetailSeoPills";
 import { JobParsedContent } from "../../../../components/job/JobParsedContent";
 import { CompanyCard } from "../../../../components/company/CompanyCard";
-import { CompanyJobsPreview } from "../../../../components/company/CompanyJobsPreview";
-import { SimilarJobsSection } from "../../../../components/job/SimilarJobsSection";
+import {
+  CompanyJobsPreviewDeferred,
+  SimilarJobsDeferred,
+} from "../../../../components/job/JobDetailDeferredSections";
 import { ResumeMatchSection } from "../../../../components/resume/ResumeMatchSection";
 import { SeoFooterLinks } from "../../../../components/seo/SeoFooterLinks";
 import { UserLocalResetCaption } from "../../../../components/job/UserLocalResetCaption";
@@ -86,28 +87,6 @@ export default async function JobDetailPage({ params }: Props) {
     ]),
     [],
     10,
-  );
-
-  const [companyJobsRes, similarRes] = await Promise.all([
-    fetchCompanyJobs(job.company.slug, { limit: 5, token, forwardedFor }),
-    fetchJobs(
-      {
-        category: job.category,
-        limit: 20,
-      },
-      {
-        internalSeoSecret: process.env.INTERNAL_SEO_SECRET ?? null,
-        forwardedFor,
-      },
-    ),
-  ]);
-  const companyJobs = (companyJobsRes.data ?? [])
-    .filter((x) => x.id !== job.id && isJobReady(x))
-    .slice(0, 3);
-  const similarJobs = rankSimilarJobs(
-    job,
-    (similarRes.data ?? []).filter(isJobReady),
-    6,
   );
 
   const applyHref = job.applyUrl?.trim() || job.sourceUrl?.trim() || "";
@@ -181,7 +160,7 @@ export default async function JobDetailPage({ params }: Props) {
           </div>
           <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
             <CompanyCard company={job.company} />
-            <CompanyJobsPreview companySlug={job.company.slug} jobs={companyJobs} />
+            <CompanyJobsPreviewDeferred job={job} />
             <EmailCaptureCard
               source="job_page"
               title="Get similar jobs in your inbox"
@@ -195,7 +174,7 @@ export default async function JobDetailPage({ params }: Props) {
           </aside>
         </div>
 
-        <SimilarJobsSection jobs={similarJobs} />
+        <SimilarJobsDeferred job={job} />
         <SeoFooterLinks browseSkills={browseFooterSkills} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       </Container>

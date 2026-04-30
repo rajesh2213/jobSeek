@@ -2,6 +2,7 @@ import { cache } from "react";
 import { auth } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
 import { fetchJobs, type JobsApiResponse } from "./api";
+import { fetchJobsRelatedSlugs } from "./jobsRelatedSlugs";
 import {
   type JobFilters,
   MAX_JOB_FILTER_QUERY_TOKENS,
@@ -86,3 +87,21 @@ export const loadWeeklyJobsPostedCount = cache(async (): Promise<number> => {
   const total = Number(response.meta?.total ?? 0);
   return Number.isFinite(total) && total >= 0 ? Math.round(total) : 0;
 });
+
+export function loadJobsListingDeferred(input: {
+  filtersKey: string;
+  currentSlug: string;
+  fallbackRelatedSlugs: string[];
+}): {
+  jobsDataPromise: Promise<JobsApiResponse>;
+  weeklyPromise: Promise<number>;
+  relatedSlugsPromise: Promise<string[]>;
+} {
+  const jobsDataPromise = loadJobsDiscoveryPage(input.filtersKey);
+  const weeklyPromise = loadWeeklyJobsPostedCount();
+  const relatedSlugsPromise = fetchJobsRelatedSlugs({
+    currentSlug: input.currentSlug,
+    fallback: input.fallbackRelatedSlugs,
+  });
+  return { jobsDataPromise, weeklyPromise, relatedSlugsPromise };
+}

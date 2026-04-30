@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import {
   loadJobsDiscoveryPage,
-  loadWeeklyJobsPostedCount,
+  loadJobsListingDeferred,
   stableJobFiltersKey,
 } from "../../../lib/jobsPageData";
-import { fetchJobsRelatedSlugs } from "../../../lib/jobsRelatedSlugs";
 import {
   buildBreadcrumbListJsonLd,
   buildJobListingItemListJsonLd,
@@ -57,11 +56,12 @@ export default async function JobsPage({ searchParams }: Props) {
     workType: filters.workType,
   });
 
-  const [response, relatedSlugs, weeklyJobsPosted] = await Promise.all([
-    loadJobsDiscoveryPage(filtersKey),
-    fetchJobsRelatedSlugs({ currentSlug, fallback: FALLBACK_RELATED_SLUGS }),
-    loadWeeklyJobsPostedCount(),
-  ]);
+  const { jobsDataPromise } = loadJobsListingDeferred({
+    filtersKey,
+    currentSlug,
+    fallbackRelatedSlugs: FALLBACK_RELATED_SLUGS,
+  });
+  const response = await jobsDataPromise;
 
   const total = response.meta?.total ?? 0;
   const minIndex = getSeoMinJobsIndex();
@@ -83,8 +83,8 @@ export default async function JobsPage({ searchParams }: Props) {
     <JobsSearchPage
       jobs={response.data}
       meta={response.meta}
-      weeklyJobsPosted={weeklyJobsPosted}
-      relatedSlugs={relatedSlugs}
+      weeklyJobsPosted={undefined}
+      relatedSlugs={FALLBACK_RELATED_SLUGS}
       listingTop={listingTop}
       listingFaq={listingFaq}
     />

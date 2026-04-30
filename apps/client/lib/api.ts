@@ -784,6 +784,7 @@ export async function fetchJobs(
     ssrPage?: string;
   },
 ): Promise<JobsApiResponse> {
+  const startMs = Date.now();
   const params = buildJobDiscoverySearchParams(filters, { includeCompanyId: true });
 
   const url = `${API_BASE_URL}/jobs${params.toString() ? `?${params}` : ""}`;
@@ -816,6 +817,7 @@ export async function fetchJobs(
   });
 
   const res = await fetch(url, fetchOptions);
+  console.log("jobs_fetch_ms", Date.now() - startMs);
   if (!res.ok) {
     throw new Error(`Failed to fetch jobs: ${res.status} ${res.statusText}`);
   }
@@ -1066,6 +1068,7 @@ export async function fetchCompanyJobs(
     ssrPage?: string;
   } = {},
 ): Promise<JobsApiResponse> {
+  const startMs = Date.now();
   const page = options.page ?? 1;
   const limit = options.limit ?? 20;
   const merged: JobFilters = {
@@ -1093,6 +1096,7 @@ export async function fetchCompanyJobs(
     cacheStatus: "MISS",
   });
   const res = await fetch(url, { headers, cache: "no-store" });
+  console.log("company_jobs_fetch_ms", Date.now() - startMs);
   if (res.status === 404) {
     return {
       data: [],
@@ -1113,6 +1117,7 @@ export async function fetchJobById(
   id: string,
   opts?: { token?: string | null; forwardedFor?: string | null },
 ): Promise<JobDetailFetchResult | null> {
+  const startMs = Date.now();
   const headers = new Headers();
   const t = opts?.token?.trim();
   if (t) headers.set("Authorization", `Bearer ${t}`);
@@ -1122,6 +1127,7 @@ export async function fetchJobById(
     headers,
     cache: "no-store",
   });
+  console.log("job_fetch_ms", Date.now() - startMs);
   if (res.status === 404) return null;
   if (!res.ok) {
     throw new Error(`Failed to fetch job ${id}: ${res.status} ${res.statusText}`);

@@ -7,6 +7,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import {
+  fetchCompanies,
   fetchCompanyJobs,
   isJobReady,
   type CompanyDetail,
@@ -118,19 +119,30 @@ export function CompanyHubClient({
   const { isPro, isLoaded: planLoaded } = useAccountPlan();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const urlKey = searchParams.toString();
   const urlFilters = useMemo(
-    () => hubFiltersFromSearchParams(searchParams),
-    [searchParams],
+    () => hubFiltersFromSearchParams(new URLSearchParams(urlKey)),
+    [urlKey],
   );
 
   const [listJobs, setListJobs] = useState<JobItem[]>(() => initialJobs.filter(isJobReady));
   const [listMeta, setListMeta] = useState(initialMeta);
+  const [relatedCompaniesState, setRelatedCompaniesState] = useState<CompanyListItem[]>(
+    relatedCompanies,
+  );
+  const [initialHydrating, setInitialHydrating] = useState(
+    initialJobs.length === 0 && initialMeta.total === 0,
+  );
   const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     setListJobs(initialJobs.filter(isJobReady));
     setListMeta(initialMeta);
   }, [initialJobs, initialMeta]);
+
+  useEffect(() => {
+    setRelatedCompaniesState(relatedCompanies);
+  }, [relatedCompanies]);
 
   const navigateHub = useCallback(
     (next: Omit<JobFilters, "companyId">) => {
@@ -151,6 +163,48 @@ export function CompanyHubClient({
     const { page: _p, limit: _l, offset: _o, ...rest } = urlFilters;
     return rest;
   }, [urlFilters]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const { page: _p, limit: _l, offset: _o, ...filterRest } = urlFilters;
+    const page = Math.max(1, urlFilters.page ?? 1);
+    const limit =
+      typeof urlFilters.limit === "number" && urlFilters.limit > 0
+        ? urlFilters.limit
+        : DEFAULT_LIMIT;
+    void (async () => {
+      try {
+        const token = await getToken();
+        const [jobsRes, companiesRes] = await Promise.all([
+          fetchCompanyJobs(slug, {
+            page,
+            limit,
+            filters: {
+              ...filterRest,
+              page: undefined,
+              limit: undefined,
+              offset: undefined,
+            },
+            token,
+          }),
+          fetchCompanies({ limit: 12, sort: "jobs" }),
+        ]);
+        if (cancelled) return;
+        setListJobs((jobsRes.data ?? []).filter(isJobReady));
+        if (jobsRes.meta) setListMeta(jobsRes.meta);
+        setRelatedCompaniesState(
+          companiesRes.data.filter((c) => c.slug !== slug).slice(0, 6),
+        );
+      } catch {
+        // non-critical
+      } finally {
+        if (!cancelled) setInitialHydrating(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken, slug, urlKey, urlFilters]);
 
   const onLoadMore = useCallback(async () => {
     if (!canLoadMore || loadingMore) return;
@@ -411,7 +465,16 @@ export function CompanyHubClient({
           </div>
         ) : null}
 
-        {emptyFiltered ? (
+        {initialHydrating ? (
+          <section className="mt-8 flex flex-col gap-5" aria-label="Loading company roles">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div
+                key={`hub-skeleton-${idx}`}
+                className="h-28 animate-pulse rounded-xl border border-ink/10 bg-surface/80"
+              />
+            ))}
+          </section>
+        ) : emptyFiltered ? (
           <div
             className="mt-8 rounded-2xl border border-dashed border-ink/15 bg-surface px-6 py-12 text-center"
             role="status"
@@ -511,14 +574,14 @@ export function CompanyHubClient({
           </>
         )}
 
-        {relatedCompanies.length > 0 ? (
+        {relatedCompaniesState.length > 0 ? (
           <section className="mt-12 border-t border-ink/10 pt-10">
             <h3 className="text-lg font-semibold text-ink">More companies hiring</h3>
             <p className="mt-1 text-sm text-ink/55">
               Other employers with active listings (by open role count).
             </p>
             <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {relatedCompanies.map((c) => (
+              {relatedCompaniesState.map((c) => (
                 <li key={c.id}>
                   <Link
                     href={`/company/${c.slug}`}

@@ -18,6 +18,7 @@ import {
   createSavedSearch,
   deleteSavedSearch,
   fetchJobs,
+  fetchSeoLandingPages,
   fetchSavedSearches,
   patchSavedSearchAlert,
   renameSavedSearch,
@@ -380,6 +381,10 @@ export function JobsSearchClient({
   const { isPro } = useAccountPlan();
   const [smartApplyBannerDismissed, setSmartApplyBannerDismissed] = useState(false);
   const [extensionPresent, setExtensionPresent] = useState(false);
+  const [resolvedWeeklyJobsPosted, setResolvedWeeklyJobsPosted] = useState<number | undefined>(
+    weeklyJobsPosted,
+  );
+  const [resolvedRelatedSlugs, setResolvedRelatedSlugs] = useState<string[]>(relatedSlugs);
 
   useEffect(() => {
     try {
@@ -390,6 +395,54 @@ export function JobsSearchClient({
     } catch {
       /* ignore */
     }
+  }, []);
+
+  useEffect(() => {
+    setResolvedWeeklyJobsPosted(weeklyJobsPosted);
+  }, [weeklyJobsPosted]);
+
+  useEffect(() => {
+    setResolvedRelatedSlugs(relatedSlugs);
+  }, [relatedSlugs]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (resolvedWeeklyJobsPosted !== undefined) {
+      return () => {
+        cancelled = true;
+      };
+    }
+    void fetchJobs({ posted: "1w", page: 1, limit: 1, sort: "latest" })
+      .then((res) => {
+        if (cancelled) return;
+        const total = Number(res.meta?.total ?? 0);
+        setResolvedWeeklyJobsPosted(Number.isFinite(total) && total >= 0 ? Math.round(total) : 0);
+      })
+      .catch(() => {
+        /* non-critical */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvedWeeklyJobsPosted]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchSeoLandingPages({ minCount: 5, maxSlugs: 150 })
+      .then((seo) => {
+        if (cancelled) return;
+        const next = seo.data
+          .map((e) => normalizeRelatedSlugPath(e.slug).replace(/^\/jobs\/?/, ""))
+          .filter(Boolean)
+          .slice(0, 8);
+        if (next.length > 0) setResolvedRelatedSlugs(next);
+      })
+      .catch(() => {
+        /* non-critical */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -974,7 +1027,7 @@ export function JobsSearchClient({
     <div className="relative z-0 flex min-h-screen flex-col">
       <div className="-mb-6 w-full sm:-mb-8">
         <TimeAdvantageSimulator
-          jobsPostedThisWeek={weeklyJobsPosted}
+          jobsPostedThisWeek={resolvedWeeklyJobsPosted}
           statRowPrefix={
             <button
               type="button"
@@ -1562,7 +1615,7 @@ export function JobsSearchClient({
           Related searches
         </p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
-          {relatedSlugs.map((slug) => (
+          {resolvedRelatedSlugs.map((slug) => (
             <Link
               key={slug}
               href={normalizeRelatedSlugPath(slug)}
