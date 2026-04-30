@@ -45,7 +45,10 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     ...parseJobFiltersFromSearch(sp),
     surface: "seo" as const,
   };
-  const response = await loadJobsDiscoveryPage(stableJobFiltersKey(filters));
+  const response = await loadJobsDiscoveryPage(stableJobFiltersKey(filters)).catch(() => ({
+    data: [],
+    meta: undefined,
+  }));
   return jobsRouteMetadata(filters, {
     canonicalPath: getCanonicalJobListingUrl(filters),
     total: response.meta?.total,
@@ -79,7 +82,7 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
     experience: filters.experience,
   });
 
-  const [response, relatedSlugsRaw, aggregations] = await Promise.all([
+  const [responseResult, relatedResult, aggregationsResult] = await Promise.allSettled([
     loadJobsDiscoveryPage(filtersKey),
     fetchJobsRelatedSlugs({ currentSlug, fallback: FALLBACK_RELATED_SLUGS }),
     fetchSeoAggregations({
@@ -87,6 +90,21 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
       internalSeoSecret: process.env.INTERNAL_SEO_SECRET ?? null,
     }),
   ]);
+  const response =
+    responseResult.status === "fulfilled"
+      ? responseResult.value
+      : { data: [], meta: { page: 1, pageSize: 20, total: 0, totalPages: 1, hasMore: false } };
+  const relatedSlugsRaw =
+    relatedResult.status === "fulfilled" ? relatedResult.value : FALLBACK_RELATED_SLUGS;
+  const aggregations =
+    aggregationsResult.status === "fulfilled"
+      ? aggregationsResult.value
+      : {
+          topSkills: [],
+          topCompanies: [],
+          salary: { avg: null, min: null, max: null },
+          hiringTrend: [],
+        };
   const relatedSlugs = relatedSlugsRaw
     .map((s) => normalizeRelatedSlugPath(s).replace(/^\/jobs\/?/, ""))
     .filter(Boolean);

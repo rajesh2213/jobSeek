@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useUser } from "@clerk/nextjs";
 import {
   motion,
   AnimatePresence,
@@ -668,19 +669,30 @@ function FinalUrgencySection() {
 }
 
 function ExitIntentCapture() {
+  const { isLoaded, isSignedIn } = useUser();
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+
+  const shouldBlockForAuth = !isLoaded || isSignedIn;
+
   useEffect(() => {
-    if (dismissed) return;
+    if (dismissed || shouldBlockForAuth) return;
     const onMouseOut = (e: MouseEvent) => {
-      if (dismissed) return;
+      if (dismissed || shouldBlockForAuth) return;
       if (e.clientY > 8) return;
       setOpen((prev) => prev || true);
     };
     window.addEventListener("mouseout", onMouseOut);
     return () => window.removeEventListener("mouseout", onMouseOut);
-  }, [dismissed]);
-  if (!open) return null;
+  }, [dismissed, shouldBlockForAuth]);
+
+  useEffect(() => {
+    if (shouldBlockForAuth) {
+      setOpen(false);
+    }
+  }, [shouldBlockForAuth]);
+
+  if (!open || shouldBlockForAuth) return null;
   return (
     <div className="fixed right-4 top-20 z-50 w-[min(92vw,420px)] rounded-2xl border border-ink/10 bg-canvas p-3 shadow-xl">
       <div className="mb-2 flex items-center justify-between">
