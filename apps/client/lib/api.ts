@@ -817,7 +817,12 @@ export async function fetchJobs(
   });
 
   const res = await fetch(url, fetchOptions);
-  console.log("jobs_fetch_ms", Date.now() - startMs);
+  const networkMs = Date.now() - startMs;
+  console.log("jobs_fetch_ms", networkMs);
+  console.log("API_NETWORK_ms", {
+    url,
+    duration: networkMs,
+  });
   if (!res.ok) {
     throw new Error(`Failed to fetch jobs: ${res.status} ${res.statusText}`);
   }

@@ -387,6 +387,14 @@ export function JobsSearchClient({
   const [resolvedRelatedSlugs, setResolvedRelatedSlugs] = useState<string[]>(relatedSlugs);
 
   useEffect(() => {
+    const t = performance.now();
+    console.log("CLIENT_HYDRATION_START_jobs", t);
+    return () => {
+      console.log("CLIENT_HYDRATION_END_jobs", performance.now() - t);
+    };
+  }, []);
+
+  useEffect(() => {
     try {
       setSmartApplyBannerDismissed(
         typeof window !== "undefined" &&

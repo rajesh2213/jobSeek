@@ -140,6 +140,7 @@ export function registerJobRoutes(
 
       const meteredLimit = isSafeToCache ? Math.min(limit, 50) : limit;
 
+      const jobsTotalStart = Date.now();
       const out = await runMeteredJobsList<JobWithCompany>(
         server.prisma,
         redis,
@@ -160,6 +161,7 @@ export function registerJobRoutes(
             }),
         },
       );
+      console.log("jobs_total_ms", Date.now() - jobsTotalStart);
 
       if (isSafeToCache) {
         reply.header("Cache-Control", "public, max-age=60, s-maxage=120");

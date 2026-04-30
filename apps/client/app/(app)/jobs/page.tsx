@@ -43,8 +43,14 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 }
 
 export default async function JobsPage({ searchParams }: Props) {
+  const pageStart = Date.now();
+  console.log("SSR_START_jobs", pageStart);
+  console.log("STEP_searchParams_start_jobs", Date.now() - pageStart);
   const sp = await searchParams;
+  console.log("STEP_searchParams_end_jobs", Date.now() - pageStart);
+  console.log("STEP_parseFilters_start_jobs", Date.now() - pageStart);
   const filters = parseJobFiltersFromSearch(sp);
+  console.log("STEP_parseFilters_end_jobs", Date.now() - pageStart);
   const filtersKey = stableJobFiltersKey(filters);
   const currentSlug = filtersToSlug({
     category: filters.category,
@@ -61,7 +67,9 @@ export default async function JobsPage({ searchParams }: Props) {
     currentSlug,
     fallbackRelatedSlugs: FALLBACK_RELATED_SLUGS,
   });
+  const jobsStart = Date.now();
   const response = await jobsDataPromise;
+  console.log("SSR_jobs_fetch_ms", Date.now() - jobsStart);
 
   const total = response.meta?.total ?? 0;
   const minIndex = getSeoMinJobsIndex();
@@ -79,6 +87,7 @@ export default async function JobsPage({ searchParams }: Props) {
   const listingFaq =
     total >= minIndex && total >= 8 ? <JobsListingFaq /> : null;
 
+  console.log("SSR_TOTAL_jobs_ms", Date.now() - pageStart);
   return (
     <JobsSearchPage
       jobs={response.data}

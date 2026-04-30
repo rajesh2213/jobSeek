@@ -156,6 +156,7 @@ export async function runMeteredJobsList<T>(
     fetchList: (effectiveLimit: number) => Promise<PaginatedResult<T>>;
   },
 ): Promise<{ items: T[]; meta: MeteredJobsListMeta }> {
+  const t0 = Date.now();
   const logMeteringCheck = (input: {
     isCapped: boolean;
     isFreeUser: boolean;
@@ -173,6 +174,15 @@ export async function runMeteredJobsList<T>(
   };
   const { limit, offset, fetchList } = args;
   const page = Math.max(1, args.page);
+  const logFetchList = (ms: number): void => {
+    console.log("jobs_fetchList_ms", ms);
+  };
+  const logMeta = (ms: number): void => {
+    console.log("jobs_meta_ms", ms);
+  };
+  const logTotal = (): void => {
+    console.log("jobs_metering_total_ms", Date.now() - t0);
+  };
 
   if (bypassCap) {
     logMeteringCheck({
@@ -182,8 +192,13 @@ export async function runMeteredJobsList<T>(
       capApplied: false,
       limitAdjusted: false,
     });
+    const listStart = Date.now();
     const result = await fetchList(limit);
+    logFetchList(Date.now() - listStart);
+    const metaStart = Date.now();
     const base = metaBase(result, offset, limit);
+    logMeta(Date.now() - metaStart);
+    logTotal();
     return {
       items: result.items,
       meta: {
@@ -210,8 +225,13 @@ export async function runMeteredJobsList<T>(
       capApplied: false,
       limitAdjusted: false,
     });
+    const listStart = Date.now();
     const result = await fetchList(limit);
+    logFetchList(Date.now() - listStart);
+    const metaStart = Date.now();
     const base = metaBase(result, offset, limit);
+    logMeta(Date.now() - metaStart);
+    logTotal();
     return {
       items: result.items,
       meta: {
@@ -280,9 +300,13 @@ export async function runMeteredJobsList<T>(
   });
 
   if (LIMITS.MODE === "soft") {
+    const listStart = Date.now();
     const result = await fetchList(limit);
+    logFetchList(Date.now() - listStart);
     const debit = await checkAndIncrementViewCap(prisma, redis, capCtx, result.items.length);
+    const metaStart = Date.now();
     const base = metaBase(result, offset, limit);
+    logMeta(Date.now() - metaStart);
     const remainingSoft = Math.max(0, debit.remaining);
     logMeteringCheck({
       isCapped: remainingSoft <= 0,
@@ -291,6 +315,7 @@ export async function runMeteredJobsList<T>(
       capApplied: result.items.length > 0,
       limitAdjusted: false,
     });
+    logTotal();
     return {
       items: result.items,
       meta: {
@@ -319,6 +344,7 @@ export async function runMeteredJobsList<T>(
       capApplied: true,
       limitAdjusted: true,
     });
+    logTotal();
     return {
       items: [] as T[],
       meta: emptyPreviewMeta(0, capState.resetAt.toISOString()),
@@ -335,9 +361,14 @@ export async function runMeteredJobsList<T>(
       capApplied: true,
       limitAdjusted: previewLimit !== limit,
     });
+    const listStart = Date.now();
     const result = await fetchList(previewLimit);
+    logFetchList(Date.now() - listStart);
     const totalMatching = result.total;
+    const metaStart = Date.now();
     const base = metaBase(result, offset, limit);
+    logMeta(Date.now() - metaStart);
+    logTotal();
     return {
       items: result.items,
       meta: {
@@ -368,13 +399,18 @@ export async function runMeteredJobsList<T>(
       capApplied: true,
       limitAdjusted: true,
     });
+    logTotal();
     return { items: [] as T[], meta: blockedPageMeta(0) };
   }
 
+  const listStart = Date.now();
   const result = await fetchList(effectiveLimit);
+  logFetchList(Date.now() - listStart);
   const debit = await checkAndIncrementViewCap(prisma, redis, capCtx, result.items.length);
   const remainingAfter = Math.max(0, debit.remaining);
+  const metaStart = Date.now();
   const base = metaBase(result, offset, limit);
+  logMeta(Date.now() - metaStart);
   logMeteringCheck({
     isCapped: remainingAfter <= 0,
     isFreeUser: true,
@@ -382,6 +418,7 @@ export async function runMeteredJobsList<T>(
     capApplied: result.items.length > 0,
     limitAdjusted: effectiveLimit !== limit,
   });
+  logTotal();
   return {
     items: result.items,
     meta: {

@@ -635,9 +635,11 @@ export function createJobRepository(prisma: PrismaClient) {
       const whereSql = buildDiscoveryWhereSql(filters, {
         includeProcessing: options?.includeProcessing ?? false,
       });
+      const start = Date.now();
       const rows = await prisma.$queryRaw<{ c: bigint }[]>`
         SELECT COUNT(*)::bigint AS c FROM "Job" j WHERE ${whereSql}
       `;
+      console.log("jobs_count_query_ms", Date.now() - start);
       return Number(rows[0]?.c ?? 0);
     },
 
@@ -723,6 +725,10 @@ export function createJobRepository(prisma: PrismaClient) {
       sort?: "latest" | "salary_desc";
       includeProcessing?: boolean;
     }): Promise<JobWithCompany[]> {
+      console.log("jobs_pagination", {
+        limit: options.limit,
+        offset: options.offset,
+      });
       const sort = options.sort ?? "latest";
       const companySelect = {
         select: {
@@ -769,20 +775,36 @@ export function createJobRepository(prisma: PrismaClient) {
         const whereSql = buildDiscoveryWhereSql(options.filters, {
           includeProcessing: options.includeProcessing ?? false,
         });
+        const idStart = Date.now();
         const idRows = await prisma.$queryRaw<{ id: string }[]>`
           SELECT j.id FROM "Job" j
           WHERE ${whereSql}
           ORDER BY COALESCE(j."postedAt", j."createdAt") DESC
           LIMIT ${options.limit} OFFSET ${options.offset}
         `;
+        console.log("jobs_id_query_ms", Date.now() - idStart);
         const ids = idRows.map((r) => r.id);
         if (ids.length === 0) return [];
+        const fetchStart = Date.now();
         const jobs = await prisma.job.findMany({
           where: { id: { in: ids } },
           select: listSelect,
         });
+        console.log("jobs_fetch_query_ms", Date.now() - fetchStart);
         const order = new Map(ids.map((id, i) => [id, i]));
         jobs.sort((a, b) => (order.get(a.id)! - order.get(b.id)!));
+        console.log("jobs_rows_returned", jobs.length);
+        const approxSize = JSON.stringify(jobs[0] || {}).length;
+        console.log("jobs_avg_row_bytes", approxSize);
+        console.log("jobs_breakdown_summary", {
+          total: jobs.length,
+          countQuery: null,
+          idQuery: "see jobs_id_query_ms",
+          fetchQuery: "see jobs_fetch_query_ms",
+          meta: null,
+          rows: jobs.length,
+          avgRowBytes: approxSize,
+        });
         return jobs as JobWithCompany[];
       }
 
@@ -791,20 +813,36 @@ export function createJobRepository(prisma: PrismaClient) {
       const whereSql = buildDiscoveryWhereSql(options.filters, {
         includeProcessing: options.includeProcessing ?? false,
       });
+      const idStart = Date.now();
       const idRows = await prisma.$queryRaw<{ id: string }[]>`
         SELECT j.id FROM "Job" j
         WHERE ${whereSql}
         ORDER BY j."salaryMin" DESC NULLS LAST, j."createdAt" DESC
         LIMIT ${options.limit} OFFSET ${options.offset}
       `;
+      console.log("jobs_id_query_ms", Date.now() - idStart);
       const ids = idRows.map((r) => r.id);
       if (ids.length === 0) return [];
+      const fetchStart = Date.now();
       const jobs = await prisma.job.findMany({
         where: { id: { in: ids } },
         select: listSelect,
       });
+      console.log("jobs_fetch_query_ms", Date.now() - fetchStart);
       const order = new Map(ids.map((id, i) => [id, i]));
       jobs.sort((a, b) => (order.get(a.id)! - order.get(b.id)!));
+      console.log("jobs_rows_returned", jobs.length);
+      const approxSize = JSON.stringify(jobs[0] || {}).length;
+      console.log("jobs_avg_row_bytes", approxSize);
+      console.log("jobs_breakdown_summary", {
+        total: jobs.length,
+        countQuery: null,
+        idQuery: "see jobs_id_query_ms",
+        fetchQuery: "see jobs_fetch_query_ms",
+        meta: null,
+        rows: jobs.length,
+        avgRowBytes: approxSize,
+      });
       return jobs as JobWithCompany[];
     },
 
