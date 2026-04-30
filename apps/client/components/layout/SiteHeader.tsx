@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { siteLogoBrandDotRef } from "../../lib/siteLogoBrandDotRef";
+import { SiteSideRailMobileNav } from "./SiteSideRail";
 
 /**
  * Sticky top bar. Account avatar lives in root layout (`FixedAccountAvatar`) so it is not
@@ -13,8 +14,8 @@ export function SiteHeader() {
       className="pointer-events-none sticky top-0 z-[70] isolate border-none shadow-none"
       id="header-topbar"
     >
-      <div className="flex h-16 items-center bg-canvas px-4 sm:px-6">
-        <div className="pointer-events-auto flex min-w-0 items-center gap-3 sm:gap-4">
+      <div className="pointer-events-auto mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-2 bg-canvas px-4 sm:h-16 sm:gap-3 sm:px-6">
+        <div className="flex min-w-0 shrink-0 items-center gap-3 sm:gap-4">
           <Link
             id="site-logo-link"
             href="/"
@@ -31,10 +32,7 @@ export function SiteHeader() {
               aria-hidden
             />
           </Link>
-          <nav
-            className="hidden min-w-0 items-center gap-3 text-xs font-bold uppercase tracking-wide text-ink/50 min-[420px]:flex lg:hidden"
-            aria-label="Sections"
-          >
+          <nav className="hidden min-w-0 items-center gap-3 text-xs font-bold uppercase tracking-wide text-ink/50" aria-label="Sections">
             <Link href="/jobs" prefetch={false} className="no-underline hover:text-brand">
               Jobs
             </Link>
@@ -42,6 +40,13 @@ export function SiteHeader() {
               Companies
             </Link>
           </nav>
+        </div>
+        <div className="flex min-w-0 flex-1 justify-center px-1 lg:hidden">
+          <SiteSideRailMobileNav />
+        </div>
+        {/* Roughly balances FixedAccountAvatar so pills stay visually centered */}
+        <div className="pointer-events-none invisible flex w-11 shrink-0 justify-end sm:w-[132px]" aria-hidden>
+          <span className="inline-block h-11 w-11 opacity-0" />
         </div>
       </div>
     </header>

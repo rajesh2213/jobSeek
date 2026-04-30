@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 import {
   motion,
   AnimatePresence,
@@ -417,7 +418,7 @@ function SocialProofSection() {
     <motion.section
       ref={ref}
       style={{ y: sectionY, opacity: sectionOpacity }}
-      className="border-y border-ink/10 bg-white/40 py-14 lg:-ml-[172px] lg:pl-[172px]"
+      className="border-y border-ink/10 bg-white/40 py-14 md:-ml-[184px] md:pl-[184px]"
     >
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">Others are already winning</p>
@@ -603,7 +604,7 @@ function FinalUrgencySection() {
   return (
     <motion.section
       {...sectionReveal}
-      className="bg-[linear-gradient(180deg,#1a1a1a_0%,#111111_100%)] px-4 py-20 text-center sm:px-6 lg:-ml-[172px] lg:pl-[172px]"
+      className="bg-[linear-gradient(180deg,#1a1a1a_0%,#111111_100%)] px-4 py-20 text-center sm:px-6 md:-ml-[184px] md:pl-[184px]"
     >
       <div className="mx-auto max-w-3xl">
         <h3 className="text-3xl font-semibold leading-snug text-white sm:text-4xl">
@@ -668,9 +669,11 @@ function FinalUrgencySection() {
 }
 
 function ExitIntentCapture() {
+  const { isLoaded, isSignedIn } = useAuth();
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   useEffect(() => {
+    if (!isLoaded || isSignedIn) return;
     if (dismissed) return;
     const onMouseOut = (e: MouseEvent) => {
       if (dismissed) return;
@@ -679,7 +682,8 @@ function ExitIntentCapture() {
     };
     window.addEventListener("mouseout", onMouseOut);
     return () => window.removeEventListener("mouseout", onMouseOut);
-  }, [dismissed]);
+  }, [dismissed, isLoaded, isSignedIn]);
+  if (!isLoaded || isSignedIn) return null;
   if (!open) return null;
   return (
     <div className="fixed right-4 top-20 z-50 w-[min(92vw,420px)] rounded-2xl border border-ink/10 bg-canvas p-3 shadow-xl">

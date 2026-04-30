@@ -27,6 +27,12 @@ export interface MeteredJobsListMeta {
   hasMore: boolean;
   capReached: boolean;
   remaining: number | null;
+  /** Number of rows debited by this request (server-authoritative). */
+  debitedCount?: number;
+  /** Remaining balance before this request was applied. */
+  remainingBefore?: number | null;
+  /** Remaining balance after this request was applied. */
+  remainingAfter?: number | null;
   resetAt: string;
   totalHidden?: number;
   viewCapUnlimited: boolean;
@@ -212,6 +218,9 @@ export async function runMeteredJobsList<T>(
         ...base,
         capReached: false,
         remaining: null,
+        debitedCount: 0,
+        remainingBefore: null,
+        remainingAfter: null,
         resetAt: new Date().toISOString(),
         viewCapUnlimited: true,
         limit: limitMeta({
@@ -245,6 +254,9 @@ export async function runMeteredJobsList<T>(
         ...base,
         capReached: false,
         remaining: null,
+        debitedCount: 0,
+        remainingBefore: null,
+        remainingAfter: null,
         resetAt: capState.resetAt.toISOString(),
         viewCapUnlimited: true,
         limit: limitMeta({
@@ -272,6 +284,9 @@ export async function runMeteredJobsList<T>(
     hasMore: false,
     capReached: true,
     remaining: 0,
+    debitedCount: 0,
+    remainingBefore: 0,
+    remainingAfter: 0,
     resetAt: resetAtIso,
     totalHidden: Math.max(0, totalMatching - DISCOVERY_PREVIEW_ROWS),
     viewCapUnlimited: false,
@@ -296,6 +311,9 @@ export async function runMeteredJobsList<T>(
     hasMore: false,
     capReached: remaining <= 0,
     remaining: Math.max(0, remaining),
+    debitedCount: 0,
+    remainingBefore: Math.max(0, remaining),
+    remainingAfter: Math.max(0, remaining),
     resetAt: capState.resetAt.toISOString(),
     viewCapUnlimited: false,
     discoveryPhase: remaining <= 0 ? "preview" : "search",
@@ -329,6 +347,9 @@ export async function runMeteredJobsList<T>(
         ...base,
         capReached: remainingSoft <= 0,
         remaining: remainingSoft,
+        debitedCount: result.items.length,
+        remainingBefore: capState.remaining,
+        remainingAfter: remainingSoft,
         resetAt: debit.resetAt.toISOString(),
         totalHidden: 0,
         viewCapUnlimited: false,
@@ -383,6 +404,9 @@ export async function runMeteredJobsList<T>(
         hasMore: false,
         capReached: true,
         remaining: 0,
+        debitedCount: 0,
+        remainingBefore: 0,
+        remainingAfter: 0,
         resetAt: capState.resetAt.toISOString(),
         totalHidden: Math.max(0, totalMatching - DISCOVERY_PREVIEW_ROWS),
         viewCapUnlimited: false,
@@ -432,6 +456,9 @@ export async function runMeteredJobsList<T>(
       ...base,
       capReached: remainingAfter <= 0,
       remaining: remainingAfter,
+      debitedCount: result.items.length,
+      remainingBefore: capState.remaining,
+      remainingAfter,
       resetAt: debit.resetAt.toISOString(),
       viewCapUnlimited: false,
       discoveryPhase: "search",

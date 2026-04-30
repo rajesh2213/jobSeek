@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { SignInButton, useUser } from "@clerk/nextjs";
 import { useAccountPlan } from "../../lib/useAccountPlan";
+import { SiteSideRailMobileNav } from "./SiteSideRail";
 
 export function MarketingHeader() {
   const { user, isLoaded } = useUser();
@@ -15,7 +16,7 @@ export function MarketingHeader() {
     <header
       className="sticky top-0 z-[70] border-b border-ink/10 bg-[rgba(245,242,235,0.92)] backdrop-blur"
     >
-      <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
+      <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-2 px-4 sm:h-16 sm:gap-3 sm:px-6">
         <Link
           href="/"
           prefetch={false}
@@ -29,7 +30,10 @@ export function MarketingHeader() {
             aria-hidden
           />
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 justify-center px-1 lg:hidden">
+          <SiteSideRailMobileNav />
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
           {showGetPro ? (
             <Link
               href="/pricing"

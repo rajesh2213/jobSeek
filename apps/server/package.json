@@ -42,6 +42,8 @@
     "seed:csv": "tsx scripts/seedCompaniesFromCSV.ts",
     "split:company-csv": "node --import tsx scripts/splitCompanyDatasetCsv.ts",
     "reset:fresh": "tsx scripts/reset.fresh.ts",
+    "reset:job-view-quota": "tsx scripts/reset.jobViewQuota.ts",
+    "diagnose:redis-viewcap": "tsx scripts/diagnose.redis.viewcap.ts",
     "metrics": "tsx src/scripts/metrics.snapshot.ts",
     "metrics:ats": "tsx src/scripts/ats.metrics.snapshot.ts",
     "monitor:pipeline": "tsx src/scripts/monitorPipeline.ts",

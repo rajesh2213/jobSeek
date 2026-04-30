@@ -44,6 +44,12 @@ coverage/
 # One-off local artifacts
 apps/server/review-output.txt
 
+# Lighthouse / perf scratch dumps (repo root)
+.tmp-lh-*.json
+
+# Packaged extension artifact (use npm run zip:ext)
+/extension.zip
+
 # Inference app markdown (keep locally; not part of code commits)
 apps/inference/**/README.md
 

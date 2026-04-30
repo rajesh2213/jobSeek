@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { LegalFooter } from "../../components/layout/LegalFooter";
 import { MarketingHeader } from "../../components/layout/MarketingHeader";
 import { PageTransition } from "../../components/layout/PageTransition";
-import { SiteSideRail } from "../../components/layout/SiteSideRail";
+import { SiteSideRailProvider } from "../../components/layout/SiteSideRail";
 
 const marketingDescription =
   "Discover open roles from career sites and boards in one place. Filter by skill, location, and remote—resume-aware matching and fast apply flows.";
@@ -24,13 +24,12 @@ export const metadata: Metadata = {
 
 export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
-    <>
+    <SiteSideRailProvider>
       <MarketingHeader />
-      <SiteSideRail />
       <div className="relative flex min-h-screen flex-col lg:pl-[112px]">
         <PageTransition>{children}</PageTransition>
         <LegalFooter />
       </div>
-    </>
+    </SiteSideRailProvider>
   );
 }

@@ -10,6 +10,7 @@ export function loadRootEnv(): void {
 
   if (!fs.existsSync(envPath)) return;
 
-  dotenv.config({ path: envPath });
+  // Ensure repo-root .env is authoritative for local dev regardless of stale shell env.
+  dotenv.config({ path: envPath, override: true });
 }
 

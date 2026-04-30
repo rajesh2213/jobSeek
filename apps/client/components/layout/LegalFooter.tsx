@@ -50,6 +50,9 @@ export function LegalFooter() {
           <Link href="/privacy" className="hover:text-brand" prefetch={false}>
             Privacy Policy
           </Link>
+          <Link href="/support" className="hover:text-brand" prefetch={false}>
+            Support
+          </Link>
           <Link href="/billing" className="hover:text-brand" prefetch={false}>
             Billing &amp; refunds
           </Link>

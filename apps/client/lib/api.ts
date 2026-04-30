@@ -116,6 +116,9 @@ export interface JobsApiResponse {
     hasMore?: boolean;
     capReached?: boolean;
     remaining?: number | null;
+    debitedCount?: number;
+    remainingBefore?: number | null;
+    remainingAfter?: number | null;
     resetAt?: string;
     totalHidden?: number;
     viewCapUnlimited?: boolean;

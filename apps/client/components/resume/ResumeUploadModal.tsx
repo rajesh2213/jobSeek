@@ -16,9 +16,11 @@ function formatBytes(n: number): string {
 export function ResumeUploadModal({
   open,
   onClose,
+  onUploadSuccess,
 }: {
   open: boolean;
   onClose: () => void;
+  onUploadSuccess?: () => void;
 }) {
   const { uploadResume, isUploading, uploadError } = useResume();
   const [file, setFile] = useState<File | null>(null);
@@ -74,11 +76,10 @@ export function ResumeUploadModal({
     try {
       await uploadResume(file);
       setSuccess(true);
-      window.setTimeout(() => {
-        onClose();
-        setFile(null);
-        setSuccess(false);
-      }, 2000);
+      onUploadSuccess?.();
+      onClose();
+      setFile(null);
+      setSuccess(false);
     } catch {
       /* uploadResume sets context error */
     }

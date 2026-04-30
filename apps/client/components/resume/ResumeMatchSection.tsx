@@ -2,7 +2,7 @@
 
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { JobItem } from "../../lib/api";
 import { fetchResumeSemanticMatch } from "../../lib/api";
 import { resumeMatchSubtitle } from "../../lib/resumeGradeLabel";
@@ -58,6 +58,7 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ScoringResult | null>(null);
+  const pendingScoreAfterUploadRef = useRef(false);
 
   useEffect(() => {
     setResult(null);
@@ -99,6 +100,13 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (!pendingScoreAfterUploadRef.current) return;
+    if (!hasResume || busy) return;
+    pendingScoreAfterUploadRef.current = false;
+    void onCheck();
+  }, [busy, hasResume, onCheck]);
 
   if (!isSignedIn) {
     return null;
@@ -193,7 +201,13 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
         </div>
       )}
 
-      <ResumeUploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
+      <ResumeUploadModal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        onUploadSuccess={() => {
+          pendingScoreAfterUploadRef.current = true;
+        }}
+      />
       <ResumeScorePanel
         open={panelOpen}
         onClose={() => setPanelOpen(false)}

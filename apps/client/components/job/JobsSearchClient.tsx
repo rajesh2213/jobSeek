@@ -79,6 +79,28 @@ function listQueryBase(f: JobFilters): JobFilters {
   return rest;
 }
 
+/** Keep client pagination meta after "Load more" but always take fresh view-cap fields from the server (e.g. after admin quota reset). */
+function mergeMeteringMetaFromServer(
+  prev: JobsApiResponse["meta"] | undefined,
+  server: JobsApiResponse["meta"] | undefined,
+): JobsApiResponse["meta"] | undefined {
+  if (!server) return prev;
+  if (!prev) return server;
+  return {
+    ...prev,
+    remaining: server.remaining,
+    debitedCount: server.debitedCount,
+    remainingBefore: server.remainingBefore,
+    remainingAfter: server.remainingAfter,
+    resetAt: server.resetAt,
+    totalHidden: server.totalHidden,
+    viewCapUnlimited: server.viewCapUnlimited,
+    discoveryPhase: server.discoveryPhase,
+    capReached: server.capReached,
+    limit: server.limit,
+  };
+}
+
 interface Props {
   jobs: JobItem[];
   meta?: JobsApiResponse["meta"];
@@ -187,8 +209,14 @@ function FreeDiscoveryQuotaStrip({
 
   const isPreview =
     listMeta.discoveryPhase === "preview" || listMeta.capReached;
-  const rem = Math.max(0, listMeta.remaining ?? 0);
+  /** Avoid `remaining ?? 0`: missing/null metered meta must not display as zero (looks like “quota exhausted”). */
+  const remKnown =
+    typeof listMeta.remaining === "number" && Number.isFinite(listMeta.remaining);
+  const rem = remKnown ? Math.max(0, listMeta.remaining as number) : null;
   const resetAt = listMeta.resetAt;
+  const showPreviewBadge =
+    isPreview ||
+    (rem !== null && rem < FREE_DISCOVERY.dailyJobs);
 
   const shell = cn(
     "inline-flex max-w-full items-stretch overflow-x-auto rounded-2xl border border-ink/[0.07] text-ink",
@@ -203,10 +231,10 @@ function FreeDiscoveryQuotaStrip({
           Free
         </p>
       </div>
-      {isPreview ? (
+      {showPreviewBadge ? (
         <>
           <DiscoveryMeterCell label="Jobs left today">
-            <span className="text-brand tabular-nums">{rem}</span>
+            <span className="text-brand tabular-nums">{rem === null ? "—" : rem}</span>
             <span className="text-ink/35"> / </span>
             <span className="tabular-nums">{FREE_DISCOVERY.dailyJobs}</span>
           </DiscoveryMeterCell>
@@ -228,7 +256,7 @@ function FreeDiscoveryQuotaStrip({
               Free views left today
             </p>
             <p className="font-sans text-xs font-bold tabular-nums leading-none tracking-wide text-ink">
-              <span className="text-brand">{rem}</span>
+              <span className="text-brand">{rem === null ? "—" : rem}</span>
               <span className="text-ink/35"> / </span>
               <span>{FREE_DISCOVERY.dailyJobs}</span>
             </p>
@@ -568,7 +596,7 @@ export function JobsSearchClient({
       const prevPage = prev?.page ?? 1;
       const serverPage = initialMeta?.page ?? 1;
       if (prev && initialMeta && prevPage > serverPage) {
-        return prev;
+        return mergeMeteringMetaFromServer(prev, initialMeta) ?? prev;
       }
       return initialMeta ?? prev;
     });
@@ -1445,7 +1473,11 @@ export function JobsSearchClient({
             </p>
           ) : null}
           <FilterChips filters={urlFilters} onRemoveChip={onRemoveChip} />
-          {!isPro && listMeta?.limit?.warning ? (
+          {!isPro &&
+          listMeta &&
+          listMeta.viewCapUnlimited === false &&
+          typeof listMeta.remaining === "number" &&
+          listMeta.remaining <= 45 ? (
             <div
               role="status"
               className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-ink"

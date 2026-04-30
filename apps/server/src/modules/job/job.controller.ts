@@ -297,6 +297,7 @@ export function registerJobRoutes(
           data: toJobDetailJson(job as unknown as JobWithCompanyRow),
           meta: {
             capReached: false,
+            remaining: null,
             resetAt,
             viewCapUnlimited: true,
             limit: {
