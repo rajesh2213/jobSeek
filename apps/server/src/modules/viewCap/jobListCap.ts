@@ -22,7 +22,7 @@ export interface MeteredJobsListMeta {
   pageSize: number;
   total: number | null;
   totalCount: number | null;
-  totalPages: number;
+  totalPages?: number;
   offset: number;
   hasMore: boolean;
   capReached: boolean;
@@ -112,13 +112,13 @@ function metaBase(
     typeof offset === "number"
       ? offset
       : (result.page - 1) * result.limit;
-  if (result.page === 1 && result.total == null) {
-    console.log("COUNT_SKIPPED_FOR_PAGE_1");
+  if (result.total == null) {
+    console.log("COUNT_REMOVED_ALL_PAGES");
   }
   const hasMore =
     result.hasMore ??
     (typeof result.total === "number"
-      ? skip + result.items.length < result.total
+      ? result.page * result.limit < result.total
       : result.items.length === result.limit);
   return {
     page: result.page,

@@ -111,7 +111,7 @@ export interface JobsApiResponse {
     pageSize: number;
     total: number | null;
     totalCount?: number | null;
-    totalPages: number;
+    totalPages?: number;
     offset?: number;
     hasMore?: boolean;
     capReached?: boolean;

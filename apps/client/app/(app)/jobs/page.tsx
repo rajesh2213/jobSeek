@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import {
   loadJobsDiscoveryPage,
   loadJobsListingDeferred,
+  loadWeeklyJobsPostedCount,
   stableJobFiltersKey,
 } from "../../../lib/jobsPageData";
 import {
@@ -70,6 +71,7 @@ export default async function JobsPage({ searchParams }: Props) {
   const jobsStart = Date.now();
   const response = await jobsDataPromise;
   console.log("SSR_jobs_fetch_ms", Date.now() - jobsStart);
+  const weeklyJobsPosted = await loadWeeklyJobsPostedCount();
 
   const total = response.meta?.total ?? 0;
   const minIndex = getSeoMinJobsIndex();
@@ -92,7 +94,7 @@ export default async function JobsPage({ searchParams }: Props) {
     <JobsSearchPage
       jobs={response.data}
       meta={response.meta}
-      weeklyJobsPosted={undefined}
+      weeklyJobsPosted={weeklyJobsPosted}
       relatedSlugs={FALLBACK_RELATED_SLUGS}
       listingTop={listingTop}
       listingFaq={listingFaq}

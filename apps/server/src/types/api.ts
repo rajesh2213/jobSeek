@@ -20,7 +20,7 @@ export interface PaginatedResult<T> {
   total: number | null;
   page: number;
   limit: number;
-  totalPages: number;
+  totalPages?: number;
   /** When set: more rows exist after this page (`skip + items.length < total`). */
   hasMore?: boolean;
 }
