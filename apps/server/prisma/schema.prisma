@@ -134,6 +134,7 @@ model Job {
   sourceUrl          String    @unique
   applyUrl           String?
   postedAt           DateTime?
+  effectivePostedAt  DateTime?
   lastSeenAt         DateTime  @default(now())
   /// Last time downstream discovery/processing consumed this job row.
   lastProcessedAt    DateTime?
@@ -181,6 +182,7 @@ model Job {
   @@index([experienceLevel])
   @@index([skills], type: Gin)
   @@index([status])
+  @@index([effectivePostedAt])
 }
 
 model SerpBatch {
