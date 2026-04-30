@@ -103,7 +103,13 @@ export async function listJobsUnified(
       data: ((payload.data ?? []) as unknown as JobItem[]).filter(isJobReady),
     } as JobsApiResponse;
   } catch (err) {
-    rethrowDirectDbFailure("/jobs", err);
+    // Regional DB/Redis issues in SSR should not blank discovery; fall back to API route.
+    try {
+      logSsrDataSource("/jobs", "http_api");
+      return await fetchJobs(filters, opts);
+    } catch {
+      rethrowDirectDbFailure("/jobs", err);
+    }
   }
 }
 
