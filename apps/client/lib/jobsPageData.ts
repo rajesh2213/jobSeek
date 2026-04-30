@@ -56,7 +56,10 @@ export const loadJobsDiscoveryPage = cache(
       {
         token,
         forwardedFor,
-        internalSeoSecret: process.env.INTERNAL_SEO_SECRET ?? null,
+        // Do not send internal SEO bypass: user-facing discovery must mirror browser `fetchJobs`
+        // (metering + `viewCapUnlimited`). Bypass here hid the quota strip on first paint and let
+        // cached “unlimited” meta diverge from the first real client request (e.g. load more → 0/75
+        // when the IP bucket was already exhausted). Keep bypass for non-listing SSR (e.g. weekly count).
       },
     );
   },
