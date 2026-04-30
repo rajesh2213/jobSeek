@@ -70,20 +70,34 @@ export class JobService {
   }
 
   async list(input: JobListInput): Promise<PaginatedResult<JobWithCompany>> {
-    const total = await this.jobRepository.countCanonicalFiltered(input.filters, {
-      includeProcessing: input.includeProcessing,
-    });
     const skip =
       typeof input.offset === "number" && input.offset >= 0
         ? input.offset
         : (input.page - 1) * input.limit;
     const effectivePage = Math.floor(skip / input.limit) + 1;
+    const shouldSkipCount = effectivePage === 1;
     const sort = input.sort ?? "latest";
     const items = await this.jobRepository.findManyCanonicalFiltered({
       filters: input.filters,
       limit: input.limit,
       offset: skip,
       sort,
+      includeProcessing: input.includeProcessing,
+    });
+    if (shouldSkipCount) {
+      return {
+        items,
+        total: null,
+        page:
+          typeof input.offset === "number" && input.offset >= 0
+            ? effectivePage
+            : input.page,
+        limit: input.limit,
+        totalPages: 1,
+        hasMore: items.length === input.limit,
+      };
+    }
+    const total = await this.jobRepository.countCanonicalFiltered(input.filters, {
       includeProcessing: input.includeProcessing,
     });
     const totalPages = Math.ceil(total / input.limit) || 1;

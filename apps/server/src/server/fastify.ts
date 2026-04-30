@@ -100,6 +100,15 @@ export async function buildServer() {
   });
 
   const logSlowRouteMs = Number(process.env.LOG_SLOW_ROUTE_MS ?? "0");
+  server.addHook("onRequest", async (request, _reply) => {
+    const reqWithStart = request as typeof request & { startTime?: number };
+    reqWithStart.startTime = Date.now();
+    console.log("API_REQUEST_RECEIVED", {
+      path: request.url,
+      ts: reqWithStart.startTime,
+    });
+  });
+
   if (logSlowRouteMs > 0) {
     server.addHook("onResponse", (request, reply, done) => {
       const ms = reply.elapsedTime;

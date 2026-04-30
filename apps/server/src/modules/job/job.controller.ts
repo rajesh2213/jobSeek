@@ -65,6 +65,13 @@ export function registerJobRoutes(
     "/jobs",
     { schema: getJobsQuerySchema },
     async (request: FastifyRequest, reply: FastifyReply) => {
+      const requestStartTime =
+        (request as FastifyRequest & { startTime?: number }).startTime ?? Date.now();
+      const handlerStart = Date.now();
+      console.log("API_HANDLER_START_jobs", {
+        delayFromReceive: handlerStart - requestStartTime,
+      });
+
       const redis = getIoredis();
       const ip = clientIp(request);
       const rl = await assertJobReadRateLimit(redis, ip);
@@ -141,6 +148,8 @@ export function registerJobRoutes(
       const meteredLimit = isSafeToCache ? Math.min(limit, 50) : limit;
 
       const jobsTotalStart = Date.now();
+      const dbStart = Date.now();
+      console.log("API_DB_START_jobs");
       const out = await runMeteredJobsList<JobWithCompany>(
         server.prisma,
         redis,
@@ -161,6 +170,9 @@ export function registerJobRoutes(
             }),
         },
       );
+      console.log("API_DB_END_jobs", {
+        dbTime: Date.now() - dbStart,
+      });
       console.log("jobs_total_ms", Date.now() - jobsTotalStart);
 
       if (isSafeToCache) {
@@ -214,6 +226,9 @@ export function registerJobRoutes(
         "api_jobs_list_metrics",
       );
 
+      console.log("API_RESPONSE_SENT_jobs", {
+        totalTime: Date.now() - requestStartTime,
+      });
       return reply.send({
         data: out.items.map((j) =>
           toJobListJson(j as unknown as JobWithCompanyRow),

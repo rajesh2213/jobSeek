@@ -38,7 +38,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   const response = await loadJobsDiscoveryPage(stableJobFiltersKey(filters));
   return jobsRouteMetadata(filters, {
     canonicalPath: getCanonicalJobListingUrl(filters),
-    total: response.meta?.total,
+    total: response.meta?.total ?? undefined,
   });
 }
 

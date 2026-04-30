@@ -109,8 +109,8 @@ export interface JobsApiResponse {
   meta?: {
     page: number;
     pageSize: number;
-    total: number;
-    totalCount?: number;
+    total: number | null;
+    totalCount?: number | null;
     totalPages: number;
     offset?: number;
     hasMore?: boolean;

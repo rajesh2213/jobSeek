@@ -20,8 +20,8 @@ export interface MeteredJobsListMeta {
   page: number;
   /** Legacy pagination size (`limit` previously). */
   pageSize: number;
-  total: number;
-  totalCount: number;
+  total: number | null;
+  totalCount: number | null;
   totalPages: number;
   offset: number;
   hasMore: boolean;
@@ -112,7 +112,14 @@ function metaBase(
     typeof offset === "number"
       ? offset
       : (result.page - 1) * result.limit;
-  const hasMore = result.hasMore ?? skip + result.items.length < result.total;
+  if (result.page === 1 && result.total == null) {
+    console.log("COUNT_SKIPPED_FOR_PAGE_1");
+  }
+  const hasMore =
+    result.hasMore ??
+    (typeof result.total === "number"
+      ? skip + result.items.length < result.total
+      : result.items.length === result.limit);
   return {
     page: result.page,
     pageSize: result.limit,
@@ -364,7 +371,7 @@ export async function runMeteredJobsList<T>(
     const listStart = Date.now();
     const result = await fetchList(previewLimit);
     logFetchList(Date.now() - listStart);
-    const totalMatching = result.total;
+    const totalMatching = result.total ?? result.items.length;
     const metaStart = Date.now();
     const base = metaBase(result, offset, limit);
     logMeta(Date.now() - metaStart);

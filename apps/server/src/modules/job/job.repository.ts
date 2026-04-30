@@ -526,13 +526,13 @@ export function buildDiscoveryWhereSql(
   if (filters.postedWithin !== undefined) {
     const since = postedSince(filters.postedWithin);
     parts.push(
-      Prisma.sql`(j."postedAt" >= ${since} OR (j."postedAt" IS NULL AND j."createdAt" >= ${since}))`,
+      Prisma.sql`((j."postedAt" IS NOT NULL AND j."postedAt" >= ${since}) OR (j."postedAt" IS NULL AND j."createdAt" >= ${since}))`,
     );
   }
   if (filters.postedAfter !== undefined) {
     const since = filters.postedAfter;
     parts.push(
-      Prisma.sql`(j."postedAt" > ${since} OR (j."postedAt" IS NULL AND j."createdAt" > ${since}))`,
+      Prisma.sql`((j."postedAt" IS NOT NULL AND j."postedAt" > ${since}) OR (j."postedAt" IS NULL AND j."createdAt" > ${since}))`,
     );
   }
   if (filters.companyId !== undefined && filters.companyId !== "") {
@@ -635,10 +635,12 @@ export function createJobRepository(prisma: PrismaClient) {
       const whereSql = buildDiscoveryWhereSql(filters, {
         includeProcessing: options?.includeProcessing ?? false,
       });
-      const start = Date.now();
-      const rows = await prisma.$queryRaw<{ c: bigint }[]>`
+      const countQuery = Prisma.sql`
         SELECT COUNT(*)::bigint AS c FROM "Job" j WHERE ${whereSql}
       `;
+      console.log("SQL_COUNT_QUERY", countQuery);
+      const start = Date.now();
+      const rows = await prisma.$queryRaw<{ c: bigint }[]>(countQuery);
       console.log("jobs_count_query_ms", Date.now() - start);
       return Number(rows[0]?.c ?? 0);
     },
@@ -775,13 +777,16 @@ export function createJobRepository(prisma: PrismaClient) {
         const whereSql = buildDiscoveryWhereSql(options.filters, {
           includeProcessing: options.includeProcessing ?? false,
         });
-        const idStart = Date.now();
-        const idRows = await prisma.$queryRaw<{ id: string }[]>`
+        const idQuery = Prisma.sql`
           SELECT j.id FROM "Job" j
           WHERE ${whereSql}
-          ORDER BY COALESCE(j."postedAt", j."createdAt") DESC
+          ORDER BY j."postedAt" DESC NULLS LAST, j."createdAt" DESC
           LIMIT ${options.limit} OFFSET ${options.offset}
         `;
+        console.log("JOBS_QUERY_OPTIMIZED");
+        console.log("SQL_ID_QUERY", idQuery);
+        const idStart = Date.now();
+        const idRows = await prisma.$queryRaw<{ id: string }[]>(idQuery);
         console.log("jobs_id_query_ms", Date.now() - idStart);
         const ids = idRows.map((r) => r.id);
         if (ids.length === 0) return [];

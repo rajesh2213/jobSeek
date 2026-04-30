@@ -1109,7 +1109,7 @@ export function JobsSearchClient({
             onSortNavigate={onSortNavigate}
             showSort={false}
             showChips={false}
-            totalRoles={listMeta?.total}
+            totalRoles={listMeta?.total ?? undefined}
             selectedCategories={uiFilters.categories}
             onCategoryToggle={(slug) =>
               setUiFilters((prev) => ({
@@ -1410,7 +1410,7 @@ export function JobsSearchClient({
                       v === "salary_desc" ? "salary_desc" : undefined,
                     )
                   }
-                  totalRoles={listMeta?.total}
+                  totalRoles={listMeta?.total ?? undefined}
                 />
               </div>
             </div>

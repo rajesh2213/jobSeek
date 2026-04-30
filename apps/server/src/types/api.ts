@@ -11,13 +11,13 @@ export interface ApiError {
 export interface PaginationMeta {
   page: number;
   limit: number;
-  total: number;
+  total: number | null;
   totalPages: number;
 }
 
 export interface PaginatedResult<T> {
   items: T[];
-  total: number;
+  total: number | null;
   page: number;
   limit: number;
   totalPages: number;
