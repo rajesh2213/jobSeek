@@ -134,6 +134,10 @@ model Job {
   sourceUrl          String    @unique
   applyUrl           String?
   postedAt           DateTime?
+  /// NOTE:
+  /// Actual index is a partial index created via raw SQL migration:
+  /// idx_jobs_effective_listing_fast
+  /// Prisma schema index below is NOT the real query index
   effectivePostedAt  DateTime?
   lastSeenAt         DateTime  @default(now())
   /// Last time downstream discovery/processing consumed this job row.

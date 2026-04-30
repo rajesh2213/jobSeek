@@ -555,6 +555,7 @@ export function buildDiscoveryWhereSql(
 export function createJobRepository(prisma: PrismaClient) {
   function buildBaseJobData(input: DedupJobInput) {
     const now = new Date();
+    const createdAt = now;
     /** Ingest-time proxy for DB `createdAt`; `computeStoredScores` ages from COALESCE(postedAt, createdAt). */
     const scores = computeStoredScores(input.source, input.postedAt ?? null, now);
     const expiresAt = computeJobExpiresAt({
@@ -581,7 +582,8 @@ export function createJobRepository(prisma: PrismaClient) {
       sourceUrl: input.sourceUrl,
       applyUrl: safeApplyUrl(input.applyUrl),
       postedAt: input.postedAt ?? null,
-      effectivePostedAt: input.postedAt ?? now,
+      effectivePostedAt: input.postedAt ?? createdAt,
+      createdAt,
       lastSeenAt: now,
       expiresAt,
       isActive: true,
@@ -784,7 +786,6 @@ export function createJobRepository(prisma: PrismaClient) {
           ORDER BY j."effectivePostedAt" DESC
           LIMIT ${options.limit} OFFSET ${options.offset}
         `;
-        console.log("JOBS_QUERY_OPTIMIZED");
         console.log("SQL_ID_QUERY", idQuery);
         const idStart = Date.now();
         const idRows = await prisma.$queryRaw<{ id: string }[]>(idQuery);
