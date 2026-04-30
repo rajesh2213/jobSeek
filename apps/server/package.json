@@ -93,6 +93,7 @@
     "rotating-file-stream": "^3.2.9"
   },
   "devDependencies": {
+    "@types/he": "^1.2.3",
     "@types/node": "^22.9.0",
     "@types/paypal__checkout-server-sdk": "^1.0.8",
     "@types/pdf-parse": "^1.1.4",
