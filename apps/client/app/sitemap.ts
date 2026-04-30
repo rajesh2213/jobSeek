@@ -3,6 +3,12 @@ import { fetchCompanies, fetchJobs, fetchSeoLandingPages } from "../lib/api";
 import { getSiteBaseUrl } from "../lib/seoSite";
 import { normalizeRelatedSlugPath } from "../lib/slug-parser";
 
+/**
+ * This route paginates jobs/companies across many HTTP requests. Static generation during
+ * `next build` exceeds Vercel's per-route timeout (~60s). Generate at request time instead.
+ */
+export const dynamic = "force-dynamic";
+
 const MAX_JOB_SITEMAP_PAGES = 10000;
 const MAX_COMPANY_SITEMAP_PAGES = 500;
 
