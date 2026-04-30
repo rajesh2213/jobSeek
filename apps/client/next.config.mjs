@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ["@jobseek/skill-constants", "@jobseek/server"],
-
-  serverExternalPackages: ["@prisma/client", "prisma", "ioredis"],
+  transpilePackages: ["@jobseek/skill-constants"],
 
   // Dynamic filter query strings use string hrefs; keep untyped routes for DX.
 

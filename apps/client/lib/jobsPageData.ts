@@ -1,8 +1,7 @@
 import { cache } from "react";
 import { auth } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
-import type { JobsApiResponse } from "./api";
-import { listJobsUnified } from "./serverApi";
+import { fetchJobs, type JobsApiResponse } from "./api";
 import {
   type JobFilters,
   MAX_JOB_FILTER_QUERY_TOKENS,
@@ -47,7 +46,7 @@ export const loadJobsDiscoveryPage = cache(
     const token = await getToken();
     const h = await headers();
     const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
-    return listJobsUnified(
+    return fetchJobs(
       {
         ...filters,
         page: filters.page ?? 1,
@@ -62,10 +61,7 @@ export const loadJobsDiscoveryPage = cache(
   },
 );
 
-/**
- * Weekly hero metric (`posted=1w`, global count) — distinct from discovery `meta.total`
- * (filtered slice). Two GET /jobs calls remain intentional unless API exposes a combined field.
- */
+/** Real weekly posted jobs count used by jobs hero stats strip. */
 export const loadWeeklyJobsPostedCount = cache(async (): Promise<number> => {
   const override = weeklyJobsPostedOverride();
   if (override !== null) return override;
@@ -74,7 +70,7 @@ export const loadWeeklyJobsPostedCount = cache(async (): Promise<number> => {
   const token = await getToken();
   const h = await headers();
   const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
-  const response = await listJobsUnified(
+  const response = await fetchJobs(
     {
       posted: "1w",
       page: 1,
@@ -90,18 +86,3 @@ export const loadWeeklyJobsPostedCount = cache(async (): Promise<number> => {
   const total = Number(response.meta?.total ?? 0);
   return Number.isFinite(total) && total >= 0 ? Math.round(total) : 0;
 });
-
-/**
- * Convenience wrapper — discovery + weekly remain two logical `/jobs` queries (SSR uses shared DB parity,
- * not Fastify HTTP). Paired with related-slugs fetch separately on the page.
- */
-export async function loadJobsListingPageBundle(filtersKey: string): Promise<{
-  discovery: JobsApiResponse;
-  weeklyJobsPosted: number;
-}> {
-  const [discovery, weeklyJobsPosted] = await Promise.all([
-    loadJobsDiscoveryPage(filtersKey),
-    loadWeeklyJobsPostedCount(),
-  ]);
-  return { discovery, weeklyJobsPosted };
-}

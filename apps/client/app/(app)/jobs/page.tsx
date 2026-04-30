@@ -36,10 +36,7 @@ interface Props {
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const sp = await searchParams;
   const filters = parseJobFiltersFromSearch(sp);
-  const response = await loadJobsDiscoveryPage(stableJobFiltersKey(filters)).catch(() => ({
-    data: [],
-    meta: undefined,
-  }));
+  const response = await loadJobsDiscoveryPage(stableJobFiltersKey(filters));
   return jobsRouteMetadata(filters, {
     canonicalPath: getCanonicalJobListingUrl(filters),
     total: response.meta?.total,
@@ -60,19 +57,11 @@ export default async function JobsPage({ searchParams }: Props) {
     workType: filters.workType,
   });
 
-  const [discoveryResult, weeklyResult, relatedResult] = await Promise.allSettled([
+  const [response, relatedSlugs, weeklyJobsPosted] = await Promise.all([
     loadJobsDiscoveryPage(filtersKey),
-    loadWeeklyJobsPostedCount(),
     fetchJobsRelatedSlugs({ currentSlug, fallback: FALLBACK_RELATED_SLUGS }),
+    loadWeeklyJobsPostedCount(),
   ]);
-  const response =
-    discoveryResult.status === "fulfilled"
-      ? discoveryResult.value
-      : { data: [], meta: { page: 1, pageSize: 20, total: 0, totalPages: 1, hasMore: false } };
-  const weeklyJobsPosted =
-    weeklyResult.status === "fulfilled" ? weeklyResult.value : 0;
-  const relatedSlugs =
-    relatedResult.status === "fulfilled" ? relatedResult.value : FALLBACK_RELATED_SLUGS;
 
   const total = response.meta?.total ?? 0;
   const minIndex = getSeoMinJobsIndex();

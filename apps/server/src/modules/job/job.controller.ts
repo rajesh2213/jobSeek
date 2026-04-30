@@ -1,14 +1,38 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { createJobRepository } from "./job.repository.js";
+import type { JobWithCompany } from "./job.repository.js";
 import { JobService } from "./job.service.js";
 import { getJobsQuerySchema, getJobParamsSchema } from "./job.schema.js";
+import type { ApiError } from "../../types/api.js";
 import { parseJobDiscoveryQuery } from "../../utils/taxonomyQuery.js";
-import { buildCapContextFromRequest } from "../viewCap/jobListCap.js";
-import { executeMeteredJobsListHttpParity } from "../../shared/jobsList.shared.js";
-import { executeJobDetailHttpParity } from "../../shared/jobDetail.shared.js";
+import {
+  toJobDetailJson,
+  toJobListJson,
+  toJobPublicJsonOverDailyCap,
+  type JobWithCompanyRow,
+} from "./job.mapper.js";
+import { getIoredis } from "../../queues/job.queue.js";
+import {
+  runMeteredJobsList,
+  clientIp,
+  isViewCapBypassRequest,
+  buildCapContextFromRequest,
+} from "../viewCap/jobListCap.js";
+import {
+  getJobViewCapState,
+  checkAndIncrementViewCap,
+} from "../viewCap/viewCap.service.js";
+import { assertJobReadRateLimit } from "../viewCap/rateLimitRedis.js";
+import { recordJobBlockedNotReady } from "../../services/jobStatusMetrics.service.js";
+import { LIMITS } from "../../config/limits.js";
+import { enqueueGrowthEmailEvent } from "../growthEmail/growthEmail.service.js";
 
 interface GetJobParams {
   id: string;
+}
+
+function parseQueryBool(raw: unknown): boolean {
+  return raw === true || raw === "true" || raw === "1";
 }
 
 function setApiCacheHeader(
@@ -41,18 +65,43 @@ export function registerJobRoutes(
     "/jobs",
     { schema: getJobsQuerySchema },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const q = request.query as Record<string, unknown>;
-      const filters = parseJobDiscoveryQuery(q);
-      request.log.debug({ filters }, "jobs_query_filters");
+      const redis = getIoredis();
+      const ip = clientIp(request);
+      const rl = await assertJobReadRateLimit(redis, ip);
+      if (!rl.ok) {
+        return reply.status(429).send({
+          error: "Too many requests",
+          code: "RATE_LIMIT",
+        } satisfies ApiError);
+      }
 
-      const sortRaw = String(q.sort ?? "latest");
+      const q = request.query as Record<string, unknown>;
       const pageRaw = q.page;
+      const limitRaw = q.limit;
+      const offsetRaw = q.offset;
       const page =
         typeof pageRaw === "string" || typeof pageRaw === "number"
           ? Math.max(1, parseInt(String(pageRaw), 10) || 1)
           : 1;
+      const limit =
+        typeof limitRaw === "string" || typeof limitRaw === "number"
+          ? Math.min(100, Math.max(1, parseInt(String(limitRaw), 10) || 20))
+          : 20;
+      const offset =
+        typeof offsetRaw === "string" || typeof offsetRaw === "number"
+          ? Math.max(0, parseInt(String(offsetRaw), 10) || 0)
+          : undefined;
 
+      const filters = parseJobDiscoveryQuery(q);
+      request.log.debug({ filters }, "jobs_query_filters");
+      const sortRaw = String(q.sort ?? "latest");
+      const sort: "latest" | "salary_desc" =
+        sortRaw === "salary_desc" || sortRaw === "salary" ? "salary_desc" : "latest";
+      const includeProcessing = parseQueryBool(q.includeProcessing);
+
+      const bypassCap = isViewCapBypassRequest(request);
       const capCtx = await buildCapContextFromRequest(server.prisma, request);
+
       const hasAuthHeader = typeof request.headers.authorization === "string";
       const isAnonymous = capCtx.internalUserId == null && !hasAuthHeader;
 
@@ -89,19 +138,30 @@ export function registerJobRoutes(
         "jobs_cache_strategy",
       );
 
-      const result = await executeMeteredJobsListHttpParity({
-        jobService,
-        query: q,
-        headers: request.headers as Record<string, string | string[] | undefined>,
-      });
+      const meteredLimit = isSafeToCache ? Math.min(limit, 50) : limit;
 
-      if (result.status === 429) {
-        return reply.status(429).send(result.body);
-      }
+      const out = await runMeteredJobsList<JobWithCompany>(
+        server.prisma,
+        redis,
+        capCtx,
+        bypassCap,
+        {
+          page,
+          limit: meteredLimit,
+          offset,
+          fetchList: (effectiveLimit) =>
+            jobService.list({
+              page,
+              limit: effectiveLimit,
+              offset,
+              filters,
+              sort,
+              includeProcessing,
+            }),
+        },
+      );
 
-      const { payload, replyHints } = result;
-
-      if (replyHints.isSafeToCache) {
+      if (isSafeToCache) {
         reply.header("Cache-Control", "public, max-age=60, s-maxage=120");
         request.log.info(
           {
@@ -109,15 +169,20 @@ export function registerJobRoutes(
             status: "HIT_ELIGIBLE",
             safeToCache: true,
           },
-          "api_cache_status",
+          "jobs_cache_status",
         );
       } else {
         const cacheableJobsList = false;
+        const cacheBypassReason = cacheableJobsList
+          ? "anonymous_public_listing"
+          : capCtx.internalUserId != null || hasAuthHeader
+            ? "authenticated_request"
+            : "metered_or_personalized";
 
         setApiCacheHeader(reply, request, {
           route: "/jobs",
           cacheable: cacheableJobsList,
-          reason: replyHints.cacheBypassReason,
+          reason: cacheBypassReason,
         });
       }
 
@@ -125,14 +190,16 @@ export function registerJobRoutes(
         {
           event: "jobs_metering_enforced",
           isSafeToCache,
-          limit: replyHints.meteredLimit,
-          page: replyHints.page,
-          capApplied: replyHints.capApplied,
+          limit: meteredLimit,
+          page,
+          capApplied: Boolean(
+            !bypassCap && !out.meta.viewCapUnlimited,
+          ),
         },
         "jobs_metering_enforced",
       );
 
-      const rowsReturned = payload.data.length;
+      const rowsReturned = out.items.length;
       const estBytes = rowsReturned * 1100;
       request.log.info(
         {
@@ -145,7 +212,12 @@ export function registerJobRoutes(
         "api_jobs_list_metrics",
       );
 
-      return reply.send(payload);
+      return reply.send({
+        data: out.items.map((j) =>
+          toJobListJson(j as unknown as JobWithCompanyRow),
+        ),
+        meta: out.meta,
+      });
     },
   );
 
@@ -171,21 +243,110 @@ export function registerJobRoutes(
       request: FastifyRequest<{ Params: GetJobParams }>,
       reply: FastifyReply,
     ) => {
-      const q = request.query as Record<string, unknown>;
-      const result = await executeJobDetailHttpParity({
-        jobService,
-        jobId: request.params.id,
-        query: q,
-        headers: request.headers as Record<string, string | string[] | undefined>,
-      });
+      const redis = getIoredis();
+      const ip = clientIp(request);
+      const rl = await assertJobReadRateLimit(redis, ip);
+      if (!rl.ok) {
+        return reply.status(429).send({
+          error: "Too many requests",
+          code: "RATE_LIMIT",
+        } satisfies ApiError);
+      }
 
-      if (result.status === 429) {
-        return reply.status(429).send(result.body);
+      const q = request.query as Record<string, unknown>;
+      const includeProcessing = parseQueryBool(q.includeProcessing);
+      const job = await jobService.getById(request.params.id, { includeProcessing });
+      if (!job) {
+        if (!includeProcessing) {
+          const hidden = await jobService.getById(request.params.id, {
+            includeProcessing: true,
+          });
+          if (hidden) {
+            recordJobBlockedNotReady();
+          }
+        }
+        return reply.status(404).send({
+          error: "Job not found",
+          code: "JOB_NOT_FOUND",
+        } satisfies ApiError);
       }
-      if (result.status === 404) {
-        return reply.status(404).send(result.body);
+
+      const capCtx = await buildCapContextFromRequest(server.prisma, request);
+      const capState = await getJobViewCapState(server.prisma, redis, capCtx);
+
+      if (capState.unlimited) {
+        const resetAt = capState.resetAt.toISOString();
+        return reply.send({
+          data: toJobDetailJson(job as unknown as JobWithCompanyRow),
+          meta: {
+            capReached: false,
+            resetAt,
+            viewCapUnlimited: true,
+            limit: {
+              mode: LIMITS.MODE,
+              remaining: null,
+              resetAt,
+              warning: false,
+              isCapped: false,
+            },
+          },
+        });
       }
-      return reply.send(result.body);
+
+      if (LIMITS.MODE === "hard" && capState.remaining <= 0) {
+        const resetAt = capState.resetAt.toISOString();
+        return reply.send({
+          data: toJobPublicJsonOverDailyCap(job as unknown as JobWithCompanyRow),
+          meta: {
+            capReached: true,
+            remaining: 0,
+            resetAt,
+            viewCapUnlimited: false,
+            limit: {
+              mode: LIMITS.MODE,
+              remaining: 0,
+              resetAt,
+              warning: true,
+              isCapped: true,
+            },
+          },
+        });
+      }
+
+      const afterCap = await checkAndIncrementViewCap(
+        server.prisma,
+        redis,
+        capCtx,
+        1,
+      );
+
+      const resetAt = afterCap.resetAt.toISOString();
+      const remaining = afterCap.unlimited ? null : afterCap.remaining;
+      if (capCtx.internalUserId) {
+        await enqueueGrowthEmailEvent({
+          userId: capCtx.internalUserId,
+          email: capCtx.userEmail ?? undefined,
+          campaignType: "event_followup",
+          jobId: job.id,
+          source: "job_detail_view",
+        });
+      }
+      return reply.send({
+        data: toJobDetailJson(job as unknown as JobWithCompanyRow),
+        meta: {
+          capReached: false,
+          remaining,
+          resetAt,
+          viewCapUnlimited: Boolean(afterCap.unlimited),
+          limit: {
+            mode: LIMITS.MODE,
+            remaining,
+            resetAt,
+            warning: typeof remaining === "number" && remaining <= 10,
+            isCapped: typeof remaining === "number" && remaining <= 0,
+          },
+        },
+      });
     },
   );
 }

@@ -3,10 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "exports": {
-    "./shared/job.shared": "./src/shared/job.shared.ts",
-    "./shared/company.shared": "./src/shared/company.shared.ts"
-  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "npx tsc",
@@ -93,7 +89,6 @@
     "rotating-file-stream": "^3.2.9"
   },
   "devDependencies": {
-    "@types/he": "^1.2.3",
     "@types/node": "^22.9.0",
     "@types/paypal__checkout-server-sdk": "^1.0.8",
     "@types/pdf-parse": "^1.1.4",

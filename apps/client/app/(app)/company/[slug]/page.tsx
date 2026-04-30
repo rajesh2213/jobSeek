@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@clerk/nextjs/server";
-import { fetchCompanies } from "../../../../lib/api";
-import { getCompanyJobsUnified } from "../../../../lib/serverApi";
-import { resolveCompanyDetail } from "../../../../lib/loadCompanyDetailSsr";
+import {
+  fetchCompanies,
+  fetchCompanyBySlug,
+  fetchCompanyJobs,
+} from "../../../../lib/api";
 import { buildBreadcrumbListJsonLd } from "../../../../lib/seo";
 import { absoluteUrl } from "../../../../lib/seoSite";
 import { CompanyHubPage } from "../../../../components/company/CompanyHubPage";
@@ -21,7 +23,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const company = await resolveCompanyDetail(slug, "metadata");
+  const company = await fetchCompanyBySlug(slug);
   if (!company) {
     return { title: "Company not found | JobLoom" };
   }
@@ -50,7 +52,7 @@ function searchRecord(
 export default async function CompanyDetailPage({ params, searchParams }: Props) {
   const { slug } = await params;
   const sp = await searchParams;
-  const company = await resolveCompanyDetail(slug, "page");
+  const company = await fetchCompanyBySlug(slug);
   if (!company) notFound();
 
   const parsed = parseJobFiltersFromSearch(searchRecord(sp));
@@ -66,7 +68,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
   const token = await getToken();
   const h = await headers();
   const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
-  const jobsResponse = await getCompanyJobsUnified(slug, {
+  const jobsResponse = await fetchCompanyJobs(slug, {
     page,
     limit,
     filters: {
