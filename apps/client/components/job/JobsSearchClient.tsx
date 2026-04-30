@@ -574,6 +574,11 @@ export function JobsSearchClient({
   }, [urlFilters]);
 
   useEffect(() => {
+    // Avoid reconciling RSC props while a client "Load more" is in flight or before its state commits:
+    // otherwise we can briefly treat SSR page-1 meta as authoritative and freeze quota (e.g. stuck at 55).
+    if (loadingMore) {
+      return;
+    }
     if (listServerSyncKeyRef.current !== jobListFiltersKey) {
       listServerSyncKeyRef.current = jobListFiltersKey;
       setListJobs(jobs.filter(isJobReady));
@@ -582,21 +587,24 @@ export function JobsSearchClient({
     }
     // Same search as last sync — parent likely re-rendered from RSC (e.g. `router.replace` after apply flash).
     // Do not shrink the list back to page 1; keep client-merged pages from "Load more".
+    const ssrJobsLen = jobs.filter(isJobReady).length;
     setListJobs((prev) => {
       const next = jobs.filter(isJobReady);
       return prev.length > next.length ? prev : next;
     });
     setListMeta((prev) => {
-      const prevPage = prev?.page ?? 1;
-      const serverPage = initialMeta?.page ?? 1;
-      if (prev && initialMeta && prevPage > serverPage) {
-        // Client merged pages via "Load more"; `initialMeta` is still the SSR page-1 snapshot.
-        // Do not merge metering from it — that would overwrite live quota (e.g. 55→55) with stale values.
+      const prevPage = Number(prev?.page ?? 1) || 1;
+      const serverPage = Number(initialMeta?.page ?? 1) || 1;
+      const mergedBeyondSsr =
+        listJobs.length > ssrJobsLen || prevPage > serverPage;
+      if (prev && initialMeta && mergedBeyondSsr) {
+        // SSR snapshot is still page 1 (and/or fewer rows); keep meter + pagination from the last client fetch.
         return prev;
       }
       return initialMeta ?? prev;
     });
-  }, [jobs, initialMeta, jobListFiltersKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- listJobs.length intentionally gates merged-list detection
+  }, [jobs, initialMeta, jobListFiltersKey, listJobs.length, loadingMore]);
 
   useEffect(() => {
     let cancelled = false;
