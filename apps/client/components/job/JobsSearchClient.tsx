@@ -79,28 +79,6 @@ function listQueryBase(f: JobFilters): JobFilters {
   return rest;
 }
 
-/** Keep client pagination meta after "Load more" but always take fresh view-cap fields from the server (e.g. after admin quota reset). */
-function mergeMeteringMetaFromServer(
-  prev: JobsApiResponse["meta"] | undefined,
-  server: JobsApiResponse["meta"] | undefined,
-): JobsApiResponse["meta"] | undefined {
-  if (!server) return prev;
-  if (!prev) return server;
-  return {
-    ...prev,
-    remaining: server.remaining,
-    debitedCount: server.debitedCount,
-    remainingBefore: server.remainingBefore,
-    remainingAfter: server.remainingAfter,
-    resetAt: server.resetAt,
-    totalHidden: server.totalHidden,
-    viewCapUnlimited: server.viewCapUnlimited,
-    discoveryPhase: server.discoveryPhase,
-    capReached: server.capReached,
-    limit: server.limit,
-  };
-}
-
 interface Props {
   jobs: JobItem[];
   meta?: JobsApiResponse["meta"];
@@ -612,7 +590,9 @@ export function JobsSearchClient({
       const prevPage = prev?.page ?? 1;
       const serverPage = initialMeta?.page ?? 1;
       if (prev && initialMeta && prevPage > serverPage) {
-        return mergeMeteringMetaFromServer(prev, initialMeta) ?? prev;
+        // Client merged pages via "Load more"; `initialMeta` is still the SSR page-1 snapshot.
+        // Do not merge metering from it — that would overwrite live quota (e.g. 55→55) with stale values.
+        return prev;
       }
       return initialMeta ?? prev;
     });
