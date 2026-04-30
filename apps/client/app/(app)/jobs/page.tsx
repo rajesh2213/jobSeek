@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import {
   loadJobsDiscoveryPage,
-  loadJobsListingPageBundle,
+  loadWeeklyJobsPostedCount,
   stableJobFiltersKey,
 } from "../../../lib/jobsPageData";
 import { fetchJobsRelatedSlugs } from "../../../lib/jobsRelatedSlugs";
@@ -60,16 +60,17 @@ export default async function JobsPage({ searchParams }: Props) {
     workType: filters.workType,
   });
 
-  const [bundleResult, relatedResult] = await Promise.allSettled([
-    loadJobsListingPageBundle(filtersKey),
+  const [discoveryResult, weeklyResult, relatedResult] = await Promise.allSettled([
+    loadJobsDiscoveryPage(filtersKey),
+    loadWeeklyJobsPostedCount(),
     fetchJobsRelatedSlugs({ currentSlug, fallback: FALLBACK_RELATED_SLUGS }),
   ]);
   const response =
-    bundleResult.status === "fulfilled"
-      ? bundleResult.value.discovery
+    discoveryResult.status === "fulfilled"
+      ? discoveryResult.value
       : { data: [], meta: { page: 1, pageSize: 20, total: 0, totalPages: 1, hasMore: false } };
   const weeklyJobsPosted =
-    bundleResult.status === "fulfilled" ? bundleResult.value.weeklyJobsPosted : 0;
+    weeklyResult.status === "fulfilled" ? weeklyResult.value : 0;
   const relatedSlugs =
     relatedResult.status === "fulfilled" ? relatedResult.value : FALLBACK_RELATED_SLUGS;
 
