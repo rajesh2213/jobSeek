@@ -40,7 +40,7 @@ function sendToExtension(extensionId: string, message: unknown): Promise<Extensi
     }
     try {
       sendMessage(extensionId, message, (response: ExtensionAuthAck) => {
-        const err = runtime.lastError;
+        const err = runtime?.lastError;
         if (err?.message) {
           resolve(null);
           return;

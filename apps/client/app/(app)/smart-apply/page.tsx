@@ -22,11 +22,11 @@ import { ProofStrip } from "../../../components/smart-apply/ProofStrip";
 import { ReadinessCockpit } from "../../../components/smart-apply/ReadinessCockpit";
 import { SetupChecklist } from "../../../components/smart-apply/SetupChecklist";
 import { TrustSafetyBlock } from "../../../components/smart-apply/TrustSafetyBlock";
+import { jobloomChromeWebStoreUrl } from "../../../lib/jobloomChromeStore";
 import { useExtensionPresence } from "../../../lib/useExtensionPresence";
 import { useExtensionAuthSync } from "../../../lib/useExtensionAuthSync";
 
 const CORAL = "#E8533A";
-const CHROME_STORE = "https://chromewebstore.google.com/search/JobLoom%20Smart%20Apply";
 const SMART_APPLY_PREMIUM_V1 = process.env.NEXT_PUBLIC_SMART_APPLY_PREMIUM_V1 !== "false";
 
 const COUNTRIES = [
@@ -632,7 +632,7 @@ export default function SmartApplyPage() {
               Required: install the Chrome extension to use Smart Apply on ATS forms.
             </p>
             <a
-              href={CHROME_STORE}
+              href={jobloomChromeWebStoreUrl()}
               target="_blank"
               rel="noopener noreferrer"
               onClick={async () => {

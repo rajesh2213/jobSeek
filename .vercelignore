@@ -1,0 +1,36 @@
+.git
+.github
+.cursor
+.vscode
+
+# Dependencies/build caches
+node_modules
+**/node_modules
+.next
+**/.next
+.turbo
+dist
+build
+coverage
+
+# Local environments/secrets
+.env
+.env.*
+!.env.example
+
+# Monorepo apps not deployed to this Vercel project
+apps/server
+apps/inference
+apps/extension
+
+# Python virtualenvs and large ML artifacts
+.venv
+**/.venv
+*.pt
+*.bin
+*.onnx
+
+# Runtime logs and dumps
+logs
+**/logs
+*.log
