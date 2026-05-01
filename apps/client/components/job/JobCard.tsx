@@ -192,6 +192,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
                   {showNewBadge ? newBadge : null}
                 </div>
                 <Link
+                  prefetch={false}
                   href={`/job/${job.id}`}
                   className={cn(
                     "line-clamp-2 block text-lg font-semibold leading-snug tracking-tight text-ink no-underline transition-colors",
@@ -248,6 +249,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
               size="sm"
             />
             <Link
+              prefetch={false}
               href={`/job/${job.id}`}
               className={buttonClassName({ variant: "primary", size: "sm" })}
             >
@@ -286,6 +288,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
               className="shrink-0"
             />
             <Link
+              prefetch={false}
               href={`/job/${job.id}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -356,6 +359,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
 
           <h3 className="mb-2 text-lg font-extrabold leading-snug tracking-tight text-ink">
             <Link
+              prefetch={false}
               href={`/job/${job.id}`}
               target="_blank"
               rel="noopener noreferrer"

@@ -19,6 +19,7 @@ export function CompanyJobsPreview({ companySlug, jobs }: Props) {
           previewJobs.map((job) => (
             <Link
               key={job.id}
+              prefetch={false}
               href={`/job/${job.id}`}
               className="block rounded-lg border border-ink/10 px-3 py-2.5 no-underline transition hover:bg-ink/5"
             >

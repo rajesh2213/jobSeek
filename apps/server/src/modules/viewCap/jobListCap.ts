@@ -268,36 +268,6 @@ export async function runMeteredJobsList<T>(
     };
   }
 
-  const emptyPreviewMeta = (
-    totalMatching: number,
-    resetAtIso: string,
-  ): MeteredJobsListMeta => ({
-    page,
-    pageSize: limit,
-    total: totalMatching,
-    totalCount: totalMatching,
-    totalPages: Math.ceil(totalMatching / limit) || 1,
-    offset:
-      typeof offset === "number"
-        ? offset
-        : (page - 1) * limit,
-    hasMore: false,
-    capReached: true,
-    remaining: 0,
-    debitedCount: 0,
-    remainingBefore: 0,
-    remainingAfter: 0,
-    resetAt: resetAtIso,
-    totalHidden: Math.max(0, totalMatching - DISCOVERY_PREVIEW_ROWS),
-    viewCapUnlimited: false,
-    discoveryPhase: "preview",
-    limit: limitMeta({
-      mode: LIMITS.MODE,
-      remaining: 0,
-      resetAt: resetAtIso,
-    }),
-  });
-
   const blockedPageMeta = (remaining: number): MeteredJobsListMeta => ({
     page,
     pageSize: limit,
@@ -324,9 +294,52 @@ export async function runMeteredJobsList<T>(
     }),
   });
 
+  /** Hard mode: capped mid-pagination — do not use preview phase (page-1 teaser only). */
+  const blockedDeepPaginationMeta = (resetAtIso: string): MeteredJobsListMeta => ({
+    page,
+    pageSize: limit,
+    total: null,
+    totalCount: null,
+    totalPages: undefined,
+    offset:
+      typeof offset === "number"
+        ? offset
+        : (page - 1) * limit,
+    hasMore: false,
+    capReached: true,
+    remaining: 0,
+    debitedCount: 0,
+    remainingBefore: 0,
+    remainingAfter: 0,
+    resetAt: resetAtIso,
+    viewCapUnlimited: false,
+    discoveryPhase: "search",
+    limit: limitMeta({
+      mode: LIMITS.MODE,
+      remaining: 0,
+      resetAt: resetAtIso,
+    }),
+  });
+
   if (LIMITS.MODE === "soft") {
+    if (capState.remaining <= 0 && page > 1) {
+      logMeteringCheck({
+        isCapped: true,
+        isFreeUser: true,
+        isProUser: false,
+        capApplied: true,
+        limitAdjusted: true,
+      });
+      logTotal();
+      return {
+        items: [] as T[],
+        meta: blockedDeepPaginationMeta(capState.resetAt.toISOString()),
+      };
+    }
+    const fetchCap =
+      capState.remaining <= 0 ? limit : Math.min(limit, Math.max(0, capState.remaining));
     const listStart = Date.now();
-    const result = await fetchList(limit);
+    const result = await fetchList(fetchCap);
     logFetchList(Date.now() - listStart);
     const debit = await checkAndIncrementViewCap(prisma, redis, capCtx, result.items.length);
     const metaStart = Date.now();
@@ -363,7 +376,7 @@ export async function runMeteredJobsList<T>(
     };
   }
 
-  // Hard mode: after exhaustion, block page 2+.
+  // Hard mode: after exhaustion, block page 2+ without switching to preview-phase UX.
   if (capState.remaining <= 0 && page > 1) {
     logMeteringCheck({
       isCapped: true,
@@ -375,7 +388,7 @@ export async function runMeteredJobsList<T>(
     logTotal();
     return {
       items: [] as T[],
-      meta: emptyPreviewMeta(0, capState.resetAt.toISOString()),
+      meta: blockedDeepPaginationMeta(capState.resetAt.toISOString()),
     };
   }
 

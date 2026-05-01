@@ -186,15 +186,19 @@ function FreeDiscoveryQuotaStrip({
 }) {
   if (listMeta.viewCapUnlimited !== false) return null;
 
-  const isPreview =
-    listMeta.discoveryPhase === "preview" || listMeta.capReached;
+  const isPage1PreviewStrip = listMeta.discoveryPhase === "preview";
+  const cappedOut =
+    listMeta.capReached === true &&
+    typeof listMeta.remaining === "number" &&
+    listMeta.remaining <= 0;
   /** Avoid `remaining ?? 0`: missing/null metered meta must not display as zero (looks like “quota exhausted”). */
   const remKnown =
     typeof listMeta.remaining === "number" && Number.isFinite(listMeta.remaining);
   const rem = remKnown ? Math.max(0, listMeta.remaining as number) : null;
   const resetAt = listMeta.resetAt;
   const showPreviewBadge =
-    isPreview ||
+    isPage1PreviewStrip ||
+    cappedOut ||
     (rem !== null && rem < FREE_DISCOVERY.dailyJobs);
 
   const shell = cn(
@@ -227,8 +231,14 @@ function FreeDiscoveryQuotaStrip({
             </span>
           </DiscoveryMeterCell>
           {quotaDivider()}
-          <DiscoveryMeterCell label="Now showing" accent>
-            Preview ×{FREE_DISCOVERY_PREVIEW_JOB_ROWS}
+          <DiscoveryMeterCell label={isPage1PreviewStrip ? "Now showing" : cappedOut ? "Status" : "Then"} accent>
+            {isPage1PreviewStrip ? (
+              <>Preview ×{FREE_DISCOVERY_PREVIEW_JOB_ROWS}</>
+            ) : cappedOut ? (
+              <>Browse limit reached</>
+            ) : (
+              <>{FREE_DISCOVERY_PREVIEW_JOB_ROWS} preview</>
+            )}
           </DiscoveryMeterCell>
           {resetAt ? (
             <>
@@ -877,7 +887,33 @@ export function JobsSearchClient({
         }
         return merged;
       });
-      setListMeta(normalizeJobsListMeta(res.meta));
+      setListMeta((prev) => {
+        const next = normalizeJobsListMeta(res.meta);
+        if (!prev || !next) return next ?? prev;
+        const blockedPagination =
+          res.data.length === 0 &&
+          next.capReached === true &&
+          next.discoveryPhase !== "preview";
+        const prevTotal = prev.total ?? prev.totalCount;
+        const nextTotal = next.total ?? next.totalCount;
+        const preserveTotals =
+          blockedPagination &&
+          typeof prevTotal === "number" &&
+          prevTotal > 0 &&
+          (nextTotal === 0 ||
+            nextTotal === null ||
+            nextTotal === undefined ||
+            Number.isNaN(Number(nextTotal)));
+        if (preserveTotals) {
+          return normalizeJobsListMeta({
+            ...next,
+            total: prevTotal,
+            totalCount: prev.totalCount ?? prevTotal,
+            totalPages: prev.totalPages ?? next.totalPages,
+          });
+        }
+        return next;
+      });
     } catch {
       // CORS / network: leave list as-is; devtools will show the error.
     } finally {

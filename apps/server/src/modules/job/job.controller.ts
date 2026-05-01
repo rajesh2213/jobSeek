@@ -26,6 +26,7 @@ import { assertJobReadRateLimit } from "../viewCap/rateLimitRedis.js";
 import { recordJobBlockedNotReady } from "../../services/jobStatusMetrics.service.js";
 import { LIMITS } from "../../config/limits.js";
 import { enqueueGrowthEmailEvent } from "../growthEmail/growthEmail.service.js";
+import { isLikelyPrefetchRequest } from "../../utils/clientNavigationHints.js";
 
 interface GetJobParams {
   id: string;
@@ -331,16 +332,19 @@ export function registerJobRoutes(
         });
       }
 
-      const afterCap = await checkAndIncrementViewCap(
-        server.prisma,
-        redis,
-        capCtx,
-        1,
-      );
+      const skipCapDebit = isLikelyPrefetchRequest(request);
+      const afterCap = skipCapDebit
+        ? {
+            allowed: capState.remaining > 0 || capState.unlimited,
+            remaining: capState.remaining,
+            resetAt: capState.resetAt,
+            unlimited: capState.unlimited,
+          }
+        : await checkAndIncrementViewCap(server.prisma, redis, capCtx, 1);
 
       const resetAt = afterCap.resetAt.toISOString();
       const remaining = afterCap.unlimited ? null : afterCap.remaining;
-      if (capCtx.internalUserId) {
+      if (!skipCapDebit && capCtx.internalUserId) {
         await enqueueGrowthEmailEvent({
           userId: capCtx.internalUserId,
           email: capCtx.userEmail ?? undefined,
