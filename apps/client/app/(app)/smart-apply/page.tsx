@@ -23,6 +23,7 @@ import { ReadinessCockpit } from "../../../components/smart-apply/ReadinessCockp
 import { SetupChecklist } from "../../../components/smart-apply/SetupChecklist";
 import { TrustSafetyBlock } from "../../../components/smart-apply/TrustSafetyBlock";
 import { useExtensionPresence } from "../../../lib/useExtensionPresence";
+import { useExtensionAuthSync } from "../../../lib/useExtensionAuthSync";
 
 const CORAL = "#E8533A";
 const CHROME_STORE = "https://chromewebstore.google.com/search/JobLoom%20Smart%20Apply";
@@ -263,6 +264,11 @@ export default function SmartApplyPage() {
     if (!authLoaded || !isSignedIn) return;
     void load();
   }, [authLoaded, isSignedIn, load]);
+
+  useExtensionAuthSync({
+    enabled: Boolean(authLoaded && isSignedIn),
+    getToken: () => getToken(),
+  });
 
   const patch = useCallback(
     async (body: ApplyProfilePatch) => {

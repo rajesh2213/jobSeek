@@ -2,6 +2,24 @@ import { compositeFieldId, parseCompositeFieldId } from "./lib/frameIds";
 import { isLikelyAtsPage } from "./lib/atsDetection";
 import { isAllowedApiPath } from "./lib/allowedApiPaths";
 import { getDefaultApiBase, isProductionExtensionBuild, resolveApiBaseFromStorage } from "./config";
+import { isTrustedExtensionWebOrigin } from "./trustedWebOrigins";
+
+const EXT_AUTH_TOKEN_MAX_CHARS = 16_384;
+
+function senderOrigin(sender: chrome.runtime.MessageSender): string | null {
+  const raw = sender.url;
+  if (!raw || typeof raw !== "string") return null;
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return null;
+  }
+}
+
+function looseJwtShape(token: string): boolean {
+  const parts = token.split(".");
+  return parts.length >= 3 && parts.every((p) => p.length > 0);
+}
 
 type ApiRequestMessage = {
   type: "API_REQUEST";
@@ -416,6 +434,54 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  return false;
+});
+
+chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
+  const origin = senderOrigin(sender);
+  if (!origin || !isTrustedExtensionWebOrigin(origin)) {
+    sendResponse({ ok: false, error: "Forbidden origin" });
+    return false;
+  }
+
+  const m = msg as { type?: unknown; token?: unknown };
+  const type = typeof m.type === "string" ? m.type : "";
+
+  if (type === "PING") {
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (type === "CLEAR_AUTH_TOKEN") {
+    void chrome.storage.local.remove(["authToken"], () => {
+      sendResponse({ ok: true });
+    });
+    return true;
+  }
+
+  if (type === "SET_AUTH_TOKEN") {
+    if (typeof m.token !== "string") {
+      sendResponse({ ok: false, error: "Invalid token" });
+      return false;
+    }
+    const token = m.token.trim();
+    if (!token) {
+      void chrome.storage.local.remove(["authToken"], () => {
+        sendResponse({ ok: true });
+      });
+      return true;
+    }
+    if (token.length > EXT_AUTH_TOKEN_MAX_CHARS || !looseJwtShape(token)) {
+      sendResponse({ ok: false, error: "Invalid token" });
+      return false;
+    }
+    void chrome.storage.local.set({ authToken: token }, () => {
+      sendResponse({ ok: true });
+    });
+    return true;
+  }
+
+  sendResponse({ ok: false, error: "Unknown message" });
   return false;
 });
 

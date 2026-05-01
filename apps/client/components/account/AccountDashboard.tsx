@@ -18,6 +18,8 @@ import {
   formatUserLocalResetDateTime,
   getUserLocalTimeZoneLabel,
 } from "../../lib/userLocalResetTime";
+import { clearExtensionAuth } from "../../lib/extensionAuthBridge";
+import { useExtensionAuthSync } from "../../lib/useExtensionAuthSync";
 
 function formatRelativeTime(iso: string): string {
   const t = new Date(iso).getTime();
@@ -62,7 +64,7 @@ const clerkAppearance = {
 
 export function AccountDashboard() {
   const { signOut } = useClerk();
-  const { getToken, isSignedIn } = useAuth();
+  const { getToken, isSignedIn, isLoaded: authLoaded } = useAuth();
   const { user, isLoaded } = useUser();
   const { hasResume, fileName, wordCount, resumeUpdatedAt, deleteResume, refreshStatus } =
     useResume();
@@ -134,6 +136,11 @@ export function AccountDashboard() {
     };
   }, [getToken]);
 
+  useExtensionAuthSync({
+    enabled: Boolean(authLoaded && isLoaded && isSignedIn),
+    getToken: () => getToken(),
+  });
+
   // Prefer plan from /api/user/me; default matches backend free tier when absent.
   const plan = me?.plan ?? "free";
   const isPro = isPaidPlan(plan);
@@ -167,6 +174,7 @@ export function AccountDashboard() {
     setSignOutError(null);
     setIsSigningOut(true);
     try {
+      await clearExtensionAuth();
       await signOut({ redirectUrl: "/jobs" });
     } catch {
       setSignOutError("Could not sign out right now. Please try again.");

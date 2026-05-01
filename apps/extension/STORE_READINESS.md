@@ -74,6 +74,8 @@ The extension helps you complete job application forms in your browser. It is no
 ### 2. Data we process
 
 - **Account and authentication:** If you are signed in, authentication material is used to reach your account. **Authentication tokens are stored locally on your device using Chrome extension storage and are never shared with third parties** (only used between the extension and JobLoom’s own servers as part of the service). They may be sent in **Authorization** headers to our servers. Do **not** claim tokens are “stored securely” in a way that implies encryption beyond what Chrome provides; the accurate story is local extension storage, not a separate vault.  
+- **Website ↔ extension handshake:** The manifest may declare **`externally_connectable`** origins (for example JobLoom production and local dev URLs only). Matching signed-in pages may send limited messages (`PING`, session sync, clear on sign-out) **only** to this extension via Chrome’s messaging API—**not** to arbitrary third-party sites—so the extension can store the same session token you already use on the website.  
+
 - **Profile, resume, and Smart Apply:** The extension may request your application profile, resume, usage limits, and optional **draft** answers for long-form questions from our servers, so it can help fill the page.  
 - **Page context (forms):** To fill a form, the extension reads the **structure and content of the application page** (e.g. fields, labels) in the tab where you use it. It does this so it can place answers in the right fields. It does not operate silently on unrelated tabs.  
 - **Product usage events:** The extension may send **limited event data** to our servers (e.g. that a supported page was detected or a fill was started) to run limits and improve the product, as defined by our API and your account. Do **not** claim “no analytics” if you send any events—describe what you send in aggregate terms.
@@ -113,6 +115,8 @@ Users may sign out, uninstall the extension, and exercise account rights (access
 
 ## Security / review implementation notes (codebase)
 
+- **`externally_connectable` + `onMessageExternal`** — The service worker validates `sender.url` against `src/trustedWebOrigins.ts` (aligned with `manifest.json`); only those origins may set or clear `authToken`. Unknown message types are rejected.  
+- **Stable dev extension ID (optional QA):** Unpacked builds normally get a new ID each time unless you add a manifest `key`. Pinning a key is useful so `NEXT_PUBLIC_JOBLOOM_EXTENSION_ID` stays stable while testing against `localhost` or jobloom.tech; follow Chrome’s packaging docs before using `key` on a store-bound build.  
 - **API path allowlist** — The service worker only proxies **known** `path` values (see `src/lib/allowedApiPaths.ts`); all other paths are rejected. `api.ts` uses the same constants.  
 - **URL resolution** — Requests use `new URL(path, base)` and **origin must match** the API base, blocking odd resolution edge cases.  
 - **No `<all_urls>`** in manifest; content matches are explicit `https` and `http` page patterns.  
