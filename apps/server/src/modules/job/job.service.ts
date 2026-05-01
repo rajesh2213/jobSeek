@@ -26,7 +26,7 @@ export interface JobListInput {
   /** If set, skips `(page - 1) * limit` and uses this offset instead. */
   offset?: number;
   filters?: JobDiscoveryFilters;
-  /** Result ordering; default latest-first by `createdAt`. */
+  /** Result ordering; default latest-first by `effectivePostedAt` (nulls last). */
   sort?: "latest" | "salary_desc";
   includeProcessing?: boolean;
 }

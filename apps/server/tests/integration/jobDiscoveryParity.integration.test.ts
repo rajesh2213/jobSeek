@@ -237,7 +237,7 @@ runDescribe("job discovery Prisma vs SQL parity", () => {
     const idRows = await prisma.$queryRaw<{ id: string }[]>`
       SELECT j.id FROM "Job" j
       WHERE ${whereSql}
-      ORDER BY COALESCE(j."postedAt", j."createdAt") DESC
+      ORDER BY j."effectivePostedAt" DESC NULLS LAST
       LIMIT 10 OFFSET 0
     `;
     const ids = idRows.map((r) => r.id);
@@ -256,7 +256,7 @@ runDescribe("job discovery Prisma vs SQL parity", () => {
     const plans = await prisma.$queryRaw<{ "QUERY PLAN": string }[]>`
       EXPLAIN (ANALYZE, BUFFERS) SELECT j.id FROM "Job" j
       WHERE ${whereSql}
-      ORDER BY COALESCE(j."postedAt", j."createdAt") DESC
+      ORDER BY j."effectivePostedAt" DESC NULLS LAST
       LIMIT 20 OFFSET 0
     `;
     const text = plans.map((p) => p["QUERY PLAN"]).join("\n");

@@ -126,9 +126,10 @@ async function main(): Promise<void> {
       await prisma.$transaction(
         async (tx) => {
           for (const [timeMs, ids] of grouped.entries()) {
+            const at = new Date(timeMs);
             await tx.job.updateMany({
               where: { id: { in: ids } },
-              data: { postedAt: new Date(timeMs) },
+              data: { postedAt: at, effectivePostedAt: at },
             });
           }
         },
