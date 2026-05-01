@@ -26,6 +26,14 @@ function maxMergedSkills(): number {
   return Math.max(1, Math.min(75, Number.isFinite(n) ? n : 60));
 }
 
+/**
+ * Single derived value for `Job.effectivePostedAt` (matches SQL COALESCE(postedAt, createdAt)).
+ * Never use wall-clock `now` here — only publication proxy or row ingest time.
+ */
+function deriveEffectivePostedAt(postedAt: Date | null, createdAt: Date): Date {
+  return postedAt ?? createdAt;
+}
+
 /** Union taxonomy + parsed tech; capped to avoid search/ranking bloat. */
 function mergeJobSkillsList(taxonomySkills: string[], techStack: string[], max: number): string[] {
   const seen = new Set<string>();
@@ -582,7 +590,7 @@ export function createJobRepository(prisma: PrismaClient) {
       sourceUrl: input.sourceUrl,
       applyUrl: safeApplyUrl(input.applyUrl),
       postedAt: input.postedAt ?? null,
-      effectivePostedAt: input.postedAt ?? createdAt,
+      effectivePostedAt: deriveEffectivePostedAt(input.postedAt ?? null, createdAt),
       createdAt,
       lastSeenAt: now,
       expiresAt,
@@ -720,7 +728,8 @@ export function createJobRepository(prisma: PrismaClient) {
 
     /**
      * Canonical jobs only; filter-first.
-     * Latest: `ORDER BY effectivePostedAt DESC NULLS LAST` (uses idx_jobs_effective_listing_fast).
+     * Latest: `effectivePostedAt DESC NULLS LAST`, then `createdAt DESC` for stable ties
+     * (idx_jobs_effective_listing_fast on first key; secondary sort may add a small sort step).
      * Postgres defaults to NULLS FIRST for DESC; null `effectivePostedAt` rows must not precede dated rows.
      * Salary: salary floor desc, then `createdAt` desc.
      */
@@ -785,7 +794,7 @@ export function createJobRepository(prisma: PrismaClient) {
         const idQuery = Prisma.sql`
           SELECT j.id FROM "Job" j
           WHERE ${whereSql}
-          ORDER BY j."effectivePostedAt" DESC NULLS LAST
+          ORDER BY j."effectivePostedAt" DESC NULLS LAST, j."createdAt" DESC
           LIMIT ${options.limit} OFFSET ${options.offset}
         `;
         console.log("SQL_ID_QUERY", idQuery);
@@ -917,7 +926,7 @@ export function createJobRepository(prisma: PrismaClient) {
 
     async create(input: DedupJobInput): Promise<Job> {
       const seenAt = new Date();
-      return prisma.job.upsert({
+      const job = await prisma.job.upsert({
         where: { sourceUrl: input.sourceUrl },
         update: {
           updatedAt: seenAt,
@@ -933,6 +942,15 @@ export function createJobRepository(prisma: PrismaClient) {
           fingerprintVersion: "v2",
         },
       });
+      const derived = deriveEffectivePostedAt(job.postedAt, job.createdAt);
+      const cur = job.effectivePostedAt;
+      if (cur === null || cur.getTime() !== derived.getTime()) {
+        return prisma.job.update({
+          where: { id: job.id },
+          data: { effectivePostedAt: derived },
+        });
+      }
+      return job;
     },
 
     async createCanonicalJob(
@@ -1044,7 +1062,7 @@ export function createJobRepository(prisma: PrismaClient) {
           category: data.category ?? "other",
           isRemote: data.isRemote,
           postedAt: data.postedAt,
-          effectivePostedAt: data.postedAt ?? row.createdAt,
+          effectivePostedAt: deriveEffectivePostedAt(data.postedAt, row.createdAt),
         },
       });
     },
@@ -1097,7 +1115,7 @@ export function createJobRepository(prisma: PrismaClient) {
           role: data.role,
           skills: data.skills,
           salaryMin: data.salaryMin,
-          effectivePostedAt: data.postedAt ?? row.createdAt,
+          effectivePostedAt: deriveEffectivePostedAt(data.postedAt, row.createdAt),
         },
       });
     },
@@ -1180,14 +1198,17 @@ export function createJobRepository(prisma: PrismaClient) {
       if (!candidate || Number.isNaN(candidate.getTime())) return false;
       const row = await prisma.job.findUnique({
         where: { id },
-        select: { postedAt: true },
+        select: { postedAt: true, createdAt: true },
       });
       if (!row) return false;
       const cur = row.postedAt;
       if (cur && candidate.getTime() >= cur.getTime()) return false;
       await prisma.job.update({
         where: { id },
-        data: { postedAt: candidate, effectivePostedAt: candidate },
+        data: {
+          postedAt: candidate,
+          effectivePostedAt: deriveEffectivePostedAt(candidate, row.createdAt),
+        },
       });
       return true;
     },

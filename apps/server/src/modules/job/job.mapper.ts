@@ -47,7 +47,7 @@ export function toJobListJson(job: JobWithCompanyRow): Record<string, unknown> {
     previewLines: preview.previewLines,
     previewLinesSource: preview.previewLinesSource,
     company: toCompanyPublic(company),
-    /** Listing sort key; keep explicit so clients align timestamps with `ORDER BY effectivePostedAt`. */
+    /** Listing sort key; aligns with `ORDER BY effectivePostedAt DESC NULLS LAST, createdAt DESC`. */
     effectivePostedAt: job.effectivePostedAt ?? null,
   };
 }
