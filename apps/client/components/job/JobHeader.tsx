@@ -18,7 +18,9 @@ export function JobHeader({ job, applyHref, applyUrlLocked }: Props) {
     <header className="space-y-3">
       <div className="flex flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <p className="text-xs font-bold uppercase tracking-wider text-ink/45">{job.category.replace(/-/g, " ")}</p>
-        <p className="shrink-0 text-xs font-medium text-ink/45">{formatTimeAgo(job.postedAt, job.createdAt)}</p>
+        <p className="shrink-0 text-xs font-medium text-ink/45">
+          {formatTimeAgo(job.effectivePostedAt ?? job.createdAt)}
+        </p>
       </div>
       <h1 className="font-display text-3xl font-normal italic text-ink sm:text-4xl">{job.title}</h1>
       <div className="flex flex-row flex-wrap items-start justify-between gap-x-4 gap-y-3">

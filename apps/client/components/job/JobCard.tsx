@@ -36,8 +36,13 @@ const NEW_JOB_MAX_MS = 10 * 60 * 60 * 1000;
 /** Stronger “Just posted” pulse for very fresh listings. */
 const JUST_POSTED_MAX_MS = 90 * 60 * 1000;
 
+/** Freshness instant aligned with API `ORDER BY effectivePostedAt`. */
+function listingFreshnessInstant(job: JobItem): string | null | undefined {
+  return job.effectivePostedAt ?? job.createdAt;
+}
+
 function isJustPosted(job: JobItem): boolean {
-  const raw = job.postedAt?.trim() || job.createdAt;
+  const raw = listingFreshnessInstant(job);
   if (!raw || raw === "null") return false;
   const t = new Date(raw).getTime();
   if (Number.isNaN(t)) return false;
@@ -45,9 +50,7 @@ function isJustPosted(job: JobItem): boolean {
 }
 
 function isNewJob(job: JobItem): boolean {
-  const hasPosted =
-    job.postedAt != null && String(job.postedAt).trim() !== "" && job.postedAt !== "null";
-  const iso = hasPosted ? job.postedAt : job.createdAt;
+  const iso = listingFreshnessInstant(job);
   if (!iso) return false;
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return false;
@@ -55,9 +58,13 @@ function isNewJob(job: JobItem): boolean {
 }
 
 function postedMetaLine(job: JobItem): string {
-  const raw = formatTimeAgo(job.postedAt, job.createdAt).replace(/\*$/, "");
+  const ts = listingFreshnessInstant(job);
+  const raw = formatTimeAgo(ts);
   if (raw === "Recently posted") return raw;
-  return `Posted ${raw}`;
+  const hasPosted =
+    job.postedAt != null && String(job.postedAt).trim() !== "" && job.postedAt !== "null";
+  const prefix = hasPosted ? "Posted" : "Added";
+  return `${prefix} ${raw}`;
 }
 
 interface Props {
@@ -73,7 +80,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
 
   const postedLabel = useMemo(
     () => postedMetaLine(job),
-    [job.postedAt, job.createdAt, tick],
+    [job.postedAt, job.effectivePostedAt, job.createdAt, tick],
   );
   const showNew = isNewJob(job);
   const justPosted = isJustPosted(job);

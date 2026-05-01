@@ -169,7 +169,7 @@ function countPostedInLast2Hours(jobs: JobItem[]): number {
   const now = Date.now();
   const twoH = 2 * 60 * 60 * 1000;
   return jobs.filter((j) => {
-    const iso = j.postedAt ?? j.createdAt;
+    const iso = j.effectivePostedAt ?? j.createdAt;
     if (!iso) return false;
     const t = new Date(iso).getTime();
     if (Number.isNaN(t)) return false;

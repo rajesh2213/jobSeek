@@ -10,7 +10,7 @@ export function JobMeta({ job }: { job: JobItem }) {
       <span>·</span>
       <span>{job.role.replace(/-/g, " ")}</span>
       <span>·</span>
-      <span>{formatTimeAgo(job.postedAt, job.createdAt)}</span>
+      <span>{formatTimeAgo(job.effectivePostedAt ?? job.createdAt)}</span>
     </div>
   );
 }

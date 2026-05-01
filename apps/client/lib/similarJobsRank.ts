@@ -29,7 +29,7 @@ export function rankSimilarJobs(
       ) {
         score += 1;
       }
-      const freshness = new Date(j.postedAt ?? j.createdAt ?? 0).getTime();
+      const freshness = new Date(j.effectivePostedAt ?? j.postedAt ?? j.createdAt ?? 0).getTime();
       return { j, score, freshness };
     });
   scored.sort((a, b) => {

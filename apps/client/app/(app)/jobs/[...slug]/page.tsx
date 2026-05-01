@@ -179,7 +179,7 @@ function buildSeoSummary(
       skillCounts.set(key, (skillCounts.get(key) ?? 0) + 1);
     }
     companyCounts.set(job.company.name, (companyCounts.get(job.company.name) ?? 0) + 1);
-    const d = new Date(job.postedAt ?? job.createdAt ?? Date.now());
+    const d = new Date(job.effectivePostedAt ?? job.postedAt ?? job.createdAt ?? Date.now());
     if (!Number.isNaN(d.getTime())) {
       const key = d.toISOString().slice(0, 10);
       trend.set(key, (trend.get(key) ?? 0) + 1);
