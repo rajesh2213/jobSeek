@@ -193,6 +193,7 @@ export function registerCompanyRoutes(
           const bundle = await companyService.getCompanyJobs(slug, {
             page,
             limit: effectiveLimit,
+            paginationStride: limit,
             filters: parsed,
             sort,
             includeProcessing,

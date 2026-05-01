@@ -164,6 +164,7 @@ export function registerJobRoutes(
             jobService.list({
               page,
               limit: effectiveLimit,
+              paginationStride: meteredLimit,
               offset,
               filters,
               sort,

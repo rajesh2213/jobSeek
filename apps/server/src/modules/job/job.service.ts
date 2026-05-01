@@ -18,6 +18,11 @@ function labelFromHyphenSlug(slug: string): string {
 export interface JobListInput {
   page: number;
   limit: number;
+  /**
+   * Rows to fetch this request (`limit`). When metered clamping uses a smaller `limit` than the
+   * client's page size, set `paginationStride` to that page size so offset stays `(page - 1) * stride`.
+   */
+  paginationStride?: number;
   /** If set, skips `(page - 1) * limit` and uses this offset instead. */
   offset?: number;
   filters?: JobDiscoveryFilters;
@@ -70,10 +75,14 @@ export class JobService {
   }
 
   async list(input: JobListInput): Promise<PaginatedResult<JobWithCompany>> {
+    const stride =
+      typeof input.paginationStride === "number" && input.paginationStride > 0
+        ? input.paginationStride
+        : input.limit;
     const skip =
       typeof input.offset === "number" && input.offset >= 0
         ? input.offset
-        : (input.page - 1) * input.limit;
+        : (input.page - 1) * stride;
     const effectivePage = Math.floor(skip / input.limit) + 1;
     const sort = input.sort ?? "latest";
     const items = await this.jobRepository.findManyCanonicalFiltered({
@@ -83,7 +92,12 @@ export class JobService {
       sort,
       includeProcessing: input.includeProcessing,
     });
-    const hasMore = items.length === input.limit;
+    const implicitStrideClamp =
+      typeof input.offset !== "number" &&
+      typeof input.paginationStride === "number" &&
+      input.paginationStride > input.limit;
+    const hasMore =
+      items.length === input.limit && !implicitStrideClamp;
     console.log("COUNT_REMOVED_ALL_PAGES");
 
     return {

@@ -209,6 +209,8 @@ export class CompanyService {
     input: {
       page: number;
       limit: number;
+      /** Same semantics as `JobListInput.paginationStride` when metered `limit` is clamped. */
+      paginationStride?: number;
       filters?: Omit<JobDiscoveryFilters, "companyId">;
       sort?: "latest" | "salary_desc";
       includeProcessing?: boolean;
@@ -225,7 +227,11 @@ export class CompanyService {
     const total = await this.jobRepository.countCanonicalFiltered(filters, {
       includeProcessing: input.includeProcessing,
     });
-    const skip = (input.page - 1) * input.limit;
+    const stride =
+      typeof input.paginationStride === "number" && input.paginationStride > 0
+        ? input.paginationStride
+        : input.limit;
+    const skip = (input.page - 1) * stride;
     const items = await this.jobRepository.findManyCanonicalFiltered({
       filters,
       limit: input.limit,
@@ -234,7 +240,7 @@ export class CompanyService {
       includeProcessing: input.includeProcessing,
     });
 
-    const totalPages = Math.ceil(total / input.limit) || 1;
+    const totalPages = Math.ceil(total / stride) || 1;
     const hasMore = skip + items.length < total;
 
     return {
