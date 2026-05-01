@@ -20,7 +20,8 @@ export function useExtensionAuthSync(options: {
   useEffect(() => {
     if (!enabled) return;
 
-    const sync = () => void syncExtensionAuthToken(() => getTokenRef.current());
+    const sync = () =>
+      void syncExtensionAuthToken(() => getTokenRef.current({ skipCache: true }));
 
     void sync();
 

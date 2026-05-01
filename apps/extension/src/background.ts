@@ -7,13 +7,16 @@ import { isTrustedExtensionWebOrigin } from "./trustedWebOrigins";
 const EXT_AUTH_TOKEN_MAX_CHARS = 16_384;
 
 function senderOrigin(sender: chrome.runtime.MessageSender): string | null {
-  const raw = sender.url;
-  if (!raw || typeof raw !== "string") return null;
-  try {
-    return new URL(raw).origin;
-  } catch {
-    return null;
-  }
+  const parseOrigin = (raw: string | undefined): string | null => {
+    if (!raw || typeof raw !== "string") return null;
+    try {
+      return new URL(raw).origin;
+    } catch {
+      return null;
+    }
+  };
+  /** Prefer `origin` — Chrome documents it for sender trust when `url` is missing or opaque (e.g. some external webpage sends). */
+  return parseOrigin(sender.origin) ?? parseOrigin(sender.url);
 }
 
 function looseJwtShape(token: string): boolean {
