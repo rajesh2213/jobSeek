@@ -720,7 +720,7 @@ export function createJobRepository(prisma: PrismaClient) {
 
     /**
      * Canonical jobs only; filter-first.
-     * Latest: `ORDER BY effectivePostedAt DESC` (materialized COALESCE(postedAt, createdAt)).
+     * Latest: `ORDER BY COALESCE(postedAt, createdAt) DESC NULLS LAST` (matches card “Posted …”).
      * Salary: salary floor desc, then `createdAt` desc.
      */
     async findManyCanonicalFiltered(options: {
@@ -780,10 +780,15 @@ export function createJobRepository(prisma: PrismaClient) {
         const whereSql = buildDiscoveryWhereSql(options.filters, {
           includeProcessing: options.includeProcessing ?? false,
         });
+        /**
+         * Match client cards (`formatTimeAgo(postedAt, createdAt)`): sort by the same freshness
+         * signal users see. Pure `effectivePostedAt` can drift (backfills, partial updates, NULLs
+         * sorting first under DESC), producing “older Posted …” rows above fresher ones.
+         */
         const idQuery = Prisma.sql`
           SELECT j.id FROM "Job" j
           WHERE ${whereSql}
-          ORDER BY j."effectivePostedAt" DESC
+          ORDER BY COALESCE(j."postedAt", j."createdAt") DESC NULLS LAST
           LIMIT ${options.limit} OFFSET ${options.offset}
         `;
         console.log("SQL_ID_QUERY", idQuery);
