@@ -140,6 +140,24 @@ export interface JobsApiResponse {
   };
 }
 
+/**
+ * Coerces list pagination meta after JSON/RSC boundaries.
+ * Without this, `listMeta.page` can be missing → `undefined + 1` is NaN → `buildJobDiscoverySearchParams`
+ * skips `page` (NaN is falsy) → GET /jobs defaults to page 1 → Load more fetches duplicates, quota meta gets overwritten by SSR snapshot.
+ */
+export function normalizeJobsListMeta(
+  meta: JobsApiResponse["meta"] | undefined,
+): JobsApiResponse["meta"] | undefined {
+  if (!meta) return undefined;
+  const page = Number(meta.page);
+  const pageSize = Number(meta.pageSize);
+  return {
+    ...meta,
+    page: Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1,
+    pageSize: Number.isFinite(pageSize) && pageSize >= 1 ? Math.floor(pageSize) : 20,
+  };
+}
+
 interface CompaniesApiResponse {
   data: CompanyListItem[];
   meta: {
@@ -739,7 +757,11 @@ function buildJobDiscoverySearchParams(
   opts?: { includeCompanyId?: boolean },
 ): URLSearchParams {
   const params = new URLSearchParams();
-  if (filters.page) params.set("page", String(filters.page));
+  const rawPage =
+    filters.page !== undefined && filters.page !== null ? Number(filters.page) : NaN;
+  if (Number.isFinite(rawPage) && rawPage >= 1) {
+    params.set("page", String(Math.floor(rawPage)));
+  }
   if (filters.limit) params.set("limit", String(filters.limit));
   if (filters.offset !== undefined) params.set("offset", String(filters.offset));
   if (filters.locations?.length) {
@@ -833,6 +855,7 @@ export async function fetchJobs(
   return {
     ...body,
     data: (body.data ?? []).filter(isJobReady),
+    meta: normalizeJobsListMeta(body.meta),
   };
 }
 
@@ -1018,7 +1041,11 @@ export async function fetchCompanies(options: {
   ssrPage?: string;
 } = {}): Promise<CompaniesApiResponse> {
   const params = new URLSearchParams();
-  if (options.page) params.set("page", String(options.page));
+  const coPage =
+    options.page !== undefined && options.page !== null ? Number(options.page) : NaN;
+  if (Number.isFinite(coPage) && coPage >= 1) {
+    params.set("page", String(Math.floor(coPage)));
+  }
   if (options.limit) params.set("limit", String(options.limit));
   if (options.q?.trim()) params.set("q", options.q.trim());
   if (options.sort && options.sort !== "jobs") params.set("sort", options.sort);
@@ -1118,6 +1145,7 @@ export async function fetchCompanyJobs(
   return {
     ...body,
     data: (body.data ?? []).filter(isJobReady),
+    meta: normalizeJobsListMeta(body.meta),
   };
 }
 

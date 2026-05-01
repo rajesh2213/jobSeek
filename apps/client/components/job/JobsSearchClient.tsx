@@ -18,6 +18,7 @@ import {
   createSavedSearch,
   deleteSavedSearch,
   fetchJobs,
+  normalizeJobsListMeta,
   fetchSeoLandingPages,
   fetchSavedSearches,
   patchSavedSearchAlert,
@@ -528,7 +529,7 @@ export function JobsSearchClient({
           : [],
   }));
   const [listJobs, setListJobs] = useState<JobItem[]>(() => jobs.filter(isJobReady));
-  const [listMeta, setListMeta] = useState(initialMeta);
+  const [listMeta, setListMeta] = useState(() => normalizeJobsListMeta(initialMeta));
   const [loadingMore, setLoadingMore] = useState(false);
   const [savedSearches, setSavedSearches] = useState<SavedSearchItem[]>([]);
   const [savedSearchLimit, setSavedSearchLimit] = useState(3);
@@ -582,7 +583,7 @@ export function JobsSearchClient({
     if (listServerSyncKeyRef.current !== jobListFiltersKey) {
       listServerSyncKeyRef.current = jobListFiltersKey;
       setListJobs(jobs.filter(isJobReady));
-      setListMeta(initialMeta);
+      setListMeta(normalizeJobsListMeta(initialMeta));
       return;
     }
     // Same search as last sync — parent likely re-rendered from RSC (e.g. `router.replace` after apply flash).
@@ -601,7 +602,7 @@ export function JobsSearchClient({
         // SSR snapshot is still page 1 (and/or fewer rows); keep meter + pagination from the last client fetch.
         return prev;
       }
-      return initialMeta ?? prev;
+      return normalizeJobsListMeta(initialMeta) ?? prev;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- listJobs.length intentionally gates merged-list detection
   }, [jobs, initialMeta, jobListFiltersKey, listJobs.length, loadingMore]);
@@ -849,7 +850,10 @@ export function JobsSearchClient({
     if (!listMeta || loadingMore || !canLoadMore) return;
     setLoadingMore(true);
     try {
-      const nextPage = listMeta.page + 1;
+      const cur = Number(listMeta?.page);
+      const currentPage =
+        Number.isFinite(cur) && cur >= 1 ? Math.floor(cur) : 1;
+      const nextPage = currentPage + 1;
       const base = listQueryBase(urlFilters);
       const token = await getToken();
       const res = await fetchJobs(
@@ -873,7 +877,7 @@ export function JobsSearchClient({
         }
         return merged;
       });
-      setListMeta(res.meta);
+      setListMeta(normalizeJobsListMeta(res.meta));
     } catch {
       // CORS / network: leave list as-is; devtools will show the error.
     } finally {
