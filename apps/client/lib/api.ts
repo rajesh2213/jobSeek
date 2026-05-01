@@ -812,7 +812,18 @@ export async function fetchJobs(
   const startMs = Date.now();
   const params = buildJobDiscoverySearchParams(filters, { includeCompanyId: true });
 
-  const url = `${API_BASE_URL}/jobs${params.toString() ? `?${params}` : ""}`;
+  /**
+   * In the browser, call Next `/api/jobs` so the route forwards visitor `x-forwarded-for`
+   * (same as SSR). Direct `NEXT_PUBLIC_API_BASE_URL` requests often lack that chain upstream.
+   * Disable with `NEXT_PUBLIC_JOBS_BROWSER_PROXY=0`.
+   */
+  const useBrowserJobsProxy =
+    typeof window !== "undefined" &&
+    (process.env.NEXT_PUBLIC_JOBS_BROWSER_PROXY ?? "1").trim() !== "0";
+  const qs = params.toString() ? `?${params}` : "";
+  const url = useBrowserJobsProxy
+    ? `/api/jobs${qs}`
+    : `${API_BASE_URL}/jobs${qs}`;
   const headers = new Headers();
   const t = opts?.token?.trim();
   if (t) headers.set("Authorization", `Bearer ${t}`);
