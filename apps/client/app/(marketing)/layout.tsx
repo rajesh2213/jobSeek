@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { LegalFooter } from "../../components/layout/LegalFooter";
 import { MarketingHeader } from "../../components/layout/MarketingHeader";
 import { PageTransition } from "../../components/layout/PageTransition";
+import { RailMainSurface } from "../../components/layout/RailMainSurface";
 import { SiteSideRailProvider } from "../../components/layout/SiteSideRail";
 
 const marketingDescription =
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
   description: marketingDescription,
   openGraph: {
     title: "JobLoom — aggregate jobs, apply early",
-    description: "Discover open roles from career sites and boards in one place.",
+    description: marketingDescription,
     images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "JobLoom" }],
   },
   twitter: {
@@ -26,8 +27,10 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
     <SiteSideRailProvider>
       <MarketingHeader />
-      <div className="relative flex min-h-screen flex-col lg:px-[112px]">
-        <PageTransition>{children}</PageTransition>
+      <div className="relative flex min-h-screen flex-col overflow-x-hidden lg:overflow-x-visible">
+        <RailMainSurface className="flex-1">
+          <PageTransition>{children}</PageTransition>
+        </RailMainSurface>
         <LegalFooter />
       </div>
     </SiteSideRailProvider>

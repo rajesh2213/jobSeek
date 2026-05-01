@@ -1162,7 +1162,7 @@ export function JobsSearchClient({
 
       <div
         id="section-filters"
-        className="relative sticky top-12 z-[50] bg-canvas/95 py-3 backdrop-blur-sm sm:py-4"
+        className="relative sticky top-14 z-[50] bg-canvas/95 py-3 backdrop-blur-sm sm:top-16 sm:py-4"
       >
         <Container
           width="jobs"

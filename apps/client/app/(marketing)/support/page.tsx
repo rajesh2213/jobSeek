@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { DESKTOP_RAIL_INSET_CLASS } from "../../../components/layout/railInset";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { getSupportEmail } from "../../../lib/siteIdentity";
@@ -73,7 +74,7 @@ export default function SupportPage() {
   const mailtoHref = supportEmail ? `mailto:${supportEmail}` : null;
 
   return (
-    <div className="min-h-screen bg-canvas pb-24 pt-10 text-ink">
+    <div className={`min-h-screen bg-canvas pb-24 pt-10 text-ink ${DESKTOP_RAIL_INSET_CLASS}`}>
       <div className="mx-auto w-[90%] max-w-readable px-4">
         <header className="text-center">
           <h1 className="font-display text-3xl font-normal tracking-tight text-ink sm:text-4xl">

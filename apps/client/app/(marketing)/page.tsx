@@ -15,6 +15,10 @@ import {
 } from "framer-motion";
 import GuidedHookDemo from "../../components/GuidedHookDemo";
 import { EmailCaptureCard } from "../../components/email/EmailCaptureCard";
+import {
+  DESKTOP_RAIL_INSET_CLASS,
+  DESKTOP_RAIL_OPTICAL_CENTER_SHIFT_CLASS,
+} from "../../components/layout/railInset";
 import { HERO_JOB_INDEX_TOTAL, SHOW_LANDING_TESTIMONIALS } from "../../lib/landingPublic";
 import { PRO_ANNUAL_USD_PER_MONTH } from "../../lib/pricingDisplay";
 import { FREE_DAILY_JOBS } from "../../lib/planLimits";
@@ -55,8 +59,8 @@ function CountUp({ to, suffix = "" }: { to: number; suffix?: string }) {
 }
 
 const SIGNAL_MESSAGES = [
-  "Aggregate listings from career sites and boards in one place",
   "Most users apply within first 10 minutes of posting",
+  "Aggregate listings from career sites and boards in one place",
   "Resume aware matching helps you spot gaps before you apply",
   "New roles added every 3 minutes",
 ];
@@ -68,7 +72,7 @@ function RotatingSignal() {
     return () => clearInterval(id);
   }, []);
   return (
-    <div className="mt-4 flex h-9 items-center justify-start overflow-hidden rounded-lg border border-ink/8 bg-white/50 px-3">
+    <div className="mt-3 flex min-h-9 items-center justify-start overflow-hidden rounded-lg border border-ink/8 bg-white/50 px-3 py-1">
       <span className="mr-2 h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-emerald-400" />
       <AnimatePresence mode="wait">
         <motion.span
@@ -108,7 +112,7 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
 
   return (
     <section
-      className="mx-auto grid w-full max-w-6xl gap-8 px-4 pb-2 pt-8 sm:px-6 lg:grid-cols-2 lg:items-center"
+      className="mx-auto grid w-full max-w-6xl gap-8 px-4 pb-2 pt-4 sm:px-6 lg:grid-cols-2 lg:items-center"
     >
       <motion.div style={{ scale: heroScale, y: heroY, opacity: heroOpacity }}>
         <div className="flex flex-wrap items-center gap-2">
@@ -135,7 +139,7 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
             too late.
           </motion.span>
         </h1>
-        <p className="mt-4 max-w-xl text-sm leading-relaxed text-ink/75 sm:text-base">
+        <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink/75 sm:text-base">
           Most resumes <span className="font-semibold text-ink">never reach a human.</span> And by the time you apply, the role is already{" "}
           <span className="font-semibold text-ink">crowded.</span>
           <br />
@@ -143,7 +147,7 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
           JobLoom helps you <span className="font-semibold text-ink">move earlier</span>, <span className="font-semibold text-ink">fix what's missing</span>, and{" "}
           <span className="font-semibold text-ink">track everything</span> - so nothing slips through.
         </p>
-        <div className="mt-6 grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="mt-2 grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-3">
           {stats.map((s, i) => (
             <motion.div
               key={s.k}
@@ -162,7 +166,7 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
             </motion.div>
           ))}
         </div>
-        <div className="mt-7 flex flex-wrap gap-3">
+        <div className="mt-4 flex flex-wrap gap-3">
           <motion.div
             animate={{ boxShadow: ["0 0 0 0 rgba(232,83,58,0.35)", "0 0 0 10px rgba(232,83,58,0)"] }}
             transition={{ repeat: Infinity, duration: 1.8 }}
@@ -188,8 +192,8 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
             subtitle="High-signal roles delivered daily. Unsubscribe anytime."
             className="rounded-2xl border border-ink/10 bg-white/70 p-2.5 [&_p:nth-of-type(2)]:mt-0.5 [&_form]:mt-2 [&_form]:gap-1.5 [&_input]:py-1.5 [&_button]:py-1.5"
           />
+          <RotatingSignal />
         </div>
-        <RotatingSignal />
       </motion.div>
 
       <motion.div style={{ rotate: cardRotate, x: cardX, y: cardY, scale: cardScale, opacity: cardOpacity }}>
@@ -418,9 +422,9 @@ function SocialProofSection() {
     <motion.section
       ref={ref}
       style={{ y: sectionY, opacity: sectionOpacity }}
-      className="border-y border-ink/10 bg-white/40 py-14 md:-ml-[184px] md:pl-[184px]"
+      className="border-y border-ink/10 bg-white/40 py-14"
     >
-      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:pl-[136px]">
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">Others are already winning</p>
         <h2 className="mt-3 text-3xl font-semibold sm:text-4xl">Real users are landing interviews faster with JobLoom</h2>
         <p className="mt-3 text-sm text-ink/65">More first-round calls. Better shortlist rates. Fewer missed opportunities.</p>
@@ -600,10 +604,12 @@ function PricingSection() {
 
 function FinalUrgencySection() {
   return (
-    <motion.section
-      {...sectionReveal}
-      className="bg-[linear-gradient(180deg,#1a1a1a_0%,#111111_100%)] px-4 py-20 text-center sm:px-6 md:-ml-[184px] md:pl-[184px]"
-    >
+    <section className="relative z-0">
+      <motion.div
+        {...sectionReveal}
+        className="relative w-full bg-[linear-gradient(180deg,#1a1a1a_0%,#111111_100%)] py-20 text-center lg:py-20"
+      >
+      <div className="px-4 sm:px-6 lg:pl-[6px] lg:pr-6">
       <div className="mx-auto max-w-3xl">
         <h3 className="text-3xl font-semibold leading-snug text-white sm:text-4xl">
           You're not competing with job seekers.
@@ -662,7 +668,9 @@ function FinalUrgencySection() {
           </motion.span>
         </motion.div>
       </div>
-    </motion.section>
+      </div>
+      </motion.div>
+    </section>
   );
 }
 
@@ -712,20 +720,24 @@ function ExitIntentCapture() {
 }
 
 export default function LandingPage() {
-  const mainRef = useRef<HTMLElement | null>(null);
+  const scrollRootRef = useRef<HTMLDivElement | null>(null);
   const { scrollYProgress } = useScroll({
-    target: mainRef,
+    target: scrollRootRef,
     offset: ["start start", "end end"],
   });
   return (
-    <main ref={mainRef} className="relative min-h-screen bg-canvas pt-6 text-ink lg:pl-0">
-      <HeroSection progress={scrollYProgress} />
-      <PainSection />
-      <SolutionSection />
-      <PricingSection />
+    <div ref={scrollRootRef} className="relative min-h-screen bg-canvas text-ink">
+      <div className={DESKTOP_RAIL_INSET_CLASS}>
+        <div className={DESKTOP_RAIL_OPTICAL_CENTER_SHIFT_CLASS}>
+          <HeroSection progress={scrollYProgress} />
+          <PainSection />
+          <SolutionSection />
+          <PricingSection />
+        </div>
+      </div>
       {SHOW_LANDING_TESTIMONIALS ? <SocialProofSection /> : null}
       <FinalUrgencySection />
       <ExitIntentCapture />
-    </main>
+    </div>
   );
 }

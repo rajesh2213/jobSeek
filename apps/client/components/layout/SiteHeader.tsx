@@ -11,10 +11,10 @@ import { SiteSideRailMobileNav } from "./SiteSideRail";
 export function SiteHeader() {
   return (
     <header
-      className="pointer-events-none sticky top-0 z-[70] isolate border-none shadow-none"
+      className="pointer-events-none sticky top-0 z-[70] isolate w-full bg-canvas shadow-none"
       id="header-topbar"
     >
-      <div className="pointer-events-auto mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-2 bg-canvas px-4 sm:h-16 sm:gap-3 sm:px-6">
+      <div className="pointer-events-auto flex h-14 w-full items-center justify-between gap-2 px-4 sm:h-16 sm:gap-3 sm:px-6">
         <div className="flex min-w-0 shrink-0 items-center gap-3 sm:gap-4">
           <Link
             id="site-logo-link"

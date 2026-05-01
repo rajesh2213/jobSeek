@@ -13,10 +13,8 @@ export function MarketingHeader() {
     (user?.firstName?.[0] || user?.primaryEmailAddress?.emailAddress?.[0] || "A").toUpperCase();
 
   return (
-    <header
-      className="sticky top-0 z-[70] border-b border-ink/10 bg-[rgba(245,242,235,0.92)] backdrop-blur"
-    >
-      <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-2 px-4 sm:h-16 sm:gap-3 sm:px-6">
+    <header className="sticky top-0 z-[70] w-full bg-canvas">
+      <div className="flex h-14 w-full items-center justify-between gap-2 px-4 sm:h-16 sm:gap-3 sm:px-6">
         <Link
           href="/"
           prefetch={false}
