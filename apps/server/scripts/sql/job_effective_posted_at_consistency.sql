@@ -4,7 +4,7 @@ FROM "Job"
 WHERE "effectivePostedAt" IS DISTINCT FROM COALESCE("postedAt", "createdAt");
 
 -- Manual sanity sample (same ordering keys as discovery "latest").
-SELECT id, "postedAt", "createdAt", "effectivePostedAt"
+SELECT id, "postedAt", "createdAt", "effectivePostedAt", "listingFreshnessAt"
 FROM "Job"
-ORDER BY "effectivePostedAt" DESC NULLS LAST, "createdAt" DESC
+ORDER BY "listingFreshnessAt" DESC, "createdAt" DESC
 LIMIT 20;

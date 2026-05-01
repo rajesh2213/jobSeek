@@ -57,7 +57,7 @@ export function formatPostedTime(iso: string | null | undefined): string {
 
 /**
  * Relative freshness: "5 minutes ago", "2 hours ago", "3 days ago".
- * Pass the same instant used for listing sort (`effectivePostedAt` + fallback).
+ * Pass the same instant as listing sort (`effectivePostedAt ?? createdAt` ≡ DB `listingFreshnessAt`).
  * Dates older than ~6 months use a short calendar date.
  */
 export function formatTimeAgo(timestamp: string | Date | null | undefined): string {

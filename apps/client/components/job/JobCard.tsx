@@ -36,7 +36,7 @@ const NEW_JOB_MAX_MS = 10 * 60 * 60 * 1000;
 /** Stronger “Just posted” pulse for very fresh listings. */
 const JUST_POSTED_MAX_MS = 90 * 60 * 1000;
 
-/** Freshness instant aligned with API `ORDER BY effectivePostedAt`. */
+/** Freshness instant aligned with listing sort (`listingFreshnessAt` ≡ effectivePostedAt ?? createdAt). */
 function listingFreshnessInstant(job: JobItem): string | null | undefined {
   return job.effectivePostedAt ?? job.createdAt;
 }

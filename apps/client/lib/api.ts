@@ -89,7 +89,7 @@ export interface JobItem {
   sourceUrl: string;
   applyUrl?: string | null;
   postedAt: string | null;
-  /** Same instant as listing `ORDER BY effectivePostedAt` (ISO string from API). */
+  /** Same instant as listing freshness / DB `listingFreshnessAt` (ISO string from API). */
   effectivePostedAt?: string | null;
   createdAt?: string;
   status?: "processing" | "ready" | "failed" | null;

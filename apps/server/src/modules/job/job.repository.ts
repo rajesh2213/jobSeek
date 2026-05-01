@@ -728,9 +728,8 @@ export function createJobRepository(prisma: PrismaClient) {
 
     /**
      * Canonical jobs only; filter-first.
-     * Latest: `effectivePostedAt DESC NULLS LAST`, then `createdAt DESC` for stable ties
-     * (idx_jobs_effective_listing_fast on first key; secondary sort may add a small sort step).
-     * Postgres defaults to NULLS FIRST for DESC; null `effectivePostedAt` rows must not precede dated rows.
+     * Latest: `listingFreshnessAt DESC` (stored generated COALESCE(effectivePostedAt, createdAt); matches UI).
+     * Index: idx_jobs_listing_freshness_at. Avoids partition skew from ordering nullable effectivePostedAt alone.
      * Salary: salary floor desc, then `createdAt` desc.
      */
     async findManyCanonicalFiltered(options: {
@@ -794,7 +793,7 @@ export function createJobRepository(prisma: PrismaClient) {
         const idQuery = Prisma.sql`
           SELECT j.id FROM "Job" j
           WHERE ${whereSql}
-          ORDER BY j."effectivePostedAt" DESC NULLS LAST, j."createdAt" DESC
+          ORDER BY j."listingFreshnessAt" DESC, j."createdAt" DESC
           LIMIT ${options.limit} OFFSET ${options.offset}
         `;
         console.log("SQL_ID_QUERY", idQuery);

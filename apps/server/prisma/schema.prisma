@@ -139,6 +139,8 @@ model Job {
   /// idx_jobs_effective_listing_fast
   /// Prisma schema index below is NOT the real query index
   effectivePostedAt  DateTime?
+  /// Stored generated: COALESCE(effectivePostedAt, createdAt). Discovery “latest” ORDER BY uses this (matches UI).
+  listingFreshnessAt DateTime @default(dbgenerated("(COALESCE(\"effectivePostedAt\", \"createdAt\")) STORED"))
   lastSeenAt         DateTime  @default(now())
   /// Last time downstream discovery/processing consumed this job row.
   lastProcessedAt    DateTime?
@@ -187,6 +189,7 @@ model Job {
   @@index([skills], type: Gin)
   @@index([status])
   @@index([effectivePostedAt])
+  @@index([listingFreshnessAt], map: "idx_jobs_listing_freshness_at")
 }
 
 model SerpBatch {
