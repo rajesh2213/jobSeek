@@ -103,7 +103,8 @@ export async function buildCapContextFromRequest(
 function metaBase(
   result: PaginatedResult<unknown>,
   offset: number | undefined,
-  _requestLimit: number,
+  /** Nominal page size from the client/query (`meteredLimit`), not the clamped fetch limit. */
+  paginationStride: number,
 ): Pick<
   MeteredJobsListMeta,
   | "page"
@@ -114,21 +115,23 @@ function metaBase(
   | "offset"
   | "hasMore"
 > {
+  const stride =
+    paginationStride > 0 ? paginationStride : Math.max(1, result.limit);
   const skip =
     typeof offset === "number"
       ? offset
-      : (result.page - 1) * result.limit;
+      : (result.page - 1) * stride;
   if (result.total == null) {
     console.log("COUNT_REMOVED_ALL_PAGES");
   }
   const hasMore =
     result.hasMore ??
     (typeof result.total === "number"
-      ? result.page * result.limit < result.total
-      : result.items.length === result.limit);
+      ? result.page * stride < result.total
+      : result.items.length === stride);
   return {
     page: result.page,
-    pageSize: result.limit,
+    pageSize: stride,
     total: result.total,
     totalCount: result.total,
     totalPages: result.totalPages,
