@@ -26,7 +26,7 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
     <SiteSideRailProvider>
       <MarketingHeader />
-      <div className="relative flex min-h-screen flex-col lg:pl-[112px]">
+      <div className="relative flex min-h-screen flex-col lg:px-[112px]">
         <PageTransition>{children}</PageTransition>
         <LegalFooter />
       </div>

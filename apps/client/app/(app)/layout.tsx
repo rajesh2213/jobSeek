@@ -16,7 +16,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <HeaderWorkflow />
         <FixedGetProButton />
         <FixedAccountAvatar />
-        <div className="relative flex min-h-screen flex-col pb-20 lg:pl-[172px]">
+        <div className="relative flex min-h-screen flex-col pb-20 lg:px-[172px]">
           <PageTransition>{children}</PageTransition>
           <LegalFooter />
         </div>

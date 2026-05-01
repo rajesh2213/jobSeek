@@ -512,7 +512,6 @@ function PricingSection() {
 
   return (
     <motion.section ref={ref} style={{ y: pricingWrapY, opacity: pricingWrapOpacity }} className="mx-auto w-full max-w-6xl px-4 pb-16 pt-8 sm:px-6">
-      <div className="lg:relative lg:-left-3.5">
         <motion.h2 style={{ y: sectionY, opacity: sectionOpacity }} className="text-center text-3xl font-semibold sm:text-4xl">
           The difference is how early you move.
         </motion.h2>
@@ -595,7 +594,6 @@ function PricingSection() {
             </motion.div>
           </motion.div>
         </div>
-      </div>
     </motion.section>
   );
 }
