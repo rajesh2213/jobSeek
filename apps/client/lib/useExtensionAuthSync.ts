@@ -9,9 +9,11 @@ const DEBOUNCE_MS = 750;
  * Keeps Smart Apply extension storage in sync with the signed-in Clerk session
  * (initial + debounced refresh on tab focus / visibility).
  */
+export type ExtensionAuthGetToken = (opts?: { skipCache?: boolean }) => Promise<string | null>;
+
 export function useExtensionAuthSync(options: {
   enabled: boolean;
-  getToken: () => Promise<string | null>;
+  getToken: ExtensionAuthGetToken;
 }): void {
   const { enabled, getToken } = options;
   const getTokenRef = useRef(getToken);

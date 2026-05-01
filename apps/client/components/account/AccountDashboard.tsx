@@ -138,7 +138,7 @@ export function AccountDashboard() {
 
   useExtensionAuthSync({
     enabled: Boolean(authLoaded && isLoaded && isSignedIn),
-    getToken: () => getToken(),
+    getToken: (opts) => getToken(opts),
   });
 
   // Prefer plan from /api/user/me; default matches backend free tier when absent.

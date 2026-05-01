@@ -267,7 +267,7 @@ export default function SmartApplyPage() {
 
   useExtensionAuthSync({
     enabled: Boolean(authLoaded && isSignedIn),
-    getToken: () => getToken(),
+    getToken: (opts) => getToken(opts),
   });
 
   const patch = useCallback(
