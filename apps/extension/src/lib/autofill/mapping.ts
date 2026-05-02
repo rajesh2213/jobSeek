@@ -18,6 +18,7 @@ export interface ProfileMappingInput {
   workAuthorization?: string;
   salaryExpectation?: string;
   availableFrom?: string;
+  noticePeriod?: string;
 }
 
 export interface MappingResult {
@@ -50,7 +51,8 @@ export function mapDeterministicValue(fieldType: FieldType, profile: ProfileMapp
     currentCompany: profile.currentCompany,
     yearsExperience: profile.yearsOfExperience,
     salary: profile.salaryExpectation,
-    availability: profile.availableFrom,
+    availability:
+      profile.availableFrom?.trim() || profile.noticePeriod?.trim() || undefined,
     workAuthorization: profile.workAuthorization,
   };
   const raw = map[fieldType];

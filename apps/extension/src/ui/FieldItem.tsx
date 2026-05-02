@@ -28,53 +28,103 @@ export function FieldItem(props: {
   field: FieldState;
   selected: boolean;
   onClick: () => void;
+  /** Sidebar-only: optional “Fill with AI” control. */
+  showGenerateAi?: boolean;
+  disableGenerateAi?: boolean;
+  onGenerateAi?: () => void;
 }) {
   const isAttention =
     props.field.status === "failed" ||
     props.field.status === "manual_required" ||
     props.field.status === "skipped";
   const statusColor = isAttention ? "#c2410c" : "#9a3412";
-  const base: CSSProperties = {
+  const shell: CSSProperties = {
     display: "flex",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
     width: "100%",
     background: props.selected ? "#fff7ed" : "#fffdf9",
     border: props.selected ? "1px solid #fb923c" : "1px solid #fed7aa",
     borderRadius: 14,
-    padding: "10px 12px",
-    textAlign: "left",
-    cursor: "pointer",
+    padding: "8px 10px",
     transition: "border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease, background 140ms ease",
     boxShadow: props.selected ? "0 0 0 3px rgba(251,146,60,0.2), 0 8px 18px rgba(194,65,12,0.12)" : "none",
     lineHeight: 1.35,
   };
+  const rowBtn: CSSProperties = {
+    flex: 1,
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    minWidth: 0,
+    border: "none",
+    background: "transparent",
+    padding: "4px 6px",
+    margin: 0,
+    cursor: "pointer",
+    textAlign: "left",
+    fontFamily: "inherit",
+    lineHeight: 1.35,
+    borderRadius: 10,
+  };
   return (
-    <button type="button" onClick={props.onClick} style={base}>
-      <span style={{ width: 18, textAlign: "center", fontSize: 15, color: statusColor }}>
-        {statusIcon(props.field)}
-      </span>
-      <span style={{ flex: 1, overflow: "hidden" }}>
-        <span
+    <div style={shell}>
+      <button type="button" onClick={props.onClick} style={rowBtn}>
+        <span style={{ width: 18, textAlign: "center", fontSize: 15, color: statusColor, flexShrink: 0 }}>
+          {statusIcon(props.field)}
+        </span>
+        <span style={{ flex: 1, overflow: "hidden", textAlign: "left", minWidth: 0 }}>
+          <span
+            style={{
+              display: "block",
+              color: "#7c2d12",
+              fontSize: 13,
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+              textOverflow: "ellipsis",
+              overflow: "hidden",
+            }}
+          >
+            {cleanLabel(props.field.label)}
+          </span>
+          <span style={{ display: "block", marginTop: 2, color: statusColor, fontSize: 11 }}>
+            {props.field.status === "ai_generating" ? "generating" : props.field.status}
+            {props.field.source ? ` · ${props.field.source}` : ""}
+            {props.field.reason ? ` · ${props.field.reason}` : ""}
+          </span>
+        </span>
+      </button>
+      {props.showGenerateAi ? (
+        <button
+          type="button"
+          aria-label="Fill with AI"
+          title="Generate an answer with AI and insert it into this field"
+          disabled={props.disableGenerateAi}
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onGenerateAi?.();
+          }}
           style={{
-            display: "block",
-            color: "#7c2d12",
-            fontSize: 13,
-            fontWeight: 700,
-            whiteSpace: "nowrap",
-            textOverflow: "ellipsis",
-            overflow: "hidden",
+            flexShrink: 0,
+            maxWidth: 118,
+            padding: "6px 8px",
+            borderRadius: 10,
+            border: "1px solid #fdba74",
+            background: props.disableGenerateAi ? "#fff7ed" : "#fff",
+            color: "#c2410c",
+            fontSize: 10,
+            fontWeight: 800,
+            lineHeight: 1.2,
+            cursor: props.disableGenerateAi ? "not-allowed" : "pointer",
+            opacity: props.disableGenerateAi ? 0.65 : 1,
+            fontFamily: "inherit",
+            whiteSpace: "normal",
+            textAlign: "center",
           }}
         >
-          {cleanLabel(props.field.label)}
-        </span>
-        <span style={{ display: "block", marginTop: 2, color: statusColor, fontSize: 11 }}>
-          {props.field.status === "ai_generating" ? "generating" : props.field.status}
-          {props.field.source ? ` · ${props.field.source}` : ""}
-          {props.field.reason ? ` · ${props.field.reason}` : ""}
-        </span>
-      </span>
-    </button>
+          Fill with AI
+        </button>
+      ) : null}
+    </div>
   );
 }
-

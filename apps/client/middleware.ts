@@ -4,7 +4,10 @@ const isProtectedRoute = createRouteMatcher(["/account(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {
-    await auth.protect();
+    // Prefer app-hosted `/sign-in` (embedded Clerk UI on localhost) over Clerk’s accounts.dev page,
+    // which can spin forever when session refresh fails (clock skew or mismatched API keys).
+    const signInUrl = new URL("/sign-in", req.url).href;
+    await auth.protect(undefined, { unauthenticatedUrl: signInUrl });
   }
 });
 

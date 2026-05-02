@@ -2,22 +2,27 @@
 declare const __EXTENSION_API_BASE__: string;
 declare const __EXT_PROD__: string;
 
-const fallback = "https://jobseek-server.up.railway.app";
+const fallbackProd = "https://jobseek-server.up.railway.app";
 
 export function getDefaultApiBase(): string {
   if (typeof __EXTENSION_API_BASE__ === "string" && __EXTENSION_API_BASE__) {
     return __EXTENSION_API_BASE__.replace(/\/+$/, "");
   }
-  return fallback;
+  return isProductionExtensionBuild() ? fallbackProd : "http://localhost:3000";
 }
 
 export function isProductionExtensionBuild(): boolean {
   return typeof __EXT_PROD__ === "string" && __EXT_PROD__ === "true";
 }
 
+/** HTTP allowed for local Fastify/API during development (production webpack builds included). */
+export function isLoopbackHttpUrl(u: URL): boolean {
+  return u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1");
+}
+
 /**
- * Resolves which API base URL to use. In production store builds, only `https` origins
- * are allowed; invalid values fall back to the default.
+ * Resolves which API base URL to use. Production builds reject non-loopback `http:` (fallback
+ * to default); `https:` and `http://localhost|127.0.0.1` are kept when stored.
  */
 export function resolveApiBaseFromStorage(
   fromStorage: string | undefined,
@@ -37,6 +42,9 @@ export function resolveApiBaseFromStorage(
     return t.replace(/\/+$/, "");
   }
   if (u.protocol === "http:") {
+    if (isLoopbackHttpUrl(u)) {
+      return t.replace(/\/+$/, "");
+    }
     if (isProductionExtensionBuild()) {
       return def;
     }

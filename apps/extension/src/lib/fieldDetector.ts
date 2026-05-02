@@ -22,6 +22,7 @@ export interface DetectedField {
   inputType?: string;
   groupKey?: string;
   charLimit?: number;
+  rows?: number;
 }
 
 export function detectFormFields(): DetectedField[] {
@@ -43,5 +44,6 @@ export function detectFormFields(): DetectedField[] {
     inputType: f.inputType,
     groupKey: f.groupKey,
     charLimit: f.charLimit,
+    rows: f.rows,
   }));
 }

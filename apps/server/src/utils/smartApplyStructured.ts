@@ -136,7 +136,7 @@ export function tryStructuredAnswer(
     return WORK_AUTH_LABEL[w] ?? w;
   }
   if (/\bavailable\s*to\s*start\b|\bstart\s*date\b|\bavailability\b/i.test(q)) {
-    return pick(p.availableFrom);
+    return pick(p.availableFrom) ?? pick(p.noticePeriod);
   }
 
   return null;

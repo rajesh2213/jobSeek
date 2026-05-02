@@ -35,6 +35,7 @@ export async function buildServer() {
     origin: true,
     credentials: false,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    exposedHeaders: ["x-jobloom-auth-failure-code", "x-jobloom-auth-hint"],
     allowedHeaders: [
       "Authorization",
       "Content-Type",

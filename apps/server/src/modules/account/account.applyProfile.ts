@@ -1,6 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { Prisma } from "@prisma/client";
-import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
+import {
+  resolveClerkUserResult,
+  sendClerkAuthFailureReply,
+} from "../../infrastructure/auth/clerkVerify.js";
 import { getResumeObjectStore } from "../../infrastructure/storage/resumeObjectStore.js";
 import { getPlanLimits } from "../../config/plans.js";
 import { resolveProPlan } from "../../utils/userPlan.js";
@@ -278,9 +281,9 @@ function computeProfileMetrics(user: {
   linkedinUrl: string | null;
   currentTitle: string | null;
   yearsOfExperience: number | null;
-  workAuthorization: string | null;
   salaryExpectation: string | null;
   availableFrom: string | null;
+  noticePeriod: string | null;
   customQA: unknown;
 }): { profileComplete: boolean; profileCompletionPct: number } {
   const hasResume = computeHasResumeFromParts({
@@ -302,9 +305,8 @@ function computeProfileMetrics(user: {
     hasResume,
     Boolean(user.currentTitle?.trim()),
     user.yearsOfExperience != null,
-    Boolean(user.workAuthorization?.trim()),
     Boolean(user.salaryExpectation?.trim()),
-    Boolean(user.availableFrom?.trim()),
+    Boolean(user.availableFrom?.trim()) || Boolean(user.noticePeriod?.trim()),
     summary,
     Array.isArray(user.customQA) && (user.customQA as unknown[]).length > 0,
   ];
@@ -385,10 +387,11 @@ async function ensureSmartApplyDayReset(
 
 export function registerAccountApplyProfileRoutes(server: FastifyInstance): void {
   server.get("/account/apply-profile", async (request, reply) => {
-    const ctx = await resolveClerkUser(server.prisma, request.headers.authorization);
-    if (!ctx) {
-      return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+    const auth = await resolveClerkUserResult(server.prisma, request.headers.authorization);
+    if (!auth.ok) {
+      return sendClerkAuthFailureReply(reply, auth.failure);
     }
+    const { ctx } = auth;
 
     const row = await server.prisma.user.findUnique({
       where: { id: ctx.internalUserId },
@@ -517,10 +520,11 @@ export function registerAccountApplyProfileRoutes(server: FastifyInstance): void
       applyProfileExtras: unknown;
     }>;
   }>("/account/apply-profile", async (request, reply) => {
-    const ctx = await resolveClerkUser(server.prisma, request.headers.authorization);
-    if (!ctx) {
-      return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+    const authPatch = await resolveClerkUserResult(server.prisma, request.headers.authorization);
+    if (!authPatch.ok) {
+      return sendClerkAuthFailureReply(reply, authPatch.failure);
     }
+    const { ctx } = authPatch;
 
     const body = request.body ?? {};
     const data: Record<string, unknown> = {};
@@ -550,7 +554,7 @@ export function registerAccountApplyProfileRoutes(server: FastifyInstance): void
       setStr("salaryExpectation", body.salaryExpectation, 200);
       setStr("currentCompensation", body.currentCompensation, 200);
       setStr("availableFrom", body.availableFrom, 120);
-      setStr("noticePeriod", body.noticePeriod, 120);
+      setStr("noticePeriod", body.noticePeriod, 500);
       setStr("relocationPreference", body.relocationPreference, 200);
       setStr("currentTitle", body.currentTitle, 200);
       setStr("currentCompany", body.currentCompany, 200);
@@ -743,10 +747,11 @@ export function registerAccountApplyProfileRoutes(server: FastifyInstance): void
   });
 
   server.post("/account/resume/extract-profile", async (request, reply) => {
-    const ctx = await resolveClerkUser(server.prisma, request.headers.authorization);
-    if (!ctx) {
-      return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+    const authExtract = await resolveClerkUserResult(server.prisma, request.headers.authorization);
+    if (!authExtract.ok) {
+      return sendClerkAuthFailureReply(reply, authExtract.failure);
     }
+    const { ctx } = authExtract;
 
     let user = await server.prisma.user.findUnique({
       where: { id: ctx.internalUserId },
@@ -1169,10 +1174,11 @@ export function registerAccountApplyProfileRoutes(server: FastifyInstance): void
   });
 
   server.get("/account/smart-apply/status", async (request, reply) => {
-    const ctx = await resolveClerkUser(server.prisma, request.headers.authorization);
-    if (!ctx) {
-      return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+    const auth = await resolveClerkUserResult(server.prisma, request.headers.authorization);
+    if (!auth.ok) {
+      return sendClerkAuthFailureReply(reply, auth.failure);
     }
+    const { ctx } = auth;
 
     await ensureSmartApplyDayReset(server.prisma, ctx.internalUserId);
 
@@ -1189,9 +1195,9 @@ export function registerAccountApplyProfileRoutes(server: FastifyInstance): void
         linkedinUrl: true,
         currentTitle: true,
         yearsOfExperience: true,
-        workAuthorization: true,
         salaryExpectation: true,
         availableFrom: true,
+        noticePeriod: true,
         professionalSummary: true,
         resumeText: true,
         resumeFileName: true,
@@ -1220,9 +1226,9 @@ export function registerAccountApplyProfileRoutes(server: FastifyInstance): void
       linkedinUrl: row.linkedinUrl,
       currentTitle: row.currentTitle,
       yearsOfExperience: row.yearsOfExperience,
-      workAuthorization: row.workAuthorization,
       salaryExpectation: row.salaryExpectation,
       availableFrom: row.availableFrom,
+      noticePeriod: row.noticePeriod,
       professionalSummary: row.professionalSummary,
       resumeText: row.resumeText,
       resumeFileName: row.resumeFileName,
@@ -1248,10 +1254,11 @@ export function registerAccountApplyProfileRoutes(server: FastifyInstance): void
       payload?: Record<string, unknown>;
     };
   }>("/account/smart-apply/events", async (request, reply) => {
-    const ctx = await resolveClerkUser(server.prisma, request.headers.authorization);
-    if (!ctx) {
-      return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+    const authEvt = await resolveClerkUserResult(server.prisma, request.headers.authorization);
+    if (!authEvt.ok) {
+      return sendClerkAuthFailureReply(reply, authEvt.failure);
     }
+    const { ctx } = authEvt;
 
     const event = request.body?.event;
     if (!event || !SMART_APPLY_EVENTS.has(event)) {
@@ -1289,10 +1296,11 @@ export function registerAccountApplyProfileRoutes(server: FastifyInstance): void
       preferenceOverrides?: Record<string, unknown>;
     };
   }>("/account/smart-apply/batch-answer", async (request, reply) => {
-    const ctx = await resolveClerkUser(server.prisma, request.headers.authorization);
-    if (!ctx) {
-      return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+    const authBatch = await resolveClerkUserResult(server.prisma, request.headers.authorization);
+    if (!authBatch.ok) {
+      return sendClerkAuthFailureReply(reply, authBatch.failure);
     }
+    const { ctx } = authBatch;
 
     const row = await server.prisma.user.findUnique({
       where: { id: ctx.internalUserId },

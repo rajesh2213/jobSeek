@@ -20,7 +20,6 @@ import { ResumeUploadModal } from "../../../components/resume/ResumeUploadModal"
 import { HeroPositioning } from "../../../components/smart-apply/HeroPositioning";
 import { ProofStrip } from "../../../components/smart-apply/ProofStrip";
 import { ReadinessCockpit } from "../../../components/smart-apply/ReadinessCockpit";
-import { SetupChecklist } from "../../../components/smart-apply/SetupChecklist";
 import { TrustSafetyBlock } from "../../../components/smart-apply/TrustSafetyBlock";
 import { jobloomChromeWebStoreUrl } from "../../../lib/jobloomChromeStore";
 import { useExtensionPresence } from "../../../lib/useExtensionPresence";
@@ -40,20 +39,6 @@ const COUNTRIES = [
   "Netherlands",
   "Singapore",
   "Other",
-] as const;
-
-const AVAILABILITY = [
-  { value: "Immediately", label: "Immediately" },
-  { value: "2 weeks", label: "2 weeks" },
-  { value: "1 month", label: "1 month" },
-  { value: "3 months", label: "3 months" },
-] as const;
-
-const WORK_AUTH = [
-  { value: "citizen", label: "Citizen" },
-  { value: "permanent_resident", label: "Permanent Resident" },
-  { value: "visa_required", label: "Visa Required" },
-  { value: "other", label: "Other" },
 ] as const;
 
 function startOfUtcDay(d: Date): Date {
@@ -94,6 +79,16 @@ const REMOTE_PREFS = [
   { value: "onsite", label: "On-site" },
   { value: "no_preference", label: "No preference" },
 ] as const;
+
+const AVAIL_NOTICE_CHOICES = [
+  { value: "Immediately", label: "Immediately" },
+  { value: "2 weeks", label: "In ~2 weeks (after notice)" },
+  { value: "1 month", label: "In ~1 month" },
+  { value: "3 months", label: "In ~3 months" },
+  { value: "Flexible", label: "Flexible / negotiable" },
+] as const;
+
+const AVAIL_NOTICE_VALUE_SET = new Set<string>(AVAIL_NOTICE_CHOICES.map((c) => c.value));
 
 type SectionId =
   | "answerBank"
@@ -222,6 +217,16 @@ function buildForm(p: ApplyProfileResponse | null): ApplyProfilePatch {
   };
 }
 
+function availabilityNoticeCombined(
+  availableFrom: string | null | undefined,
+  noticePeriod: string | null | undefined,
+): string {
+  const a = (availableFrom ?? "").trim();
+  const n = (noticePeriod ?? "").trim();
+  if (a && n && a !== n) return `${a}\n${n}`;
+  return n || a;
+}
+
 export default function SmartApplyPage() {
   const { getToken, isSignedIn, isLoaded: authLoaded } = useAuth();
   const { hasResume, fileName, resumeUpdatedAt, refreshStatus } = useResume();
@@ -347,6 +352,11 @@ export default function SmartApplyPage() {
   const pctUsed =
     jobsLimit > 0 ? Math.min(100, Math.round((jobsToday / jobsLimit) * 100)) : 0;
 
+  const availNoticeStored = availabilityNoticeCombined(form.availableFrom, form.noticePeriod).trim();
+  const availNoticeIsPreset = !availNoticeStored || AVAIL_NOTICE_VALUE_SET.has(availNoticeStored);
+  const availNoticeCustomLabel =
+    availNoticeStored.length > 72 ? `${availNoticeStored.slice(0, 69)}…` : availNoticeStored;
+
   const handleSaveClick = async (continueNext = false) => {
     const ok = await patch(form);
     if (!ok || !continueNext) return;
@@ -398,13 +408,14 @@ export default function SmartApplyPage() {
       }
       case "applicationFields": {
         const extraCount = Object.keys(asExtrasObject(form.applyProfileExtras)).length;
+        const availNotice =
+          [form.availableFrom, form.noticePeriod].some((x) => String(x ?? "").trim().length > 0)
+            ? "avail"
+            : "";
         const fields = [
-          form.workAuthorization,
           form.salaryExpectation,
           form.currentCompensation,
-          form.availableFrom,
-          form.noticePeriod,
-          form.relocationPreference,
+          availNotice,
           form.remotePreference,
           extraCount > 0 ? "extras" : "",
         ];
@@ -624,8 +635,6 @@ export default function SmartApplyPage() {
         </aside>
 
         <main className="space-y-4">
-          {SMART_APPLY_PREMIUM_V1 ? <SetupChecklist /> : null}
-
           <section className="rounded-2xl border border-line bg-surface p-4 shadow-card ring-1 ring-ink/5">
             <h2 className="text-sm font-bold text-ink">Browser extension</h2>
             <p className="mt-1 text-xs text-ink-muted">
@@ -652,12 +661,26 @@ export default function SmartApplyPage() {
           <section className="rounded-2xl border border-line bg-surface p-4 shadow-card ring-1 ring-ink/5">
             <h2 className="text-sm font-bold text-ink">How to use Smart Apply</h2>
             <ol className="mt-2 list-decimal space-y-2 pl-4 text-xs text-ink-muted">
-              <li>Upload a resume first (required). Import your profile from it. Smart Apply uses it as the primary source for answers.</li>
-              <li>This page is optional context: fill as much or as little as you want for more user-aligned answers.</li>
-              <li>Install the Chrome extension and make sure you are signed in with the same JobLoom account.</li>
-              <li>From JobLoom jobs, click Apply to open the application page in a new tab.</li>
-              <li>On the application form, use the extension to detect fields and auto-fill from this saved profile.</li>
-              <li>Review every filled answer, edit where needed, then submit manually.</li>
+              <li>
+                Upload a resume first (required), then import your profile from it—Smart Apply treats your resume as
+                the primary source for answers.
+              </li>
+              <li>
+                Treat this page as optional context: add as much or as little detail as you want so answers match how you
+                sound.
+              </li>
+              <li>Install the Chrome extension and stay signed in with the same JobLoom account on the site and in the extension.</li>
+              <li>
+                From JobLoom job listings, click Apply to open the employer&apos;s application in a new tab—any ATS page
+                works.
+              </li>
+              <li>
+                On the form, run the extension&apos;s one-click field detection and autofill using this saved profile.
+              </li>
+              <li>
+                Review generated long answers and every autofilled field; edit where needed, then submit manually—you stay
+                in control.
+              </li>
             </ol>
           </section>
 
@@ -813,12 +836,28 @@ export default function SmartApplyPage() {
                 <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
                   Manual Entry Required: these fields are usually not reliably available from resume extraction.
                 </p>
-                <label className="block text-xs font-medium text-ink/70">Work authorization<select value={form.workAuthorization ?? ""} onChange={(e) => updateField("workAuthorization", e.target.value)} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm"><option value="">Select...</option>{WORK_AUTH.map((w) => (<option key={w.value} value={w.value}>{w.label}</option>))}</select></label>
                 <label className="block text-xs font-medium text-ink/70">Expected compensation<input value={form.salaryExpectation ?? ""} onChange={(e) => updateField("salaryExpectation", e.target.value)} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" /></label>
                 <label className="block text-xs font-medium text-ink/70">Current compensation<input value={form.currentCompensation ?? ""} onChange={(e) => updateField("currentCompensation", e.target.value)} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" /></label>
-                <label className="block text-xs font-medium text-ink/70">Available from<select value={form.availableFrom ?? ""} onChange={(e) => updateField("availableFrom", e.target.value)} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm"><option value="">Select...</option>{AVAILABILITY.map((a) => (<option key={a.value} value={a.value}>{a.label}</option>))}</select></label>
-                <label className="block text-xs font-medium text-ink/70">Notice period<input value={form.noticePeriod ?? ""} onChange={(e) => updateField("noticePeriod", e.target.value)} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" /></label>
-                <label className="block text-xs font-medium text-ink/70">Relocation preference<input value={form.relocationPreference ?? ""} onChange={(e) => updateField("relocationPreference", e.target.value)} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm" /></label>
+                <label className="block text-xs font-medium text-ink/70">
+                  Available from / notice period
+                  <select
+                    value={availNoticeStored}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, availableFrom: "", noticePeriod: e.target.value }))
+                    }
+                    className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm"
+                  >
+                    <option value="">Select…</option>
+                    {!availNoticeIsPreset ? (
+                      <option value={availNoticeStored}>{`Current: ${availNoticeCustomLabel}`}</option>
+                    ) : null}
+                    {AVAIL_NOTICE_CHOICES.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <label className="block text-xs font-medium text-ink/70">Remote preference<select value={form.remotePreference ?? ""} onChange={(e) => updateField("remotePreference", e.target.value)} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm">{REMOTE_PREFS.map((o) => (<option key={o.value || "empty"} value={o.value}>{o.label}</option>))}</select></label>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">

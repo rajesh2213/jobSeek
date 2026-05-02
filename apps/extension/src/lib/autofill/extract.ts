@@ -183,7 +183,8 @@ export function getFieldContext(el: Element): FieldContext {
   const label = getLabel(el);
   const container = findFieldContainer(el);
   const containerText = normalizeText(container.textContent ?? "");
-  const questionText = containerText.slice(0, 380);
+  /** Ashby/Greenhouse-style cards pack several prompts into one container — keep enough context for essays + sourcing. */
+  const questionText = containerText.slice(0, 1600);
   const groupLabel = getGroupLabel(el);
   const sectionLabel = getSectionLabel(container);
   const options = optionLabels(el);
@@ -336,6 +337,7 @@ export function extractFieldMetadata(): FieldMetadata[] {
       selector: `[data-jsa-id="${id}"]`,
       groupKey,
       charLimit: input.maxLength > 0 ? input.maxLength : undefined,
+      rows: node instanceof HTMLTextAreaElement ? node.rows : undefined,
       questionHash: hashQuestion([context.questionText, context.groupLabel, context.label].join(" ")),
     });
   }

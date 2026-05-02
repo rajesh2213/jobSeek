@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 const EVENT_NAME = "jobseek-extension-ready";
 
 export function useExtensionPresence(pollMs = 1500): boolean {
-  const [present, setPresent] = useState(false);
+  const [present, setPresent] = useState(
+    () => typeof window !== "undefined" && window.__JOBSEEK_EXTENSION__ === true,
+  );
 
   useEffect(() => {
     const check = () => {

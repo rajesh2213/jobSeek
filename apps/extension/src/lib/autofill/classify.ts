@@ -40,6 +40,23 @@ const CONTACT_PATTERNS: Array<{ type: FieldType; re: RegExp }> = [
 
 const STRICT_LOCAL_TYPES: FieldType[] = ["email", "phone", "linkedin", "github"];
 
+/**
+ * Recruiting-channel "source" questions only. Do **not** treat "open source" (software) as
+ * hear-about (false positive on `\bsource\b`).
+ */
+function looksLikeHearAboutSourceHay(hay: string): boolean {
+  if (!hay.trim()) return false;
+  if (
+    /\b(how did you hear|where did you hear|where did you find|hear about this|hear about the|hear about this role|hear about this vacancy|hear about the vacancy|vacancy source|referral source|application source|candidate source|job source)\b/i.test(
+      hay,
+    )
+  ) {
+    return true;
+  }
+  if (/\b(application|job|vacancy|referral|candidate)\s+source\b/i.test(hay)) return true;
+  return false;
+}
+
 /** Field-local copy only — never use the bloated container `questionText` here. */
 function buildNarrowHay(field: FieldMetadata): string {
   return [
@@ -57,17 +74,51 @@ function buildNarrowHay(field: FieldMetadata): string {
 }
 
 /**
+ * Ashby / Greenhouse often label long-answer boxes "Your answer" with a modest `maxlength`
+ * (<120). Without merging `questionText`, essay prompts never reach `looksLikeLongQuestion`.
+ */
+function looksLikeGenericEssayPlaceholder(narrowHay: string): boolean {
+  const t = narrowHay.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!t) return true;
+  const exact = new Set([
+    "your answer",
+    "your response",
+    "answer",
+    "response",
+    "details",
+    "please elaborate",
+    "enter your answer",
+    "type your answer",
+    "type here",
+    "add details",
+    "write your answer",
+    "additional information",
+    "supporting details",
+  ]);
+  if (exact.has(t)) return true;
+  if (t.length <= 2) return true;
+  if (/^(answer|response)(\s*\d+)?$/i.test(t)) return true;
+  return false;
+}
+
+/**
  * Essay / long-form prompts. Uses narrow hay only so sibling questions in the same DOM
  * container do not mark "Company" or "LinkedIn URL" as open-ended.
  */
 function looksLikeLongQuestion(narrowHay: string): boolean {
   if (!narrowHay) return false;
   if (/\?/.test(narrowHay)) {
-    return /(describe|tell us|explain|walk us through|why|how would|what (?:is your|was your|are your|would you)|elaborate|detail)/i.test(
-      narrowHay,
-    );
+    if (
+      /(describe|tell us|explain|walk us through|why|how would|what (?:is your|was your|are your|would you)|elaborate|detail|what practices|what challenges|have you (?:made|worked)|share with us)/i.test(
+        narrowHay,
+      )
+    ) {
+      return true;
+    }
   }
-  return /(describe|tell us|explain|walk us through|contribution|postgres|founder|referrer)/i.test(narrowHay);
+  return /(describe|tell us about your experience|tell us|explain|walk us through|contribution|open source|async|remote environment|remote work|challenges have you faced|practices or approaches|postgres|founder|referrer)/i.test(
+    narrowHay,
+  );
 }
 
 /** Do not resolve title/company from the full container blob — avoids essay prompts mentioning "company". */
@@ -131,7 +182,7 @@ export function classifyField(field: FieldMetadata): ClassifiedField {
 
     const type = /\b(yes|no|true|false)\b/i.test(hay) ? "boolean" : "unknown";
     const byContent = matchContactPattern(narrowHay, hayFull);
-    if (/\b(hear about|vacancy source|source)\b/i.test(hay)) {
+    if (looksLikeHearAboutSourceHay(hay)) {
       return { ...field, fieldType: "hearAbout", isOpenEnded: false, classificationSource: "rule" };
     }
     return {
@@ -158,7 +209,7 @@ export function classifyField(field: FieldMetadata): ClassifiedField {
     textLike &&
     /\bname\b/i.test(field.label || field.name) &&
     !/\b(first|last|email|company|employer|manager)\b/i.test(field.label || "") &&
-    !/\b(source|hear about|where did you hear)\b/i.test(hay)
+    !looksLikeHearAboutSourceHay(hay)
   ) {
     return { ...field, fieldType: "fullName", isOpenEnded: false, classificationSource: "rule" };
   }
@@ -170,8 +221,11 @@ export function classifyField(field: FieldMetadata): ClassifiedField {
     }
   }
 
+  /** Location / referral / visa cues must not use container `questionText` — sibling prompts pollute the blob. */
+  const localDisambigHay = [localHay, narrowHay, field.nearbyText].join(" ").trim();
+
   if (textLike) {
-    const locHay = [narrowHay, field.context.questionText].join(" ").toLowerCase();
+    const locHay = localDisambigHay.toLowerCase();
     if (
       /\b(location|application location|work location|where are you located|where are you based|current location|office location|located in)\b/i.test(
         locHay,
@@ -182,23 +236,56 @@ export function classifyField(field: FieldMetadata): ClassifiedField {
     }
   }
 
-  if (/\b(referral|referrer)\b/i.test(hay)) {
+  if (/\b(referral|referrer)\b/i.test(localDisambigHay)) {
     return { ...field, fieldType: "short_text", isOpenEnded: false, classificationSource: "rule" };
   }
-  if (/\b(previous founder|over the age of 18|over 18|visa sponsorship|work authorization)\b/i.test(hay)) {
+  if (
+    /\b(previous founder|over the age of 18|over 18|visa sponsorship|work authorization)\b/i.test(localDisambigHay)
+  ) {
     return { ...field, fieldType: "boolean", isOpenEnded: false, classificationSource: "rule" };
   }
-  if (/\b(source|hear about|where did you hear)\b/i.test(hay)) {
+
+  const qt = field.context.questionText ?? "";
+  const mergedForEssayProbe = `${narrowHay} ${qt}`.trim();
+
+  /**
+   * Custom-source comboboxes are often `<input type="text">` with large maxlength — they must stay
+   * `hearAbout`, not AI essays. Use the prompt head plus **reject** when merged copy clearly looks
+   * like an essay (Tell us/describe/challenges…) so sibling blobs don’t steal real essays.
+   */
+  const qtHead = qt.slice(0, 420);
+  if (
+    textLike &&
+    looksLikeHearAboutSourceHay(qtHead) &&
+    !looksLikeLongQuestion(mergedForEssayProbe)
+  ) {
+    return { ...field, fieldType: "hearAbout", isOpenEnded: false, classificationSource: "rule" };
+  }
+
+  /**
+   * Merge `questionText` for textarea and generous single-line boxes (Ashby uses tall text inputs).
+   */
+  const mergeEssayContext =
+    inputType === "textarea" ||
+    ((inputType === "text" || inputType === "search") &&
+      (field.charLimit === undefined ||
+        field.charLimit >= 120 ||
+        (field.rows ?? 0) >= 3 ||
+        (!narrowHay.trim() && qt.trim().length >= 40) ||
+        (looksLikeGenericEssayPlaceholder(narrowHay) &&
+          looksLikeLongQuestion(mergedForEssayProbe))));
+  const essayDetectionHay = mergeEssayContext ? mergedForEssayProbe : narrowHay;
+  if (textLike && looksLikeLongQuestion(essayDetectionHay)) {
+    return { ...field, fieldType: "openEnded", isOpenEnded: true, classificationSource: "rule" };
+  }
+
+  if (looksLikeHearAboutSourceHay(hay)) {
     return { ...field, fieldType: "hearAbout", isOpenEnded: false, classificationSource: "rule" };
   }
 
   const byPattern = matchContactPattern(narrowHay, hayFull);
   if (byPattern) {
     return { ...field, fieldType: byPattern.type, isOpenEnded: false, classificationSource: "rule" };
-  }
-
-  if (textLike && looksLikeLongQuestion(narrowHay)) {
-    return { ...field, fieldType: "openEnded", isOpenEnded: true, classificationSource: "rule" };
   }
 
   if (inputType === "textarea") {

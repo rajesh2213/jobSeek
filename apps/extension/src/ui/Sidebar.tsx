@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { JOBLOOM_WEB_ORIGIN } from "../jobloomWeb";
 import { FieldItem } from "./FieldItem";
+import { shouldShowGenerateWithAiButton } from "./fieldGenerateAi";
 import type { FieldState, SidebarState } from "./store";
 import { extensionLogoPrimUrl } from "../lib/extensionAssets";
 import {
@@ -56,6 +57,7 @@ export function Sidebar(props: {
   onClose: () => void;
   onAutofill: () => void;
   onFieldClick: (fieldId: string, selector: string) => void;
+  onGenerateFieldAi?: (fieldId: string) => void;
 }) {
   const [autofillHover, setAutofillHover] = useState(false);
   const [accountInfoOpen, setAccountInfoOpen] = useState(false);
@@ -86,6 +88,10 @@ export function Sidebar(props: {
   const profileIncomplete = st != null && st.profileComplete === false;
   const autofillBlocked = props.state.isRunning || limitReached || profileIncomplete;
 
+  /** Token present but `/account/*` calls returned nothing (offline API, wrong base URL, or 401). */
+  const sessionStoredButProfileUnavailable =
+    tok === true && loaded && props.state.profile == null && st == null;
+
   /** Do not show “Signed in” without name/email — stale storage tokens can exist without a live session. */
   const accountPrimary =
     tok === false
@@ -96,13 +102,17 @@ export function Sidebar(props: {
           ? "Loading account…"
           : displayName ||
             email ||
-            (!props.state.profile && !st
-              ? "Not signed in"
-              : "Add your name or email under Account on the website");
+            (sessionStoredButProfileUnavailable
+              ? "Can't load account from API"
+              : !props.state.profile && !st
+                ? "Not signed in"
+                : "Add your name or email under Account on the website");
 
-  /** One place for sign-in guidance — avoids repeating jobloom.tech / popup across three lines. */
-  const needsWebsiteHint =
-    tok === false || (loaded && tok === true && st == null);
+  /** Sign-in guidance when there is no stored token. */
+  const needsWebsiteHint = tok === false;
+
+  /** Token exists but profile/status failed — usually API host or auth mismatch. */
+  const needsApiReachabilityHint = sessionStoredButProfileUnavailable;
 
   const planSummary =
     tok === false
@@ -308,6 +318,35 @@ export function Sidebar(props: {
                   Use Open website account below or visit jobloom.tech to sign in.
                 </p>
               ) : null}
+              {needsApiReachabilityHint ? (
+                <div style={{ margin: "0 0 8px", fontSize: 10, color: "#9a3412", lineHeight: 1.45 }}>
+                  <p style={{ margin: "0 0 6px" }}>
+                    The extension saved a session token but could not load account data from your JobLoom API.
+                  </p>
+                  {props.state.accountSyncHint ? (
+                    <p
+                      style={{
+                        margin: 0,
+                        padding: "8px",
+                        borderRadius: 8,
+                        background: "#fff7ed",
+                        border: "1px solid #fdba74",
+                        fontFamily: "ui-monospace, monospace",
+                        fontSize: 9,
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {props.state.accountSyncHint}
+                    </p>
+                  ) : (
+                    <p style={{ margin: 0 }}>
+                      Check <strong>storage apiBase</strong>, run <strong>apps/server</strong> on that host, set{" "}
+                      <strong>CLERK_SECRET_KEY</strong> (or CLERK_JWT_KEY) for the same Clerk instance as Next.js,
+                      then reload this extension.
+                    </p>
+                  )}
+                </div>
+              ) : null}
               <p style={{ margin: "0 0 6px", fontSize: 10, color: textMuted, lineHeight: 1.45 }}>
                 {planSummary}
               </p>
@@ -454,14 +493,32 @@ export function Sidebar(props: {
         ))}
       </div>
       <div style={{ flex: 1, overflow: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-        {rows.map((field) => (
-          <FieldItem
-            key={field.id}
-            field={field}
-            selected={props.state.selectedFieldId === field.id}
-            onClick={() => props.onFieldClick(field.id, field.selector)}
-          />
-        ))}
+        {rows.map((field) => {
+          const detected = props.state.detectedFields.find((f) => f.id === field.id);
+          const showAi =
+            Boolean(props.onGenerateFieldAi) &&
+            shouldShowGenerateWithAiButton(field, detected);
+          const aiDisabled =
+            props.state.isRunning ||
+            profileIncomplete ||
+            limitReached ||
+            props.state.hasAuthToken === false ||
+            props.state.hasAuthToken === null ||
+            field.status === "ai_generating";
+          return (
+            <FieldItem
+              key={field.id}
+              field={field}
+              selected={props.state.selectedFieldId === field.id}
+              onClick={() => props.onFieldClick(field.id, field.selector)}
+              showGenerateAi={showAi}
+              disableGenerateAi={aiDisabled}
+              onGenerateAi={
+                props.onGenerateFieldAi ? () => props.onGenerateFieldAi?.(field.id) : undefined
+              }
+            />
+          );
+        })}
       </div>
     </aside>
   );

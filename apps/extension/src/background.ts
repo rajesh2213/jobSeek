@@ -1,7 +1,12 @@
 import { compositeFieldId, parseCompositeFieldId } from "./lib/frameIds";
 import { isLikelyAtsPage } from "./lib/atsDetection";
 import { isAllowedApiPath } from "./lib/allowedApiPaths";
-import { getDefaultApiBase, isProductionExtensionBuild, resolveApiBaseFromStorage } from "./config";
+import {
+  getDefaultApiBase,
+  isLoopbackHttpUrl,
+  isProductionExtensionBuild,
+  resolveApiBaseFromStorage,
+} from "./config";
 import { isTrustedExtensionWebOrigin } from "./trustedWebOrigins";
 
 const EXT_AUTH_TOKEN_MAX_CHARS = 16_384;
@@ -165,6 +170,7 @@ type AiAnswerPayload = {
   selector?: string;
   questionHash?: string;
   groupKey?: string;
+  forceReplace?: boolean;
 };
 
 async function fillTabAiAnswers(tabId: number, answers: AiAnswerPayload[]) {
@@ -351,9 +357,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           sendResponse({ ok: false, status: 0, error: "Invalid API URL" });
           return;
         }
-        const isHttps = u.protocol === "https:";
-        const isDevHttp = u.protocol === "http:" && !isProductionExtensionBuild();
-        if (!isHttps && !isDevHttp) {
+        const canFetch =
+          u.protocol === "https:" ||
+          isLoopbackHttpUrl(u) ||
+          (u.protocol === "http:" && !isProductionExtensionBuild());
+        if (!canFetch) {
           sendResponse({ ok: false, status: 0, error: "API requests must use HTTPS" });
           return;
         }

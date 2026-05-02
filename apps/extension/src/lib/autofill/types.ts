@@ -61,6 +61,8 @@ export interface FieldMetadata {
   selector: string;
   groupKey?: string;
   charLimit?: number;
+  /** `<textarea rows="…">` when present — improves essay vs short-text classification. */
+  rows?: number;
   questionHash?: string;
 }
 

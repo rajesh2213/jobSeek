@@ -100,36 +100,115 @@ async function proxyApiRequest<T = unknown>(params: {
   });
 }
 
-export async function fetchApplyProfile() {
+export type ExtensionApiFetchMeta = {
+  ok: boolean;
+  status: number;
+  error?: string;
+  /** Fastify `/account/*` may include these on 401 when not in production API mode. */
+  authHint?: string;
+  authFailureCode?: string;
+};
+
+function metaFromProxy401Json<T extends Record<string, unknown>>(
+  res: ProxyResponse<T>,
+): Pick<ExtensionApiFetchMeta, "authHint" | "authFailureCode"> {
+  const data = res.data;
+  if (!data || typeof data !== "object") return {};
+
+  let obj: Record<string, unknown> = data as Record<string, unknown>;
+  const raw = obj.raw;
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    if (t.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(t) as unknown;
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          obj = parsed as Record<string, unknown>;
+        }
+      } catch {
+        /* keep obj */
+      }
+    }
+  }
+
+  const authHint = typeof obj.authHint === "string" ? obj.authHint : undefined;
+  const authFailureCode = typeof obj.authFailureCode === "string" ? obj.authFailureCode : undefined;
+  return { authHint, authFailureCode };
+}
+
+export async function fetchApplyProfileDetailed(): Promise<
+  { profile: Record<string, unknown> | null } & ExtensionApiFetchMeta
+> {
   const token = await getToken();
-  if (!token) return null;
+  if (!token) {
+    return {
+      profile: null,
+      ok: false,
+      status: 0,
+      error: "No auth token in extension storage",
+    };
+  }
   const res = await proxyApiRequest<Record<string, unknown>>({
     path: API_PATHS.applyProfile,
     auth: true,
     responseType: "json",
   });
-  if (!res.ok) return null;
-  return (res.data ?? null) as Record<string, unknown> | null;
+  const hints = res.status === 401 ? metaFromProxy401Json(res) : {};
+  return {
+    profile: res.ok ? ((res.data ?? null) as Record<string, unknown> | null) : null,
+    ok: res.ok,
+    status: res.status,
+    error: res.error,
+    ...hints,
+  };
 }
 
-export async function fetchSmartApplyStatus() {
+export async function fetchApplyProfile() {
+  const r = await fetchApplyProfileDetailed();
+  return r.profile;
+}
+
+export type SmartApplyStatusPayload = {
+  jobsToday: number;
+  jobsLimit: number;
+  jobsRemaining: number;
+  resetsAt: string;
+  plan: string;
+  profileComplete: boolean;
+  profileCompletionPct: number;
+};
+
+export async function fetchSmartApplyStatusDetailed(): Promise<
+  { snapshot: SmartApplyStatusPayload | null } & ExtensionApiFetchMeta
+> {
   const token = await getToken();
-  if (!token) return null;
-  const res = await proxyApiRequest<{
-    jobsToday: number;
-    jobsLimit: number;
-    jobsRemaining: number;
-    resetsAt: string;
-    plan: string;
-    profileComplete: boolean;
-    profileCompletionPct: number;
-  }>({
+  if (!token) {
+    return {
+      snapshot: null,
+      ok: false,
+      status: 0,
+      error: "No auth token in extension storage",
+    };
+  }
+  const res = await proxyApiRequest<SmartApplyStatusPayload>({
     path: API_PATHS.smartApplyStatus,
     auth: true,
     responseType: "json",
   });
-  if (!res.ok) return null;
-  return res.data ?? null;
+  const hints =
+    res.status === 401 ? metaFromProxy401Json(res as ProxyResponse<Record<string, unknown>>) : {};
+  return {
+    snapshot: res.ok ? (res.data ?? null) : null,
+    ok: res.ok,
+    status: res.status,
+    error: res.error,
+    ...hints,
+  };
+}
+
+export async function fetchSmartApplyStatus() {
+  const r = await fetchSmartApplyStatusDetailed();
+  return r.snapshot;
 }
 
 /** Non-null payload from `/account/smart-apply/status` (for sidebar / store). */

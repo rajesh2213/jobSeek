@@ -1,5 +1,8 @@
 import type { FastifyInstance } from "fastify";
-import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
+import {
+  resolveClerkUserResult,
+  sendClerkAuthFailureReply,
+} from "../../infrastructure/auth/clerkVerify.js";
 import { registerAccountResumeRoutes } from "./account.controller.js";
 import { registerAccountApplyProfileRoutes } from "./account.applyProfile.js";
 import {
@@ -13,10 +16,11 @@ export function registerAccountRoutes(server: FastifyInstance): void {
   registerAccountResumeRoutes(server);
   registerAccountApplyProfileRoutes(server);
   server.get("/account/summary", async (request, reply) => {
-    const ctx = await resolveClerkUser(server.prisma, request.headers.authorization);
-    if (!ctx) {
-      return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+    const auth = await resolveClerkUserResult(server.prisma, request.headers.authorization);
+    if (!auth.ok) {
+      return sendClerkAuthFailureReply(reply, auth.failure);
     }
+    const ctx = auth.ctx;
 
     await ensureUserJobViewsDayReset(server.prisma, ctx.internalUserId);
 

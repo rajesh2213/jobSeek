@@ -37,6 +37,8 @@ export type SidebarState = {
   hasAuthToken: boolean | null;
   /** `true` after the first profile + status fetch for this ATS session finishes. */
   accountDataLoaded: boolean;
+  /** Last profile/status HTTP diagnostic when token exists but API data is missing. */
+  accountSyncHint: string | null;
   resumeFile: ResumeFilePayload | null;
   progress: { completed: number; total: number };
   error: string | null;
@@ -64,7 +66,8 @@ function cleanFieldLabel(raw: string): string {
   return deduped.join(" ").trim();
 }
 
-function pickLabel(field: DetectedField): string {
+/** Sidebar row title — exported for AI prompts so wording matches the field list. */
+export function pickDetectedFieldLabel(field: DetectedField): string {
   const gl = cleanFieldLabel(field.groupLabel ?? "");
   const qt = cleanFieldLabel(field.questionText ?? "");
   const lb = cleanFieldLabel(field.label ?? "");
@@ -104,6 +107,7 @@ const state: SidebarState = {
   smartApplyStatus: null,
   hasAuthToken: null,
   accountDataLoaded: false,
+  accountSyncHint: null,
   resumeFile: null,
   progress: { completed: 0, total: 0 },
   error: null,
@@ -142,7 +146,7 @@ export function setDetectedFields(fields: DetectedField[]): void {
       reason: undefined,
     }),
     id: field.id,
-    label: pickLabel(field),
+    label: pickDetectedFieldLabel(field),
     selector: field.elementSelector,
     frameId: field.frameId,
     groupKey: field.groupKey,

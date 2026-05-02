@@ -4,15 +4,19 @@ const webpack = require("webpack");
 const TerserPlugin = require("terser-webpack-plugin");
 
 const analyze = process.env.ANALYZE === "1";
-const extApiBase = process.env.EXTENSION_API_BASE || "https://jobseek-server.up.railway.app";
 
 module.exports = (env, argv) => {
   const isProd = argv.mode === "production";
+  /** Dev builds default to local Fastify; prod builds default to hosted API unless overridden. */
+  const extApiBase =
+    process.env.EXTENSION_API_BASE ||
+    (isProd ? "https://jobseek-server.up.railway.app" : "http://localhost:3000");
 
   return {
     entry: {
       background: "./src/background.ts",
       content: "./src/content.ts",
+      presenceBeacon: "./src/presenceBeacon.ts",
       popup: "./src/popup/popup.tsx",
     },
     devtool: isProd ? false : "cheap-module-source-map",

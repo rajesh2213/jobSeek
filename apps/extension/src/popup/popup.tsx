@@ -72,6 +72,7 @@ function mapProfile(raw: Record<string, unknown> | null): ApplyProfile | null {
     salaryExpectation:
       typeof raw.salaryExpectation === "string" ? raw.salaryExpectation : undefined,
     availableFrom: typeof raw.availableFrom === "string" ? raw.availableFrom : undefined,
+    noticePeriod: typeof raw.noticePeriod === "string" ? raw.noticePeriod : undefined,
     pronouns: typeof extras.pronouns === "string" ? extras.pronouns : undefined,
     hearAbout: typeof extras.hearAbout === "string" ? extras.hearAbout : undefined,
     hasResume: typeof raw.hasResume === "boolean" ? raw.hasResume : undefined,

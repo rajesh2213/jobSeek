@@ -21,6 +21,7 @@ export interface ApplyProfile {
   workAuthorization?: string;
   salaryExpectation?: string;
   availableFrom?: string;
+  noticePeriod?: string;
   pronouns?: string;
   hearAbout?: string;
   /** From GET /account/apply-profile — true if resume text or file bytes exist. */
@@ -60,6 +61,8 @@ export interface ApplyAiAnswerInput {
   selector?: string;
   questionHash?: string;
   groupKey?: string;
+  /** When true (e.g. sidebar “Generate with AI”), apply even if the field already has a different value. */
+  forceReplace?: boolean;
 }
 
 export interface ApplyAiAnswerResult {
@@ -125,6 +128,66 @@ function queryElement<T extends Element>(selector: string): T | null {
   return null;
 }
 
+/** Lexical / ProseMirror / Ashby stacks often hide the real `<textarea>` and show `[contenteditable]`. */
+function findRichTextSurface(control: HTMLElement): HTMLElement | null {
+  let p: HTMLElement | null = control.parentElement;
+  for (let depth = 0; depth < 9 && p; depth++) {
+    const candidates = Array.from(p.querySelectorAll<HTMLElement>('[contenteditable="true"]'));
+    for (const ce of candidates) {
+      const r = ce.getBoundingClientRect();
+      if (r.width < 14 || r.height < 14) continue;
+      const rc = control.getBoundingClientRect();
+      const verticallyNear = !(r.bottom < rc.top - 120 || r.top > rc.bottom + 120);
+      if (verticallyNear) return ce;
+    }
+    p = p.parentElement;
+  }
+  return null;
+}
+
+function verificationProbe(expectedRaw: string): string {
+  const e = expectedRaw.trim().toLowerCase();
+  return e.slice(0, Math.min(260, e.length));
+}
+
+function readFilledText(
+  control: HTMLInputElement | HTMLTextAreaElement,
+  rich: HTMLElement | null,
+): string {
+  const native = String(control.value ?? "").trim().toLowerCase();
+  if (rich) {
+    const ce = (rich.innerText ?? rich.textContent ?? "").trim().toLowerCase();
+    return ce.length >= native.length ? ce : native;
+  }
+  return native;
+}
+
+async function fillRichTextSurface(surface: HTMLElement, text: string): Promise<void> {
+  const doc = surface.ownerDocument ?? document;
+  surface.focus({ preventScroll: false });
+  surface.scrollIntoView({ block: "center", behavior: "instant" });
+  await sleep(30);
+  try {
+    const sel = doc.getSelection();
+    const range = doc.createRange();
+    range.selectNodeContents(surface);
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    doc.execCommand("insertText", false, text);
+  } catch {
+    surface.textContent = text;
+  }
+  surface.dispatchEvent(
+    new InputEvent("input", {
+      bubbles: true,
+      cancelable: true,
+      inputType: "insertText",
+      data: text.slice(0, Math.min(256, text.length)),
+    }),
+  );
+  surface.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
 function snapshotIfNeeded(
   selector: string,
   el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
@@ -149,6 +212,9 @@ function snapshotIfNeeded(
 }
 
 async function fillElement(selector: string, value: string, seen: Set<string>): Promise<boolean> {
+  const valueTrim = value.trim();
+  if (!valueTrim) return false;
+
   const el = queryElement(selector) as
     | HTMLInputElement
     | HTMLTextAreaElement
@@ -164,69 +230,96 @@ async function fillElement(selector: string, value: string, seen: Set<string>): 
     const options = Array.from(el.options);
     const best = options.find(
       (o) =>
-        o.text.toLowerCase().includes(value.toLowerCase()) ||
-        o.value.toLowerCase().includes(value.toLowerCase()),
+        o.text.toLowerCase().includes(valueTrim.toLowerCase()) ||
+        o.value.toLowerCase().includes(valueTrim.toLowerCase()),
     );
     if (!best) return false;
     el.value = best.value;
     el.dispatchEvent(new Event("change", { bubbles: true }));
   } else {
-    const nativeSetter = Object.getOwnPropertyDescriptor(
+    const proto =
       el instanceof HTMLTextAreaElement
         ? window.HTMLTextAreaElement.prototype
-        : window.HTMLInputElement.prototype,
-      "value",
-    )?.set;
+        : window.HTMLInputElement.prototype;
+    const nativeSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
     if (!nativeSetter) return false;
-    nativeSetter.call(el, value);
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-    el.dispatchEvent(new Event("change", { bubbles: true }));
-    const htmlInput = el as HTMLInputElement;
-    const looksLikeAutocomplete =
-      htmlInput.type === "search" ||
-      htmlInput.getAttribute("role") === "combobox" ||
-      htmlInput.getAttribute("aria-autocomplete") != null ||
-      (htmlInput.placeholder ?? "").toLowerCase().includes("start typing");
-    if (looksLikeAutocomplete) {
-      el.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
-      el.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowDown", bubbles: true }));
-      el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-      el.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", bubbles: true }));
+
+    const rich = findRichTextSurface(el);
+    if (rich) {
+      await fillRichTextSurface(rich, valueTrim);
+      nativeSetter.call(el, valueTrim);
+      el.dispatchEvent(
+        new InputEvent("input", {
+          bubbles: true,
+          cancelable: true,
+          inputType: "insertText",
+          data: valueTrim.slice(0, Math.min(256, valueTrim.length)),
+        }),
+      );
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    } else {
+      nativeSetter.call(el, valueTrim);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      const htmlInput = el as HTMLInputElement;
+      const looksLikeAutocomplete =
+        htmlInput.type === "search" ||
+        htmlInput.getAttribute("role") === "combobox" ||
+        htmlInput.getAttribute("aria-autocomplete") != null ||
+        (htmlInput.placeholder ?? "").toLowerCase().includes("start typing");
+      if (looksLikeAutocomplete) {
+        el.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+        el.dispatchEvent(new KeyboardEvent("keyup", { key: "ArrowDown", bubbles: true }));
+        el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+        el.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", bubbles: true }));
+      }
     }
   }
 
-  await sleep(30 + Math.random() * 50);
-  const verifyValue = (target: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): string => {
-    if (target instanceof HTMLSelectElement) {
-      const opt = target.options[target.selectedIndex];
-      return (opt?.text ?? target.value ?? "").trim().toLowerCase();
+  await sleep(45 + Math.random() * 55);
+
+  const verifySelectOrNative = (): boolean => {
+    if (el instanceof HTMLSelectElement) {
+      const opt = el.options[el.selectedIndex];
+      const got = (opt?.text ?? el.value ?? "").trim().toLowerCase();
+      const probe = verificationProbe(valueTrim);
+      return probe.length > 0 && got.includes(probe);
     }
-    return String((target as HTMLInputElement | HTMLTextAreaElement).value ?? "")
-      .trim()
-      .toLowerCase();
+    const richNow = findRichTextSurface(el);
+    const got = readFilledText(el, richNow);
+    const probe = verificationProbe(valueTrim);
+    return probe.length > 0 && got.includes(probe);
   };
-  const expected = value.trim().toLowerCase();
-  if (expected && !verifyValue(el).includes(expected)) {
+
+  if (!verifySelectOrNative()) {
     if (el instanceof HTMLSelectElement) {
       el.dispatchEvent(new Event("change", { bubbles: true }));
     } else {
-      const nativeSetter = Object.getOwnPropertyDescriptor(
+      const proto =
         el instanceof HTMLTextAreaElement
           ? window.HTMLTextAreaElement.prototype
-          : window.HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      if (nativeSetter) {
-        nativeSetter.call(el, value);
+          : window.HTMLInputElement.prototype;
+      const nativeSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+      const richRetry = findRichTextSurface(el);
+      if (richRetry && nativeSetter) {
+        await fillRichTextSurface(richRetry, valueTrim);
+        nativeSetter.call(el, valueTrim);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+      } else if (nativeSetter) {
+        nativeSetter.call(el, valueTrim);
         el.dispatchEvent(new Event("input", { bubbles: true }));
         el.dispatchEvent(new Event("change", { bubbles: true }));
       }
     }
-    await sleep(40);
-    if (expected && !verifyValue(el).includes(expected)) return false;
+    await sleep(70);
+    if (!verifySelectOrNative()) return false;
   }
+
   el.blur();
-  return true;
+  findRichTextSurface(el)?.blur();
+  await sleep(90);
+  return verifySelectOrNative();
 }
 
 function getCurrentTextValue(selector: string): string {
@@ -239,7 +332,10 @@ function getCurrentTextValue(selector: string): string {
   if (el instanceof HTMLSelectElement) {
     return (el.options[el.selectedIndex]?.text ?? el.value ?? "").trim();
   }
-  return String(el.value ?? "").trim();
+  const native = String(el.value ?? "").trim();
+  const rich = findRichTextSurface(el);
+  const ce = rich ? (rich.innerText ?? rich.textContent ?? "").trim() : "";
+  return ce.length > native.length ? ce : native;
 }
 
 function choiceText(input: HTMLInputElement): string {
@@ -583,12 +679,14 @@ function findFallbackSelector(
   input: ApplyAiAnswerInput,
   detectedFields: DetectedField[],
 ): string | null {
+  const byId = detectedFields.find((f) => f.id === input.id);
+  if (byId?.elementSelector) return byId.elementSelector;
   if (input.groupKey) {
-    const byGroup = detectedFields.find((f) => f.isOpenEnded && f.groupKey && f.groupKey === input.groupKey);
+    const byGroup = detectedFields.find((f) => f.groupKey && f.groupKey === input.groupKey);
     if (byGroup?.elementSelector) return byGroup.elementSelector;
   }
   if (input.questionHash) {
-    const byHash = detectedFields.find((f) => f.isOpenEnded && f.questionHash && f.questionHash === input.questionHash);
+    const byHash = detectedFields.find((f) => f.questionHash && f.questionHash === input.questionHash);
     if (byHash?.elementSelector) return byHash.elementSelector;
   }
   if (!input.question) return null;
@@ -652,7 +750,13 @@ export async function fillAIAnswersWithFallback(
     let success = false;
     for (const selector of selectorCandidates) {
       const existing = getCurrentTextValue(selector);
-      if (existing && existing.toLowerCase() !== input.answer.trim().toLowerCase()) continue;
+      if (
+        !input.forceReplace &&
+        existing &&
+        existing.toLowerCase() !== input.answer.trim().toLowerCase()
+      ) {
+        continue;
+      }
       const ok = await fillElement(selector, input.answer, seen);
       if (ok) {
         usedSelectors.add(selector);
@@ -669,7 +773,8 @@ export async function fillAIAnswersWithFallback(
     const fallbackSelectors = unresolvedTextAnswerSelectors(usedSelectors, detectedFields);
     let idx = 0;
     for (const input of unresolved) {
-      const selector = fallbackSelectors[idx++];
+      const fromId = detectedFields.find((f) => f.id === input.id)?.elementSelector;
+      const selector = fromId ?? fallbackSelectors[idx++];
       if (!selector) {
         failedIds.push(input.id);
         continue;

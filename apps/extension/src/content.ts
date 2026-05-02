@@ -12,8 +12,7 @@ import { isLikelyAtsPage } from "./lib/atsDetection";
 const isTopFrame = window.self === window.top;
 const isAtsPage = isLikelyAtsPage(window.location.href);
 
-(window as Window & { __JOBSEEK_EXTENSION__?: boolean }).__JOBSEEK_EXTENSION__ = true;
-window.dispatchEvent(new Event("jobseek-extension-ready"));
+/** Page-visible beacon lives in presenceBeacon.js (MAIN world); isolated scripts cannot set host globals. */
 
 if (isTopFrame && isAtsPage) {
   void chrome.runtime.sendMessage({ type: "ON_ATS_PAGE", hostname: window.location.hostname });
@@ -142,6 +141,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             selector?: string;
             questionHash?: string;
             groupKey?: string;
+            forceReplace?: boolean;
           }>,
           fields,
         );
