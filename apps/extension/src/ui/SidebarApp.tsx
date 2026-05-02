@@ -22,6 +22,7 @@ import {
 import { shouldShowGenerateWithAiButton } from "./fieldGenerateAi";
 import type { DetectedField } from "../lib/fieldDetector";
 import { SIDEBAR_PANEL_WIDTH_PX, SIDEBAR_TRANSITION } from "./uiMotion";
+import { isProductionExtensionBuild } from "../config";
 
 function sendRuntime<T>(msg: object): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -86,7 +87,15 @@ function buildAccountSyncHint(
   const statusOk = Boolean(s.ok && s.snapshot);
   if (profileOk && statusOk) return null;
 
+  const prod = isProductionExtensionBuild();
+
   if (p.status === 401 || s.status === 401) {
+    if (prod) {
+      if (p.error === "Not authenticated" || s.error === "Not authenticated") {
+        return "Sign in to JobLoom in your browser, then refresh this page.";
+      }
+      return "Your JobLoom session could not be verified. Sign out and sign back in on JobLoom, then refresh this page.";
+    }
     if (p.error === "Not authenticated" || s.error === "Not authenticated") {
       return "HTTP 401 — the extension proxy had no auth token (storage race or cleared). Open a JobLoom tab while signed in so the site can push a fresh token to the extension, then reload this side panel.";
     }
@@ -110,7 +119,15 @@ function buildAccountSyncHint(
 
   const parts: string[] = [];
   if (!profileOk) {
-    if (p.status === 404) {
+    if (prod) {
+      if (p.status === 404) {
+        parts.push("Open JobLoom once while signed in to finish account setup.");
+      } else if (p.status === 0) {
+        parts.push("Could not reach JobLoom. Check your connection and try again.");
+      } else {
+        parts.push("Could not load your JobLoom profile. Try again shortly.");
+      }
+    } else if (p.status === 404) {
       parts.push(
         "GET /account/apply-profile returned 404 — open the JobLoom site signed in once so the user row exists.",
       );
@@ -123,7 +140,13 @@ function buildAccountSyncHint(
     }
   }
   if (!statusOk) {
-    if (s.status === 0) {
+    if (prod) {
+      if (s.status === 0) {
+        parts.push("Could not refresh Smart Apply status. Check your connection.");
+      } else if (s.status !== 401) {
+        parts.push("Could not refresh Smart Apply status. Try again.");
+      }
+    } else if (s.status === 0) {
       parts.push(`GET /account/smart-apply/status failed: ${s.error ?? "network error"}.`);
     } else if (s.status !== 401) {
       parts.push(`GET /account/smart-apply/status → HTTP ${s.status}${s.error ? ` (${s.error})` : ""}`);

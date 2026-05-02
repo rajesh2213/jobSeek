@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
 import { detectFormFields } from "./lib/fieldDetector";
 import { fillAIAnswersWithFallback, fillStandardFields, undoLastFill } from "./lib/formFiller";
 import type { ApplyProfile } from "./lib/formFiller";
@@ -41,8 +41,9 @@ function ensureSidebarRoot(): HTMLElement {
     container = document.createElement("div");
     container.id = "jobwizard-sidebar-root";
   }
-  if (container.parentElement !== document.documentElement) {
-    document.documentElement.appendChild(container);
+  const html = document.documentElement;
+  if (container.parentElement !== html || html.lastElementChild !== container) {
+    html.appendChild(container);
   }
   Object.assign(container.style, {
     position: "fixed",
@@ -57,7 +58,9 @@ function ensureSidebarRoot(): HTMLElement {
     isolation: "isolate",
     overflow: "visible",
   });
-  let mount = container.querySelector<HTMLElement>("#jobwizard-sidebar-mount");
+  let mount =
+    container.querySelector<HTMLElement>("#jobwizard-sidebar-mount") ??
+    container.shadowRoot?.querySelector<HTMLElement>("#jobwizard-sidebar-mount");
   if (!mount) {
     mount = document.createElement("div");
     mount.id = "jobwizard-sidebar-mount";
@@ -84,9 +87,91 @@ function ensureSidebarRoot(): HTMLElement {
   return mount;
 }
 
+let sidebarReactRoot: Root | null = null;
+let sidebarMountEl: HTMLElement | null = null;
+
+function mountSidebarApp(): void {
+  const mount = ensureSidebarRoot();
+  if (sidebarMountEl === mount && sidebarReactRoot && mount.isConnected) return;
+
+  if (sidebarReactRoot) {
+    try {
+      sidebarReactRoot.unmount();
+    } catch {
+      /* root may already be torn down */
+    }
+    sidebarReactRoot = null;
+    sidebarMountEl = null;
+  }
+
+  sidebarMountEl = mount;
+  sidebarReactRoot = createRoot(mount);
+  /** Sync store before first React paint so SidebarApp does not briefly `return null`. */
+  patchSidebarState({ isVisible: true, atsDetected: true });
+  sidebarReactRoot.render(createElement(SidebarApp, { isAtsPage: true }));
+}
+
+function reconcileSidebarMount(): void {
+  const mount = ensureSidebarRoot();
+  if (!mount.isConnected || sidebarMountEl !== mount || !sidebarReactRoot) {
+    mountSidebarApp();
+  }
+}
+
+/**
+ * SPAs (e.g. Greenhouse) may replace `<html>`/`MutationObserver` targets entirely — observers then
+ * watch detached nodes and never fire again. Combine `document` observation, periodic reconcile,
+ * and keeping our host last under `<html>` for stacking.
+ */
+function ensureSidebarSurvivesDomChurn(): void {
+  let debounceTimer: number | undefined;
+
+  const schedule = () => {
+    if (debounceTimer !== undefined) window.clearTimeout(debounceTimer);
+    debounceTimer = window.setTimeout(() => {
+      debounceTimer = undefined;
+      window.requestAnimationFrame(() => reconcileSidebarMount());
+    }, 60);
+  };
+
+  const mo = new MutationObserver(schedule);
+
+  function bindMutationObservers(): void {
+    mo.disconnect();
+    try {
+      mo.observe(document, { childList: true });
+    } catch {
+      /* Document observation unsupported — polling still runs */
+    }
+    const html = document.documentElement;
+    if (html) mo.observe(html, { childList: true });
+    const body = document.body;
+    if (body) mo.observe(body, { childList: true });
+  }
+
+  bindMutationObservers();
+
+  window.addEventListener(
+    "pageshow",
+    () => {
+      bindMutationObservers();
+      schedule();
+    },
+    { passive: true },
+  );
+
+  document.addEventListener("visibilitychange", schedule, { passive: true });
+
+  window.setInterval(() => {
+    if (document.visibilityState === "visible") {
+      window.requestAnimationFrame(() => reconcileSidebarMount());
+    }
+  }, 400);
+}
+
 if (showInjectedChrome) {
-  const root = ensureSidebarRoot();
-  createRoot(root).render(createElement(SidebarApp, { isAtsPage: true }));
+  mountSidebarApp();
+  ensureSidebarSurvivesDomChurn();
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {

@@ -88,6 +88,32 @@ if (!existsSync(manPath)) {
       }
     }
     pass("host_permissions avoids universal https/http wildcards");
+    /** MV3: web_accessible_resources patterns must end with path segment "slash asterisk" only (no slash-apply-slash style paths). */
+    function warMatchPatternPathOk(pat) {
+      const schemeSep = String(pat).indexOf("://");
+      if (schemeSep < 0) return false;
+      const afterScheme = String(pat).slice(schemeSep + 3);
+      const slashIx = afterScheme.indexOf("/");
+      if (slashIx < 0) return false;
+      return afterScheme.slice(slashIx) === "/*";
+    }
+    const war = m.web_accessible_resources;
+    if (Array.isArray(war)) {
+      let warChecked = false;
+      let warOk = true;
+      for (const entry of war) {
+        const matches = entry?.matches;
+        if (!Array.isArray(matches)) continue;
+        for (const pat of matches) {
+          warChecked = true;
+          if (!warMatchPatternPathOk(pat)) {
+            fail(`web_accessible_resources match pattern path must be exactly /* : ${pat}`);
+            warOk = false;
+          }
+        }
+      }
+      if (warChecked && warOk) pass("web_accessible_resources matches use path /* only");
+    }
     for (const k of ["16", "48", "128"]) {
       if (!m.icons || !m.icons[k]) {
         fail(`icons.${k} missing in manifest`);

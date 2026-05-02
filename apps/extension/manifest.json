@@ -123,34 +123,7 @@
   "web_accessible_resources": [
     {
       "resources": ["assets/logo-prim.png", "assets/icon-16.png", "assets/icon-32.png", "assets/icon-48.png", "assets/icon-128.png"],
-      "matches": [
-        "https://*/apply/*",
-        "https://*/careers/*",
-        "https://*/jobs/*",
-        "https://*/join-us/*",
-        "https://*.applytojob.com/*",
-        "https://*.ashbyhq.com/*",
-        "https://*.bamboohr.com/*",
-        "https://*.eightfold.ai/*",
-        "https://*.greenhouse.io/*",
-        "https://*.icims.com/*",
-        "https://*.jobs.ashbyhq.com/*",
-        "https://*.jobvite.com/*",
-        "https://jobs.ashbyhq.com/*",
-        "https://*.lever.co/*",
-        "https://*.linkedin.com/*",
-        "https://*.myworkdayjobs.com/*",
-        "https://*.oraclecloud.com/*",
-        "https://*.recruitee.com/*",
-        "https://*.smartrecruiters.com/*",
-        "https://*.successfactors.com/*",
-        "https://*.taleo.net/*",
-        "https://*.teamtailor.com/*",
-        "https://*.workday.com/*",
-        "https://jobloom.tech/*",
-        "https://jobseek-server.up.railway.app/*",
-        "https://www.jobloom.tech/*"
-      ]
+      "matches": ["https://*/*"]
     }
   ],
   "externally_connectable": {
