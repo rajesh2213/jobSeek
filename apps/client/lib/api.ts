@@ -212,28 +212,6 @@ export type JobDetailFetchResult = {
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? "http://localhost:3000";
 
-function debugFastifyFetch(input: {
-  route: string;
-  url: string;
-  mode: "revalidate" | "no-store";
-  revalidateSeconds?: number;
-  cacheStatus: "HIT" | "MISS";
-}): void {
-  if (typeof window !== "undefined") return;
-  if (process.env.DEBUG_FASTIFY_FETCH !== "1") return;
-  console.info(
-    JSON.stringify({
-      event: "api_cache_status",
-      source: "ssr",
-      route: input.route,
-      url: input.url,
-      xSsrCache: input.cacheStatus,
-      mode: input.mode,
-      revalidateSeconds: input.revalidateSeconds ?? null,
-    }),
-  );
-}
-
 export interface AccountSummary {
   plan: "free" | "pro";
   jobViewsToday: number;
@@ -811,7 +789,6 @@ export async function fetchJobs(
     ssrPage?: string;
   },
 ): Promise<JobsApiResponse> {
-  const startMs = Date.now();
   const params = buildJobDiscoverySearchParams(filters, { includeCompanyId: true });
 
   /**
@@ -846,21 +823,8 @@ export async function fetchJobs(
   const fetchOptions: RequestInit & { next?: { revalidate?: number } } = internalBypass
     ? { headers, next: { revalidate: 120 } }
     : { headers, cache: "no-store" };
-  debugFastifyFetch({
-    route: "/jobs",
-    url,
-    mode: internalBypass ? "revalidate" : "no-store",
-    revalidateSeconds: internalBypass ? 120 : undefined,
-    cacheStatus: internalBypass ? "HIT" : "MISS",
-  });
 
   const res = await fetch(url, fetchOptions);
-  const networkMs = Date.now() - startMs;
-  console.log("jobs_fetch_ms", networkMs);
-  console.log("API_NETWORK_ms", {
-    url,
-    duration: networkMs,
-  });
   if (!res.ok) {
     throw new Error(`Failed to fetch jobs: ${res.status} ${res.statusText}`);
   }
@@ -1075,13 +1039,6 @@ export async function fetchCompanies(options: {
   const reqInit: RequestInit & { next?: { revalidate?: number } } = isServer
     ? { headers, next: { revalidate: 60 } }
     : { headers, cache: "no-store" };
-  debugFastifyFetch({
-    route: "/companies",
-    url,
-    mode: isServer ? "revalidate" : "no-store",
-    revalidateSeconds: isServer ? 60 : undefined,
-    cacheStatus: isServer ? "HIT" : "MISS",
-  });
   const res = await fetch(url, reqInit);
   if (!res.ok) {
     throw new Error(`Failed to fetch companies: ${res.status}`);
@@ -1116,7 +1073,6 @@ export async function fetchCompanyJobs(
     ssrPage?: string;
   } = {},
 ): Promise<JobsApiResponse> {
-  const startMs = Date.now();
   const page = options.page ?? 1;
   const limit = options.limit ?? 20;
   const merged: JobFilters = {
@@ -1137,14 +1093,7 @@ export async function fetchCompanyJobs(
     headers.set("x-ssr-origin", "next-server");
     headers.set("x-ssr-page", options.ssrPage?.trim() || "company");
   }
-  debugFastifyFetch({
-    route: "/company/:slug/jobs",
-    url,
-    mode: "no-store",
-    cacheStatus: "MISS",
-  });
   const res = await fetch(url, { headers, cache: "no-store" });
-  console.log("company_jobs_fetch_ms", Date.now() - startMs);
   if (res.status === 404) {
     return {
       data: [],
@@ -1166,7 +1115,6 @@ export async function fetchJobById(
   id: string,
   opts?: { token?: string | null; forwardedFor?: string | null },
 ): Promise<JobDetailFetchResult | null> {
-  const startMs = Date.now();
   const headers = new Headers();
   const t = opts?.token?.trim();
   if (t) headers.set("Authorization", `Bearer ${t}`);
@@ -1176,7 +1124,6 @@ export async function fetchJobById(
     headers,
     cache: "no-store",
   });
-  console.log("job_fetch_ms", Date.now() - startMs);
   if (res.status === 404) return null;
   if (!res.ok) {
     throw new Error(`Failed to fetch job ${id}: ${res.status} ${res.statusText}`);

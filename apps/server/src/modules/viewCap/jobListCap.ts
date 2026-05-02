@@ -6,7 +6,6 @@ import { checkAndIncrementViewCap, getJobViewCapState } from "./viewCap.service.
 import type { PaginatedResult } from "../../types/api.js";
 import { LIMITS, type CapMode } from "../../config/limits.js";
 import { DISCOVERY_PREVIEW_ROWS } from "./discoveryCap.js";
-import { logger } from "../../utils/logger.js";
 
 export interface CapContext {
   internalUserId: string | null;
@@ -121,9 +120,6 @@ function metaBase(
     typeof offset === "number"
       ? offset
       : (result.page - 1) * stride;
-  if (result.total == null) {
-    console.log("COUNT_REMOVED_ALL_PAGES");
-  }
   const hasMore =
     result.hasMore ??
     (typeof result.total === "number"
@@ -172,49 +168,12 @@ export async function runMeteredJobsList<T>(
     fetchList: (effectiveLimit: number) => Promise<PaginatedResult<T>>;
   },
 ): Promise<{ items: T[]; meta: MeteredJobsListMeta }> {
-  const t0 = Date.now();
-  const logMeteringCheck = (input: {
-    isCapped: boolean;
-    isFreeUser: boolean;
-    isProUser: boolean;
-    capApplied: boolean;
-    limitAdjusted: boolean;
-  }): void => {
-    logger.info(
-      {
-        event: "jobs_metering_check",
-        ...input,
-      },
-      "jobs_metering_check",
-    );
-  };
   const { limit, offset, fetchList } = args;
   const page = Math.max(1, args.page);
-  const logFetchList = (ms: number): void => {
-    console.log("jobs_fetchList_ms", ms);
-  };
-  const logMeta = (ms: number): void => {
-    console.log("jobs_meta_ms", ms);
-  };
-  const logTotal = (): void => {
-    console.log("jobs_metering_total_ms", Date.now() - t0);
-  };
 
   if (bypassCap) {
-    logMeteringCheck({
-      isCapped: false,
-      isFreeUser: false,
-      isProUser: true,
-      capApplied: false,
-      limitAdjusted: false,
-    });
-    const listStart = Date.now();
     const result = await fetchList(limit);
-    logFetchList(Date.now() - listStart);
-    const metaStart = Date.now();
     const base = metaBase(result, offset, limit);
-    logMeta(Date.now() - metaStart);
-    logTotal();
     return {
       items: result.items,
       meta: {
@@ -237,20 +196,8 @@ export async function runMeteredJobsList<T>(
 
   const capState = await getJobViewCapState(prisma, redis, capCtx);
   if (capState.unlimited) {
-    logMeteringCheck({
-      isCapped: false,
-      isFreeUser: false,
-      isProUser: true,
-      capApplied: false,
-      limitAdjusted: false,
-    });
-    const listStart = Date.now();
     const result = await fetchList(limit);
-    logFetchList(Date.now() - listStart);
-    const metaStart = Date.now();
     const base = metaBase(result, offset, limit);
-    logMeta(Date.now() - metaStart);
-    logTotal();
     return {
       items: result.items,
       meta: {
@@ -326,14 +273,6 @@ export async function runMeteredJobsList<T>(
 
   if (LIMITS.MODE === "soft") {
     if (capState.remaining <= 0 && page > 1) {
-      logMeteringCheck({
-        isCapped: true,
-        isFreeUser: true,
-        isProUser: false,
-        capApplied: true,
-        limitAdjusted: true,
-      });
-      logTotal();
       return {
         items: [] as T[],
         meta: blockedDeepPaginationMeta(capState.resetAt.toISOString()),
@@ -341,22 +280,10 @@ export async function runMeteredJobsList<T>(
     }
     const fetchCap =
       capState.remaining <= 0 ? limit : Math.min(limit, Math.max(0, capState.remaining));
-    const listStart = Date.now();
     const result = await fetchList(fetchCap);
-    logFetchList(Date.now() - listStart);
     const debit = await checkAndIncrementViewCap(prisma, redis, capCtx, result.items.length);
-    const metaStart = Date.now();
     const base = metaBase(result, offset, limit);
-    logMeta(Date.now() - metaStart);
     const remainingSoft = Math.max(0, debit.remaining);
-    logMeteringCheck({
-      isCapped: remainingSoft <= 0,
-      isFreeUser: true,
-      isProUser: false,
-      capApplied: result.items.length > 0,
-      limitAdjusted: false,
-    });
-    logTotal();
     return {
       items: result.items,
       meta: {
@@ -381,14 +308,6 @@ export async function runMeteredJobsList<T>(
 
   // Hard mode: after exhaustion, block page 2+ without switching to preview-phase UX.
   if (capState.remaining <= 0 && page > 1) {
-    logMeteringCheck({
-      isCapped: true,
-      isFreeUser: true,
-      isProUser: false,
-      capApplied: true,
-      limitAdjusted: true,
-    });
-    logTotal();
     return {
       items: [] as T[],
       meta: blockedDeepPaginationMeta(capState.resetAt.toISOString()),
@@ -398,21 +317,9 @@ export async function runMeteredJobsList<T>(
   // Hard mode: after exhaustion, keep page 1 preview.
   if (capState.remaining <= 0 && page === 1) {
     const previewLimit = Math.min(limit, DISCOVERY_PREVIEW_ROWS);
-    logMeteringCheck({
-      isCapped: true,
-      isFreeUser: true,
-      isProUser: false,
-      capApplied: true,
-      limitAdjusted: previewLimit !== limit,
-    });
-    const listStart = Date.now();
     const result = await fetchList(previewLimit);
-    logFetchList(Date.now() - listStart);
     const totalMatching = result.total ?? result.items.length;
-    const metaStart = Date.now();
     const base = metaBase(result, offset, limit);
-    logMeta(Date.now() - metaStart);
-    logTotal();
     return {
       items: result.items,
       meta: {
@@ -439,33 +346,13 @@ export async function runMeteredJobsList<T>(
   // Hard mode + remaining budget: every returned row decrements the same daily pool.
   const effectiveLimit = Math.min(limit, Math.max(0, capState.remaining));
   if (effectiveLimit <= 0) {
-    logMeteringCheck({
-      isCapped: true,
-      isFreeUser: true,
-      isProUser: false,
-      capApplied: true,
-      limitAdjusted: true,
-    });
-    logTotal();
     return { items: [] as T[], meta: blockedPageMeta(0) };
   }
 
-  const listStart = Date.now();
   const result = await fetchList(effectiveLimit);
-  logFetchList(Date.now() - listStart);
   const debit = await checkAndIncrementViewCap(prisma, redis, capCtx, result.items.length);
   const remainingAfter = Math.max(0, debit.remaining);
-  const metaStart = Date.now();
   const base = metaBase(result, offset, limit);
-  logMeta(Date.now() - metaStart);
-  logMeteringCheck({
-    isCapped: remainingAfter <= 0,
-    isFreeUser: true,
-    isProUser: false,
-    capApplied: result.items.length > 0,
-    limitAdjusted: effectiveLimit !== limit,
-  });
-  logTotal();
   return {
     items: result.items,
     meta: {

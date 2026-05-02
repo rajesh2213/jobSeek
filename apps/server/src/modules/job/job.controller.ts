@@ -38,24 +38,14 @@ function parseQueryBool(raw: unknown): boolean {
 
 function setApiCacheHeader(
   reply: FastifyReply,
-  request: FastifyRequest,
+  _request: FastifyRequest,
   input: { route: string; cacheable: boolean; reason: string },
 ): void {
-  const value = input.cacheable
+  const { cacheable } = input;
+  const value = cacheable
     ? "public, max-age=30, s-maxage=30"
     : "private, no-store";
   reply.header("Cache-Control", value);
-  request.log.info(
-    {
-      event: "api_cache_status",
-      route: input.route,
-      method: request.method,
-      cacheStatus: input.cacheable ? "HIT_ELIGIBLE" : "BYPASS",
-      cacheControl: value,
-      reason: input.reason,
-    },
-    "api_cache_status",
-  );
 }
 
 export function registerJobRoutes(
@@ -66,13 +56,6 @@ export function registerJobRoutes(
     "/jobs",
     { schema: getJobsQuerySchema },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const requestStartTime =
-        (request as FastifyRequest & { startTime?: number }).startTime ?? Date.now();
-      const handlerStart = Date.now();
-      console.log("API_HANDLER_START_jobs", {
-        delayFromReceive: handlerStart - requestStartTime,
-      });
-
       const redis = getIoredis();
       const ip = clientIp(request);
       const rl = await assertJobReadRateLimit(redis, ip);
@@ -101,7 +84,6 @@ export function registerJobRoutes(
           : undefined;
 
       const filters = parseJobDiscoveryQuery(q);
-      request.log.debug({ filters }, "jobs_query_filters");
       const sortRaw = String(q.sort ?? "latest");
       const sort: "latest" | "salary_desc" =
         sortRaw === "salary_desc" || sortRaw === "salary" ? "salary_desc" : "latest";
@@ -135,22 +117,8 @@ export function registerJobRoutes(
         !isHeavyQuery &&
         !isDeepPagination;
 
-      request.log.info(
-        {
-          event: "jobs_cache_strategy",
-          isSafeToCache,
-          isCommonFilterQuery,
-          isHeavyQuery,
-          isDeepPagination,
-        },
-        "jobs_cache_strategy",
-      );
-
       const meteredLimit = isSafeToCache ? Math.min(limit, 50) : limit;
 
-      const jobsTotalStart = Date.now();
-      const dbStart = Date.now();
-      console.log("API_DB_START_jobs");
       const out = await runMeteredJobsList<JobWithCompany>(
         server.prisma,
         redis,
@@ -172,21 +140,9 @@ export function registerJobRoutes(
             }),
         },
       );
-      console.log("API_DB_END_jobs", {
-        dbTime: Date.now() - dbStart,
-      });
-      console.log("jobs_total_ms", Date.now() - jobsTotalStart);
 
       if (isSafeToCache) {
         reply.header("Cache-Control", "public, max-age=60, s-maxage=120");
-        request.log.info(
-          {
-            event: "jobs_cache_status",
-            status: "HIT_ELIGIBLE",
-            safeToCache: true,
-          },
-          "jobs_cache_status",
-        );
       } else {
         const cacheableJobsList = false;
         const cacheBypassReason = cacheableJobsList
@@ -202,35 +158,6 @@ export function registerJobRoutes(
         });
       }
 
-      request.log.info(
-        {
-          event: "jobs_metering_enforced",
-          isSafeToCache,
-          limit: meteredLimit,
-          page,
-          capApplied: Boolean(
-            !bypassCap && !out.meta.viewCapUnlimited,
-          ),
-        },
-        "jobs_metering_enforced",
-      );
-
-      const rowsReturned = out.items.length;
-      const estBytes = rowsReturned * 1100;
-      request.log.info(
-        {
-          event: "api_request_metrics",
-          route: "/jobs",
-          method: "GET",
-          rowsReturned,
-          estimatedKB: Number((estBytes / 1024).toFixed(2)),
-        },
-        "api_jobs_list_metrics",
-      );
-
-      console.log("API_RESPONSE_SENT_jobs", {
-        totalTime: Date.now() - requestStartTime,
-      });
       return reply.send({
         data: out.items.map((j) =>
           toJobListJson(j as unknown as JobWithCompanyRow),

@@ -104,10 +104,6 @@ export async function buildServer() {
   server.addHook("onRequest", async (request, _reply) => {
     const reqWithStart = request as typeof request & { startTime?: number };
     reqWithStart.startTime = Date.now();
-    console.log("API_REQUEST_RECEIVED", {
-      path: request.url,
-      ts: reqWithStart.startTime,
-    });
   });
 
   if (logSlowRouteMs > 0) {

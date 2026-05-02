@@ -98,7 +98,6 @@ export class JobService {
       input.paginationStride > input.limit;
     const hasMore =
       items.length === input.limit && !implicitStrideClamp;
-    console.log("COUNT_REMOVED_ALL_PAGES");
 
     return {
       items,
