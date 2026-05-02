@@ -106,6 +106,11 @@ if (!existsSync(manPath)) {
         if (!Array.isArray(matches)) continue;
         for (const pat of matches) {
           warChecked = true;
+          const trimmed = String(pat).trim();
+          if (trimmed === "https://*/*" || trimmed === "http://*/*") {
+            fail(`avoid universal web_accessible_resources match ${trimmed}`);
+            warOk = false;
+          }
           if (!warMatchPatternPathOk(pat)) {
             fail(`web_accessible_resources match pattern path must be exactly /* : ${pat}`);
             warOk = false;

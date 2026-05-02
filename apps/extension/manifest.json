@@ -9,12 +9,14 @@
     "48": "assets/icon-48.png",
     "128": "assets/icon-128.png"
   },
-  "permissions": ["activeTab", "storage", "webNavigation"],
-  "host_permissions": [
+  "permissions": ["activeTab", "storage", "webNavigation", "scripting"],
+  "optional_host_permissions": [
     "https://*/apply/*",
     "https://*/careers/*",
     "https://*/jobs/*",
-    "https://*/join-us/*",
+    "https://*/join-us/*"
+  ],
+  "host_permissions": [
     "https://*.applytojob.com/*",
     "https://*.ashbyhq.com/*",
     "https://*.bamboohr.com/*",
@@ -45,10 +47,6 @@
   "content_scripts": [
     {
       "matches": [
-        "https://*/apply/*",
-        "https://*/careers/*",
-        "https://*/jobs/*",
-        "https://*/join-us/*",
         "https://*.applytojob.com/*",
         "https://*.ashbyhq.com/*",
         "https://*.bamboohr.com/*",
@@ -79,10 +77,6 @@
     },
     {
       "matches": [
-        "https://*/apply/*",
-        "https://*/careers/*",
-        "https://*/jobs/*",
-        "https://*/join-us/*",
         "https://*.applytojob.com/*",
         "https://*.ashbyhq.com/*",
         "https://*.bamboohr.com/*",
@@ -123,7 +117,30 @@
   "web_accessible_resources": [
     {
       "resources": ["assets/logo-prim.png", "assets/icon-16.png", "assets/icon-32.png", "assets/icon-48.png", "assets/icon-128.png"],
-      "matches": ["https://*/*"]
+      "matches": [
+        "https://*.applytojob.com/*",
+        "https://*.ashbyhq.com/*",
+        "https://*.bamboohr.com/*",
+        "https://*.eightfold.ai/*",
+        "https://*.greenhouse.io/*",
+        "https://*.icims.com/*",
+        "https://*.jobs.ashbyhq.com/*",
+        "https://*.jobvite.com/*",
+        "https://jobs.ashbyhq.com/*",
+        "https://*.lever.co/*",
+        "https://*.linkedin.com/*",
+        "https://*.myworkdayjobs.com/*",
+        "https://*.oraclecloud.com/*",
+        "https://*.recruitee.com/*",
+        "https://*.smartrecruiters.com/*",
+        "https://*.successfactors.com/*",
+        "https://*.taleo.net/*",
+        "https://*.teamtailor.com/*",
+        "https://*.workday.com/*",
+        "https://jobloom.tech/*",
+        "https://jobseek-server.up.railway.app/*",
+        "https://www.jobloom.tech/*"
+      ]
     }
   ],
   "externally_connectable": {

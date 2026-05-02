@@ -8,6 +8,10 @@ import {
   postSmartApplyEvent,
 } from "../lib/api";
 import type { ApplyProfile, FillFieldResult, ResumeFilePayload } from "../lib/formFiller";
+import {
+  OPTIONAL_GENERIC_CAREER_ORIGINS,
+  matchesOptionalGenericCareerPath,
+} from "../lib/careerPathPatterns";
 import { isSmartApplyEligibleSurface } from "../lib/smartApplySurface";
 import { extensionLogoPrimUrl } from "../lib/extensionAssets";
 
@@ -118,6 +122,7 @@ function Popup() {
   const [jobTitle, setJobTitle] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [resumeAttachMessage, setResumeAttachMessage] = useState<string | null>(null);
+  const [optionalCareerPathsGranted, setOptionalCareerPathsGranted] = useState(false);
   const firstFillStartMsRef = useRef<number | null>(null);
   const firstSuccessSentRef = useRef(false);
 
@@ -132,6 +137,17 @@ function Popup() {
     const id = window.setInterval(refreshStorage, 2000);
     return () => window.clearInterval(id);
   }, [refreshStorage]);
+
+  useEffect(() => {
+    const syncOptional = () => {
+      void chrome.permissions.contains({ origins: [...OPTIONAL_GENERIC_CAREER_ORIGINS] }).then((ok) => {
+        setOptionalCareerPathsGranted(Boolean(ok));
+      });
+    };
+    syncOptional();
+    chrome.permissions.onAdded.addListener(syncOptional);
+    chrome.permissions.onRemoved.addListener(syncOptional);
+  }, []);
 
   useEffect(() => {
     if (!token) {
@@ -161,7 +177,10 @@ function Popup() {
             fields?: ScanField[];
             isAtsPage?: boolean;
           }>({ type: "SCAN_TAB_FIELDS", tabId });
-          const ats = res.isAtsPage ?? isSmartApplyEligibleSurface(u);
+          const ats =
+            res.isAtsPage ??
+            (isSmartApplyEligibleSurface(u) ||
+              (optionalCareerPathsGranted && matchesOptionalGenericCareerPath(u)));
           setIsAts(ats);
           if (res.success === false) {
             setFieldCount(0);
@@ -184,11 +203,26 @@ function Popup() {
         }
       })();
     });
-  }, []);
+  }, [optionalCareerPathsGranted]);
 
   useEffect(() => {
     refreshTab();
   }, [refreshTab]);
+
+  const grantOptionalEmployerSites = useCallback(async () => {
+    try {
+      const granted = await chrome.permissions.request({
+        origins: [...OPTIONAL_GENERIC_CAREER_ORIGINS],
+      });
+      if (!granted) return;
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const id = tabs[0]?.id;
+        if (id !== undefined) void chrome.tabs.reload(id);
+      });
+    } catch {
+      /* dismissed dialog */
+    }
+  }, []);
 
   const runFill = async () => {
     setError(null);
@@ -496,6 +530,44 @@ function Popup() {
         <p style={{ margin: "0 0 12px", fontSize: 12, color: "#777" }}>
           Navigate to a job application page (Greenhouse, Lever, Workday, Ashby, ...).
         </p>
+        {!optionalCareerPathsGranted ? (
+          <div
+            style={{
+              marginBottom: 12,
+              padding: 10,
+              borderRadius: 8,
+              background: "#fff8f5",
+              border: `1px solid ${CORAL}33`,
+              fontSize: 11,
+              color: "#555",
+            }}
+          >
+            <p style={{ margin: "0 0 8px" }}>
+              Employer sites that only use URLs like{" "}
+              <code style={{ fontSize: 10 }}>/jobs/</code>,{" "}
+              <code style={{ fontSize: 10 }}>/careers/</code>, or{" "}
+              <code style={{ fontSize: 10 }}>/apply/</code> need an extra permission (Chrome will
+              prompt). ATS-hosted boards above work without this.
+            </p>
+            <button
+              type="button"
+              onClick={() => void grantOptionalEmployerSites()}
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: "none",
+                background: CORAL,
+                color: "white",
+                fontWeight: 700,
+                fontSize: 12,
+                cursor: "pointer",
+              }}
+            >
+              Allow company career-page URLs →
+            </button>
+          </div>
+        ) : null}
         {status ? (
           <div style={{ marginBottom: 12 }}>
             <div

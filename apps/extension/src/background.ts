@@ -1,4 +1,6 @@
 import { compositeFieldId, parseCompositeFieldId } from "./lib/frameIds";
+import { OPTIONAL_GENERIC_CAREER_ORIGINS, matchesOptionalGenericCareerPath } from "./lib/careerPathPatterns";
+import { syncOptionalCareerContentScripts } from "./lib/optionalCareerScripts";
 import { isSmartApplyEligibleSurface } from "./lib/smartApplySurface";
 import { isAllowedApiPath } from "./lib/allowedApiPaths";
 import {
@@ -103,7 +105,17 @@ async function scanTabFields(tabId: number) {
   }
   const tab = await chrome.tabs.get(tabId).catch(() => null);
   const tabUrl = tab?.url ?? "";
-  const isAtsPage = isSmartApplyEligibleSurface(tabUrl);
+  let optionalCareerGranted = false;
+  try {
+    optionalCareerGranted = await chrome.permissions.contains({
+      origins: [...OPTIONAL_GENERIC_CAREER_ORIGINS],
+    });
+  } catch {
+    optionalCareerGranted = false;
+  }
+  const isAtsPage =
+    isSmartApplyEligibleSurface(tabUrl) ||
+    (optionalCareerGranted && matchesOptionalGenericCareerPath(tabUrl));
   return { success: true as const, fields: merged, isAtsPage, tabUrl };
 }
 
@@ -505,3 +517,8 @@ chrome.action.onClicked.addListener((tab) => {
 chrome.tabs.onActivated.addListener(() => {
   void chrome.action.setBadgeText({ text: "" });
 });
+
+chrome.runtime.onInstalled.addListener(() => void syncOptionalCareerContentScripts());
+chrome.permissions.onAdded.addListener(() => void syncOptionalCareerContentScripts());
+chrome.permissions.onRemoved.addListener(() => void syncOptionalCareerContentScripts());
+void syncOptionalCareerContentScripts();
