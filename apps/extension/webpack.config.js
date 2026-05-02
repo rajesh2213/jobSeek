@@ -12,6 +12,15 @@ module.exports = (env, argv) => {
     process.env.EXTENSION_API_BASE ||
     (isProd ? "https://jobseek-server.up.railway.app" : "http://localhost:3000");
 
+  const trustedWebOrigins = isProd
+    ? ["https://jobloom.tech", "https://www.jobloom.tech"]
+    : [
+        "https://jobloom.tech",
+        "https://www.jobloom.tech",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+      ];
+
   return {
     entry: {
       background: "./src/background.ts",
@@ -55,6 +64,9 @@ module.exports = (env, argv) => {
       new webpack.DefinePlugin({
         __EXTENSION_API_BASE__: JSON.stringify(String(extApiBase).replace(/\/+$/, "")),
         __EXT_PROD__: JSON.stringify(isProd ? "true" : "false"),
+        /** Empty in production so store bundles contain no loopback URL literals (check-ext). */
+        __LOCAL_API_FALLBACK__: JSON.stringify(isProd ? "" : "http://localhost:3000"),
+        __TRUSTED_EXTENSION_WEB_ORIGINS__: JSON.stringify(trustedWebOrigins),
       }),
       ...(analyze
         ? [

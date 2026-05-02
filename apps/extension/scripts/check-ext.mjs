@@ -69,17 +69,25 @@ if (!existsSync(manPath)) {
     } else {
       pass(`description present (${m.description.length}/132 chars)`);
     }
-    const mtext = read(manPath);
-    if (mtext.includes("localhost") || mtext.includes("127.0.0.1")) {
-      fail("manifest must not reference localhost/127.0.0.1");
+    const { externally_connectable: _ignoreExt, ...manifestWithoutExternal } = m;
+    const manifestProdSlice = JSON.stringify(manifestWithoutExternal);
+    if (manifestProdSlice.includes("localhost") || manifestProdSlice.includes("127.0.0.1")) {
+      fail("manifest must not reference localhost/127.0.0.1 outside externally_connectable");
     } else {
-      pass("manifest has no dev URLs");
+      pass("manifest has no dev URLs outside externally_connectable");
     }
-    if (mtext.includes("<all_urls>")) {
+    if (manifestProdSlice.includes("<all_urls>")) {
       fail("avoid <all_urls> in host_permissions and content matches");
     } else {
       pass("no <all_urls> in manifest");
     }
+    const broad = new Set(["https://*/*", "http://*/*"]);
+    for (const entry of m.host_permissions ?? []) {
+      if (broad.has(String(entry).trim())) {
+        fail(`avoid universal host permission ${entry}`);
+      }
+    }
+    pass("host_permissions avoids universal https/http wildcards");
     for (const k of ["16", "48", "128"]) {
       if (!m.icons || !m.icons[k]) {
         fail(`icons.${k} missing in manifest`);

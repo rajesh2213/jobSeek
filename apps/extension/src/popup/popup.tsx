@@ -8,7 +8,7 @@ import {
   postSmartApplyEvent,
 } from "../lib/api";
 import type { ApplyProfile, FillFieldResult, ResumeFilePayload } from "../lib/formFiller";
-import { isLikelyAtsPage } from "../lib/atsDetection";
+import { isSmartApplyEligibleSurface } from "../lib/smartApplySurface";
 import { extensionLogoPrimUrl } from "../lib/extensionAssets";
 
 const CORAL = "#E8533A";
@@ -161,7 +161,7 @@ function Popup() {
             fields?: ScanField[];
             isAtsPage?: boolean;
           }>({ type: "SCAN_TAB_FIELDS", tabId });
-          const ats = res.isAtsPage ?? isLikelyAtsPage(u);
+          const ats = res.isAtsPage ?? isSmartApplyEligibleSurface(u);
           setIsAts(ats);
           if (res.success === false) {
             setFieldCount(0);

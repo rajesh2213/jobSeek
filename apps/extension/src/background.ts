@@ -1,5 +1,5 @@
 import { compositeFieldId, parseCompositeFieldId } from "./lib/frameIds";
-import { isLikelyAtsPage } from "./lib/atsDetection";
+import { isSmartApplyEligibleSurface } from "./lib/smartApplySurface";
 import { isAllowedApiPath } from "./lib/allowedApiPaths";
 import {
   getDefaultApiBase,
@@ -103,7 +103,7 @@ async function scanTabFields(tabId: number) {
   }
   const tab = await chrome.tabs.get(tabId).catch(() => null);
   const tabUrl = tab?.url ?? "";
-  const isAtsPage = isLikelyAtsPage(tabUrl);
+  const isAtsPage = isSmartApplyEligibleSurface(tabUrl);
   return { success: true as const, fields: merged, isAtsPage, tabUrl };
 }
 

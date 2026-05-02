@@ -8,17 +8,24 @@ import { SidebarApp } from "./ui/SidebarApp";
 import { SIDEBAR_PANEL_WIDTH_PX } from "./ui/uiMotion";
 import { getSidebarState, patchSidebarState } from "./ui/store";
 import { isLikelyAtsPage } from "./lib/atsDetection";
+import { isSmartApplyEligibleSurface } from "./lib/smartApplySurface";
 
 const isTopFrame = window.self === window.top;
-const isAtsPage = isLikelyAtsPage(window.location.href);
+
+/**
+ * Content scripts only run where `manifest.json` `content_scripts.matches` allow; that is the
+ * career/ATS surface — show floating UI on the top frame without a second hostname heuristic gate.
+ */
+const showInjectedChrome = isTopFrame;
 
 /** Page-visible beacon lives in presenceBeacon.js (MAIN world); isolated scripts cannot set host globals. */
 
-if (isTopFrame && isAtsPage) {
+if (showInjectedChrome) {
   void chrome.runtime.sendMessage({ type: "ON_ATS_PAGE", hostname: window.location.hostname });
   void postSmartApplyEvent("ats_page_detected", {
     hostname: window.location.hostname,
     path: window.location.pathname,
+    strictAtsSignals: isLikelyAtsPage(window.location.href),
   });
 }
 
@@ -77,9 +84,9 @@ function ensureSidebarRoot(): HTMLElement {
   return mount;
 }
 
-if (isTopFrame && isAtsPage) {
+if (showInjectedChrome) {
   const root = ensureSidebarRoot();
-  createRoot(root).render(createElement(SidebarApp, { isAtsPage }));
+  createRoot(root).render(createElement(SidebarApp, { isAtsPage: true }));
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -91,7 +98,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "SCAN_FIELDS") {
     try {
       const fields = detectFormFields();
-      sendResponse({ success: true, fields, isAtsPage });
+      sendResponse({
+        success: true,
+        fields,
+        isAtsPage: isSmartApplyEligibleSurface(window.location.href),
+      });
     } catch (error) {
       replyError(error);
     }
@@ -168,10 +179,6 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "TOGGLE_SIDEBAR") {
     if (!isTopFrame) {
       sendResponse({ success: false, error: "Sidebar runs in main frame only" });
-      return false;
-    }
-    if (!isAtsPage) {
-      sendResponse({ success: false, error: "Not an ATS page" });
       return false;
     }
     const current = getSidebarState();

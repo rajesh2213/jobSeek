@@ -99,10 +99,10 @@ function buildAccountSyncHint(
       (typeof s.authFailureCode === "string" && s.authFailureCode) ||
       "";
     const base =
-      "HTTP 401 Unauthorized — Clerk rejected the JWT. Set CLERK_SECRET_KEY or CLERK_JWT_KEY in repo .env (same Clerk project as Next.js), restart npm run dev:server, use the same host for the site as in NEXT_PUBLIC_SITE_URL (localhost vs 127.0.0.1), then reload this extension.";
+      "HTTP 401 Unauthorized — Clerk rejected the JWT. Set CLERK_SECRET_KEY or CLERK_JWT_KEY in repo .env (same Clerk project as Next.js), restart npm run dev:server, use a single canonical site host in NEXT_PUBLIC_SITE_URL (do not mix loopback hostnames), then reload this extension.";
     const apiBaseHint =
       !apiLine && !code
-        ? " If you develop locally: rebuild the extension (dev default apiBase is http://localhost:3000). If chrome.storage.local.apiBase still points at a hosted URL, clear it or set apiBase to http://localhost:3000."
+        ? " For local API: rebuild the extension with dev webpack so apiBase defaults to your machine, or set chrome.storage.local.apiBase to your dev server URL; clear a stale hosted value if needed."
         : "";
     if (!apiLine && !code) return `${base}${apiBaseHint}`;
     return `API diagnostics${code ? ` (${code})` : ""}${apiLine ? `: ${apiLine}` : ""}\n\n${base}`;

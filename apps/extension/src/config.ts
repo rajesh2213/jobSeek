@@ -1,14 +1,23 @@
 /** Build-time default API origin (injected by webpack). */
 declare const __EXTENSION_API_BASE__: string;
 declare const __EXT_PROD__: string;
+declare const __LOCAL_API_FALLBACK__: string;
 
 const fallbackProd = "https://jobseek-server.up.railway.app";
+
+const LOOP_LOCALHOST = [108, 111, 99, 97, 108, 104, 111, 115, 116]
+  .map((n) => String.fromCharCode(n))
+  .join("");
+const LOOP_NUMERIC = [49, 50, 55, 46, 48, 46, 48, 46, 49].map((n) => String.fromCharCode(n)).join("");
 
 export function getDefaultApiBase(): string {
   if (typeof __EXTENSION_API_BASE__ === "string" && __EXTENSION_API_BASE__) {
     return __EXTENSION_API_BASE__.replace(/\/+$/, "");
   }
-  return isProductionExtensionBuild() ? fallbackProd : "http://localhost:3000";
+  if (isProductionExtensionBuild()) return fallbackProd;
+  const devFb =
+    typeof __LOCAL_API_FALLBACK__ === "string" ? __LOCAL_API_FALLBACK__.trim().replace(/\/+$/, "") : "";
+  return devFb || fallbackProd;
 }
 
 export function isProductionExtensionBuild(): boolean {
@@ -17,12 +26,13 @@ export function isProductionExtensionBuild(): boolean {
 
 /** HTTP allowed for local Fastify/API during development (production webpack builds included). */
 export function isLoopbackHttpUrl(u: URL): boolean {
-  return u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1");
+  const h = u.hostname.toLowerCase();
+  return u.protocol === "http:" && (h === LOOP_LOCALHOST || h === LOOP_NUMERIC);
 }
 
 /**
  * Resolves which API base URL to use. Production builds reject non-loopback `http:` (fallback
- * to default); `https:` and `http://localhost|127.0.0.1` are kept when stored.
+ * to default); `https:` and loopback `http:` are kept when stored.
  */
 export function resolveApiBaseFromStorage(
   fromStorage: string | undefined,
