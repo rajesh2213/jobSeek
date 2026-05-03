@@ -333,8 +333,20 @@ export function registerBillingRoutes(server: FastifyInstance): void {
         };
 
         const response = await client.execute(requestForClient);
-        const result = response.result as CreateSubscriptionResponse;
+        const result = response.result as CreateSubscriptionResponse & { id?: string };
         const approvalUrl = result.links?.find((link) => link.rel === "approve")?.href;
+
+        if (result.id) {
+          server.log.info(
+            {
+              event: "paypal_subscription_draft_created",
+              paypalSubscriptionId: result.id,
+              internalUserId: ctx.internalUserId,
+              planType,
+            },
+            "paypal_subscription_draft_created",
+          );
+        }
 
         if (!approvalUrl) {
           server.log.error({ paypalResult: result }, "PayPal approval URL missing");
