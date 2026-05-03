@@ -31,13 +31,22 @@ export function isLoopbackHttpUrl(u: URL): boolean {
 }
 
 /**
- * Resolves which API base URL to use. Production builds reject non-loopback `http:` (fallback
- * to default); `https:` and loopback `http:` are kept when stored.
+ * Resolves which API base URL to use.
+ *
+ * **Store / production webpack builds** always use the baked-in `def` from `__EXTENSION_API_BASE__`
+ * (see webpack `EXTENSION_API_BASE`). Ignoring `chrome.storage.local.apiBase` avoids broken installs
+ * where a dev loopback or old staging URL was left in storage — those show as 404 / “Can’t load
+ * account” on real ATS pages.
+ *
+ * **Dev builds** may override via storage (`https:` or loopback `http:`).
  */
 export function resolveApiBaseFromStorage(
   fromStorage: string | undefined,
   def: string = getDefaultApiBase(),
 ): string {
+  if (isProductionExtensionBuild()) {
+    return def;
+  }
   if (!fromStorage || typeof fromStorage !== "string") {
     return def;
   }
@@ -54,9 +63,6 @@ export function resolveApiBaseFromStorage(
   if (u.protocol === "http:") {
     if (isLoopbackHttpUrl(u)) {
       return t.replace(/\/+$/, "");
-    }
-    if (isProductionExtensionBuild()) {
-      return def;
     }
     return t.replace(/\/+$/, "");
   }

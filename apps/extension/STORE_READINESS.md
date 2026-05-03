@@ -13,7 +13,7 @@
 | Popup (built) | `src/popup/` → `dist/popup.js` + `popup.html` (bundled; **not** the toolbar entry in this product — there is no `action.default_popup`) |
 | Options | None |
 | Assets | `icons/*` → `dist/assets/*` at build |
-| API default | Production webpack build: `https://jobseek-server.up.railway.app`; dev build: `http://localhost:3000` (override: env `EXTENSION_API_BASE`). Stored `chrome.storage.local.apiBase` wins when set. |
+| API default | Production webpack build: `https://jobseek-server.up.railway.app` (override: env `EXTENSION_API_BASE` at build time). **Store builds ignore** `chrome.storage.local.apiBase` and clear it on install/update so dev URLs cannot break production. Dev builds may still override via storage. |
 
 **Scripts (from `apps/extension`):** `build:ext` (clean + production bundle), `check:ext`, `zip:ext` → `extension.zip` (files at zip root, not a parent folder). Root `package.json` forwards `build:ext` / `zip:ext` / `check:ext` to the workspace.
 

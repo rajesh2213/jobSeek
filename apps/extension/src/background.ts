@@ -518,7 +518,12 @@ chrome.tabs.onActivated.addListener(() => {
   void chrome.action.setBadgeText({ text: "" });
 });
 
-chrome.runtime.onInstalled.addListener(() => void syncOptionalCareerContentScripts());
+chrome.runtime.onInstalled.addListener(() => {
+  void syncOptionalCareerContentScripts();
+  if (isProductionExtensionBuild()) {
+    void chrome.storage.local.remove(["apiBase"]);
+  }
+});
 chrome.permissions.onAdded.addListener(() => void syncOptionalCareerContentScripts());
 chrome.permissions.onRemoved.addListener(() => void syncOptionalCareerContentScripts());
 void syncOptionalCareerContentScripts();
