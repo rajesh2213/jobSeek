@@ -3,7 +3,7 @@ declare const __EXTENSION_API_BASE__: string;
 declare const __EXT_PROD__: string;
 declare const __LOCAL_API_FALLBACK__: string;
 
-const fallbackProd = "https://jobseek-server.up.railway.app";
+const fallbackProd = "https://api.jobloom.tech";
 
 const LOOP_LOCALHOST = [108, 111, 99, 97, 108, 104, 111, 115, 116]
   .map((n) => String.fromCharCode(n))

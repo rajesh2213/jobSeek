@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "JobLoom Smart Apply Assistant",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Fill job applications faster with smart autofill and AI-assisted answers on real job application pages.",
   "icons": {
     "16": "assets/icon-16.png",
@@ -37,7 +37,7 @@
     "https://*.teamtailor.com/*",
     "https://*.workday.com/*",
     "https://jobloom.tech/*",
-    "https://jobseek-server.up.railway.app/*",
+    "https://api.jobloom.tech/*",
     "https://www.jobloom.tech/*"
   ],
   "background": {
@@ -67,7 +67,7 @@
         "https://*.teamtailor.com/*",
         "https://*.workday.com/*",
         "https://jobloom.tech/*",
-        "https://jobseek-server.up.railway.app/*",
+        "https://api.jobloom.tech/*",
         "https://www.jobloom.tech/*"
       ],
       "js": ["presenceBeacon.js"],
@@ -97,7 +97,7 @@
         "https://*.teamtailor.com/*",
         "https://*.workday.com/*",
         "https://jobloom.tech/*",
-        "https://jobseek-server.up.railway.app/*",
+        "https://api.jobloom.tech/*",
         "https://www.jobloom.tech/*"
       ],
       "js": ["content.js"],
@@ -138,7 +138,7 @@
         "https://*.teamtailor.com/*",
         "https://*.workday.com/*",
         "https://jobloom.tech/*",
-        "https://jobseek-server.up.railway.app/*",
+        "https://api.jobloom.tech/*",
         "https://www.jobloom.tech/*"
       ]
     }

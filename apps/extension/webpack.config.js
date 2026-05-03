@@ -10,7 +10,7 @@ module.exports = (env, argv) => {
   /** Dev builds default to local Fastify; prod builds default to hosted API unless overridden. */
   const extApiBase =
     process.env.EXTENSION_API_BASE ||
-    (isProd ? "https://jobseek-server.up.railway.app" : "http://localhost:3000");
+    (isProd ? "https://api.jobloom.tech" : "http://localhost:3000");
 
   const trustedWebOrigins = isProd
     ? ["https://jobloom.tech", "https://www.jobloom.tech"]
