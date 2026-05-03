@@ -20,7 +20,7 @@ const PLAN_TYPE_BY_KEY: Record<CheckoutKey, "monthly" | "yearly"> = {
 
 export function PricingPlansClient() {
   const { isSignedIn, getToken } = useAuth();
-  const { isPro, pendingUpgrade, upgradeCheckExpired, markPendingUpgrade, refresh } = useAccountPlan();
+  const { isPro, pendingUpgrade, markPendingUpgrade, refresh, clearPendingUpgrade } = useAccountPlan();
   const [busy, setBusy] = useState<null | CheckoutKey>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,18 +110,26 @@ export function PricingPlansClient() {
       ) : null}
       {pendingUpgrade && !isPro ? (
         <div className="mx-auto mt-6 max-w-lg rounded-xl border border-brand/30 bg-brand/5 px-4 py-3 text-center text-sm text-ink">
-          Payment submitted. We are confirming your subscription now.
-          {upgradeCheckExpired ? (
-            <div className="mt-2">
-              <button
-                type="button"
-                onClick={() => void refresh()}
-                className="rounded-md border border-brand px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10"
-              >
-                Refresh status
-              </button>
-            </div>
-          ) : null}
+          <p>Payment submitted. We are confirming your subscription now.</p>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              className="rounded-md border border-brand px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10"
+            >
+              Refresh status
+            </button>
+            <button
+              type="button"
+              onClick={() => clearPendingUpgrade()}
+              className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-ink-muted hover:bg-ink/5"
+            >
+              Stuck? Reset checkout
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-ink-muted">
+            If confirmation takes more than about a minute, we stop blocking checkout automatically.
+          </p>
         </div>
       ) : null}
       {isPro ? (

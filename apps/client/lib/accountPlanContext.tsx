@@ -20,7 +20,6 @@ export interface AccountPlanContextValue {
   isPro: boolean;
   isLoaded: boolean;
   pendingUpgrade: boolean;
-  upgradeCheckExpired: boolean;
   refresh: () => Promise<AccountSummary | null>;
   markPendingUpgrade: () => void;
   clearPendingUpgrade: () => void;
@@ -33,7 +32,6 @@ export function AccountPlanProvider({ children }: { children: ReactNode }) {
   const [summary, setSummary] = useState<AccountSummary | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [pendingUpgrade, setPendingUpgrade] = useState(false);
-  const [upgradeCheckExpired, setUpgradeCheckExpired] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!isSignedIn) {
@@ -52,7 +50,6 @@ export function AccountPlanProvider({ children }: { children: ReactNode }) {
     setLoaded(true);
     if (s?.plan === "pro") {
       setPendingUpgrade(false);
-      setUpgradeCheckExpired(false);
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(PENDING_UPGRADE_STORAGE_KEY);
       }
@@ -62,7 +59,6 @@ export function AccountPlanProvider({ children }: { children: ReactNode }) {
 
   const markPendingUpgrade = useCallback(() => {
     setPendingUpgrade(true);
-    setUpgradeCheckExpired(false);
     if (typeof window !== "undefined") {
       window.localStorage.setItem(PENDING_UPGRADE_STORAGE_KEY, "1");
     }
@@ -70,7 +66,6 @@ export function AccountPlanProvider({ children }: { children: ReactNode }) {
 
   const clearPendingUpgrade = useCallback(() => {
     setPendingUpgrade(false);
-    setUpgradeCheckExpired(false);
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(PENDING_UPGRADE_STORAGE_KEY);
     }
@@ -89,7 +84,6 @@ export function AccountPlanProvider({ children }: { children: ReactNode }) {
     if (typeof window === "undefined") return;
     const pending = window.localStorage.getItem(PENDING_UPGRADE_STORAGE_KEY) === "1";
     setPendingUpgrade(pending);
-    if (!pending) setUpgradeCheckExpired(false);
   }, [authLoaded, clearPendingUpgrade, isSignedIn]);
 
   useEffect(() => {
@@ -104,19 +98,18 @@ export function AccountPlanProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
       if (latest?.plan === "pro") return;
       if (Date.now() - startedAt >= 60_000) {
-        setUpgradeCheckExpired(true);
+        clearPendingUpgrade();
         return;
       }
       setTimeout(poll, 2500);
     };
 
-    setUpgradeCheckExpired(false);
     void poll();
 
     return () => {
       cancelled = true;
     };
-  }, [authLoaded, isSignedIn, pendingUpgrade, refresh, summary?.plan]);
+  }, [authLoaded, clearPendingUpgrade, isSignedIn, pendingUpgrade, refresh, summary?.plan]);
 
   const value = useMemo<AccountPlanContextValue>(() => {
     const plan = summary?.plan ?? "free";
@@ -125,7 +118,6 @@ export function AccountPlanProvider({ children }: { children: ReactNode }) {
       isPro: planIsPro(plan),
       isLoaded: authLoaded && loaded,
       pendingUpgrade,
-      upgradeCheckExpired,
       refresh,
       markPendingUpgrade,
       clearPendingUpgrade,
@@ -136,7 +128,6 @@ export function AccountPlanProvider({ children }: { children: ReactNode }) {
     pendingUpgrade,
     refresh,
     summary,
-    upgradeCheckExpired,
     markPendingUpgrade,
     clearPendingUpgrade,
   ]);
