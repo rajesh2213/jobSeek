@@ -202,6 +202,38 @@ async function executeWithTimeoutAndNetworkRetry(
   throw lastError;
 }
 
+/** Inspect a billing plan (live vs sandbox follows PAYPAL_MODE). Throws if PayPal API errors (wrong env or invalid id). */
+export async function fetchPayPalBillingPlan(planId: string): Promise<{
+  id: string;
+  status?: string;
+  name?: string;
+  description?: string;
+}> {
+  const client = createPayPalHttpClient();
+  const request: paypalhttp.HttpRequest = {
+    path: `/v1/billing/plans/${encodeURIComponent(planId)}`,
+    verb: "GET",
+    headers: { "Content-Type": "application/json" },
+    body: {},
+  };
+  const response = await client.execute(request);
+  const result = response.result as {
+    id?: string;
+    status?: string;
+    name?: string;
+    description?: string;
+  };
+  if (!result.id) {
+    throw new Error("PayPal plan response missing id");
+  }
+  return {
+    id: result.id,
+    status: result.status,
+    name: result.name,
+    description: result.description,
+  };
+}
+
 export async function fetchPayPalSubscriptionDetails(
   subscriptionId: string,
 ): Promise<PayPalSubscriptionDetails | null> {

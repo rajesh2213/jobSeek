@@ -298,10 +298,15 @@ export function registerBillingRoutes(server: FastifyInstance): void {
         const client = createPayPalHttpClient();
         const planId = getPayPalPlanId(planType);
         const { returnUrl, cancelUrl } = resolvePayPalSubscriptionCheckoutUrls();
+        const payeePreferred =
+          process.env.PAYPAL_PAYEE_PREFERRED?.trim().toUpperCase() === "IMMEDIATE_PAYMENT_REQUIRED"
+            ? "IMMEDIATE_PAYMENT_REQUIRED"
+            : "UNRESTRICTED";
+
         const createRequest = {
           plan_id: planId,
           custom_id: ctx.internalUserId.trim(),
-          start_time: new Date(Date.now() + 60_000).toISOString(),
+          start_time: new Date(Date.now() + 120_000).toISOString().replace(/\.\d{3}Z$/, "Z"),
           application_context: {
             brand_name: "JobLoom",
             locale: "en-US",
@@ -309,6 +314,10 @@ export function registerBillingRoutes(server: FastifyInstance): void {
             shipping_preference: "NO_SHIPPING",
             return_url: returnUrl,
             cancel_url: cancelUrl,
+            payment_method: {
+              payer_selected: "PAYPAL",
+              payee_preferred: payeePreferred,
+            },
           },
         };
 
