@@ -32,7 +32,7 @@ export function PricingPlansClient() {
   useEffect(() => {
     DodoPayments.Initialize({
       mode: DODO_MODE,
-      displayType: "inline",
+      displayType: "overlay",
       onEvent: (event) => {
         if (event.event_type === "checkout.error") {
           console.error(event);
@@ -43,6 +43,15 @@ export function PricingPlansClient() {
       DodoPayments.Checkout.close();
     };
   }, []);
+
+  const closeDodoCheckoutAndReset = useCallback(() => {
+    try {
+      DodoPayments.Checkout.close();
+    } catch {
+      /* ignore */
+    }
+    clearPendingUpgrade();
+  }, [clearPendingUpgrade]);
 
   const startPayPalCheckout = useCallback(
     async (which: CheckoutKey) => {
@@ -109,7 +118,6 @@ export function PricingPlansClient() {
           markPendingUpgrade();
           DodoPayments.Checkout.open({
             checkoutUrl: data.checkoutUrl,
-            elementId: "dodo-inline-checkout",
           });
           return;
         }
@@ -177,26 +185,34 @@ export function PricingPlansClient() {
         </p>
       ) : null}
       {pendingUpgrade && !isPro ? (
-        <div className="mx-auto mt-6 max-w-lg rounded-xl border border-brand/30 bg-brand/5 px-4 py-3 text-center text-sm text-ink">
-          <p>Payment submitted. We are confirming your subscription now.</p>
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+        <div
+          className="mx-auto mt-8 max-w-md rounded-2xl border border-line bg-surface px-6 py-5 shadow-card ring-1 ring-ink/5"
+          role="status"
+        >
+          <p className="text-center font-sans text-base font-semibold text-ink">Confirming your upgrade</p>
+          <p className="mt-2 text-center text-sm leading-relaxed text-ink-muted">
+            We are waiting for your payment provider to confirm. This usually takes a few seconds.
+          </p>
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
             <button
               type="button"
               onClick={() => void refresh()}
-              className="rounded-md border border-brand px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10"
+              className="rounded-xl border-2 border-brand bg-brand px-4 py-2.5 text-center text-sm font-semibold text-white transition-opacity hover:opacity-95"
             >
               Refresh status
             </button>
             <button
               type="button"
-              onClick={() => clearPendingUpgrade()}
-              className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-ink-muted hover:bg-ink/5"
+              onClick={closeDodoCheckoutAndReset}
+              className="rounded-xl border border-line bg-surface px-4 py-2.5 text-center text-sm font-semibold text-ink transition-colors hover:bg-ink/[0.04]"
             >
-              Stuck? Reset checkout
+              Close checkout and cancel
             </button>
           </div>
-          <p className="mt-2 text-xs text-ink-muted">
-            If confirmation takes more than about a minute, we stop blocking checkout automatically.
+          <p className="mt-4 text-center text-xs leading-relaxed text-ink-muted">
+            If you closed the payment popup or the timer keeps running, tap <span className="font-medium text-ink">Close checkout and cancel</span> to
+            tear down the session and unlock these buttons. After a successful payment, keep this open—we will confirm automatically (or use Refresh
+            status).
           </p>
         </div>
       ) : null}
@@ -205,12 +221,6 @@ export function PricingPlansClient() {
           Your Pro plan is active.
         </p>
       ) : null}
-
-      <div
-        id="dodo-inline-checkout"
-        className="mx-auto mt-8 min-h-[120px] w-full max-w-4xl rounded-xl border border-line bg-surface/80 p-4 shadow-inner"
-        aria-live="polite"
-      />
 
       <div className="mx-auto mt-12 grid max-w-4xl gap-6 md:grid-cols-2 md:gap-8">
         <div
