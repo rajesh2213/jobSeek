@@ -35,6 +35,55 @@ export function getPayPalWebhookId(): string {
   return readRequiredEnv("PAYPAL_WEBHOOK_ID");
 }
 
+/**
+ * PayPal subscription approval requires absolute HTTPS return/cancel URLs in production (live mode).
+ * Prefer explicit PAYPAL_RETURN_URL / PAYPAL_CANCEL_URL; otherwise derive from CLIENT_URL or NEXT_PUBLIC_SITE_URL.
+ */
+export function resolvePayPalSubscriptionCheckoutUrls(): { returnUrl: string; cancelUrl: string } {
+  const explicitReturn = process.env.PAYPAL_RETURN_URL?.trim();
+  const explicitCancel = process.env.PAYPAL_CANCEL_URL?.trim();
+  const originRaw =
+    process.env.PAYPAL_CHECKOUT_ORIGIN?.trim() ||
+    process.env.CLIENT_URL?.trim() ||
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    "";
+
+  const normalizeOrigin = (raw: string): string => raw.replace(/\/+$/, "");
+
+  const validateAbsolute = (label: string, url: string): void => {
+    try {
+      const u = new URL(url);
+      if (u.protocol !== "https:" && u.protocol !== "http:") {
+        throw new Error(`${label} must be http(s)`);
+      }
+      if (process.env.NODE_ENV === "production" && u.protocol !== "https:") {
+        throw new Error(
+          `${label} must use https:// in production (PayPal live rejects plain http except special cases).`,
+        );
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`Invalid ${label}: ${msg}`);
+    }
+  };
+
+  const origin = originRaw ? normalizeOrigin(originRaw) : "";
+  const returnUrl =
+    explicitReturn || (origin ? `${origin}/pricing?paypal=return` : "");
+  const cancelUrl =
+    explicitCancel || (origin ? `${origin}/pricing?paypal=cancel` : "");
+
+  if (!returnUrl || !cancelUrl) {
+    throw new Error(
+      "PayPal checkout URLs missing: set PAYPAL_RETURN_URL and PAYPAL_CANCEL_URL, or set CLIENT_URL / NEXT_PUBLIC_SITE_URL (or PAYPAL_CHECKOUT_ORIGIN) so defaults can be built.",
+    );
+  }
+
+  validateAbsolute("PayPal return URL", returnUrl);
+  validateAbsolute("PayPal cancel URL", cancelUrl);
+  return { returnUrl, cancelUrl };
+}
+
 export function createPayPalHttpClient(): InstanceType<typeof paypal.core.PayPalHttpClient> {
   const clientId = readRequiredEnv("PAYPAL_CLIENT_ID");
   const clientSecret = readRequiredEnv("PAYPAL_CLIENT_SECRET");

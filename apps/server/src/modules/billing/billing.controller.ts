@@ -5,6 +5,7 @@ import {
   createPayPalHttpClient,
   fetchPayPalSubscriptionDetails,
   getPayPalPlanId,
+  resolvePayPalSubscriptionCheckoutUrls,
   verifyPayPalWebhook,
   type BillingPlanType,
 } from "./paypal.client.js";
@@ -96,6 +97,27 @@ const billingMetrics = {
 function incrementMetric(name: keyof typeof billingMetrics): number {
   billingMetrics[name] += 1;
   return billingMetrics[name];
+}
+
+/** Best-effort PayPal REST client error payload for logs (no response headers — may contain tokens). */
+function paypalExecuteErrorSummary(err: unknown): Record<string, unknown> | undefined {
+  if (!err || typeof err !== "object") return undefined;
+  const o = err as Record<string, unknown>;
+  const statusCode = o.statusCode;
+  const message = typeof o.message === "string" ? o.message : undefined;
+  let parsedBody: unknown;
+  if (typeof message === "string") {
+    try {
+      parsedBody = JSON.parse(message) as unknown;
+    } catch {
+      parsedBody = undefined;
+    }
+  }
+  const out: Record<string, unknown> = {};
+  if (statusCode !== undefined) out.statusCode = statusCode;
+  if (parsedBody !== undefined) out.details = parsedBody;
+  else if (message !== undefined) out.message = message.slice(0, 500);
+  return Object.keys(out).length ? out : undefined;
 }
 
 export function registerBillingRoutes(server: FastifyInstance): void {
@@ -275,14 +297,18 @@ export function registerBillingRoutes(server: FastifyInstance): void {
       try {
         const client = createPayPalHttpClient();
         const planId = getPayPalPlanId(planType);
+        const { returnUrl, cancelUrl } = resolvePayPalSubscriptionCheckoutUrls();
         const createRequest = {
           plan_id: planId,
           custom_id: ctx.internalUserId.trim(),
           start_time: new Date(Date.now() + 60_000).toISOString(),
           application_context: {
             brand_name: "JobLoom",
+            locale: "en-US",
             user_action: "SUBSCRIBE_NOW",
             shipping_preference: "NO_SHIPPING",
+            return_url: returnUrl,
+            cancel_url: cancelUrl,
           },
         };
 
@@ -308,8 +334,20 @@ export function registerBillingRoutes(server: FastifyInstance): void {
 
         return reply.send({ approvalUrl });
       } catch (err) {
-        server.log.error({ err, planType }, "PayPal create-subscription failed");
-        return reply.status(502).send({ error: "Checkout provider error", code: "CHECKOUT_FAILED" });
+        const paypalApi = paypalExecuteErrorSummary(err);
+        server.log.error(
+          { err, planType, paypalApi },
+          "PayPal create-subscription failed",
+        );
+        const msg = err instanceof Error ? err.message : String(err);
+        const configHint =
+          msg.includes("PayPal checkout URLs missing") ||
+          msg.includes("PAYPAL_RETURN_URL") ||
+          msg.includes("must use https://");
+        return reply.status(configHint ? 503 : 502).send({
+          error: configHint ? "Billing checkout URL misconfigured on server" : "Checkout provider error",
+          code: configHint ? "CHECKOUT_URL_CONFIG" : "CHECKOUT_FAILED",
+        });
       }
     },
   );
