@@ -275,6 +275,27 @@ export async function fetchAccountSummary(token: string): Promise<AccountSummary
   return (await res.json()) as AccountSummary;
 }
 
+export interface BillingStatusResponse {
+  plan: "free" | "pro";
+  subscription: {
+    provider: string;
+    status: string;
+    currentPeriodEnd: string;
+  } | null;
+}
+
+/** Authoritative subscription row + effective plan (for post-checkout polling). */
+export async function fetchBillingStatus(token: string): Promise<BillingStatusResponse | null> {
+  const t = token.trim();
+  if (!t) return null;
+  const res = await fetch(`${API_BASE_URL}/billing/status`, {
+    headers: { Authorization: `Bearer ${t}` },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as BillingStatusResponse;
+}
+
 export interface ApplyProfileCustomQA {
   question: string;
   answer: string;

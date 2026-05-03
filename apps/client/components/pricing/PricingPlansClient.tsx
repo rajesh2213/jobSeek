@@ -1,7 +1,8 @@
 "use client";
 
 import { SignInButton, useAuth } from "@clerk/nextjs";
-import { useCallback, useState } from "react";
+import { DodoPayments } from "dodopayments-checkout";
+import { useCallback, useEffect, useState } from "react";
 import { API_BASE_URL } from "../../lib/api";
 import { useAccountPlan } from "../../lib/useAccountPlan";
 import {
@@ -18,21 +19,39 @@ const PLAN_TYPE_BY_KEY: Record<CheckoutKey, "monthly" | "yearly"> = {
   pro_monthly: "monthly",
 };
 
+const DODO_MODE: "test" | "live" =
+  process.env.NEXT_PUBLIC_DODO_PAYMENTS_MODE === "live" ? "live" : "test";
+
 export function PricingPlansClient() {
   const { isSignedIn, getToken } = useAuth();
   const { isPro, pendingUpgrade, markPendingUpgrade, refresh, clearPendingUpgrade } = useAccountPlan();
-  const [busy, setBusy] = useState<null | CheckoutKey>(null);
+  const [busyPayPal, setBusyPayPal] = useState<null | CheckoutKey>(null);
+  const [busyDodo, setBusyDodo] = useState<null | CheckoutKey>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const startCheckout = useCallback(
+  useEffect(() => {
+    DodoPayments.Initialize({
+      mode: DODO_MODE,
+      displayType: "inline",
+      onEvent: (event) => {
+        if (event.event_type === "checkout.error") {
+          console.error(event);
+        }
+      },
+    });
+    return () => {
+      DodoPayments.Checkout.close();
+    };
+  }, []);
+
+  const startPayPalCheckout = useCallback(
     async (which: CheckoutKey) => {
       setError(null);
-      setBusy(which);
+      setBusyPayPal(which);
       try {
         const token = await getToken();
         if (!token) {
           setError("Sign in to continue.");
-          setBusy(null);
           return;
         }
         const res = await fetch(`${API_BASE_URL}/billing/paypal/create-subscription`, {
@@ -46,7 +65,6 @@ export function PricingPlansClient() {
         const data = (await res.json().catch(() => ({}))) as { approvalUrl?: string; error?: string };
         if (!res.ok) {
           setError(data.error ?? "Could not start checkout. Try again.");
-          setBusy(null);
           return;
         }
         if (data.approvalUrl) {
@@ -58,20 +76,59 @@ export function PricingPlansClient() {
       } catch {
         setError("Network error. Check your connection and API URL.");
       } finally {
-        setBusy(null);
+        setBusyPayPal(null);
       }
     },
     [getToken, markPendingUpgrade],
   );
 
-  const PlanAction = ({
-    which,
-    label,
-  }: {
-    which: CheckoutKey;
-    label: string;
-  }) => {
-    const loading = busy === which;
+  const startDodoCheckout = useCallback(
+    async (which: CheckoutKey) => {
+      setError(null);
+      setBusyDodo(which);
+      try {
+        const token = await getToken();
+        if (!token) {
+          setError("Sign in to continue.");
+          return;
+        }
+        const res = await fetch(`${API_BASE_URL}/billing/dodo/create-checkout`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ planType: PLAN_TYPE_BY_KEY[which] }),
+        });
+        const data = (await res.json().catch(() => ({}))) as { checkoutUrl?: string; error?: string; code?: string };
+        if (!res.ok) {
+          setError(data.error ?? "Could not start checkout. Try again.");
+          return;
+        }
+        if (data.checkoutUrl) {
+          markPendingUpgrade();
+          DodoPayments.Checkout.open({
+            checkoutUrl: data.checkoutUrl,
+            elementId: "dodo-inline-checkout",
+          });
+          return;
+        }
+        setError("No checkout URL returned.");
+      } catch {
+        setError("Network error. Check your connection and API URL.");
+      } finally {
+        setBusyDodo(null);
+      }
+    },
+    [getToken, markPendingUpgrade],
+  );
+
+  const PlanActions = ({ which }: { which: CheckoutKey }) => {
+    const loadingPayPal = busyPayPal === which;
+    const loadingDodo = busyDodo === which;
+    const waiting = pendingUpgrade && !isPro;
+    const disabled = waiting || loadingPayPal || loadingDodo;
+
     if (!isSignedIn) {
       return (
         <SignInButton mode="modal" forceRedirectUrl="/pricing">
@@ -80,21 +137,32 @@ export function PricingPlansClient() {
             className="w-full rounded-xl py-3.5 text-center text-[15px] font-bold text-white transition-opacity hover:opacity-95 disabled:opacity-60"
             style={{ backgroundColor: CORAL }}
           >
-            {label}
+            Sign in to upgrade
           </button>
         </SignInButton>
       );
     }
+
     return (
-      <button
-        type="button"
-        disabled={loading || (pendingUpgrade && !isPro)}
-        onClick={() => void startCheckout(which)}
-        className="w-full rounded-xl py-3.5 text-center text-[15px] font-bold text-white transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
-        style={{ backgroundColor: CORAL }}
-      >
-        {loading ? "Redirecting…" : pendingUpgrade && !isPro ? "Processing payment…" : label}
-      </button>
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => void startPayPalCheckout(which)}
+          className="w-full rounded-xl py-3.5 text-center text-[15px] font-bold text-white transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+          style={{ backgroundColor: CORAL }}
+        >
+          {waiting ? "Processing payment…" : loadingPayPal ? "Redirecting…" : "Pay with PayPal"}
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => void startDodoCheckout(which)}
+          className="w-full rounded-xl border-2 border-ink/20 bg-surface py-3.5 text-center text-[15px] font-bold text-ink transition-opacity hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {waiting ? "Processing payment…" : loadingDodo ? "Opening checkout…" : "Pay with Card"}
+        </button>
+      </div>
     );
   };
 
@@ -138,6 +206,12 @@ export function PricingPlansClient() {
         </p>
       ) : null}
 
+      <div
+        id="dodo-inline-checkout"
+        className="mx-auto mt-8 min-h-[120px] w-full max-w-4xl rounded-xl border border-line bg-surface/80 p-4 shadow-inner"
+        aria-live="polite"
+      />
+
       <div className="mx-auto mt-12 grid max-w-4xl gap-6 md:grid-cols-2 md:gap-8">
         <div
           className="relative flex flex-col rounded-2xl border-2 border-brand bg-surface p-8 shadow-card ring-1 ring-brand/15"
@@ -177,7 +251,7 @@ export function PricingPlansClient() {
             ))}
           </ul>
           <div className="mt-8">
-            <PlanAction which="pro_annual" label="Get Pro Annual →" />
+            <PlanActions which="pro_annual" />
           </div>
         </div>
 
@@ -201,7 +275,7 @@ export function PricingPlansClient() {
             ))}
           </ul>
           <div className="mt-8">
-            <PlanAction which="pro_monthly" label="Get Pro Monthly →" />
+            <PlanActions which="pro_monthly" />
           </div>
         </div>
       </div>

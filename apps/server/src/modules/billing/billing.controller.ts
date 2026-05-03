@@ -9,6 +9,7 @@ import {
   verifyPayPalWebhook,
   type BillingPlanType,
 } from "./paypal.client.js";
+import { resolveProPlan } from "../../utils/userPlan.js";
 import { applyPayPalSubscriptionEvent, statusFromPayPalEvent } from "./billing.service.js";
 
 type PayPalSubscriptionCreateBody = {
@@ -420,4 +421,30 @@ export function registerBillingRoutes(server: FastifyInstance): void {
       }
     },
   );
+
+  server.get("/billing/status", async (request, reply) => {
+    const ctx = await resolveClerkUser(server.prisma, request.headers.authorization);
+    if (!ctx) {
+      return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+    }
+    const { plan } = await resolveProPlan(server.prisma, ctx.internalUserId, ctx.email);
+    const subscription = await server.prisma.subscription.findUnique({
+      where: { userId: ctx.internalUserId },
+      select: {
+        provider: true,
+        status: true,
+        currentPeriodEnd: true,
+      },
+    });
+    return reply.send({
+      plan,
+      subscription: subscription
+        ? {
+            provider: subscription.provider,
+            status: subscription.status,
+            currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
+          }
+        : null,
+    });
+  });
 }

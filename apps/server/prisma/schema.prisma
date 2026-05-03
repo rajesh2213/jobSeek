@@ -44,6 +44,11 @@ enum GrowthEmailSendStatus {
   failed
 }
 
+enum SubscriptionProvider {
+  paypal
+  dodo
+}
+
 enum EmailJobSendChannel {
   saved_search_alert
   growth_email
@@ -373,12 +378,13 @@ model Application {
 }
 
 model Subscription {
-  id                   String   @id @default(uuid())
-  userId               String   @unique
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  provider             String   @default("paypal")
-  paypalId             String?  @unique
-  stripeCustomerId     String?  @unique
+  id                   String               @id @default(uuid())
+  userId               String               @unique
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider             SubscriptionProvider @default(paypal)
+  paypalId             String?              @unique
+  dodoSubscriptionId   String?              @unique
+  stripeCustomerId     String?              @unique
   stripePriceId        String?
   stripeSubscriptionId String?  @unique
   status               String // "active" | "canceled" | "past_due"

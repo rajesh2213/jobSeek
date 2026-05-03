@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { fetchAccountSummary, type AccountSummary } from "./api";
+import { fetchAccountSummary, fetchBillingStatus, type AccountSummary } from "./api";
 import { isPro as planIsPro } from "./planLimits";
 
 export const PENDING_UPGRADE_STORAGE_KEY = "jobloom.pendingUpgrade";
@@ -45,10 +45,16 @@ export function AccountPlanProvider({ children }: { children: ReactNode }) {
       setLoaded(true);
       return null;
     }
-    const s = await fetchAccountSummary(token);
+    const [s, billing] = await Promise.all([fetchAccountSummary(token), fetchBillingStatus(token)]);
     setSummary(s);
     setLoaded(true);
-    if (s?.plan === "pro") {
+    const subStatus = billing?.subscription?.status;
+    const checkoutTerminal =
+      s?.plan === "pro" ||
+      subStatus === "active" ||
+      subStatus === "past_due" ||
+      subStatus === "canceled";
+    if (checkoutTerminal) {
       setPendingUpgrade(false);
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(PENDING_UPGRADE_STORAGE_KEY);
@@ -96,7 +102,17 @@ export function AccountPlanProvider({ children }: { children: ReactNode }) {
     const poll = async () => {
       const latest = await refresh();
       if (cancelled) return;
-      if (latest?.plan === "pro") return;
+      const token = await getToken();
+      const billing = token ? await fetchBillingStatus(token) : null;
+      const subStatus = billing?.subscription?.status;
+      if (
+        latest?.plan === "pro" ||
+        subStatus === "active" ||
+        subStatus === "past_due" ||
+        subStatus === "canceled"
+      ) {
+        return;
+      }
       if (Date.now() - startedAt >= 60_000) {
         clearPendingUpgrade();
         return;
@@ -109,7 +125,7 @@ export function AccountPlanProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [authLoaded, clearPendingUpgrade, isSignedIn, pendingUpgrade, refresh, summary?.plan]);
+  }, [authLoaded, clearPendingUpgrade, getToken, isSignedIn, pendingUpgrade, refresh, summary?.plan]);
 
   const value = useMemo<AccountPlanContextValue>(() => {
     const plan = summary?.plan ?? "free";

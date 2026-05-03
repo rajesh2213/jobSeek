@@ -6,6 +6,7 @@ import { registerDebugRoutes } from "../../modules/debug/debug.controller.js";
 import { registerLocationRoutes } from "../../modules/locations/locations.controller.js";
 import { registerInternalMetricsRoutes } from "../../modules/internal/internal.metrics.routes.js";
 import { registerBillingRoutes } from "../../modules/billing/billing.controller.js";
+import { registerDodoBillingRoutes } from "../../modules/billing/dodo.controller.js";
 import { registerSavedSearchRoutes } from "../../modules/saved-search/savedSearch.routes.js";
 import { registerApplicationsRoutes } from "../../modules/applications/applications.routes.js";
 import { registerGrowthEmailRoutes } from "../../modules/growthEmail/growthEmail.routes.js";
@@ -53,6 +54,7 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   registerGrowthEmailRoutes(server);
   registerApplicationsRoutes(server);
   registerBillingRoutes(server);
+  registerDodoBillingRoutes(server);
   createJobController(server);
   createCompanyController(server);
   const seoService = createSeoService(server.prisma);
