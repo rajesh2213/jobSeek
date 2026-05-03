@@ -1,4 +1,4 @@
-import { verifyToken } from "@clerk/backend";
+import { createClerkClient, verifyToken } from "@clerk/backend";
 import { TokenVerificationError } from "@clerk/backend/errors";
 import { decodeJwt, verifyJwt, type VerifyJwtOptions } from "@clerk/backend/jwt";
 import { parsePublishableKey } from "@clerk/shared/keys";
@@ -72,6 +72,72 @@ export function sendClerkAuthFailureReply(reply: FastifyReply, failure: ClerkAut
 function syntheticEmail(clerkId: string): string {
   const safe = clerkId.replace(/[^a-zA-Z0-9_-]/g, "_");
   return `${safe}@users.clerk.local`;
+}
+
+function isSyntheticClerkLocalEmail(email: string): boolean {
+  return email.endsWith("@users.clerk.local");
+}
+
+/** Real inbox address from JWT custom claims, if Clerk adds `email` to the session token. */
+function realEmailFromJwt(emailRaw: string | null): string | null {
+  if (emailRaw?.includes("@") && !isSyntheticClerkLocalEmail(emailRaw)) return emailRaw;
+  return null;
+}
+
+const clerkPrimaryEmailCache = new Map<string, { email: string; expiresAtMs: number }>();
+const CLERK_PRIMARY_EMAIL_CACHE_TTL_MS = 300_000;
+
+/**
+ * Session JWTs often omit `email`. Resolve the user's primary email via Clerk Backend API
+ * (requires CLERK_SECRET_KEY). Cached briefly to avoid a Backend API call on every request.
+ */
+async function getPrimaryEmailFromClerkBackend(clerkUserId: string): Promise<string | null> {
+  const now = Date.now();
+  const hit = clerkPrimaryEmailCache.get(clerkUserId);
+  if (hit && hit.expiresAtMs > now) return hit.email;
+
+  const secretKey = process.env.CLERK_SECRET_KEY?.trim();
+  if (!secretKey) return null;
+
+  try {
+    const clerk = createClerkClient({ secretKey });
+    const u = await clerk.users.getUser(clerkUserId);
+    const primaryId = u.primaryEmailAddressId;
+    const primary =
+      (primaryId ? u.emailAddresses.find((a) => a.id === primaryId) : undefined) ??
+      u.emailAddresses[0];
+    const addr = primary?.emailAddress?.trim();
+    if (addr?.includes("@") && !isSyntheticClerkLocalEmail(addr)) {
+      clerkPrimaryEmailCache.set(clerkUserId, {
+        email: addr,
+        expiresAtMs: now + CLERK_PRIMARY_EMAIL_CACHE_TTL_MS,
+      });
+      return addr;
+    }
+  } catch (err) {
+    logger.warn(
+      { err, clerkUserId, event: "clerk_backend_primary_email_failed" },
+      "Clerk Backend API: could not load primary email for user",
+    );
+  }
+  return null;
+}
+
+async function resolveEmailToPersist(
+  sub: string,
+  emailRaw: string | null,
+  existingEmail: string | null | undefined,
+): Promise<string> {
+  const fromJwt = realEmailFromJwt(emailRaw);
+  if (fromJwt) return fromJwt;
+
+  const fromApi = await getPrimaryEmailFromClerkBackend(sub);
+  if (fromApi) return fromApi;
+
+  if (existingEmail && !isSyntheticClerkLocalEmail(existingEmail)) {
+    return existingEmail;
+  }
+  return syntheticEmail(sub);
 }
 
 /** Node / Fastify may surface `authorization` as `string | string[] | undefined`. */
@@ -323,23 +389,20 @@ async function upsertUserFromClerkPayload(
   if (!userFields) return null;
   const { sub, emailRaw } = userFields;
 
-  const email = emailRaw?.includes("@") ? emailRaw : syntheticEmail(sub);
-
   const existing = await prisma.user.findUnique({
     where: { clerkId: sub },
     select: { id: true, email: true },
   });
+  const emailToPersist = await resolveEmailToPersist(sub, emailRaw, existing?.email);
+
   const user = existing
     ? await prisma.user.update({
         where: { clerkId: sub },
-        data:
-          emailRaw?.includes("@") && !emailRaw.endsWith("@users.clerk.local")
-            ? { email: emailRaw }
-            : {},
+        data: emailToPersist !== existing.email ? { email: emailToPersist } : {},
         select: { id: true, email: true },
       })
     : await prisma.user.create({
-        data: { clerkId: sub, email },
+        data: { clerkId: sub, email: emailToPersist },
         select: { id: true, email: true },
       });
   await ensureEmailPreference(prisma, {
@@ -356,9 +419,13 @@ async function upsertUserFromClerkPayload(
     });
   }
 
+  const ctxEmail =
+    realEmailFromJwt(emailRaw) ??
+    (!isSyntheticClerkLocalEmail(user.email) ? user.email : null);
+
   return {
     clerkId: sub,
-    email: emailRaw,
+    email: ctxEmail,
     internalUserId: user.id,
   };
 }
