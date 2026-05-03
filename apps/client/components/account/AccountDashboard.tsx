@@ -19,7 +19,6 @@ import {
   getUserLocalTimeZoneLabel,
 } from "../../lib/userLocalResetTime";
 import { clearExtensionAuth } from "../../lib/extensionAuthBridge";
-import { useExtensionAuthSync } from "../../lib/useExtensionAuthSync";
 
 function formatRelativeTime(iso: string): string {
   const t = new Date(iso).getTime();
@@ -135,11 +134,6 @@ export function AccountDashboard() {
       cancelled = true;
     };
   }, [getToken]);
-
-  useExtensionAuthSync({
-    enabled: Boolean(authLoaded && isLoaded && isSignedIn),
-    getToken: (opts) => getToken(opts),
-  });
 
   // Prefer plan from /api/user/me; default matches backend free tier when absent.
   const plan = me?.plan ?? "free";

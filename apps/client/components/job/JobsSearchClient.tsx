@@ -48,6 +48,7 @@ import { JobList } from "./JobList";
 import { ScrollCollapseChrome, useScrollRevealPromos } from "./ScrollCollapseChrome";
 import { EmptyState } from "../ui/EmptyState";
 import { cn } from "../../lib/cn";
+import { jobloomChromeWebStoreUrl } from "../../lib/jobloomChromeStore";
 import {
   JobsHeroDynamicLoading,
   JobsInlineFiltersDynamicLoading,
@@ -1132,7 +1133,7 @@ export function JobsSearchClient({
               </p>
             </div>
             <a
-              href="https://chrome.google.com/webstore"
+              href={jobloomChromeWebStoreUrl()}
               target="_blank"
               rel="noopener noreferrer"
               className="shrink-0 rounded-lg px-4 py-2 text-[13px] font-semibold text-white no-underline"

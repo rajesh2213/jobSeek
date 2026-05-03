@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { API_BASE_URL } from "./api";
+import { useExtensionAuthSync } from "./useExtensionAuthSync";
 
 interface ResumeState {
   resumeText: string | null;
@@ -33,7 +34,12 @@ interface ResumeContextValue extends ResumeState {
 const ResumeContext = createContext<ResumeContextValue | null>(null);
 
 export function ResumeProvider({ children }: { children: ReactNode }) {
-  const { isSignedIn, getToken } = useAuth();
+  const { isSignedIn, isLoaded, getToken } = useAuth();
+
+  useExtensionAuthSync({
+    enabled: Boolean(isLoaded && isSignedIn),
+    getToken: (opts) => getToken(opts),
+  });
   const [state, setState] = useState<ResumeState>({
     resumeText: null,
     resumeBullets: [],

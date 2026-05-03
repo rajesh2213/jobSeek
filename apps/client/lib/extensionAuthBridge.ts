@@ -1,8 +1,10 @@
+import { resolveJobloomExtensionId } from "./jobloomExtensionId";
+
 export type ExtensionAuthAck = { ok?: boolean; error?: string };
 
-export function getJobloomExtensionId(): string | null {
-  const id = process.env.NEXT_PUBLIC_JOBLOOM_EXTENSION_ID?.trim();
-  return id ? id : null;
+/** Chrome extension ID used for `sendMessage` auth sync (matches published listing by default). */
+export function getJobloomExtensionId(): string {
+  return resolveJobloomExtensionId();
 }
 
 /** Web origins matching JobLoom Smart Apply `externally_connectable` may expose `chrome.runtime.sendMessage`. */
@@ -58,7 +60,7 @@ export async function syncExtensionAuthToken(
   getToken: () => Promise<string | null>,
 ): Promise<boolean> {
   const extId = getJobloomExtensionId();
-  if (!extId || !extensionBridgeAvailable()) return false;
+  if (!extensionBridgeAvailable()) return false;
   const token = await getToken();
   if (!token) return false;
   const res = await sendToExtension(extId, { type: "SET_AUTH_TOKEN", token });
@@ -66,15 +68,13 @@ export async function syncExtensionAuthToken(
 }
 
 export async function clearExtensionAuth(): Promise<void> {
-  const extId = getJobloomExtensionId();
-  if (!extId || !extensionBridgeAvailable()) return;
-  await sendToExtension(extId, { type: "CLEAR_AUTH_TOKEN" });
+  if (!extensionBridgeAvailable()) return;
+  await sendToExtension(getJobloomExtensionId(), { type: "CLEAR_AUTH_TOKEN" });
 }
 
 /** Detect install + manifest allowlist without writing storage. */
 export async function pingExtension(): Promise<boolean> {
-  const extId = getJobloomExtensionId();
-  if (!extId || !extensionBridgeAvailable()) return false;
-  const res = await sendToExtension(extId, { type: "PING" });
+  if (!extensionBridgeAvailable()) return false;
+  const res = await sendToExtension(getJobloomExtensionId(), { type: "PING" });
   return res?.ok === true;
 }

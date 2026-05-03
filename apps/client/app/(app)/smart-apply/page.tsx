@@ -23,7 +23,6 @@ import { ReadinessCockpit } from "../../../components/smart-apply/ReadinessCockp
 import { TrustSafetyBlock } from "../../../components/smart-apply/TrustSafetyBlock";
 import { jobloomChromeWebStoreUrl } from "../../../lib/jobloomChromeStore";
 import { useExtensionPresence } from "../../../lib/useExtensionPresence";
-import { useExtensionAuthSync } from "../../../lib/useExtensionAuthSync";
 
 const CORAL = "#E8533A";
 const SMART_APPLY_PREMIUM_V1 = process.env.NEXT_PUBLIC_SMART_APPLY_PREMIUM_V1 !== "false";
@@ -269,11 +268,6 @@ export default function SmartApplyPage() {
     if (!authLoaded || !isSignedIn) return;
     void load();
   }, [authLoaded, isSignedIn, load]);
-
-  useExtensionAuthSync({
-    enabled: Boolean(authLoaded && isSignedIn),
-    getToken: (opts) => getToken(opts),
-  });
 
   const patch = useCallback(
     async (body: ApplyProfilePatch) => {
