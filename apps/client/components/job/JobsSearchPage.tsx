@@ -28,6 +28,7 @@ export function JobsSearchPage({
   listingTop,
   listingFaq,
 }: Props) {
+  /* B1: Suspense wraps client subtree for progressive hydration; listing rows remain in SSR props. */
   return (
     <Suspense fallback={<JobsShellSkeleton />}>
       <JobsSearchClient

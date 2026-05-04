@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import {
   loadJobsDiscoveryPage,
-  loadWeeklyJobsPostedCount,
+  loadJobsListingDeferred,
   stableJobFiltersKey,
+  weeklyJobsPostedEnvOverride,
 } from "../../../lib/jobsPageData";
 import {
   buildBreadcrumbListJsonLd,
@@ -12,10 +13,7 @@ import {
   jobsRouteMetadata,
 } from "../../../lib/seo";
 import { JobsSearchPage } from "../../../components/job/JobsSearchPage";
-import {
-  getCanonicalJobListingUrl,
-  parseJobFiltersFromSearch,
-} from "../../../lib/slug-parser";
+import { getCanonicalJobListingUrl, parseJobFiltersFromSearch } from "../../../lib/slug-parser";
 import { JsonLdScript } from "../../../components/seo/JsonLdScript";
 import { JobsListingFaq } from "../../../components/seo/JobsListingFaq";
 
@@ -46,10 +44,8 @@ export default async function JobsPage({ searchParams }: Props) {
   const filters = parseJobFiltersFromSearch(sp);
   const filtersKey = stableJobFiltersKey(filters);
 
-  const [response, weeklyJobsPosted] = await Promise.all([
-    loadJobsDiscoveryPage(filtersKey),
-    loadWeeklyJobsPostedCount(),
-  ]);
+  const { jobsDataPromise } = loadJobsListingDeferred({ filtersKey });
+  const response = await jobsDataPromise;
 
   const total = response.meta?.total ?? 0;
   const minIndex = getSeoMinJobsIndex();
@@ -67,11 +63,15 @@ export default async function JobsPage({ searchParams }: Props) {
   const listingFaq =
     total >= minIndex && total >= 8 ? <JobsListingFaq /> : null;
 
+  const weeklyFromEnv = weeklyJobsPostedEnvOverride();
+
+  // B1: Skip awaiting weekly API on SSR unless ops pins `JOBS_WEEKLY_POSTED_OVERRIDE`; otherwise
+  // JobsSearchClient fills the hero stat via fetchJobs (posted=1w) on mount.
   return (
     <JobsSearchPage
       jobs={response.data}
       meta={response.meta}
-      weeklyJobsPosted={weeklyJobsPosted}
+      weeklyJobsPosted={weeklyFromEnv ?? undefined}
       relatedSlugs={FALLBACK_RELATED_SLUGS}
       listingTop={listingTop}
       listingFaq={listingFaq}

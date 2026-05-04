@@ -7,7 +7,8 @@ import {
   MAX_JOB_FILTER_QUERY_TOKENS,
 } from "./slug-parser";
 
-function weeklyJobsPostedOverride(): number | null {
+/** Sync read for SSR hero strip — avoids API when ops pins `JOBS_WEEKLY_POSTED_OVERRIDE`. */
+export function weeklyJobsPostedEnvOverride(): number | null {
   const raw = process.env.JOBS_WEEKLY_POSTED_OVERRIDE?.trim();
   if (!raw) return null;
   const parsed = Number.parseInt(raw, 10);
@@ -66,7 +67,7 @@ export const loadJobsDiscoveryPage = cache(
 
 /** Real weekly posted jobs count used by jobs hero stats strip. */
 export const loadWeeklyJobsPostedCount = cache(async (): Promise<number> => {
-  const override = weeklyJobsPostedOverride();
+  const override = weeklyJobsPostedEnvOverride();
   if (override !== null) return override;
 
   const { getToken } = await auth();
@@ -90,3 +91,12 @@ export const loadWeeklyJobsPostedCount = cache(async (): Promise<number> => {
   return Number.isFinite(total) && total >= 0 ? Math.round(total) : 0;
 });
 
+/** Starts listing fetch only. Related SEO slugs come from client `JobsSearchClient` (fetchSeoLandingPages). */
+export function loadJobsListingDeferred(input: {
+  filtersKey: string;
+}): {
+  jobsDataPromise: Promise<JobsApiResponse>;
+} {
+  const jobsDataPromise = loadJobsDiscoveryPage(input.filtersKey);
+  return { jobsDataPromise };
+}

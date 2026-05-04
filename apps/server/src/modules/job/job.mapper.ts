@@ -1,5 +1,6 @@
 import type { Job } from "@prisma/client";
 import { cleanJobDescription } from "../../utils/cleanJobDescription.js";
+import { LIST_JOB_DESCRIPTION_MAX_CHARS } from "./jobListing.constants.js";
 import { buildJobPreviewLines } from "./jobPreviewLines.js";
 
 export type JobCompanyPublic = {
@@ -18,6 +19,19 @@ export type JobWithCompanyRow = Job & { company: JobCompanyPublic };
 /**
  * Shared company serializer for list/detail payloads.
  */
+/** List payloads only: keep non-null descriptions but cap length (ellipsis). */
+function truncateJobDescriptionForList(
+  cleaned: string | null | undefined,
+  maxChars: number = LIST_JOB_DESCRIPTION_MAX_CHARS,
+): string | null {
+  if (cleaned == null) return null;
+  const t = cleaned.trim();
+  if (t.length === 0) return "";
+  if (t.length <= maxChars) return t;
+  const slice = t.slice(0, Math.max(1, maxChars - 1)).trimEnd();
+  return `${slice}…`;
+}
+
 function toCompanyPublic(company: JobCompanyPublic): Record<string, unknown> {
   return {
     id: company.id,
@@ -34,22 +48,17 @@ function toCompanyPublic(company: JobCompanyPublic): Record<string, unknown> {
  * List serializer (phase 1): keep `description` for compatibility, omit heavy parsed/enriched fields.
  */
 export function toJobListJson(job: JobWithCompanyRow): Record<string, unknown> {
-  const {
-    company,
-    parsedDescription: _parsedDescription,
-    enriched: _enriched,
-    description: rawDescription,
-    ...rest
-  } = job;
+  const { company, parsedDescription: _parsedDescription, enriched: _enriched, ...rest } = job;
+  const cleanedFull = cleanJobDescription(job.description);
   const preview = buildJobPreviewLines({
     parsedDescription: job.parsedDescription,
-    description: rawDescription,
+    description: job.description,
     company: job.company,
   });
+  const description = truncateJobDescriptionForList(cleanedFull);
   return {
     ...rest,
-    /** Omit full body on listings — reduces JSON + RSC payload; cards use `previewLines`. */
-    description: null,
+    description,
     previewLines: preview.previewLines,
     previewLinesSource: preview.previewLinesSource,
     company: toCompanyPublic(company),

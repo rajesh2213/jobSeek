@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { performance } from "node:perf_hooks";
 import { createJobRepository } from "./job.repository.js";
 import type { JobWithCompany } from "./job.repository.js";
 import { JobService } from "./job.service.js";
@@ -56,9 +57,11 @@ export function registerJobRoutes(
     "/jobs",
     { schema: getJobsQuerySchema },
     async (request: FastifyRequest, reply: FastifyReply) => {
+      const tRouteStart = performance.now();
       const redis = getIoredis();
       const ip = clientIp(request);
       const rl = await assertJobReadRateLimit(redis, ip);
+      const tAfterRateLimit = performance.now();
       if (!rl.ok) {
         return reply.status(429).send({
           error: "Too many requests",
@@ -91,6 +94,7 @@ export function registerJobRoutes(
 
       const bypassCap = isViewCapBypassRequest(request);
       const capCtx = await buildCapContextFromRequest(server.prisma, request);
+      const tAfterCapCtx = performance.now();
 
       const hasAuthHeader = typeof request.headers.authorization === "string";
       const isAnonymous = capCtx.internalUserId == null && !hasAuthHeader;
@@ -139,6 +143,17 @@ export function registerJobRoutes(
               includeProcessing,
             }),
         },
+      );
+      const tAfterList = performance.now();
+
+      const durMs = (a: number, b: number) => Math.max(0, Math.round((b - a) * 100) / 100);
+      reply.header(
+        "Server-Timing",
+        [
+          `rate_limit;dur=${durMs(tRouteStart, tAfterRateLimit)}`,
+          `cap_ctx;dur=${durMs(tAfterRateLimit, tAfterCapCtx)}`,
+          `metered_list;dur=${durMs(tAfterCapCtx, tAfterList)}`,
+        ].join(", "),
       );
 
       if (isSafeToCache) {

@@ -15,6 +15,12 @@ export const LISTING_EXCLUDED_ROLE_SLUGS: readonly string[] = [
   "career-areas",
 ];
 
+/**
+ * Max characters for `description` on GET /jobs list JSON (truncate only; never omit the field).
+ * Preview lines use parsed/description server-side before truncation for serialization.
+ */
+export const LIST_JOB_DESCRIPTION_MAX_CHARS = 1200;
+
 /** Extra slugs excluded only from GET /jobs/roles suggestions (broader junk). */
 export const ROLE_SUGGEST_EXTRA_EXCLUDED: readonly string[] = [
   "culture",
