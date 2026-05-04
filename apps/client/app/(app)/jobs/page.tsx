@@ -62,8 +62,10 @@ export default async function JobsPage({ searchParams }: Props) {
     currentSlug,
     fallbackRelatedSlugs: FALLBACK_RELATED_SLUGS,
   });
-  const response = await jobsDataPromise;
-  const weeklyJobsPosted = await loadWeeklyJobsPostedCount();
+  const [response, weeklyJobsPosted] = await Promise.all([
+    jobsDataPromise,
+    loadWeeklyJobsPostedCount(),
+  ]);
 
   const total = response.meta?.total ?? 0;
   const minIndex = getSeoMinJobsIndex();
