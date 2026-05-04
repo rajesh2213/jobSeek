@@ -34,16 +34,22 @@ function toCompanyPublic(company: JobCompanyPublic): Record<string, unknown> {
  * List serializer (phase 1): keep `description` for compatibility, omit heavy parsed/enriched fields.
  */
 export function toJobListJson(job: JobWithCompanyRow): Record<string, unknown> {
-  const { company, parsedDescription: _parsedDescription, enriched: _enriched, ...rest } = job;
-  const description = cleanJobDescription(job.description);
+  const {
+    company,
+    parsedDescription: _parsedDescription,
+    enriched: _enriched,
+    description: rawDescription,
+    ...rest
+  } = job;
   const preview = buildJobPreviewLines({
     parsedDescription: job.parsedDescription,
-    description: job.description,
+    description: rawDescription,
     company: job.company,
   });
   return {
     ...rest,
-    description,
+    /** Omit full body on listings — reduces JSON + RSC payload; cards use `previewLines`. */
+    description: null,
     previewLines: preview.previewLines,
     previewLinesSource: preview.previewLinesSource,
     company: toCompanyPublic(company),

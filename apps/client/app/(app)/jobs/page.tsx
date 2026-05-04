@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import {
   loadJobsDiscoveryPage,
-  loadJobsListingDeferred,
   loadWeeklyJobsPostedCount,
   stableJobFiltersKey,
 } from "../../../lib/jobsPageData";
@@ -16,7 +15,6 @@ import { JobsSearchPage } from "../../../components/job/JobsSearchPage";
 import {
   getCanonicalJobListingUrl,
   parseJobFiltersFromSearch,
-  filtersToSlug,
 } from "../../../lib/slug-parser";
 import { JsonLdScript } from "../../../components/seo/JsonLdScript";
 import { JobsListingFaq } from "../../../components/seo/JobsListingFaq";
@@ -47,23 +45,9 @@ export default async function JobsPage({ searchParams }: Props) {
   const sp = await searchParams;
   const filters = parseJobFiltersFromSearch(sp);
   const filtersKey = stableJobFiltersKey(filters);
-  const currentSlug = filtersToSlug({
-    category: filters.category,
-    role: filters.role,
-    skills: filters.skills,
-    country: filters.country,
-    location: filters.location,
-    isRemote: filters.isRemote,
-    workType: filters.workType,
-  });
 
-  const { jobsDataPromise } = loadJobsListingDeferred({
-    filtersKey,
-    currentSlug,
-    fallbackRelatedSlugs: FALLBACK_RELATED_SLUGS,
-  });
   const [response, weeklyJobsPosted] = await Promise.all([
-    jobsDataPromise,
+    loadJobsDiscoveryPage(filtersKey),
     loadWeeklyJobsPostedCount(),
   ]);
 
