@@ -12,6 +12,8 @@ const ALLOWED_QUERY_KEYS = new Set([
   "country",
   "locations",
   "category",
+  /** Multi-select categories (comma-separated); must match client `filtersToSearchParams`. */
+  "categories",
   "remote",
   "workType",
   "types",

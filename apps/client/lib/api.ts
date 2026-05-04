@@ -621,6 +621,8 @@ export async function deleteSavedSearch(token: string, id: string): Promise<void
     method: "DELETE",
     headers: { Authorization: `Bearer ${t}` },
   });
+  // Idempotent: duplicate taps or races may 404 after the row is already gone.
+  if (res.status === 404) return;
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
     throw new ApiRequestError(

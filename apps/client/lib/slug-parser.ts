@@ -494,6 +494,9 @@ export function getCanonicalJobListingUrl(filters: JobFilters): string {
   if (filters.skills && filters.skills.length > 1) {
     p.set("skills", filters.skills.join(","));
   }
+  if (filters.categories?.length) {
+    p.set("categories", filters.categories.join(","));
+  }
   if (filters.companyId) p.set("companyId", filters.companyId);
 
   const qs = p.toString();
