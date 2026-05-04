@@ -831,7 +831,7 @@ export function JobsInlineFilters({
                   <input
                     value={cityQuery}
                     onChange={(e) => setCityQuery(e.target.value)}
-                    placeholder="e.g. Chennai"
+                    placeholder="e.g. london"
                     role="combobox"
                     aria-expanded={showCitySuggestionsList}
                     aria-controls={cityListId}
