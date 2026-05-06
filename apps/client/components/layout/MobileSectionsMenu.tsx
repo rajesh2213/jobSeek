@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -81,12 +80,16 @@ export function MobileSectionsMenu({ open, onClose }: Props) {
 
   if (!open) return null;
 
+  const navigateAndClose = (path: string) => {
+    onClose();
+    signalProgrammaticNavigation(path);
+    router.push(path);
+  };
+
   const goProtected = (path: string) => {
     if (!authLoaded) return;
     const dest = isSignedIn ? path : signInWithNext(path);
-    signalProgrammaticNavigation(dest);
-    router.push(dest);
-    onClose();
+    navigateAndClose(dest);
   };
 
   return (
@@ -94,37 +97,35 @@ export function MobileSectionsMenu({ open, onClose }: Props) {
       <button
         type="button"
         aria-label="Close menu"
-        className="fixed inset-0 z-[74] bg-black/25 lg:hidden"
+        className="fixed inset-0 z-[74] bg-black/25 pointer-events-auto lg:hidden"
         onClick={onClose}
       />
       <nav
         id="mobile-sections-nav"
         aria-label="Sections"
         className={cn(
-          "fixed left-0 right-0 top-14 z-[75] max-h-[min(70vh,calc(100dvh-3.5rem))] overflow-y-auto overscroll-contain border-b border-ink/10 bg-canvas px-3 py-3 shadow-lg sm:top-16 lg:hidden",
+          "fixed left-0 right-0 top-14 z-[75] max-h-[min(70vh,calc(100dvh-3.5rem))] overflow-y-auto overscroll-contain border-b border-ink/10 bg-canvas px-3 py-3 shadow-lg pointer-events-auto sm:top-16 lg:hidden",
         )}
       >
         <div className="mx-auto flex w-full max-w-md flex-col gap-2">
-          <Link
-            href="/jobs"
-            prefetch={false}
+          <button
+            type="button"
             aria-current={jobs ? "page" : undefined}
-            className={cn(variantClass("teal", jobs), "no-underline")}
-            onClick={onClose}
+            className={cn(variantClass("teal", jobs), "cursor-pointer border-0")}
+            onClick={() => navigateAndClose("/jobs")}
           >
             <span className={labelClass}>Jobs</span>
             {jobs ? <ActiveDot /> : null}
-          </Link>
-          <Link
-            href="/companies"
-            prefetch={false}
+          </button>
+          <button
+            type="button"
             aria-current={companies ? "page" : undefined}
-            className={cn(variantClass("rose", companies), "no-underline")}
-            onClick={onClose}
+            className={cn(variantClass("rose", companies), "cursor-pointer border-0")}
+            onClick={() => navigateAndClose("/companies")}
           >
             <span className={labelClass}>Companies</span>
             {companies ? <ActiveDot /> : null}
-          </Link>
+          </button>
           <button
             type="button"
             aria-current={smartApply ? "page" : undefined}
