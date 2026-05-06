@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { loadJobsDiscoveryPage, stableJobFiltersKey } from "../../../../lib/jobsPageData";
 import { fetchJobsRelatedSlugs } from "../../../../lib/jobsRelatedSlugs";
 import {
+  buildJobDiscoveryCrumbItems,
   buildBreadcrumbListJsonLd,
   buildJobListingItemListJsonLd,
   getSeoMinJobsIndex,
@@ -20,6 +21,7 @@ import {
 } from "../../../../lib/slug-parser";
 import { JsonLdScript } from "../../../../components/seo/JsonLdScript";
 import { JobsListingFaq } from "../../../../components/seo/JobsListingFaq";
+import { SeoBreadcrumbs } from "../../../../components/seo/SeoBreadcrumbs";
 import type { JobItem } from "../../../../lib/api";
 import { fetchSeoAggregations } from "../../../../lib/api";
 
@@ -98,10 +100,19 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
 
   const listingTop = (
     <>
+      <SeoBreadcrumbs items={buildJobDiscoveryCrumbItems(filters)} />
       <JsonLdScript data={buildBreadcrumbListJsonLd(jobDiscoveryBreadcrumbJsonLdPaths(filters))} />
       {indexable ? (
         <JsonLdScript data={buildJobListingItemListJsonLd(response.data.slice(0, 10), total)} />
       ) : null}
+      <section className="mt-4 rounded-xl border border-ink/10 bg-surface px-4 py-3 text-sm text-ink/75">
+        <p>
+          <Link href="/" className="font-semibold text-brand hover:underline">
+            JobLoom
+          </Link>{" "}
+          helps you discover real-time jobs from company career sites in one place, then drill into focused listings like this page.
+        </p>
+      </section>
       <section className="mt-4 rounded-xl border border-ink/10 bg-surface px-4 py-4 text-sm text-ink/80">
         <p className="font-semibold text-ink">
           {seoSummary.summaryLine}

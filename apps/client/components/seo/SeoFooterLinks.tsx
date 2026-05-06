@@ -53,6 +53,13 @@ export function SeoFooterLinks(props?: { browseSkills?: string[] }) {
   );
   return (
     <section className="mt-16 space-y-8 border-t border-ink/10 py-8">
+      <p className="text-sm text-ink/70">
+        Find more real-time jobs on{" "}
+        <Link href="/" className="font-semibold text-brand no-underline hover:underline">
+          JobLoom
+        </Link>
+        .
+      </p>
       <BrowseGroup
         title="Browse by skills"
         values={skillQueries}

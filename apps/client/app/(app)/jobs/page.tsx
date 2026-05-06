@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import {
   loadJobsDiscoveryPage,
   loadJobsListingDeferred,
@@ -6,6 +7,7 @@ import {
   weeklyJobsPostedEnvOverride,
 } from "../../../lib/jobsPageData";
 import {
+  buildJobDiscoveryCrumbItems,
   buildBreadcrumbListJsonLd,
   buildJobListingItemListJsonLd,
   getSeoMinJobsIndex,
@@ -16,6 +18,7 @@ import { JobsSearchPage } from "../../../components/job/JobsSearchPage";
 import { getCanonicalJobListingUrl, parseJobFiltersFromSearch } from "../../../lib/slug-parser";
 import { JsonLdScript } from "../../../components/seo/JsonLdScript";
 import { JobsListingFaq } from "../../../components/seo/JobsListingFaq";
+import { SeoBreadcrumbs } from "../../../components/seo/SeoBreadcrumbs";
 
 const FALLBACK_RELATED_SLUGS = [
   "role/react-developer/location/remote",
@@ -53,10 +56,19 @@ export default async function JobsPage({ searchParams }: Props) {
 
   const listingTop = (
     <>
+      <SeoBreadcrumbs items={buildJobDiscoveryCrumbItems(filters)} />
       <JsonLdScript data={buildBreadcrumbListJsonLd(jobDiscoveryBreadcrumbJsonLdPaths(filters))} />
       {indexable ? (
         <JsonLdScript data={buildJobListingItemListJsonLd(response.data.slice(0, 10), total)} />
       ) : null}
+      <section className="mt-4 rounded-xl border border-ink/10 bg-surface px-4 py-3 text-sm text-ink/75">
+        <p>
+          <Link href="/" className="font-semibold text-brand hover:underline">
+            JobLoom
+          </Link>{" "}
+          finds jobs directly from company career sites before they appear on many major job boards, so you can apply earlier from one search surface.
+        </p>
+      </section>
     </>
   );
 

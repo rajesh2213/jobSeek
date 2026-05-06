@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   fetchCompanyBySlug,
@@ -83,6 +84,14 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
             { name: company.name },
           ]}
         />
+        <section className="mb-4 rounded-xl border border-ink/10 bg-surface px-4 py-3 text-sm text-ink/75">
+          <p>
+            <Link href="/" className="font-semibold text-brand hover:underline">
+              JobLoom
+            </Link>{" "}
+            centralizes real-time jobs from company career sites, so company pages like this stay connected to broader discovery on the homepage and listings.
+          </p>
+        </section>
       </div>
       <CompanyHubPage
         company={company}

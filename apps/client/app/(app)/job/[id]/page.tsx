@@ -26,6 +26,7 @@ import {
 } from "../../../../components/job/JobDetailDeferredSections";
 import { ResumeMatchSection } from "../../../../components/resume/ResumeMatchSection";
 import { SeoFooterLinks } from "../../../../components/seo/SeoFooterLinks";
+import { SeoBreadcrumbs } from "../../../../components/seo/SeoBreadcrumbs";
 import { UserLocalResetCaption } from "../../../../components/job/UserLocalResetCaption";
 import { EmailCaptureCard } from "../../../../components/email/EmailCaptureCard";
 
@@ -97,6 +98,21 @@ export default async function JobDetailPage({ params }: Props) {
   return (
     <main className="min-h-screen">
       <Container width="wide" className="py-8">
+        <SeoBreadcrumbs
+          items={[
+            { name: "Home", href: "/" },
+            { name: "Jobs", href: "/jobs" },
+            { name: job.title },
+          ]}
+        />
+        <section className="mb-4 rounded-xl border border-ink/10 bg-surface px-4 py-3 text-sm text-ink/75">
+          <p>
+            <Link href="/" className="font-semibold text-brand hover:underline">
+              JobLoom
+            </Link>{" "}
+            finds jobs directly from company career sites before many job boards, then routes you into detailed role pages like this one.
+          </p>
+        </section>
         <div className="mt-4 grid grid-cols-1 gap-8 lg:grid-cols-3">
           <div className="min-w-0 space-y-6 lg:col-span-2">
             <Card accent="brand" as="article" className="space-y-6 px-6 py-8 text-left sm:px-8">
