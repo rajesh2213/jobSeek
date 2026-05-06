@@ -277,8 +277,8 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
       accent={accent}
       className={cn("h-full transition-shadow", cardHoverClass, isAppliedFlash && "ring-2 ring-teal/45 bg-teal-soft/35")}
     >
-      <div className="relative z-0 flex items-start gap-5">
-        <div className="absolute right-6 top-6 z-10 flex max-w-[min(100%,calc(100%-1rem))] min-w-0 flex-col gap-2">
+      <div className="relative z-0 flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-5">
+        <div className="absolute right-6 top-6 z-10 hidden max-w-[min(100%,calc(100%-1rem))] min-w-0 flex-col gap-2 lg:flex">
           <div className="flex flex-nowrap justify-end gap-2">
             <ApplyJobButton
               jobId={job.id}
@@ -355,8 +355,8 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
             {initial}
           </div>
         )}
-        <div className="relative min-w-0 flex-1 pr-[13.5rem] sm:pr-56">
-          <div className="mb-1.5 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-0 flex-1 pr-0 lg:pr-[13.5rem] xl:pr-56">
+          <div className="mb-1.5 flex min-w-0 flex-wrap items-center gap-2">
             <span className="text-[10px] font-bold uppercase tracking-widest text-ink/30">
               {postedLabel}
             </span>
@@ -370,22 +370,29 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
               href={`/job/${job.id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className={`no-underline transition-colors ${titleHover} text-ink`}
+              className={cn(
+                `no-underline transition-colors ${titleHover} text-ink`,
+                "line-clamp-3 lg:line-clamp-none",
+              )}
             >
               {job.title}
             </Link>
           </h3>
 
-          <p className="mb-2 text-sm font-medium text-ink/55">
+          <p className="mb-2 min-w-0 text-base font-medium text-ink/55 sm:text-sm">
             <Link
               href={`/company/${job.company.slug}`}
-              className="font-bold text-ink/75 no-underline hover:text-brand"
+              className="break-words font-bold text-ink/75 no-underline hover:text-brand"
             >
               {job.company.name}
             </Link>
           </p>
-          <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-snug">
-            {showLocation ? <span className="min-w-0 text-black/50">📍 {locationText}</span> : null}
+          <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-2 text-sm leading-snug text-black/50 sm:text-[13px]">
+            {showLocation ? (
+              <span className="min-w-0 break-words">
+                📍 <span className="break-words">{locationText}</span>
+              </span>
+            ) : null}
             <WorkTypeOutlinePill job={job} className="shrink-0" />
           </div>
 
@@ -415,7 +422,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
           ) : null}
 
           <p
-            className="mb-3 line-clamp-2 whitespace-pre-line text-[13px] leading-[1.5] text-black/45"
+            className="mb-3 line-clamp-3 whitespace-pre-line text-sm leading-[1.5] text-black/45 sm:line-clamp-2 sm:text-[13px] lg:line-clamp-2"
             aria-label="Role preview"
           >
             {previewLines
@@ -423,6 +430,36 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
               .map((line) => (previewFromResponsibility ? `↳ ${line}` : line))
               .join("\n")}
           </p>
+
+          <div className="min-w-0 lg:hidden">
+            <ResumeScorePill job={job} />
+          </div>
+
+          <div className="mt-4 flex w-full min-w-0 flex-wrap gap-2 border-t border-ink/10 pt-4 lg:hidden [&_a]:min-h-11 [&_button]:min-h-11 [&_a]:inline-flex [&_button]:inline-flex [&_a]:items-center [&_button]:items-center">
+            <ApplyJobButton
+              jobId={job.id}
+              applyUrl={applyHref}
+              outlineTone={accent}
+              size="sm"
+              variant="outline"
+              className="min-h-11 shrink-0 sm:min-h-0"
+            />
+            <AppliedToggleButton
+              jobId={job.id}
+              outlineTone={accent}
+              size="sm"
+              className="min-h-11 shrink-0 sm:min-h-0"
+            />
+            <Link
+              prefetch={false}
+              href={`/job/${job.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(buttonClassName({ variant: "primary", size: "sm" }), "min-h-11 shrink-0 sm:min-h-0")}
+            >
+              View role →
+            </Link>
+          </div>
         </div>
       </div>
     </Card>

@@ -25,7 +25,7 @@ export function FixedGetProButton() {
   }
 
   return (
-    <div style={fixedFrame} className="relative z-[100]">
+    <div style={fixedFrame} className={cn("relative z-[100]", "hidden lg:block")}>
       <WorkflowEndpointGlow>
         {(glow) => (
           <Link

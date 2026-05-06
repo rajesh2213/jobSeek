@@ -22,7 +22,7 @@ export function Container({
           ? "max-w-jobs"
           : "max-w-[1400px]";
   return (
-    <div className={cn("mx-auto w-full px-6", max, className)} {...rest}>
+    <div className={cn("mx-auto w-full px-4 sm:px-6", max, className)} {...rest}>
       {children}
     </div>
   );

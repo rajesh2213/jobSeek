@@ -401,7 +401,7 @@ function DesktopRailNav() {
   );
 }
 
-/** Center column for MarketingHeader / SiteHeader below `lg`. Must render inside `SiteSideRailProvider`. */
+/** Horizontal pills (unused by default headers). App/marketing shells use `MobileSectionsMenu` instead. Must render inside `SiteSideRailProvider`. */
 export function SiteSideRailMobileNav() {
   const ctx = useRailContext();
   const {

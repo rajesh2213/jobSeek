@@ -449,8 +449,12 @@ export function JobsInlineFilters({
   const locationsPanelClass =
     "absolute left-0 top-full z-[100] mt-2 max-w-[min(100vw-2rem,380px)] rounded-xl border border-ink/10 bg-surface p-3 shadow-lg overflow-visible";
   const triggerClass =
-    "h-10 min-w-[140px] max-w-[220px] rounded-xl border border-ink/15 bg-surface px-4 text-left text-xs font-bold uppercase tracking-wide text-ink shadow-sm transition-colors hover:border-ink/30 focus:outline-none focus:ring-2 focus:ring-brand/20 whitespace-nowrap";
-  const rolePanelClass = `${panelClass} min-w-[min(100vw-2rem,400px)] max-w-[min(100vw-2rem,460px)]`;
+    "flex min-h-11 items-center whitespace-nowrap rounded-xl border border-ink/15 bg-surface px-4 text-left text-xs font-bold uppercase tracking-wide text-ink shadow-sm transition-colors hover:border-ink/30 focus:outline-none focus:ring-2 focus:ring-brand/20 sm:h-10 sm:min-h-0 min-w-[140px] max-w-[220px]";
+  const rolePanelClass = cn(
+    panelClass,
+    "min-w-[min(100vw-2rem,400px)] max-w-[min(100vw-2rem,460px)]",
+    "max-lg:max-h-[min(40vh,22rem)] max-lg:overflow-y-auto",
+  );
   const cityQ = cityQuery.trim();
   const showCitySuggestionsList =
     openMenu === "locations" &&

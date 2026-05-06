@@ -1118,7 +1118,7 @@ export function JobsSearchClient({
         {listingTop}
         {showSmartApplyInstallBanner ? (
           <div
-            className="mb-3 flex items-center gap-3 rounded-[10px] border border-[rgba(232,83,58,0.2)] px-4 py-3"
+            className="mb-3 flex flex-wrap items-center gap-3 rounded-[10px] border border-[rgba(232,83,58,0.2)] px-4 py-3"
             style={{
               background: "linear-gradient(135deg, #fff8f6, #ffffff)",
             }}
@@ -1126,9 +1126,9 @@ export function JobsSearchClient({
             <span className="text-lg" aria-hidden>
               ⚡
             </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-ink">Smart Apply is ready</p>
-              <p className="m-0 text-[13px] text-[#666]">
+            <div className="min-w-0 flex-1 basis-[min(100%,16rem)]">
+              <p className="text-base font-semibold text-ink sm:text-sm">Smart Apply is ready</p>
+              <p className="m-0 text-sm text-[#666] sm:text-[13px]">
                 Install the Chrome extension to auto-fill job applications
               </p>
             </div>
@@ -1136,7 +1136,7 @@ export function JobsSearchClient({
               href={jobloomChromeWebStoreUrl()}
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 rounded-lg px-4 py-2 text-[13px] font-semibold text-white no-underline"
+              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white no-underline sm:min-h-0 sm:text-[13px]"
               style={{ background: "#E8533A" }}
             >
               Install →
@@ -1144,7 +1144,7 @@ export function JobsSearchClient({
             <button
               type="button"
               onClick={dismissSmartApplyBanner}
-              className="shrink-0 border-0 bg-transparent p-1 text-ink/50 hover:text-ink"
+              className="flex min-h-11 min-w-11 shrink-0 items-center justify-center border-0 bg-transparent p-1 text-ink/50 hover:text-ink sm:min-h-0 sm:min-w-0"
               aria-label="Dismiss"
             >
               ✕
@@ -1155,7 +1155,10 @@ export function JobsSearchClient({
 
       <div
         id="section-filters"
-        className="relative sticky top-14 z-[50] bg-canvas/95 py-3 backdrop-blur-sm sm:top-16 sm:py-4"
+        className={cn(
+          "relative z-[50] bg-canvas/95 py-3 backdrop-blur-sm sm:py-4",
+          "lg:sticky lg:top-16 lg:backdrop-blur-sm",
+        )}
       >
         <Container
           width="jobs"

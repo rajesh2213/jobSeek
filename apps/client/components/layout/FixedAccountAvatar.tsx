@@ -30,7 +30,7 @@ export function FixedAccountAvatar() {
     return (
       <div
         style={fixedFrame}
-        className={cn(shellClass, "cursor-default opacity-60")}
+        className={cn(shellClass, "cursor-default opacity-60", "hidden lg:block")}
         aria-hidden
       />
     );
@@ -53,7 +53,7 @@ export function FixedAccountAvatar() {
         href="/account"
         prefetch={false}
         style={fixedFrame}
-        className={shellClass}
+        className={cn(shellClass, "hidden lg:block")}
         aria-label={`Account (${label})`}
       >
         {user.imageUrl ? (
@@ -72,7 +72,7 @@ export function FixedAccountAvatar() {
 
   return (
     <SignInButton mode="modal">
-      <button type="button" style={fixedFrame} className={shellClass} aria-label="Sign in">
+      <button type="button" style={fixedFrame} className={cn(shellClass, "hidden lg:block")} aria-label="Sign in">
         <svg
           className="h-5 w-5 text-ink/60 transition-colors group-hover:text-brand"
           fill="none"
