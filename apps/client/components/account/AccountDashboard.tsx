@@ -60,6 +60,7 @@ const clerkAppearance = {
       border: "1px solid rgba(0,0,0,0.08)",
       width: "100%",
       maxWidth: "100%",
+      minWidth: "0",
     },
     rootBox: { width: "100%", maxWidth: "100%", margin: "0" },
     // Hiding the navbar breaks Clerk’s two-column layout and clips the main column on the left.
@@ -71,7 +72,7 @@ const clerkAppearance = {
       overflow: "visible",
     },
     pageScrollBox: {
-      padding: "16px",
+      padding: "12px",
       width: "100%",
       maxWidth: "100%",
       boxSizing: "border-box",
@@ -264,8 +265,8 @@ export function AccountDashboard() {
   };
 
   return (
-    <div className="box-border mx-auto grid w-full max-w-[1160px] grid-cols-1 gap-5 px-4 py-5 sm:gap-6 sm:px-6 sm:py-6 xl:grid-cols-[300px_minmax(0,1fr)] xl:gap-8 xl:px-8 xl:py-8">
-      <aside className="self-start rounded-2xl border border-line bg-surface p-5 shadow-card ring-1 ring-ink/5 sm:p-6 xl:sticky xl:top-20 xl:p-7">
+    <div className="box-border mx-auto grid w-full max-w-[1320px] grid-cols-1 gap-5 px-4 py-5 sm:gap-6 sm:px-6 sm:py-6 xl:grid-cols-[260px_minmax(0,1fr)] xl:gap-7 xl:px-6 xl:py-8 2xl:grid-cols-[300px_minmax(0,1fr)] 2xl:gap-8 2xl:px-8">
+      <aside className="self-start rounded-2xl border border-line bg-surface p-5 shadow-card ring-1 ring-ink/5 sm:p-6 xl:sticky xl:top-20 xl:p-6 2xl:p-7">
         <div className="flex flex-col items-center text-center">
           {user?.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -557,7 +558,7 @@ export function AccountDashboard() {
         </div>
       </aside>
 
-      <div id="jobseek-clerk-profile" className="w-full min-w-0 rounded-2xl border border-ink/8 bg-surface/70 p-2 shadow-card sm:p-3">
+      <div id="jobseek-clerk-profile" className="w-full min-w-0 rounded-2xl border border-ink/8 bg-surface/70 p-1.5 shadow-card sm:p-2">
         <UserProfile routing="hash" appearance={clerkAppearance} />
       </div>
 
