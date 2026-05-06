@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { JobItem } from "../../lib/api";
 import { fetchResumeSemanticMatch } from "../../lib/api";
@@ -15,6 +15,7 @@ import { extractJobSkills, jobSkillCanonicalsForSemantic } from "../../lib/skill
 import { useResume } from "../../lib/resumeContext";
 import { useAccountPlan } from "../../lib/useAccountPlan";
 import { cn } from "../../lib/cn";
+import { signInWithNext } from "../../lib/signInUrl";
 import { buttonFocusRing } from "../ui/Button";
 import { ResumeScorePanel } from "./ResumeScorePanel";
 import { ResumeUploadModal } from "./ResumeUploadModal";
@@ -31,12 +32,17 @@ function pillColors(score: number): { bg: string; fg: string; border: string } {
 
 export function ResumeScorePill({ job }: { job: JobItem }) {
   const { isSignedIn, getToken } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { isPro, isLoaded: planLoaded } = useAccountPlan();
   const { hasResume, resumeText, resumeBullets, isLoading } = useResume();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [scoring, setScoring] = useState(false);
   const [result, setResult] = useState<ScoringResult | null>(null);
+  const returnPath = `${pathname}${searchParams.size > 0 ? `?${searchParams.toString()}` : ""}`;
+  const signInHref = signInWithNext(returnPath || "/jobs");
 
   useEffect(() => {
     setResult(null);
@@ -73,6 +79,13 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
   }, [getToken, job, resumeBullets, resumeText]);
 
   const onCheckClick = useCallback(async () => {
+    if (!isSignedIn) {
+      router.push(signInHref);
+      return;
+    }
+    if (!planLoaded || !isPro || isLoading) {
+      return;
+    }
     if (!hasResume) {
       setUploadOpen(true);
       return;
@@ -83,44 +96,16 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
     } finally {
       setScoring(false);
     }
-  }, [hasResume, runScore]);
+  }, [hasResume, isLoading, isPro, isSignedIn, planLoaded, router, runScore, signInHref]);
 
-  if (!isSignedIn) {
-    return null;
-  }
-
-  if (!planLoaded) {
-    return (
-      <div className="h-9 w-full min-w-[10rem] shrink-0 animate-pulse rounded-lg bg-ink/10" aria-hidden />
-    );
-  }
-
-  if (!isPro) {
-    return (
-      <Link
-        href="/pricing"
-        className={cn(
-          buttonFocusRing,
-          "relative flex h-9 w-full min-w-0 items-center justify-center rounded-lg border-2 border-brand/35 bg-brand/10 px-3 text-xs font-bold tracking-wide text-brand no-underline transition-[transform,box-shadow] duration-200 hover:bg-brand/15",
-        )}
-      >
-        <span aria-hidden className="absolute left-3 shrink-0 text-sm leading-none">
-          📄
-        </span>
-        <span className="text-center">Pro: resume match</span>
-      </Link>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="h-9 w-full min-w-[10rem] shrink-0 animate-pulse rounded-lg bg-ink/10" aria-hidden />
-    );
-  }
-
-  const showScoredPill = Boolean(result) && !scoring;
+  const showScoredPill = Boolean(result) && !scoring && isSignedIn && planLoaded && isPro && !isLoading;
   const scored = result;
   const c = scored ? pillColors(scored.score) : null;
+  const lockedForFreeUser = isSignedIn && planLoaded && !isPro;
+  const loadingState = isSignedIn && (!planLoaded || isLoading);
+  const actionDisabled = scoring || lockedForFreeUser || loadingState;
+  const lockTitle = lockedForFreeUser ? "Resume match is a Pro feature." : undefined;
+  const lockDescriptionId = `resume-match-lock-hint-${job.id}`;
 
   return (
     <>
@@ -148,32 +133,44 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
           <span className="shrink-0 text-[11px] font-medium opacity-75">See full breakdown →</span>
         </button>
       ) : (
-        <button
-          type="button"
-          onClick={() => void onCheckClick()}
-          disabled={scoring}
-          className={cn(
-            buttonFocusRing,
-            "relative flex h-9 w-full min-w-0 items-center rounded-lg border-2 border-ink/12 bg-transparent px-3 text-xs font-bold tracking-wide text-ink/65",
-            "transition-[transform,box-shadow,border-color,background-color,color] duration-200 ease-out",
-            "hover:-translate-y-px hover:border-brand/45 hover:bg-brand/[0.07] hover:text-ink hover:shadow-md hover:shadow-black/[0.08]",
-            "active:translate-y-0 active:shadow-sm active:shadow-black/[0.04]",
-            "disabled:pointer-events-none disabled:opacity-50",
-            "dark:border-white/14 dark:text-ink/75",
-            "dark:hover:border-brand/50 dark:hover:bg-brand/[0.12] dark:hover:shadow-black/35",
-          )}
-        >
-          {scoring ? (
-            <span className="mx-auto h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-ink/20 border-t-brand" />
-          ) : (
-            <>
-              <span aria-hidden className="absolute left-3 shrink-0 text-sm leading-none">
-                📄
-              </span>
-              <span className="w-full text-center">Check match</span>
-            </>
-          )}
-        </button>
+        <div className="w-full" title={lockTitle}>
+          <button
+            type="button"
+            onClick={() => void onCheckClick()}
+            disabled={scoring || loadingState}
+            aria-disabled={lockedForFreeUser}
+            aria-describedby={lockedForFreeUser ? lockDescriptionId : undefined}
+            className={cn(
+              buttonFocusRing,
+              "relative flex h-9 w-full min-w-0 items-center rounded-lg border-2 border-ink/12 bg-transparent px-3 text-xs font-bold tracking-wide text-ink/65",
+              "transition-[transform,box-shadow,border-color,background-color,color] duration-200 ease-out",
+              !actionDisabled &&
+                "hover:-translate-y-px hover:border-brand/45 hover:bg-brand/[0.07] hover:text-ink hover:shadow-md hover:shadow-black/[0.08]",
+              !actionDisabled && "active:translate-y-0 active:shadow-sm active:shadow-black/[0.04]",
+              (scoring || loadingState) && "opacity-60",
+              lockedForFreeUser &&
+                "cursor-not-allowed border-brand/30 bg-brand/5 text-brand/85 hover:border-brand/45 hover:bg-brand/10",
+              "dark:border-white/14 dark:text-ink/75",
+              !actionDisabled && "dark:hover:border-brand/50 dark:hover:bg-brand/[0.12] dark:hover:shadow-black/35",
+            )}
+          >
+            {scoring ? (
+              <span className="mx-auto h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-ink/20 border-t-brand" />
+            ) : (
+              <>
+                <span aria-hidden className="absolute left-3 shrink-0 text-sm leading-none">
+                  {lockedForFreeUser ? "🔒" : "📄"}
+                </span>
+                <span className="w-full text-center">{loadingState ? "Loading match…" : "Check match"}</span>
+              </>
+            )}
+          </button>
+          {lockedForFreeUser ? (
+            <span id={lockDescriptionId} className="sr-only">
+              Resume match is available on Pro plans only.
+            </span>
+          ) : null}
+        </div>
       )}
 
       <ResumeUploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
