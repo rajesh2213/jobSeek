@@ -1,4 +1,4 @@
-/** Display copy for Pro plans (must match Lemon Squeezy / checkout). */
+/** Display copy for Pro plans (must match live checkout pricing). */
 
 export const PRO_MONTHLY_USD = 4.99;
 export const PRO_ANNUAL_USD_PER_MONTH = 3.5;

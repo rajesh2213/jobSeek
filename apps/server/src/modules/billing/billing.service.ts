@@ -55,6 +55,23 @@ export function resolvePlanFromSubscriptions(
   return "free";
 }
 
+export function hasActiveEntitlement(
+  subscription: Pick<EntitlementSubscription, "status" | "currentPeriodEnd" | "graceEndsAt"> | null | undefined,
+  now: Date,
+): boolean {
+  if (!subscription) return false;
+  return resolvePlanFromSubscriptions(
+    [
+      {
+        status: subscription.status,
+        currentPeriodEnd: subscription.currentPeriodEnd,
+        graceEndsAt: subscription.graceEndsAt,
+      },
+    ],
+    now,
+  ) === "pro";
+}
+
 function pastDueGraceEnds(now: Date): Date {
   const graceDays = Number.parseInt(process.env.PAYPAL_PAST_DUE_GRACE_DAYS ?? "3", 10);
   const safeGraceDays = Number.isFinite(graceDays) && graceDays >= 0 ? graceDays : 3;
@@ -99,6 +116,8 @@ export async function applyBillingSubscriptionWebhookEvent(
     providerTimestampIso?: string | null;
     /** Internal jobs: do not record ProcessedWebhookEvent or require dedupe id. */
     skipProcessedWebhook?: boolean;
+    /** Internal/manual operations may explicitly bypass stale-event monotonic checks. */
+    skipMonotonicCheck?: boolean;
   },
 ): Promise<ApplyBillingSubscriptionResult> {
   const now = new Date();
@@ -113,7 +132,7 @@ export async function applyBillingSubscriptionWebhookEvent(
         providerTimestampIso: params.providerTimestampIso,
       });
 
-  const skipMonotonic = params.skipProcessedWebhook || params.eventType.startsWith("INTERNAL.");
+  const skipMonotonic = params.skipMonotonicCheck === true;
 
   const paypalId = params.provider === "paypal" ? params.providerSubscriptionId : null;
   const dodoSubscriptionId = params.provider === "dodo" ? params.providerSubscriptionId : null;
@@ -179,6 +198,28 @@ export async function applyBillingSubscriptionWebhookEvent(
         where: { id: params.userId },
         data: { plan },
       });
+      server.log.info({
+        event: "billing_entitlement_evaluated",
+        provider: params.provider,
+        userId: params.userId,
+        subscriptionId: params.providerSubscriptionId,
+        status: params.status,
+        currentPeriodEnd: params.currentPeriodEnd.toISOString(),
+        graceEndsAt: subscriptionData.graceEndsAt ? subscriptionData.graceEndsAt.toISOString() : null,
+        resolvedPlan: plan,
+        eventType: params.eventType,
+      });
+      if (plan === "free" && (params.status === "canceled" || params.status === "past_due")) {
+        server.log.info({
+          event: "billing_webhook_downgrade",
+          provider: params.provider,
+          userId: params.userId,
+          subscriptionId: params.providerSubscriptionId,
+          status: params.status,
+          currentPeriodEnd: params.currentPeriodEnd.toISOString(),
+          eventType: params.eventType,
+        });
+      }
       return { applied: true };
     },
     {
@@ -198,6 +239,7 @@ export async function applyPayPalSubscriptionEvent(
     userId: string;
     status: BillingWebhookStatus;
     currentPeriodEnd: Date;
+    skipMonotonicCheck?: boolean;
   },
 ): Promise<ApplyBillingSubscriptionResult> {
   return applyBillingSubscriptionWebhookEvent(server, {
@@ -211,6 +253,7 @@ export async function applyPayPalSubscriptionEvent(
     explicitEventId: params.eventId,
     providerTimestampIso: params.eventAt.toISOString(),
     skipProcessedWebhook: params.eventType.startsWith("INTERNAL."),
+    skipMonotonicCheck: params.skipMonotonicCheck,
   });
 }
 

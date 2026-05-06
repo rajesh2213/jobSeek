@@ -47,6 +47,17 @@ test("downgrades to free when all subscriptions are non-active and out of period
   assert.equal(plan, "free");
 });
 
+test("keeps pro while canceled subscription is still within paid period", () => {
+  const now = new Date("2026-05-06T10:00:00.000Z");
+  const plan = resolvePlanFromSubscriptions(
+    [
+      { status: "canceled", currentPeriodEnd: new Date("2026-05-09T10:00:00.000Z"), graceEndsAt: null },
+    ],
+    now,
+  );
+  assert.equal(plan, "pro");
+});
+
 function mockTxFactory() {
   const processed = new Set<string>();
   let subscriptionWrites = 0;
@@ -94,6 +105,9 @@ test("event replay safety: same event id does not apply twice", async () => {
   const m = mockTxFactory();
 
   const fakeServer = {
+    log: {
+      info: () => {},
+    },
     prisma: {
       $transaction: async (fn: (tx: any) => Promise<{ applied: boolean }>) => fn(m.tx),
     },
@@ -167,6 +181,9 @@ test("older eventAt does not overwrite subscription (stale)", async () => {
   };
 
   const fakeServer = {
+    log: {
+      info: () => {},
+    },
     prisma: {
       $transaction: async (fn: (t: any) => Promise<unknown>) => fn(tx),
     },
@@ -222,6 +239,9 @@ test("Dodo synthetic dedupe id is stable for same provider timestamp", async () 
   };
 
   const fakeServer = {
+    log: {
+      info: () => {},
+    },
     prisma: {
       $transaction: async (fn: (t: any) => Promise<unknown>) => fn(tx),
     },

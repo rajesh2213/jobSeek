@@ -15,7 +15,7 @@ export const PRO_FEATURES = [
 export const FAQ = [
   {
     q: "Can I cancel anytime?",
-    a: "Yes. Cancel from your account or billing portal whenever you like. You keep access through the end of the period you already paid for.",
+    a: "Yes. Cancel directly from Account settings. Cancellation stops renewal, and you keep access through the end of the current paid period.",
   },
   {
     q: "What happens to my data if I downgrade?",
@@ -24,5 +24,9 @@ export const FAQ = [
   {
     q: "Is there a free trial?",
     a: "You can explore the product on the free tier first. Pro unlocks unlimited browsing, resume insights, Smart Apply, and job alerts as soon as you subscribe.",
+  },
+  {
+    q: "Which payment providers do you support?",
+    a: "JobLoom subscriptions are processed through PayPal and Dodo Payments. Provider-specific receipts and billing descriptors come from those processors.",
   },
 ] as const;

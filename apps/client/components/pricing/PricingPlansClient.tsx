@@ -3,6 +3,7 @@
 import { SignInButton, useAuth } from "@clerk/nextjs";
 import { DodoPayments } from "dodopayments-checkout";
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { API_BASE_URL } from "../../lib/api";
 import { useAccountPlan } from "../../lib/useAccountPlan";
 import {
@@ -24,10 +25,12 @@ const DODO_MODE: "test" | "live" =
 
 export function PricingPlansClient() {
   const { isSignedIn, getToken } = useAuth();
+  const searchParams = useSearchParams();
   const { isPro, pendingUpgrade, markPendingUpgrade, refresh, clearPendingUpgrade } = useAccountPlan();
   const [busyPayPal, setBusyPayPal] = useState<null | CheckoutKey>(null);
   const [busyDodo, setBusyDodo] = useState<null | CheckoutKey>(null);
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   useEffect(() => {
     DodoPayments.Initialize({
@@ -52,6 +55,24 @@ export function PricingPlansClient() {
     }
     clearPendingUpgrade();
   }, [clearPendingUpgrade]);
+
+  useEffect(() => {
+    const paypal = searchParams.get("paypal");
+    const dodo = searchParams.get("dodo");
+    const checkoutReturned = paypal === "return" || dodo === "return";
+    const checkoutCanceled = paypal === "cancel" || dodo === "cancel";
+    if (checkoutReturned) {
+      markPendingUpgrade();
+      setStatusMessage("Payment received. Activating your subscription...");
+      return;
+    }
+    if (checkoutCanceled) {
+      clearPendingUpgrade();
+      setStatusMessage("Checkout canceled. No changes were made to your subscription.");
+      return;
+    }
+    setStatusMessage(null);
+  }, [clearPendingUpgrade, markPendingUpgrade, searchParams]);
 
   const startPayPalCheckout = useCallback(
     async (which: CheckoutKey) => {
@@ -184,6 +205,11 @@ export function PricingPlansClient() {
           {error}
         </p>
       ) : null}
+      {statusMessage ? (
+        <p className="mx-auto mt-6 max-w-lg rounded-xl border border-line bg-surface px-4 py-3 text-center text-sm text-ink">
+          {statusMessage}
+        </p>
+      ) : null}
       {pendingUpgrade && !isPro ? (
         <div
           className="mx-auto mt-8 max-w-md rounded-2xl border border-line bg-surface px-6 py-5 shadow-card ring-1 ring-ink/5"
@@ -191,7 +217,7 @@ export function PricingPlansClient() {
         >
           <p className="text-center font-sans text-base font-semibold text-ink">Confirming your upgrade</p>
           <p className="mt-2 text-center text-sm leading-relaxed text-ink-muted">
-            We are waiting for your payment provider to confirm. This usually takes a few seconds.
+            We are waiting for your payment provider webhook confirmation. This usually takes a few seconds.
           </p>
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
             <button

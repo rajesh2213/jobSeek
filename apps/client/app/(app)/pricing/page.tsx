@@ -84,7 +84,9 @@ export default function PricingPage() {
           </dl>
         </div>
 
-        <p className="mx-auto mt-12 text-center text-sm text-ink-muted">Secure checkout · Cancel anytime</p>
+        <p className="mx-auto mt-12 text-center text-sm text-ink-muted">
+          Secure checkout via PayPal or Dodo Payments · Cancel anytime from Account settings
+        </p>
         <p className="mx-auto mt-4 max-w-xl text-center text-xs leading-relaxed text-ink/65">
           By subscribing you agree to our{" "}
           <Link href="/terms" className="font-medium text-brand hover:underline">

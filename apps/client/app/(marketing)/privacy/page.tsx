@@ -46,7 +46,7 @@ export default function PrivacyPage() {
       <h3>Payments</h3>
       <p>
         <strong>We do not store your full card number or other complete payment method details on our systems.</strong>{" "}
-        Payments for subscriptions are processed by a <strong>third-party payment provider</strong> that may act as the{" "}
+        Payments for subscriptions are processed by <strong>PayPal</strong> and <strong>Dodo Payments</strong>, either of which may act as the{" "}
         <strong>Merchant of Record</strong>. The provider handles payment data, charge authorization, and related records in
         line with its own terms and privacy policy. <strong>We receive limited billing metadata</strong> (such as subscription
         status, product or plan identifier, and transaction or customer references) needed to provide access to paid

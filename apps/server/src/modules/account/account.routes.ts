@@ -32,6 +32,19 @@ export function registerAccountRoutes(server: FastifyInstance): void {
     }
 
     const { pro, plan } = await resolveProPlan(server.prisma, ctx.internalUserId, ctx.email);
+    const sub = await server.prisma.subscription.findUnique({
+      where: { userId: ctx.internalUserId },
+      select: { provider: true, status: true, currentPeriodEnd: true, graceEndsAt: true },
+    });
+    server.log.info({
+      event: "account_summary_entitlement",
+      userId: ctx.internalUserId,
+      provider: sub?.provider ?? null,
+      status: sub?.status ?? null,
+      currentPeriodEnd: sub?.currentPeriodEnd.toISOString() ?? null,
+      graceEndsAt: sub?.graceEndsAt?.toISOString() ?? null,
+      entitlementResult: plan,
+    });
 
     return reply.send({
       plan,

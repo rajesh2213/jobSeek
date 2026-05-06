@@ -3,7 +3,7 @@
  * Set NEXT_PUBLIC_* values in production; fallbacks keep the UI usable in dev.
  */
 
-export const LEGAL_LAST_UPDATED = "15 April 2025";
+export const LEGAL_LAST_UPDATED = "6 May 2026";
 
 export function getSiteOperator(): string {
   return process.env.NEXT_PUBLIC_COMPANY_LEGAL_NAME?.trim() || "JobLoom";

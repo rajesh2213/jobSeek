@@ -2,10 +2,12 @@ import type { FastifyInstance } from "fastify";
 import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
 import {
   applyDodoSubscriptionEvent,
+  hasActiveEntitlement,
   statusFromDodoEvent,
 } from "./billing.service.js";
 import {
   createDodoCheckoutSession,
+  fetchDodoSubscriptionPeriodEnd,
   verifyAndParseDodoWebhook,
   type DodoBillingPlanType,
   type UnwrapWebhookEvent,
@@ -93,12 +95,7 @@ async function resolveDodoWebhookInternalUserId(
   return { userId: user.id, viaEmailFallback: true };
 }
 
-function subscriptionPeriodEndFromDodo(
-  event: UnwrapWebhookEvent,
-  server: FastifyInstance,
-  userId: string,
-  subscriptionId: string,
-): Date {
+function subscriptionPeriodEndFromDodoEvent(event: UnwrapWebhookEvent): Date | null {
   if (event.type === "subscription.active" || event.type === "subscription.cancelled") {
     const raw = event.data.next_billing_date?.trim();
     if (raw) {
@@ -106,16 +103,40 @@ function subscriptionPeriodEndFromDodo(
       if (!Number.isNaN(parsed.getTime())) return parsed;
     }
   }
-  server.log.error(
-    {
-      msg: "dodo_webhook_period_end_missing",
-      userId,
-      subscriptionId,
-      eventType: event.type,
-    },
-    "Dodo webhook missing next_billing_date; using now for currentPeriodEnd",
-  );
-  return new Date();
+  return null;
+}
+
+export function pickDodoCurrentPeriodEnd(params: {
+  eventPeriodEnd: Date | null;
+  existingPeriodEnd: Date | null;
+  providerPeriodEnd: Date | null;
+  now: Date;
+}): {
+  currentPeriodEnd: Date;
+  fallbackSourceUsed: "event.next_billing_date" | "db.currentPeriodEnd" | "provider.fetch" | "now";
+} {
+  if (params.eventPeriodEnd) {
+    return {
+      currentPeriodEnd: params.eventPeriodEnd,
+      fallbackSourceUsed: "event.next_billing_date",
+    };
+  }
+  if (params.existingPeriodEnd && params.existingPeriodEnd.getTime() > params.now.getTime()) {
+    return {
+      currentPeriodEnd: params.existingPeriodEnd,
+      fallbackSourceUsed: "db.currentPeriodEnd",
+    };
+  }
+  if (params.providerPeriodEnd && params.providerPeriodEnd.getTime() > params.now.getTime()) {
+    return {
+      currentPeriodEnd: params.providerPeriodEnd,
+      fallbackSourceUsed: "provider.fetch",
+    };
+  }
+  return {
+    currentPeriodEnd: params.now,
+    fallbackSourceUsed: "now",
+  };
 }
 
 function resolveDodoDedupeEventId(
@@ -151,10 +172,10 @@ async function assertAllowedDodoCheckout(
   if (!row) return { ok: false, code: "USER_NOT_FOUND" };
 
   const proByPlan = row.plan === "pro" || row.plan === "pro_plus";
-  const proBySub = row.subscription?.status === "active";
+  const entitledBySubscription = hasActiveEntitlement(row.subscription, new Date());
   const pastDue = row.subscription?.status === "past_due";
 
-  if ((proByPlan || proBySub) && !pastDue) {
+  if ((proByPlan || entitledBySubscription) && !pastDue) {
     return { ok: false, code: "ALREADY_PRO" };
   }
   return { ok: true };
@@ -245,7 +266,12 @@ export function registerDodoBillingRoutes(server: FastifyInstance): void {
       const eventType = event.type;
       const normalizedStatus = statusFromDodoEvent(eventType);
       if (!normalizedStatus) {
-        server.log.warn({ eventType }, "Unhandled Dodo event");
+        server.log.warn({
+          event: "billing_webhook_event_ignored",
+          provider: "dodo",
+          eventType,
+          eventId: readHeader(request.headers as Record<string, unknown>, "webhook-id") ?? null,
+        });
         return reply.send({ received: true, ignored: true });
       }
 
@@ -286,22 +312,36 @@ export function registerDodoBillingRoutes(server: FastifyInstance): void {
 
       const eventAt = new Date(event.timestamp);
       const eventAtSafe = Number.isNaN(eventAt.getTime()) ? new Date() : eventAt;
-
-      const currentPeriodEnd =
-        event.type === "subscription.active" || event.type === "subscription.cancelled"
-          ? subscriptionPeriodEndFromDodo(event, server, userId, subscriptionId)
-          : (() => {
-              server.log.error(
-                {
-                  msg: "dodo_payment_webhook_period_end_now",
-                  userId,
-                  subscriptionId,
-                  eventType,
-                },
-                "Dodo payment webhook using now for currentPeriodEnd",
-              );
-              return new Date();
-            })();
+      const existing = await server.prisma.subscription.findUnique({
+        where: { userId },
+        select: { currentPeriodEnd: true },
+      });
+      const eventPeriodEnd = subscriptionPeriodEndFromDodoEvent(event);
+      let providerPeriodEnd: Date | null = null;
+      if (!eventPeriodEnd) {
+        try {
+          providerPeriodEnd = await fetchDodoSubscriptionPeriodEnd(subscriptionId);
+        } catch {
+          providerPeriodEnd = null;
+        }
+      }
+      const selected = pickDodoCurrentPeriodEnd({
+        eventPeriodEnd,
+        existingPeriodEnd: existing?.currentPeriodEnd ?? null,
+        providerPeriodEnd,
+        now: new Date(),
+      });
+      const currentPeriodEnd = selected.currentPeriodEnd;
+      if (selected.fallbackSourceUsed !== "event.next_billing_date") {
+        server.log.warn({
+          event: "dodo_period_end_fallback_used",
+          provider: "dodo",
+          eventType,
+          userId,
+          subscriptionId,
+          fallbackSourceUsed: selected.fallbackSourceUsed,
+        });
+      }
 
       const dedupeId = resolveDodoDedupeEventId(request.headers as Record<string, unknown>, event, subscriptionId);
 

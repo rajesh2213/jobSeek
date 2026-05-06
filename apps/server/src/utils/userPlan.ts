@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { devPlanOverrideForUser } from "./devPlanOverride.js";
+import { hasActiveEntitlement } from "../modules/billing/billing.service.js";
 
 export type BillingPlan = "free" | "pro";
 
@@ -41,10 +42,7 @@ export async function resolveProPlan(
   if (override === "pro") return { pro: true, plan: "pro" };
   if (override === "free") return { pro: false, plan: "free" };
 
-  if (row.plan === "pro" || row.plan === "pro_plus") return { pro: true, plan: "pro" };
-
-  const subActive = row.subscription?.status === "active";
-  if (subActive) {
+  if (hasActiveEntitlement(row.subscription, new Date())) {
     return { pro: true, plan: "pro" };
   }
 

@@ -49,8 +49,8 @@ export default function TermsPage() {
 
       <h2>4. Subscriptions and billing</h2>
       <p>
-        Certain features require a paid subscription. Payments for subscriptions are processed by a <strong>third-party payment
-        provider</strong> that may act as the <strong>Merchant of Record</strong>. This means the payment provider may handle
+        Certain features require a paid subscription. Payments for subscriptions are processed by <strong>PayPal</strong> and{" "}
+        <strong>Dodo Payments</strong>, either of which may act as the <strong>Merchant of Record</strong>. This means the payment provider may handle
         billing, invoicing, tax collection, and certain aspects of refunds and first-line payment support, as described at
         checkout, in your receipt, and in the provider&apos;s terms. We receive the information we need to activate, renew, and
         manage your access to paid features. Fees, billing period (for example, monthly or annual), and taxes are shown at
@@ -65,8 +65,8 @@ export default function TermsPage() {
 
       <h2>5. Cancellation</h2>
       <p>
-        You may cancel a subscription through the account or subscription controls we provide, including any billing or
-        customer portal made available by the third-party payment provider. When you cancel, you generally retain access to
+        You may cancel a subscription in <strong>Account settings</strong> (and through provider billing controls where available).
+        When you cancel, you generally retain access to
         paid features <strong>until the end of the period you have already paid for</strong>, unless otherwise stated at
         purchase. See our <a href="/billing">Billing, cancellation, and refunds</a> page.
       </p>

@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { fetchAccountSummary, fetchBillingStatus, type AccountSummary } from "./api";
+import { isBillingSubscriptionEntitled } from "./billingEntitlement";
 import { isPro as planIsPro } from "./planLimits";
 
 export const PENDING_UPGRADE_STORAGE_KEY = "jobloom.pendingUpgrade";
@@ -46,11 +47,15 @@ export function AccountPlanProvider({ children }: { children: ReactNode }) {
       return null;
     }
     const [s, billing] = await Promise.all([fetchAccountSummary(token), fetchBillingStatus(token)]);
-    setSummary(s);
+    const entitledFromBilling = isBillingSubscriptionEntitled(billing?.subscription ?? null);
+    const normalizedSummary = s
+      ? { ...s, plan: entitledFromBilling ? "pro" : s.plan }
+      : s;
+    setSummary(normalizedSummary);
     setLoaded(true);
     const subStatus = billing?.subscription?.status;
     const checkoutTerminal =
-      s?.plan === "pro" ||
+      normalizedSummary?.plan === "pro" ||
       subStatus === "active" ||
       subStatus === "past_due" ||
       subStatus === "canceled";
@@ -60,7 +65,7 @@ export function AccountPlanProvider({ children }: { children: ReactNode }) {
         window.localStorage.removeItem(PENDING_UPGRADE_STORAGE_KEY);
       }
     }
-    return s;
+    return normalizedSummary;
   }, [getToken, isSignedIn]);
 
   const markPendingUpgrade = useCallback(() => {

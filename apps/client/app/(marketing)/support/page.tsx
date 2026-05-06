@@ -63,7 +63,7 @@ const TOPICS = [
     faqs: [
       {
         q: "How do I cancel?",
-        a: "Open Billing & refunds for cancellation guidance. You may also manage subscription status through your payment provider where applicable.",
+        a: "Open Account settings and use Cancel Subscription. Cancellation stops renewal and keeps access until your current period ends.",
       },
     ],
   },

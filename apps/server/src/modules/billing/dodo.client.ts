@@ -97,6 +97,32 @@ export async function createDodoCheckoutSession(params: {
   return { checkoutUrl };
 }
 
+export async function cancelDodoSubscription(
+  subscriptionId: string,
+  comment: string,
+): Promise<{ alreadyCanceled: boolean }> {
+  const client = createDodoApiClient();
+  const existing = await client.subscriptions.retrieve(subscriptionId);
+  if (existing.cancel_at_next_billing_date || existing.status === "cancelled") {
+    return { alreadyCanceled: true };
+  }
+  await client.subscriptions.update(subscriptionId, {
+    cancel_at_next_billing_date: true,
+    cancel_reason: "cancelled_by_customer",
+    cancellation_comment: comment,
+  });
+  return { alreadyCanceled: false };
+}
+
+export async function fetchDodoSubscriptionPeriodEnd(subscriptionId: string): Promise<Date | null> {
+  const client = createDodoApiClient();
+  const sub = await client.subscriptions.retrieve(subscriptionId);
+  const raw = sub.next_billing_date?.trim();
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function readHeader(headers: Record<string, unknown>, name: string): string | undefined {
   const direct = headers[name];
   if (typeof direct === "string" && direct) return direct;

@@ -281,6 +281,7 @@ export interface BillingStatusResponse {
     provider: string;
     status: string;
     currentPeriodEnd: string;
+    graceEndsAt: string | null;
   } | null;
 }
 
@@ -294,6 +295,36 @@ export async function fetchBillingStatus(token: string): Promise<BillingStatusRe
   });
   if (!res.ok) return null;
   return (await res.json()) as BillingStatusResponse;
+}
+
+export interface BillingCancelResponse {
+  success: boolean;
+  provider: "paypal" | "dodo";
+  effectiveUntil: string;
+  alreadyCanceled?: boolean;
+}
+
+export async function cancelSubscription(
+  token: string,
+  reason?: string,
+): Promise<BillingCancelResponse> {
+  const t = token.trim();
+  const res = await fetch(`${API_BASE_URL}/billing/cancel-subscription`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${t}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ reason }),
+  });
+  const data = (await res.json().catch(() => ({}))) as BillingCancelResponse & {
+    error?: string;
+    code?: string;
+  };
+  if (!res.ok) {
+    throw new ApiRequestError(data.error ?? "Could not cancel subscription.", res.status, data.code);
+  }
+  return data;
 }
 
 export interface ApplyProfileCustomQA {

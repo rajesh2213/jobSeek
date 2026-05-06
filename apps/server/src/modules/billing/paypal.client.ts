@@ -13,6 +13,11 @@ export type PayPalSubscriptionDetails = {
   nextBillingTime: Date | null;
   customId: string | null;
 };
+export type CancelPayPalSubscriptionResult = {
+  alreadyCanceled: boolean;
+  responseCode?: number;
+  providerStatus?: string;
+};
 const VERIFY_TIMEOUT_MS = 3000;
 const VERIFY_MAX_ATTEMPTS = 3; // initial + 2 retries
 
@@ -264,4 +269,52 @@ export async function fetchPayPalSubscriptionDetails(
       ? (result as { custom_id: string }).custom_id
       : null,
   };
+}
+
+export async function cancelPayPalSubscription(
+  subscriptionId: string,
+  reason: string,
+): Promise<CancelPayPalSubscriptionResult> {
+  const client = createPayPalHttpClient();
+  const request: paypalhttp.HttpRequest = {
+    path: `/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`,
+    verb: "POST",
+    headers: { "content-type": "application/json" },
+    body: { reason },
+  };
+  try {
+    await executeWithTimeoutAndNetworkRetry(client, request, {
+      timeoutMs: VERIFY_TIMEOUT_MS,
+      maxAttempts: VERIFY_MAX_ATTEMPTS,
+    });
+    return { alreadyCanceled: false, responseCode: 204 };
+  } catch (err) {
+    const statusCode = err && typeof err === "object" && "statusCode" in err
+      ? Number((err as { statusCode?: unknown }).statusCode)
+      : undefined;
+    if (isPayPalCancelAlreadyInactiveError(statusCode, err)) {
+      return {
+        alreadyCanceled: true,
+        responseCode: statusCode,
+        providerStatus: "already_inactive",
+      };
+    }
+    throw err;
+  }
+}
+
+export function isPayPalCancelAlreadyInactiveError(
+  statusCode: number | undefined,
+  err: unknown,
+): boolean {
+  const rawMessage = err instanceof Error ? err.message : String(err);
+  const upper = rawMessage.toUpperCase();
+  const alreadyCanceledHint =
+    upper.includes("CANCELLED") ||
+    upper.includes("CANCELED") ||
+    upper.includes("INACTIVE") ||
+    upper.includes("SUSPENDED") ||
+    upper.includes("INVALID") ||
+    upper.includes("STATUS");
+  return statusCode === 422 && alreadyCanceledHint;
 }

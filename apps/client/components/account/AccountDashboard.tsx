@@ -6,8 +6,11 @@ import { UserProfile, useAuth, useClerk, useUser } from "@clerk/nextjs";
 import { createPortal } from "react-dom";
 import type { Appearance } from "@clerk/types";
 import {
+  cancelSubscription,
+  fetchBillingStatus,
   fetchSavedSearchAlertStatus,
   fetchSmartApplyStatus,
+  type BillingStatusResponse,
   type UserMeResponse,
 } from "../../lib/api";
 import { isPro as isPaidPlan, PLAN_LIMITS } from "../../lib/planLimits";
@@ -19,6 +22,7 @@ import {
   getUserLocalTimeZoneLabel,
 } from "../../lib/userLocalResetTime";
 import { clearExtensionAuth } from "../../lib/extensionAuthBridge";
+import { isBillingSubscriptionEntitled } from "../../lib/billingEntitlement";
 
 function formatRelativeTime(iso: string): string {
   const t = new Date(iso).getTime();
@@ -31,6 +35,17 @@ function formatRelativeTime(iso: string): string {
   if (days < 14) return `${days} days ago`;
   const weeks = Math.floor(days / 7);
   return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
+}
+
+function formatDateTime(iso?: string | null): string {
+  if (!iso) return "—";
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return "—";
+  return dt.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 const clerkAppearance = {
@@ -76,6 +91,11 @@ export function AccountDashboard() {
   const [smartApplyStatus, setSmartApplyStatus] = useState<Awaited<
     ReturnType<typeof fetchSmartApplyStatus>
   > | null>(null);
+  const [billingStatus, setBillingStatus] = useState<BillingStatusResponse | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelSuccess, setCancelSuccess] = useState<string | null>(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +141,26 @@ export function AccountDashboard() {
       try {
         const token = await getToken({ skipCache: true });
         if (!token) {
+          if (!cancelled) setBillingStatus(null);
+          return;
+        }
+        const s = await fetchBillingStatus(token);
+        if (!cancelled) setBillingStatus(s);
+      } catch {
+        if (!cancelled) setBillingStatus(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const token = await getToken({ skipCache: true });
+        if (!token) {
           if (!cancelled) setSmartApplyStatus(null);
           return;
         }
@@ -136,7 +176,7 @@ export function AccountDashboard() {
   }, [getToken]);
 
   // Prefer plan from /api/user/me; default matches backend free tier when absent.
-  const plan = me?.plan ?? "free";
+  const plan = isBillingSubscriptionEntitled(billingStatus?.subscription ?? null) ? "pro" : (me?.plan ?? "free");
   const isPro = isPaidPlan(plan);
   const limit = me?.jobViewsLimit ?? PLAN_LIMITS.free.dailyJobViews;
   const rawUsed = me?.jobViewsToday ?? 0;
@@ -145,6 +185,9 @@ export function AccountDashboard() {
   const smartApplyHref = isSignedIn
     ? "/smart-apply"
     : signInWithNext("/smart-apply");
+  const billingSub = billingStatus?.subscription ?? null;
+  const canCancel = billingSub?.status === "active" || billingSub?.status === "past_due";
+  const cancellationEndsAt = billingSub?.currentPeriodEnd ?? null;
 
   const primary = user?.emailAddresses?.find((e) => e.id === user?.primaryEmailAddressId) ??
     user?.emailAddresses?.[0];
@@ -177,6 +220,46 @@ export function AccountDashboard() {
     }
   };
 
+  const handleCancelSubscription = async () => {
+    if (cancelBusy) return;
+    setCancelBusy(true);
+    setCancelError(null);
+    setCancelSuccess(null);
+    try {
+      const token = await getToken({ skipCache: true });
+      if (!token) {
+        setCancelError("Sign in required.");
+        return;
+      }
+      const result = await cancelSubscription(
+        token,
+        "Canceled by customer from account settings.",
+      );
+      setBillingStatus((prev) => {
+        if (!prev?.subscription) return prev;
+        return {
+          ...prev,
+          subscription: {
+            ...prev.subscription,
+            status: "canceled",
+            currentPeriodEnd: result.effectiveUntil,
+          },
+        };
+      });
+      setCancelSuccess(
+        `Cancellation scheduled. Your ${result.provider === "paypal" ? "PayPal" : "Dodo"} subscription remains active until ${formatDateTime(result.effectiveUntil)}.`,
+      );
+      const updated = await fetchBillingStatus(token);
+      setBillingStatus(updated);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not cancel subscription.";
+      setCancelError(message);
+    } finally {
+      setCancelBusy(false);
+      setCancelConfirmOpen(false);
+    }
+  };
+
   return (
     <div className="box-border mx-auto grid w-[90%] max-w-jobs grid-cols-1 gap-8 px-4 py-8 lg:grid-cols-[280px_minmax(0,1fr)]">
       <aside className="sticky top-6 self-start rounded-2xl border border-line bg-surface p-7 shadow-card ring-1 ring-ink/5">
@@ -197,6 +280,53 @@ export function AccountDashboard() {
             {displayName}
           </p>
           <p className="mt-1 break-all text-sm text-ink-muted">{email}</p>
+        </div>
+
+        <hr className="my-6 border-ink/10" />
+
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-ink/45">
+            Billing
+          </p>
+          <p className="mt-2 text-sm text-ink">
+            Provider:{" "}
+            <span className="font-semibold">
+              {billingSub ? (billingSub.provider === "paypal" ? "PayPal" : "Dodo Payments") : "—"}
+            </span>
+          </p>
+          <p className="mt-1 text-sm text-ink">
+            Status: <span className="font-semibold">{billingSub?.status ?? "none"}</span>
+          </p>
+          <p className="mt-1 text-sm text-ink">
+            Renews/ends:{" "}
+            <span className="font-semibold">{formatDateTime(billingSub?.currentPeriodEnd ?? null)}</span>
+          </p>
+          {billingSub?.status === "past_due" && billingSub.graceEndsAt ? (
+            <p className="mt-1 text-xs text-amber-700">
+              Payment issue: grace period until {formatDateTime(billingSub.graceEndsAt)}.
+            </p>
+          ) : null}
+          {billingSub?.status === "canceled" && cancellationEndsAt ? (
+            <p className="mt-2 text-xs text-ink-muted">
+              Your subscription will end on {formatDateTime(cancellationEndsAt)}.
+            </p>
+          ) : null}
+          {canCancel ? (
+            <button
+              type="button"
+              onClick={() => setCancelConfirmOpen(true)}
+              disabled={cancelBusy}
+              className="mt-3 w-full rounded-xl border border-ink/15 bg-white px-3 py-2 text-sm font-semibold text-ink transition-colors hover:border-brand/40 hover:text-brand disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {cancelBusy ? "Canceling..." : "Cancel Subscription"}
+            </button>
+          ) : null}
+          {cancelSuccess ? (
+            <p className="mt-2 text-xs text-emerald-700">{cancelSuccess}</p>
+          ) : null}
+          {cancelError ? (
+            <p className="mt-2 text-xs text-red-600">{cancelError}</p>
+          ) : null}
         </div>
 
         <hr className="my-6 border-ink/10" />
@@ -476,6 +606,48 @@ export function AccountDashboard() {
           ,
           document.body,
         )
+        : null}
+      {cancelConfirmOpen && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[120] flex items-center justify-center bg-ink/45 px-4 backdrop-blur-[2px]"
+              role="dialog"
+              aria-modal="true"
+              onClick={() => {
+                if (!cancelBusy) setCancelConfirmOpen(false);
+              }}
+            >
+              <div
+                className="w-full max-w-md rounded-2xl border border-ink/10 bg-surface p-5 shadow-[0_18px_60px_rgba(0,0,0,0.25)]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="text-lg font-semibold text-ink">Cancel subscription?</h3>
+                <p className="mt-2 text-sm text-ink/70">
+                  Canceling stops renewal only. Your subscription remains active until{" "}
+                  {formatDateTime(cancellationEndsAt)}.
+                </p>
+                <div className="mt-5 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCancelConfirmOpen(false)}
+                    disabled={cancelBusy}
+                    className="rounded-lg border border-ink/15 bg-white px-4 py-2 text-sm font-semibold text-ink transition-colors hover:border-ink/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Keep subscription
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleCancelSubscription()}
+                    disabled={cancelBusy}
+                    className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {cancelBusy ? "Canceling..." : "Confirm cancel"}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
         : null}
     </div>
   );

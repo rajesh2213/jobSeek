@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import paypalhttp from "@paypal/paypalhttp";
 import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
 import {
+  cancelPayPalSubscription,
   createPayPalHttpClient,
   fetchPayPalSubscriptionDetails,
   getPayPalPlanId,
@@ -11,10 +12,12 @@ import {
 } from "./paypal.client.js";
 import { resolveProPlan } from "../../utils/userPlan.js";
 import { applyPayPalSubscriptionEvent, statusFromPayPalEvent } from "./billing.service.js";
+import { cancelDodoSubscription } from "./dodo.client.js";
 
 type PayPalSubscriptionCreateBody = {
   planType?: BillingPlanType;
 };
+type BillingCancelBody = { reason?: string };
 
 type PayPalSubscriptionLink = {
   rel?: string;
@@ -178,6 +181,12 @@ export function registerBillingRoutes(server: FastifyInstance): void {
 
         const normalizedStatus = statusFromPayPalEvent(eventType);
         if (!normalizedStatus) {
+          server.log.warn({
+            event: "billing_webhook_event_ignored",
+            provider: "paypal",
+            eventType,
+            eventId,
+          });
           return reply.send({ received: true, ignored: true });
         }
 
@@ -374,7 +383,7 @@ export function registerBillingRoutes(server: FastifyInstance): void {
     },
   );
 
-  server.post<{ Params: { subscriptionId: string } }>(
+  server.post<{ Params: { subscriptionId: string }; Querystring: { force?: string } }>(
     "/internal/paypal/reconcile/:subscriptionId",
     async (request, reply) => {
       if (!isInternalBillingAuthorized(request.headers.authorization)) {
@@ -398,6 +407,36 @@ export function registerBillingRoutes(server: FastifyInstance): void {
         if (!user) {
           return reply.status(404).send({ error: "User not found", code: "USER_NOT_FOUND" });
         }
+        const force = request.query.force === "true";
+        server.log.info({
+          event: "paypal_reconcile_fetched_provider_state",
+          subscriptionId: details.id,
+          userId,
+          force,
+          providerStatus: details.status,
+          providerCurrentPeriodEnd: details.nextBillingTime?.toISOString() ?? null,
+        });
+        const existing = await server.prisma.subscription.findUnique({
+          where: { userId },
+          select: { status: true, lastEventAt: true, lastEventType: true },
+        });
+        if (existing?.lastEventAt && !force) {
+          server.log.warn(
+            {
+              event: "paypal_reconcile_requires_force",
+              subscriptionId,
+              userId,
+              existingStatus: existing.status,
+              existingLastEventAt: existing.lastEventAt.toISOString(),
+              existingLastEventType: existing.lastEventType,
+            },
+            "PayPal reconcile blocked because existing subscription has newer or unknown state; pass ?force=true to override",
+          );
+          return reply.status(409).send({
+            error: "Reconcile blocked to avoid overriding newer state. Re-run with force=true if needed.",
+            code: "RECONCILE_REQUIRES_FORCE",
+          });
+        }
 
         const result = await applyPayPalSubscriptionEvent(server, {
           eventType: "INTERNAL.RECONCILE",
@@ -406,6 +445,25 @@ export function registerBillingRoutes(server: FastifyInstance): void {
           userId,
           status: mapPayPalSubscriptionStatus(details.status),
           currentPeriodEnd: details.nextBillingTime ?? new Date(),
+          skipMonotonicCheck: force,
+        });
+        if (result.stale) {
+          server.log.warn({
+            event: "paypal_reconcile_skipped_stale",
+            subscriptionId: details.id,
+            userId,
+            force,
+          });
+        }
+        server.log.info({
+          event: "paypal_reconcile_applied",
+          subscriptionId: details.id,
+          userId,
+          force,
+          applied: result.applied,
+          stale: result.stale ?? false,
+          status: details.status,
+          currentPeriodEnd: (details.nextBillingTime ?? new Date()).toISOString(),
         });
 
         return reply.send({
@@ -422,6 +480,86 @@ export function registerBillingRoutes(server: FastifyInstance): void {
     },
   );
 
+  server.post<{ Body: BillingCancelBody }>("/billing/cancel-subscription", async (request, reply) => {
+    const ctx = await resolveClerkUser(server.prisma, request.headers.authorization);
+    if (!ctx) {
+      return reply.status(401).send({ error: "Unauthorized", code: "UNAUTHORIZED" });
+    }
+    const subscription = await server.prisma.subscription.findUnique({
+      where: { userId: ctx.internalUserId },
+      select: {
+        provider: true,
+        paypalId: true,
+        dodoSubscriptionId: true,
+        status: true,
+        currentPeriodEnd: true,
+      },
+    });
+    if (!subscription) {
+      return reply.status(404).send({ error: "Subscription not found", code: "SUBSCRIPTION_NOT_FOUND" });
+    }
+    const effectiveUntil = subscription.currentPeriodEnd.toISOString();
+    const reason =
+      request.body?.reason?.trim() || "Canceled by customer from JobLoom account settings.";
+    if (subscription.status === "canceled") {
+      return reply.send({ success: true, provider: subscription.provider, effectiveUntil, alreadyCanceled: true });
+    }
+
+    try {
+      if (subscription.provider === "paypal") {
+        const paypalId = subscription.paypalId?.trim();
+        if (!paypalId) {
+          return reply.status(409).send({ error: "PayPal subscription id missing", code: "MISSING_PROVIDER_ID" });
+        }
+        const providerResult = await cancelPayPalSubscription(paypalId, reason);
+        server.log.info({
+          event: "billing_cancel_requested",
+          provider: "paypal",
+          userId: ctx.internalUserId,
+          paypalId,
+          responseCode: providerResult.responseCode ?? null,
+          dbStatus: subscription.status,
+          effectiveUntil,
+          providerStatus: providerResult.providerStatus ?? null,
+          alreadyCanceled: providerResult.alreadyCanceled,
+        });
+        return reply.send({
+          success: true,
+          provider: "paypal",
+          effectiveUntil,
+          alreadyCanceled: providerResult.alreadyCanceled,
+        });
+      }
+
+      const dodoId = subscription.dodoSubscriptionId?.trim();
+      if (!dodoId) {
+        return reply.status(409).send({ error: "Dodo subscription id missing", code: "MISSING_PROVIDER_ID" });
+      }
+      const providerResult = await cancelDodoSubscription(dodoId, reason);
+      server.log.info({
+        event: "billing_cancel_requested",
+        provider: "dodo",
+        userId: ctx.internalUserId,
+        subscriptionId: dodoId,
+        dbStatus: subscription.status,
+        currentPeriodEnd: effectiveUntil,
+        alreadyCanceled: providerResult.alreadyCanceled,
+      });
+      return reply.send({
+        success: true,
+        provider: "dodo",
+        effectiveUntil,
+        alreadyCanceled: providerResult.alreadyCanceled,
+      });
+    } catch (err) {
+      server.log.error(
+        { err, event: "billing_cancel_failed", userId: ctx.internalUserId, provider: subscription.provider },
+        "Billing cancel-subscription failed",
+      );
+      return reply.status(502).send({ error: "Cancellation request failed", code: "CANCEL_FAILED" });
+    }
+  });
+
   server.get("/billing/status", async (request, reply) => {
     const ctx = await resolveClerkUser(server.prisma, request.headers.authorization);
     if (!ctx) {
@@ -434,7 +572,17 @@ export function registerBillingRoutes(server: FastifyInstance): void {
         provider: true,
         status: true,
         currentPeriodEnd: true,
+        graceEndsAt: true,
       },
+    });
+    server.log.info({
+      event: "billing_runtime_entitlement",
+      userId: ctx.internalUserId,
+      provider: subscription?.provider ?? null,
+      status: subscription?.status ?? null,
+      currentPeriodEnd: subscription?.currentPeriodEnd.toISOString() ?? null,
+      graceEndsAt: subscription?.graceEndsAt?.toISOString() ?? null,
+      entitlementResult: plan,
     });
     return reply.send({
       plan,
@@ -443,6 +591,7 @@ export function registerBillingRoutes(server: FastifyInstance): void {
             provider: subscription.provider,
             status: subscription.status,
             currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
+            graceEndsAt: subscription.graceEndsAt ? subscription.graceEndsAt.toISOString() : null,
           }
         : null,
     });

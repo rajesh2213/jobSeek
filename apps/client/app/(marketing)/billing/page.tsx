@@ -18,15 +18,15 @@ export default function BillingPage() {
       <p>
         This page explains how <strong>paid</strong> plans for JobLoom (for example, &quot;Pro&quot; or a similarly named plan)
         work. Your <a href="/terms">Terms of Service</a> and <a href="/privacy">Privacy Policy</a> also apply. More detail on
-        charges, tax, and payment support may appear at <strong>checkout</strong> and in documentation from the{" "}
-        <strong>third-party payment provider</strong> (which may act as <strong>Merchant of Record</strong> for your purchase).
+        charges, tax, and payment support may appear at <strong>checkout</strong> and in documentation from our payment providers{" "}
+        <strong>PayPal</strong> and <strong>Dodo Payments</strong> (which may act as <strong>Merchant of Record</strong> for your purchase).
       </p>
 
       <h2>1. Subscription; billing period</h2>
       <p>
         Paid access is a <strong>subscription</strong> billed in <strong>advance</strong> for the period you select (for example,{" "}
         <strong>monthly</strong> or <strong>annual</strong>). The price, currency, and billing interval are shown before you
-        complete payment. Payment is processed by our <strong>third-party payment provider</strong>, not by us directly; your
+        complete payment. Payment is processed by <strong>PayPal</strong> or <strong>Dodo Payments</strong>, not by us directly; your
         bank or card statement may list the provider&apos;s name. The provider may handle invoicing, tax collection, and
         first-line payment questions under its own terms.
       </p>
@@ -39,9 +39,7 @@ export default function BillingPage() {
 
       <h2>2. Cancellation</h2>
       <p>
-        You may <strong>cancel at any time</strong> through the <strong>subscription or billing controls</strong> we or our
-        payment provider make available (for example, a <strong>customer or billing portal</strong> linked from your account,
-        your receipt, or the provider&apos;s site). <strong>Canceling stops renewal</strong>—it does not retroactively refund the
+        You may <strong>cancel at any time</strong> from <strong>Account settings</strong>. <strong>Canceling stops renewal</strong>—it does not retroactively refund the
         current period unless a refund is required by law, offered by the payment provider, or agreed by us in writing.
       </p>
       <p>
@@ -62,16 +60,23 @@ export default function BillingPage() {
         refund is processed.
       </p>
 
-      <h2>4. Price changes</h2>
+      <h2>4. Failed payments and grace period</h2>
+      <p>
+        If a renewal payment fails, your subscription may move into a temporary <strong>past due</strong> grace period while
+        we retry collection through PayPal or Dodo Payments. During grace, paid access may remain active. If payment is not
+        recovered before grace ends, access moves to the free tier.
+      </p>
+
+      <h2>5. Price changes</h2>
       <p>
         We may change prices or plans. Where required by law, we will give <strong>advance notice</strong> and, if you do not
         agree, you may <strong>cancel before the new price applies</strong> to your next renewal.
       </p>
 
-      <h2>5. Taxes</h2>
+      <h2>6. Taxes</h2>
       <p>Applicable <strong>taxes</strong> may be added to your total as shown at checkout, depending on your location and law.</p>
 
-      <h2>6. Account termination</h2>
+      <h2>7. Account termination</h2>
       <p>
         We may suspend or terminate the Service for serious breach of our terms or for legal, security, or fraud reasons, as
         described in the <a href="/terms">Terms of Service</a>. You may close your account through available account or
@@ -79,7 +84,7 @@ export default function BillingPage() {
         <a href="/privacy">Privacy Policy</a> for deletion.
       </p>
 
-      <h2>7. Contact</h2>
+      <h2>8. Contact</h2>
       <p>
         Billing and subscription help:{" "}
         {support ? (
