@@ -66,9 +66,12 @@ const clerkAppearance = {
     scrollBox: {
       width: "100%",
       maxWidth: "100%",
+      height: "auto",
+      maxHeight: "none",
+      overflow: "visible",
     },
     pageScrollBox: {
-      padding: "24px",
+      padding: "16px",
       width: "100%",
       maxWidth: "100%",
       boxSizing: "border-box",
@@ -261,8 +264,8 @@ export function AccountDashboard() {
   };
 
   return (
-    <div className="box-border mx-auto grid w-[90%] max-w-jobs grid-cols-1 gap-8 px-4 py-8 lg:grid-cols-[280px_minmax(0,1fr)]">
-      <aside className="sticky top-6 self-start rounded-2xl border border-line bg-surface p-7 shadow-card ring-1 ring-ink/5">
+    <div className="box-border mx-auto grid w-full max-w-[1160px] grid-cols-1 gap-5 px-4 py-5 sm:gap-6 sm:px-6 sm:py-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-8 lg:px-8 lg:py-8">
+      <aside className="self-start rounded-2xl border border-line bg-surface p-5 shadow-card ring-1 ring-ink/5 sm:p-6 lg:sticky lg:top-20 lg:p-7">
         <div className="flex flex-col items-center text-center">
           {user?.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -554,10 +557,7 @@ export function AccountDashboard() {
         </div>
       </aside>
 
-      <div
-        id="jobseek-clerk-profile"
-        className="w-full min-w-0"
-      >
+      <div id="jobseek-clerk-profile" className="w-full min-w-0 rounded-2xl border border-ink/8 bg-surface/70 p-2 shadow-card sm:p-3">
         <UserProfile routing="hash" appearance={clerkAppearance} />
       </div>
 
