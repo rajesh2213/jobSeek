@@ -264,8 +264,8 @@ export function AccountDashboard() {
   };
 
   return (
-    <div className="box-border mx-auto grid w-full max-w-[1160px] grid-cols-1 gap-5 px-4 py-5 sm:gap-6 sm:px-6 sm:py-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-8 lg:px-8 lg:py-8">
-      <aside className="self-start rounded-2xl border border-line bg-surface p-5 shadow-card ring-1 ring-ink/5 sm:p-6 lg:sticky lg:top-20 lg:p-7">
+    <div className="box-border mx-auto grid w-full max-w-[1160px] grid-cols-1 gap-5 px-4 py-5 sm:gap-6 sm:px-6 sm:py-6 xl:grid-cols-[300px_minmax(0,1fr)] xl:gap-8 xl:px-8 xl:py-8">
+      <aside className="self-start rounded-2xl border border-line bg-surface p-5 shadow-card ring-1 ring-ink/5 sm:p-6 xl:sticky xl:top-20 xl:p-7">
         <div className="flex flex-col items-center text-center">
           {user?.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
