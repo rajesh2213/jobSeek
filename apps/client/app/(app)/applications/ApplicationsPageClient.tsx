@@ -84,11 +84,12 @@ export function ApplicationsPageClient() {
   const [filter, setFilter] = useState<FilterTab>("active");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState("");
+  const safeApplications = Array.isArray(applications) ? applications : [];
 
   const filtered = useMemo(() => {
-    let list = applications;
+    let list = safeApplications;
     if (filter === "all") {
-      list = applications;
+      list = safeApplications;
     } else if (filter === "active") {
       list = list.filter((a) => !a.archived);
     } else if (filter === "archived") {
@@ -101,7 +102,7 @@ export function ApplicationsPageClient() {
       );
     }
     return list;
-  }, [applications, filter]);
+  }, [safeApplications, filter]);
 
   const selected = useMemo(
     () => filtered.find((a) => a.id === selectedId) ?? null,
@@ -109,7 +110,7 @@ export function ApplicationsPageClient() {
   );
 
   const emptyCopy = useMemo(() => {
-    if (applications.length === 0) {
+    if (safeApplications.length === 0) {
       return {
         title: "No applications yet",
         body: 'Click "Apply" on any job to automatically track your application',
@@ -136,7 +137,7 @@ export function ApplicationsPageClient() {
       body: "Try another filter tab or add an application from the job board.",
       showBrowse: true,
     } as const;
-  }, [applications.length, filter]);
+  }, [safeApplications.length, filter]);
 
   useEffect(() => {
     if (selected) {

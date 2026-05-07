@@ -80,8 +80,8 @@ export function ApplicationsProvider({ children }: { children: ReactNode }) {
         fetchApplications(token),
         fetchApplicationStats(token),
       ]);
-
-      setApplications(list);
+      const safeList = Array.isArray(list) ? list : [];
+      setApplications(safeList);
       setStats({ total: st.total, needsAction: st.needsAction });
     } catch {
       setApplications([]);
