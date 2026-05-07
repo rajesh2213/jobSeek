@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { loadRootEnv } from "../../infrastructure/env/loadEnv.js";
 import { prisma } from "../../infrastructure/db/prisma.js";
 import { logger } from "../../utils/logger.js";
-import { getRedisConnection } from "../../queues/job.queue.js";
+import { getIoredis, getRedisConnection } from "../../queues/job.queue.js";
 import {
   DISCOVER_ATS_ENDPOINTS_QUEUE_NAME,
   DISCOVER_FROM_JOBS_JOB,
@@ -52,6 +52,18 @@ const ACTIVATION_SCORE_THRESHOLD = 8;
 const DEFAULT_VALIDATE_BATCH = 20;
 const MIN_BATCH_SIZE = 20;
 const MAX_BATCH_SIZE = 100;
+const DISCOVERY_CURSOR_KEY = "ats_discovery:jobs_cursor:v1";
+const DISCOVERY_CURSOR_SWEEP_KEY = "ats_discovery:last_recovery_sweep_ms:v1";
+const CURSOR_RECOVERY_SWEEP_MS =
+  Math.max(10, Number(process.env.DISCOVERY_RECOVERY_SWEEP_MINUTES ?? "180") || 180) *
+  60 *
+  1000;
+const CURSOR_REWIND_SECONDS = Math.max(
+  30,
+  Number(process.env.DISCOVERY_CURSOR_REWIND_SECONDS ?? "120") || 120,
+);
+const DISCOVERY_CURSOR_ENABLED = process.env.DISCOVERY_CURSOR_ENABLED !== "0";
+const DEBUG_DISCOVERY_SELECTOR = process.env.DEBUG_DISCOVERY_SELECTOR === "1";
 // REQUIRED_SELECT
 const SERP_DISCOVERY_SELECT = {
   id: true,
@@ -91,6 +103,46 @@ let lastSerpEstimatedKb = 0;
 let lastJobsEstimatedKb = 0;
 let lastSerpEfficiency = 1;
 let lastJobsEfficiency = 1;
+let recentJobVisitSet = new Map<string, number>();
+
+type DiscoveryCursor = {
+  lastSeenAtIso: string;
+  lastId: string;
+};
+
+function cleanupRecentVisitSet(nowMs: number): void {
+  if (recentJobVisitSet.size < 50_000) return;
+  const minTs = nowMs - 30 * 60 * 1000;
+  const next = new Map<string, number>();
+  for (const [id, ts] of recentJobVisitSet) {
+    if (ts >= minTs) next.set(id, ts);
+  }
+  recentJobVisitSet = next;
+}
+
+function parseDiscoveryCursor(raw: string | null): DiscoveryCursor | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<DiscoveryCursor>;
+    if (
+      typeof parsed.lastSeenAtIso !== "string" ||
+      parsed.lastSeenAtIso.trim() === "" ||
+      typeof parsed.lastId !== "string"
+    ) {
+      return null;
+    }
+    return {
+      lastSeenAtIso: parsed.lastSeenAtIso,
+      lastId: parsed.lastId,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isCursorStale(cursorSince: Date, lookbackSince: Date): boolean {
+  return cursorSince.getTime() < lookbackSince.getTime() - 60_000;
+}
 
 function adaptiveTake(base: number, lastEstimatedKb: number, lastEfficiency: number): number {
   let next = base;
@@ -588,23 +640,94 @@ async function discoverFromJobs(batchSize: number): Promise<void> {
     return;
   }
   const take = adaptiveTake(Math.min(100, Math.max(25, batchSize)), lastJobsEstimatedKb, lastJobsEfficiency);
+  const redis = getIoredis();
   const now = new Date();
   const nowMs = now.getTime();
   const lookbackDays = Math.max(1, Number(process.env.PROCESSING_LOOKBACK_DAYS ?? "7") || 7);
   const lookbackSince = new Date(nowMs - lookbackDays * 24 * 60 * 60 * 1000);
-  const jobIdRows = await prisma.$queryRaw<Array<{ id: string }>>`
-    SELECT id
-    FROM "Job"
-    WHERE (
-      "lastProcessedAt" IS NULL
-      OR "lastSeenAt" > "lastProcessedAt"
-    )
-      AND "lastSeenAt" >= ${lookbackSince}
-    ORDER BY COALESCE("lastProcessedAt", TO_TIMESTAMP(0)) ASC, "lastSeenAt" DESC
-    LIMIT ${take}
-  `;
+  const cursorRaw = await redis.get(DISCOVERY_CURSOR_KEY);
+  const parsedCursor = parseDiscoveryCursor(cursorRaw);
+  if (cursorRaw && !parsedCursor) {
+    logger.warn(
+      { event: "DISCOVERY_CURSOR_INVALID_RESET", key: DISCOVERY_CURSOR_KEY },
+      "DISCOVERY_CURSOR_INVALID_RESET",
+    );
+    await redis.del(DISCOVERY_CURSOR_KEY);
+  }
+  const shouldRunRecoverySweep = async (): Promise<boolean> => {
+    const lastSweepRaw = await redis.get(DISCOVERY_CURSOR_SWEEP_KEY);
+    const lastSweepMs = lastSweepRaw ? Number.parseInt(lastSweepRaw, 10) : 0;
+    return !Number.isFinite(lastSweepMs) || nowMs - lastSweepMs >= CURSOR_RECOVERY_SWEEP_MS;
+  };
+  const runRecoverySweep = DISCOVERY_CURSOR_ENABLED && (await shouldRunRecoverySweep());
+  const cursorDate =
+    parsedCursor != null ? new Date(parsedCursor.lastSeenAtIso) : lookbackSince;
+  const cursorSince =
+    Number.isNaN(cursorDate.getTime()) || cursorDate < lookbackSince
+      ? lookbackSince
+      : cursorDate;
+  const cursorId = parsedCursor?.lastId ?? "";
+  const effectiveCursorSince = new Date(
+    Math.max(lookbackSince.getTime(), cursorSince.getTime() - CURSOR_REWIND_SECONDS * 1000),
+  );
+  if (DISCOVERY_CURSOR_ENABLED && parsedCursor && isCursorStale(cursorSince, lookbackSince)) {
+    logger.warn(
+      {
+        event: "DISCOVERY_CURSOR_STALE",
+        cursorSince: cursorSince.toISOString(),
+        lookbackSince: lookbackSince.toISOString(),
+      },
+      "DISCOVERY_CURSOR_STALE",
+    );
+  }
+  const selectorStart = Date.now();
+  const jobIdRows = runRecoverySweep
+    ? await prisma.$queryRaw<Array<{ id: string; lastSeenAt: Date }>>`
+        SELECT id, "lastSeenAt"
+        FROM "Job"
+        WHERE (
+          "lastProcessedAt" IS NULL
+          OR "lastSeenAt" > "lastProcessedAt"
+        )
+          AND "lastSeenAt" >= ${lookbackSince}
+        ORDER BY COALESCE("lastProcessedAt", TO_TIMESTAMP(0)) ASC, "lastSeenAt" DESC
+        LIMIT ${take}
+      `
+    : DISCOVERY_CURSOR_ENABLED
+      ? await prisma.$queryRaw<Array<{ id: string; lastSeenAt: Date }>>`
+          SELECT id, "lastSeenAt"
+          FROM "Job"
+          WHERE (
+            "lastProcessedAt" IS NULL
+            OR "lastSeenAt" > "lastProcessedAt"
+          )
+            AND (
+              "lastSeenAt" > ${effectiveCursorSince}
+              OR ("lastSeenAt" = ${effectiveCursorSince} AND id > ${cursorId})
+            )
+            AND "lastSeenAt" >= ${lookbackSince}
+          ORDER BY "lastSeenAt" ASC, id ASC
+          LIMIT ${take}
+        `
+      : await prisma.$queryRaw<Array<{ id: string; lastSeenAt: Date }>>`
+          SELECT id, "lastSeenAt"
+          FROM "Job"
+          WHERE (
+            "lastProcessedAt" IS NULL
+            OR "lastSeenAt" > "lastProcessedAt"
+          )
+            AND "lastSeenAt" >= ${lookbackSince}
+          ORDER BY COALESCE("lastProcessedAt", TO_TIMESTAMP(0)) ASC, "lastSeenAt" DESC
+          LIMIT ${take}
+        `;
+  const selectorRuntimeMs = Date.now() - selectorStart;
   const jobIds = jobIdRows.map((row) => row.id);
-  if (jobIds.length === 0) return;
+  if (jobIds.length === 0) {
+    if (runRecoverySweep) {
+      await redis.set(DISCOVERY_CURSOR_SWEEP_KEY, String(nowMs));
+    }
+    return;
+  }
 
   assertRequiredSelect("Job", "atsDiscovery.discoverFromJobs.findMany", JOB_DISCOVERY_SELECT);
   const jobs = await prisma.job.findMany({
@@ -619,10 +742,13 @@ async function discoverFromJobs(batchSize: number): Promise<void> {
   lastJobsEstimatedKb = queryMetrics.estimatedKB;
 
   const processedJobIds: string[] = [];
+  let duplicateRevisitEstimate = 0;
   let updatedRows = 0;
   let skippedRows = 0;
   for (const job of jobs) {
     processedJobIds.push(job.id);
+    if (recentJobVisitSet.has(job.id)) duplicateRevisitEstimate += 1;
+    recentJobVisitSet.set(job.id, nowMs);
     const urls = [job.sourceUrl, job.applyUrl].filter((u): u is string => typeof u === "string" && u.trim().length > 0);
 
     let candidate: AtsEndpointDiscoveryCandidate | null = null;
@@ -731,6 +857,90 @@ async function discoverFromJobs(batchSize: number): Promise<void> {
       where: { id: { in: processedJobIds } },
       data: { lastProcessedAt: now },
     });
+  }
+  cleanupRecentVisitSet(nowMs);
+  if (DISCOVERY_CURSOR_ENABLED && !runRecoverySweep) {
+    const tail = jobIdRows[jobIdRows.length - 1];
+    if (tail) {
+      await redis.set(
+        DISCOVERY_CURSOR_KEY,
+        JSON.stringify({
+          lastSeenAtIso: tail.lastSeenAt.toISOString(),
+          lastId: tail.id,
+        } satisfies DiscoveryCursor),
+      );
+    }
+  }
+  if (runRecoverySweep) {
+    await redis.set(DISCOVERY_CURSOR_SWEEP_KEY, String(nowMs));
+  }
+  if (DEBUG_DISCOVERY_SELECTOR) {
+    const selectorCountRows = await prisma.$queryRaw<Array<{ c: bigint }>>`
+      SELECT COUNT(*)::bigint AS c
+      FROM "Job"
+      WHERE (
+        "lastProcessedAt" IS NULL
+        OR "lastSeenAt" > "lastProcessedAt"
+      )
+        AND "lastSeenAt" >= ${lookbackSince}
+    `;
+    const selectorMatches = Number(selectorCountRows[0]?.c ?? 0);
+    const boundarySkippedRows = DISCOVERY_CURSOR_ENABLED && !runRecoverySweep
+      ? await prisma.$queryRaw<Array<{ c: bigint }>>`
+          SELECT COUNT(*)::bigint AS c
+          FROM "Job"
+          WHERE (
+            "lastProcessedAt" IS NULL
+            OR "lastSeenAt" > "lastProcessedAt"
+          )
+            AND "lastSeenAt" >= ${lookbackSince}
+            AND (
+              "lastSeenAt" < ${effectiveCursorSince}
+              OR ("lastSeenAt" = ${effectiveCursorSince} AND id <= ${cursorId})
+            )
+        `
+      : [{ c: BigInt(0) }];
+    const rowsSkippedByCursorBoundary = Number(boundarySkippedRows[0]?.c ?? 0);
+    const queueCounts = await getAtsDiscoveryQueue().getJobCounts(
+      "wait",
+      "active",
+      "delayed",
+      "failed",
+      "completed",
+    );
+    logger.info(
+      {
+        event: "DISCOVERY_SELECTOR_METRICS",
+        mode: runRecoverySweep
+          ? "recovery_sweep"
+          : DISCOVERY_CURSOR_ENABLED
+            ? "incremental_cursor"
+            : "legacy_full_scan",
+        batchSizeRequested: batchSize,
+        batchTake: take,
+        rowsMatchedApprox: selectorMatches,
+        rowsReturned: jobs.length,
+        rowsScannedEstimate: selectorMatches,
+        rescannedRowEstimate: Math.max(0, selectorMatches - jobs.length),
+        rowsSkippedByCursorBoundary,
+        duplicateRevisitEstimate,
+        selectorRuntimeMs,
+        cursorSince: effectiveCursorSince.toISOString(),
+        queueLag: queueCounts.wait + queueCounts.delayed,
+        backlogSize: queueCounts.wait + queueCounts.active + queueCounts.delayed,
+      },
+      "DISCOVERY_SELECTOR_METRICS",
+    );
+    logger.info(
+      {
+        event: "DISCOVERY_THROUGHPUT_CYCLE",
+        discoveredJobsThisCycle: updatedRows,
+        candidateRowsThisCycle: jobs.length,
+        selectorRuntimeMs,
+        discoveryYield: jobs.length === 0 ? 0 : Number((updatedRows / jobs.length).toFixed(4)),
+      },
+      "DISCOVERY_THROUGHPUT_CYCLE",
+    );
   }
   lastJobsEfficiency = logEfficiencyMetrics({
     name: "atsDiscovery.discoverFromJobs",

@@ -25,6 +25,12 @@ import {
   fetchWellfoundJobsHtml,
 } from "../modules/discovery/extractors/wellfoundJobs.extractor.js";
 import { computeJobContentHash } from "../utils/jobContentHash.js";
+import {
+  estimateJsonBytes,
+  logUpdateReturnBytesEstimate,
+  logUpdateReturnClassification,
+  logUpdateReturnOptimized,
+} from "../utils/dbPayloadDebug.js";
 
 const REMOTEOK_API = "https://remoteok.com/api";
 const MAX_REMOTEOK_JOBS_PER_COMPANY = 35;
@@ -109,6 +115,14 @@ export async function processIngestJobsFromSource(
   jobService: JobService,
   payload: IngestJobsFromSourcePayload,
 ): Promise<void> {
+  logUpdateReturnClassification({
+    location: "fallbackIngestion.finalize.updateMany",
+    classification: "NO_RETURN_NEEDED",
+  });
+  logUpdateReturnOptimized({
+    location: "fallbackIngestion.finalize.updateMany",
+    strategy: "updateMany",
+  });
   const jobRepository = createJobRepository(prisma);
   const { companyId, companyName, domain, wellfoundUrl } = payload;
 
@@ -177,9 +191,17 @@ export async function processIngestJobsFromSource(
               result.inserted,
             );
           }
-          await prisma.job.update({
+          const updateRes = await prisma.job.updateMany({
             where: { id: result.canonical.id },
             data: { contentHash: newContentHash, lastProcessedAt: new Date() },
+          });
+          if (updateRes.count === 0) {
+            throw new Error(`fallbackIngestion.wellfound.finalize.missing_row:${result.canonical.id}`);
+          }
+          logUpdateReturnBytesEstimate({
+            location: "fallbackIngestion.wellfound.finalize",
+            estimatedBytes: estimateJsonBytes({ id: result.canonical.id, contentHash: newContentHash }),
+            rows: 1,
           });
         } catch (err) {
           logger.debug(
@@ -262,9 +284,17 @@ export async function processIngestJobsFromSource(
               result.inserted,
             );
           }
-          await prisma.job.update({
+          const updateRes = await prisma.job.updateMany({
             where: { id: result.canonical.id },
             data: { contentHash: newContentHash, lastProcessedAt: new Date() },
+          });
+          if (updateRes.count === 0) {
+            throw new Error(`fallbackIngestion.remoteok.finalize.missing_row:${result.canonical.id}`);
+          }
+          logUpdateReturnBytesEstimate({
+            location: "fallbackIngestion.remoteok.finalize",
+            estimatedBytes: estimateJsonBytes({ id: result.canonical.id, contentHash: newContentHash }),
+            rows: 1,
           });
         } catch (err) {
           logger.debug(

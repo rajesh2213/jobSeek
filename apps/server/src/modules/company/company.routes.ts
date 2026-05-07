@@ -18,6 +18,13 @@ import {
 } from "./company.schema.js";
 import type { CompaniesListingSort, CompanyListingRow } from "./companyListing.types.js";
 
+const COMPANY_AGG_CACHE_ENABLED = process.env.COMPANY_AGG_CACHE_ENABLED !== "0";
+const COMPANY_AGG_CACHE_TTL_SECONDS = Math.max(
+  15,
+  Number(process.env.COMPANY_AGG_CACHE_TTL_SECONDS ?? "60") || 60,
+);
+const DEBUG_COMPANY_AGG = process.env.DEBUG_COMPANY_AGG === "1";
+
 function parseCompaniesSort(raw: unknown): CompaniesListingSort {
   const s = typeof raw === "string" ? raw : "jobs";
   if (s === "recent" || s === "name") return s;
@@ -106,6 +113,7 @@ export function registerCompanyRoutes(
     { schema: getCompaniesQuerySchema },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const hasAuthHeader = typeof request.headers.authorization === "string";
+      const redis = getIoredis();
       setApiCacheHeader(reply, request, {
         route: "/companies",
         cacheable: !hasAuthHeader,
@@ -117,6 +125,57 @@ export function registerCompanyRoutes(
       const sort = parseCompaniesSort(q.sort);
       const hiring = parseQueryBool(q.hiring);
       const remote = parseQueryBool(q.remote);
+      const cacheKey = [
+        "companies:agg:v1",
+        page,
+        limit,
+        search.trim().toLowerCase(),
+        sort,
+        hiring ? "1" : "0",
+        remote ? "1" : "0",
+      ].join(":");
+      const callerType =
+        typeof request.headers["x-ssr-origin"] === "string"
+          ? "internal_ssr"
+          : "unknown";
+      const ssrPage =
+        typeof request.headers["x-ssr-page"] === "string"
+          ? request.headers["x-ssr-page"]
+          : null;
+      const startedAt = Date.now();
+
+      if (!hasAuthHeader && COMPANY_AGG_CACHE_ENABLED) {
+        const hit = await redis.get(cacheKey);
+        if (hit) {
+          const parsed = JSON.parse(hit) as {
+            data: ReturnType<typeof toCompanyListingPublicJson>[];
+            meta: {
+              page: number;
+              limit: number;
+              total: number;
+              totalPages: number;
+              hasMore: boolean;
+              stats: { totalTracked: number; hiringThisWeek: number };
+            };
+          };
+          if (DEBUG_COMPANY_AGG) {
+            request.log.info(
+              {
+                event: "COMPANY_AGG_TRIGGER",
+                route: "/companies",
+                cacheStatus: "HIT",
+                callerType,
+                ssrPage,
+                sitemap: ssrPage === "sitemap",
+                executionMs: Date.now() - startedAt,
+                cacheKey,
+              },
+              "COMPANY_AGG_TRIGGER",
+            );
+          }
+          return reply.send(parsed);
+        }
+      }
 
       const result = await companyService.listCompaniesDiscovery({
         q: search,
@@ -126,8 +185,7 @@ export function registerCompanyRoutes(
         page,
         limit,
       });
-
-      return reply.send({
+      const responsePayload = {
         data: result.items.map(toCompanyListingPublicJson),
         meta: {
           page: result.page,
@@ -137,7 +195,31 @@ export function registerCompanyRoutes(
           hasMore: result.hasMore,
           stats: result.stats,
         },
-      });
+      };
+      if (!hasAuthHeader && COMPANY_AGG_CACHE_ENABLED) {
+        await redis.set(
+          cacheKey,
+          JSON.stringify(responsePayload),
+          "EX",
+          COMPANY_AGG_CACHE_TTL_SECONDS,
+        );
+      }
+      if (DEBUG_COMPANY_AGG) {
+        request.log.info(
+          {
+            event: "COMPANY_AGG_TRIGGER",
+            route: "/companies",
+            cacheStatus: "MISS",
+            callerType,
+            ssrPage,
+            sitemap: ssrPage === "sitemap",
+            executionMs: Date.now() - startedAt,
+            cacheKey,
+          },
+          "COMPANY_AGG_TRIGGER",
+        );
+      }
+      return reply.send(responsePayload);
     },
   );
 

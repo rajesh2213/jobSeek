@@ -49,6 +49,12 @@ import {
   logQueryMetrics,
 } from "../utils/queryMetrics.js";
 import { hashedCacheKey } from "../utils/cacheKey.js";
+import {
+  estimateJsonBytes,
+  logUpdateReturnBytesEstimate,
+  logUpdateReturnClassification,
+  logUpdateReturnOptimized,
+} from "../utils/dbPayloadDebug.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -254,6 +260,23 @@ function jobWorkerConcurrency(): number {
 }
 
 async function start(): Promise<void> {
+  logUpdateReturnClassification({
+    location: "jobWorker.processJob.cachedSkip.updateMany",
+    classification: "NO_RETURN_NEEDED",
+  });
+  logUpdateReturnOptimized({
+    location: "jobWorker.processJob.cachedSkip.updateMany",
+    strategy: "updateMany",
+  });
+  logUpdateReturnClassification({
+    location: "jobWorker.processJob.finalize.updateMany",
+    classification: "NO_RETURN_NEEDED",
+  });
+  logUpdateReturnOptimized({
+    location: "jobWorker.processJob.finalize.updateMany",
+    strategy: "updateMany",
+  });
+
   loadRootEnv();
   assertWorkerProcessEnv();
 
@@ -708,12 +731,24 @@ async function start(): Promise<void> {
         let updatedRows = 0;
         let skippedRows = 0;
         if (!withinWindow || !needsProcessing || canonicalRow?.contentHash === newContentHash) {
-          await prisma.job.update({
+          const updateRes = await prisma.job.updateMany({
             where: { id: result.canonical.id },
             data: {
               lastProcessedAt: now,
               contentHash: newContentHash,
-            } as Prisma.JobUpdateInput,
+            } as Prisma.JobUpdateManyMutationInput,
+          });
+          if (updateRes.count === 0) {
+            throw new Error(`jobWorker.processJob.finalize.skipParse_missing_row:${result.canonical.id}`);
+          }
+          logUpdateReturnBytesEstimate({
+            location: "jobWorker.processJob.finalize.skipParse",
+            estimatedBytes: estimateJsonBytes({
+              id: result.canonical.id,
+              lastProcessedAt: now,
+              contentHash: newContentHash,
+            }),
+            rows: 1,
           });
           skippedRows = 1;
         } else {
@@ -723,12 +758,24 @@ async function start(): Promise<void> {
             result.canonical.id,
             result.inserted,
           );
-          await prisma.job.update({
+          const updateRes = await prisma.job.updateMany({
             where: { id: result.canonical.id },
             data: {
               lastProcessedAt: now,
               contentHash: newContentHash,
-            } as Prisma.JobUpdateInput,
+            } as Prisma.JobUpdateManyMutationInput,
+          });
+          if (updateRes.count === 0) {
+            throw new Error(`jobWorker.processJob.finalize.afterParse_missing_row:${result.canonical.id}`);
+          }
+          logUpdateReturnBytesEstimate({
+            location: "jobWorker.processJob.finalize.afterParse",
+            estimatedBytes: estimateJsonBytes({
+              id: result.canonical.id,
+              lastProcessedAt: now,
+              contentHash: newContentHash,
+            }),
+            rows: 1,
           });
           updatedRows = 1;
         }

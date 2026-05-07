@@ -41,6 +41,12 @@ import {
   logQueryMetrics,
 } from "../utils/queryMetrics.js";
 import { hashedCacheKey } from "../utils/cacheKey.js";
+import {
+  estimateJsonBytes,
+  logUpdateReturnBytesEstimate,
+  logUpdateReturnClassification,
+  logUpdateReturnOptimized,
+} from "../utils/dbPayloadDebug.js";
 
 // Avoid back-to-back fetches when lastCrawledAt was just set.
 const MIN_MS_SINCE_LAST_CRAWL_FOR_INGEST = Math.floor(2.5 * 60 * 1000);
@@ -118,6 +124,14 @@ function clampPoolSize(envName: string, fallback: string, hardMax: number): numb
 }
 
 async function start(): Promise<void> {
+  logUpdateReturnClassification({
+    location: "atsEndpoint.worker.finalize.updateMany",
+    classification: "NO_RETURN_NEEDED",
+  });
+  logUpdateReturnOptimized({
+    location: "atsEndpoint.worker.finalize.updateMany",
+    strategy: "updateMany",
+  });
   loadRootEnv();
   assertWorkerProcessEnv();
 
@@ -461,9 +475,21 @@ async function start(): Promise<void> {
     const processedAt = new Date();
     if (processedCanonicalIds.length > 0) {
       for (const row of flatIngest) {
-        await prisma.job.update({
+        const updateRes = await prisma.job.updateMany({
           where: { id: row.canonicalId },
           data: { lastProcessedAt: processedAt, contentHash: row.newContentHash },
+        });
+        if (updateRes.count === 0) {
+          throw new Error(`atsEndpoint.worker.finalize.missing_row:${row.canonicalId}`);
+        }
+        logUpdateReturnBytesEstimate({
+          location: "atsEndpoint.worker.finalize.perCanonical",
+          estimatedBytes: estimateJsonBytes({
+            id: row.canonicalId,
+            lastProcessedAt: processedAt,
+            contentHash: row.newContentHash,
+          }),
+          rows: 1,
         });
       }
     }

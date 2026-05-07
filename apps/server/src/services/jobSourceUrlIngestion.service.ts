@@ -27,6 +27,12 @@ import {
 } from "../utils/jobValidation.js";
 import { applyRetryStrategies } from "../utils/jobRetryStrategies.js";
 import { computeJobContentHash } from "../utils/jobContentHash.js";
+import {
+  estimateJsonBytes,
+  logUpdateReturnBytesEstimate,
+  logUpdateReturnClassification,
+  logUpdateReturnOptimized,
+} from "../utils/dbPayloadDebug.js";
 
 const MAX_JOB_HUBS = 10;
 const MAX_CANDIDATES = 50;
@@ -66,6 +72,14 @@ export async function processIngestJobsFromSourceUrl(
   jobService: JobService,
   payload: IngestJobsFromSourceUrlPayload,
 ): Promise<void> {
+  logUpdateReturnClassification({
+    location: "jobSourceUrlIngestion.finalize.updateMany",
+    classification: "NO_RETURN_NEEDED",
+  });
+  logUpdateReturnOptimized({
+    location: "jobSourceUrlIngestion.finalize.updateMany",
+    strategy: "updateMany",
+  });
   const jobRepository = createJobRepository(prisma);
   const { companyId, companyName, url } = payload;
   const trimmedUrl = url?.trim();
@@ -433,9 +447,20 @@ export async function processIngestJobsFromSourceUrl(
             result.inserted,
           );
         }
-        await prisma.job.update({
+        const updateRes = await prisma.job.updateMany({
           where: { id: result.canonical.id },
           data: { contentHash: newContentHash, lastProcessedAt: new Date() },
+        });
+        if (updateRes.count === 0) {
+          throw new Error(`jobSourceUrlIngestion.finalize.missing_row:${result.canonical.id}`);
+        }
+        logUpdateReturnBytesEstimate({
+          location: "jobSourceUrlIngestion.finalize.perCanonical",
+          estimatedBytes: estimateJsonBytes({
+            id: result.canonical.id,
+            contentHash: newContentHash,
+          }),
+          rows: 1,
         });
         return result.inserted;
       } catch (err) {
