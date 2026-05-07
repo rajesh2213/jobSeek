@@ -247,6 +247,7 @@ export async function runGrowthEmailCampaign(params: {
       campaignLabel: campaignLabel(campaignType),
       jobs: jobsPayload,
       ctaUrl: `${clientPublicUrl().replace(/\/$/, "")}/jobs`,
+      upgradeToProUrl: `${clientPublicUrl().replace(/\/$/, "")}/pricing`,
       managePreferencesUrl: `${clientPublicUrl().replace(/\/$/, "")}/saved-searches`,
       unsubscribeUrl: `${apiPublicUrl().replace(/\/$/, "")}/growth-email/unsubscribe?token=${encodeURIComponent(token)}`,
       brandLogoUrl: `${clientPublicUrl().replace(/\/$/, "")}/brand/jobloom-logo-prim.png`,
