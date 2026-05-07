@@ -1,0 +1,11 @@
+[Unit]
+Description=Run JobSeek SERP scheduler daily
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+RandomizedDelaySec=300
+Unit=jobseek-serp-scheduler.service
+
+[Install]
+WantedBy=timers.target

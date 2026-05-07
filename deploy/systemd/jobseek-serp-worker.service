@@ -1,0 +1,16 @@
+[Unit]
+Description=JobSeek SERP Worker
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/jobSeek
+EnvironmentFile=/home/ubuntu/jobSeek/.env
+Environment=WORKER_NAME=jobseek-serp-worker
+ExecStart=/usr/bin/npm run worker:serp -w @jobseek/server
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

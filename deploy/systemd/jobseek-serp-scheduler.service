@@ -1,0 +1,11 @@
+[Unit]
+Description=JobSeek SERP Scheduler (one-shot enqueue)
+After=network.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/jobSeek
+EnvironmentFile=/home/ubuntu/jobSeek/.env
+Environment=WORKER_NAME=jobseek-serp-scheduler
+ExecStart=/usr/bin/npm run scheduler:serp -w @jobseek/server
