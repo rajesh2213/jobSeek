@@ -62,7 +62,7 @@ const SIGNAL_MESSAGES = [
   "Most users apply within first 10 minutes of posting",
   "Aggregate listings from career sites and boards in one place",
   "Resume aware matching helps you spot gaps before you apply",
-  "New roles added every 3 minutes",
+  "See the newest roles before the crowd",
 ];
 
 function RotatingSignal() {
@@ -108,7 +108,7 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
   const cardX = isMobileViewport ? mapRange(progress, 0.16, 0.48, 0, 18) : mapRange(progress, 0, 0.16, 0, 190);
   const cardY = isMobileViewport ? mapRange(progress, 0.16, 0.48, 0, -8) : mapRange(progress, 0, 0.16, 0, -24);
   const cardScale = isMobileViewport ? mapRange(progress, 0.16, 0.48, 1, 0.98) : mapRange(progress, 0, 0.16, 1, 0.92);
-  const cardOpacity = isMobileViewport ? mapRange(progress, 0.18, 0.52, 1, 0.9) : mapRange(progress, 0.01, 0.17, 1, 0.2);
+  const cardOpacity = isMobileViewport ? 1 : mapRange(progress, 0.01, 0.17, 1, 0.2);
   const pulseColor = useTransform(progress, [0, 0.05, 0.1, 0.2], ["#E8533A", "#F97316", "#E8533A", "#E8533A"]);
 
   const stats = useMemo(
@@ -133,7 +133,7 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
             Apply within <span className="font-extrabold text-brand">5 mins</span>
           </span>
           <span className="rounded-full border border-brand/20 bg-brand/[0.06] px-3 py-1.5 text-xs font-semibold text-ink/70 shadow-sm sm:whitespace-nowrap sm:px-3.5">
-            New roles every <span className="font-extrabold text-brand">3 mins</span>
+            <span className="font-extrabold text-brand">See the newest roles before the crowd</span>
           </span>
         </div>
         <h1 className="mt-4 font-display text-[clamp(2.7rem,12vw,3.9rem)] leading-[1.03] text-ink sm:text-6xl">
