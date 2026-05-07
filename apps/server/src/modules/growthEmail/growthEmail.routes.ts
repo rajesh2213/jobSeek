@@ -55,10 +55,16 @@ export function registerGrowthEmailRoutes(server: FastifyInstance): void {
         email: emailRaw,
         source,
         context: request.body?.context ? (request.body.context as object) : undefined,
+        marketingEnabled: true,
+        frequency: "daily",
+        unsubscribedAt: null,
       },
       update: {
         source,
         context: request.body?.context ? (request.body.context as object) : undefined,
+        marketingEnabled: true,
+        frequency: "daily",
+        unsubscribedAt: null,
       },
     });
     return reply.send({ success: true, mode: "lead" });
@@ -127,11 +133,26 @@ export function registerGrowthEmailRoutes(server: FastifyInstance): void {
     if (!userId || !verifyGrowthEmailUnsubscribeToken(userId, "growth_all", secret, token)) {
       return reply.status(403).type("text/html").send("<p>Invalid unsubscribe link.</p>");
     }
-    await ensureEmailPreference(server.prisma, { userId, source: "unsubscribe_link" });
-    await server.prisma.emailPreference.update({
-      where: { userId },
-      data: { marketingEnabled: false, frequency: "off" },
+    const user = await server.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
     });
+    if (user) {
+      await ensureEmailPreference(server.prisma, { userId, source: "unsubscribe_link" });
+      await server.prisma.emailPreference.update({
+        where: { userId },
+        data: { marketingEnabled: false, frequency: "off" },
+      });
+    } else {
+      await server.prisma.emailLead.updateMany({
+        where: { email: userId },
+        data: {
+          marketingEnabled: false,
+          frequency: "off",
+          unsubscribedAt: new Date(),
+        },
+      });
+    }
     return reply
       .type("text/html")
       .send(
@@ -152,11 +173,21 @@ export function registerGrowthEmailRoutes(server: FastifyInstance): void {
           where: { email },
           select: { id: true },
         });
-        if (!user) continue;
-        await ensureEmailPreference(server.prisma, { userId: user.id, source: `provider_${type}` });
-        await server.prisma.emailPreference.update({
-          where: { userId: user.id },
-          data: { marketingEnabled: false, frequency: "off" },
+        if (user) {
+          await ensureEmailPreference(server.prisma, { userId: user.id, source: `provider_${type}` });
+          await server.prisma.emailPreference.update({
+            where: { userId: user.id },
+            data: { marketingEnabled: false, frequency: "off" },
+          });
+          continue;
+        }
+        await server.prisma.emailLead.updateMany({
+          where: { email },
+          data: {
+            marketingEnabled: false,
+            frequency: "off",
+            unsubscribedAt: new Date(),
+          },
         });
       }
       return reply.send({ success: true });

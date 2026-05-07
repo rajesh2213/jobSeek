@@ -313,12 +313,38 @@ model EmailPreference {
 }
 
 model EmailLead {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  source    String
-  context   Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                    String              @id @default(uuid())
+  email                 String              @unique
+  source                String
+  context               Json?
+  marketingEnabled      Boolean             @default(true)
+  frequency             EmailFrequency      @default(daily)
+  lastGrowthEmailSentAt DateTime?
+  unsubscribedAt        DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  growthEmailSends      EmailLeadGrowthSend[]
+
+  @@index([marketingEnabled, frequency])
+  @@index([lastGrowthEmailSentAt])
+}
+
+model EmailLeadGrowthSend {
+  id                String                  @id @default(uuid())
+  emailLeadId       String
+  emailLead         EmailLead               @relation(fields: [emailLeadId], references: [id], onDelete: Cascade)
+  campaignType      GrowthEmailCampaignType
+  periodKey         String
+  status            GrowthEmailSendStatus   @default(sent)
+  providerMessageId String?
+  subjectUsed       String?
+  jobCountSent      Int                     @default(0)
+  sentAt            DateTime?
+  error             String?
+  createdAt         DateTime                @default(now())
+
+  @@unique([emailLeadId, campaignType, periodKey])
+  @@index([emailLeadId, createdAt])
 }
 
 model GrowthEmailSend {

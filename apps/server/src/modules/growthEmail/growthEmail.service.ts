@@ -129,8 +129,10 @@ export async function runGrowthEmailCampaign(params: {
   const now = new Date();
   const pKey = periodKey(campaignType, now);
   const frequency = frequencyForCampaign(campaignType);
+  const page = Math.max(1, params.page ?? 1);
+  const pageSize = params.pageSize ?? DEFAULT_PAGE_SIZE;
 
-  const recipients = params.userId
+  const userRecipients = params.userId
     ? await prisma.user.findMany({
         where: { id: params.userId },
         select: { id: true, email: true },
@@ -143,15 +145,42 @@ export async function runGrowthEmailCampaign(params: {
           },
         },
         select: { id: true, email: true },
-        skip: (Math.max(1, params.page ?? 1) - 1) * (params.pageSize ?? DEFAULT_PAGE_SIZE),
-        take: params.pageSize ?? DEFAULT_PAGE_SIZE,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
       });
+
+  const leadCandidates =
+    !params.userId && campaignType === "daily_digest"
+      ? await prisma.emailLead.findMany({
+          where: {
+            marketingEnabled: true,
+            frequency: "daily",
+            unsubscribedAt: null,
+          },
+          select: { id: true, email: true },
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+        })
+      : [];
+  const leadEmails = leadCandidates.map((lead) => lead.email);
+  const userEmails =
+    leadEmails.length > 0
+      ? new Set(
+          (
+            await prisma.user.findMany({
+              where: { email: { in: leadEmails } },
+              select: { email: true },
+            })
+          ).map((row) => row.email),
+        )
+      : new Set<string>();
+  const leadRecipients = leadCandidates.filter((lead) => !userEmails.has(lead.email));
 
   const jobService = new JobService(createJobRepository(prisma));
   let sent = 0;
   let skipped = 0;
 
-  for (const recipient of recipients) {
+  for (const recipient of userRecipients) {
     const pref = await prisma.emailPreference.upsert({
       where: { userId: recipient.id },
       create: {
@@ -296,5 +325,131 @@ export async function runGrowthEmailCampaign(params: {
     sent += 1;
   }
 
-  return { processed: recipients.length, sent, skipped };
+  for (const lead of leadRecipients) {
+    const leadRecord = await prisma.emailLead.findUnique({
+      where: { id: lead.id },
+      select: {
+        id: true,
+        marketingEnabled: true,
+        frequency: true,
+        lastGrowthEmailSentAt: true,
+      },
+    });
+    if (!leadRecord || !leadRecord.marketingEnabled || leadRecord.frequency === "off") {
+      skipped += 1;
+      continue;
+    }
+
+    if (
+      leadRecord.lastGrowthEmailSentAt &&
+      now.getTime() - leadRecord.lastGrowthEmailSentAt.getTime() < GLOBAL_THROTTLE_MS
+    ) {
+      skipped += 1;
+      continue;
+    }
+
+    const existingLeadSend = await prisma.emailLeadGrowthSend.findUnique({
+      where: {
+        emailLeadId_campaignType_periodKey: {
+          emailLeadId: lead.id,
+          campaignType,
+          periodKey: pKey,
+        },
+      },
+    });
+    if (existingLeadSend) {
+      skipped += 1;
+      continue;
+    }
+
+    const listing = await jobService.list({
+      page: 1,
+      limit: 20,
+      sort: "latest",
+      filters: {
+        postedAfter: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+      },
+    });
+    const selected = listing.items.slice(0, 20);
+    if (selected.length === 0) {
+      skipped += 1;
+      await prisma.emailLeadGrowthSend.create({
+        data: {
+          emailLeadId: lead.id,
+          campaignType,
+          periodKey: pKey,
+          status: "skipped",
+          jobCountSent: 0,
+          error: "No eligible jobs after dedupe",
+        },
+      });
+      continue;
+    }
+
+    const jobsPayload: GrowthEmailTemplateJob[] = selected.map((j) => ({
+      id: j.id,
+      title: j.title,
+      company: j.company.name,
+      location: [j.locationCity, j.locationCountry].filter(Boolean).join(", ") || "Remote/Unknown",
+      url: `${clientPublicUrl().replace(/\/$/, "")}/job/${j.id}`,
+      postedAt: j.postedAt ? j.postedAt.toISOString().slice(0, 10) : "Recently posted",
+      category: j.category || "other",
+    }));
+    const subject = getGrowthEmailSubject({ campaignType, jobCount: jobsPayload.length });
+    const secret = process.env.JOB_ALERT_HMAC_SECRET?.trim();
+    if (!secret) {
+      skipped += 1;
+      continue;
+    }
+    const token = signGrowthEmailUnsubscribeToken(
+      lead.email,
+      "growth_all",
+      secret,
+      Date.now() + 30 * 24 * 60 * 60 * 1000,
+    );
+    const html = renderGrowthEmailHtml({
+      userName: lead.email.split("@")[0] ?? "there",
+      campaignLabel: campaignLabel(campaignType),
+      jobs: jobsPayload,
+      ctaUrl: `${clientPublicUrl().replace(/\/$/, "")}/jobs`,
+      upgradeToProUrl: `${clientPublicUrl().replace(/\/$/, "")}/pricing`,
+      managePreferencesUrl: `${clientPublicUrl().replace(/\/$/, "")}/jobs`,
+      unsubscribeUrl: `${apiPublicUrl().replace(/\/$/, "")}/growth-email/unsubscribe?token=${encodeURIComponent(token)}`,
+      brandLogoUrl: `${clientPublicUrl().replace(/\/$/, "")}/brand/jobloom-logo-prim.png`,
+    });
+
+    const send = await sendEmail({
+      to: lead.email,
+      subject,
+      html,
+      eventName: "growth_email_lead",
+    });
+
+    await prisma.emailLeadGrowthSend.create({
+      data: {
+        emailLeadId: lead.id,
+        campaignType,
+        periodKey: pKey,
+        status: send.ok ? "sent" : "failed",
+        providerMessageId: send.messageId,
+        subjectUsed: subject,
+        jobCountSent: jobsPayload.length,
+        sentAt: send.ok ? now : null,
+        error: send.ok ? null : send.error,
+      },
+    });
+
+    if (!send.ok) {
+      skipped += 1;
+      continue;
+    }
+
+    await prisma.emailLead.update({
+      where: { id: lead.id },
+      data: { lastGrowthEmailSentAt: now },
+    });
+    sent += 1;
+  }
+
+  return { processed: userRecipients.length + leadRecipients.length, sent, skipped };
 }
