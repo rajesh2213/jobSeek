@@ -101,14 +101,62 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
     return () => mq.removeEventListener("change", apply);
   }, []);
 
-  const heroScale = isMobileViewport ? mapRange(progress, 0.12, 0.42, 1, 0.985) : mapRange(progress, 0, 0.16, 1, 0.95);
-  const heroY = isMobileViewport ? mapRange(progress, 0.12, 0.42, 0, -10) : mapRange(progress, 0, 0.16, 0, -28);
-  const heroOpacity = isMobileViewport ? mapRange(progress, 0.16, 0.48, 1, 0.9) : mapRange(progress, 0.04, 0.15, 1, 0.24);
-  const cardRotate = isMobileViewport ? mapRange(progress, 0.16, 0.48, 0, 4) : mapRange(progress, 0, 0.16, 0, 14);
-  const cardX = isMobileViewport ? mapRange(progress, 0.16, 0.48, 0, 18) : mapRange(progress, 0, 0.16, 0, 190);
-  const cardY = isMobileViewport ? mapRange(progress, 0.16, 0.48, 0, -8) : mapRange(progress, 0, 0.16, 0, -24);
-  const cardScale = isMobileViewport ? mapRange(progress, 0.16, 0.48, 1, 0.98) : mapRange(progress, 0, 0.16, 1, 0.92);
-  const cardOpacity = isMobileViewport ? 1 : mapRange(progress, 0.01, 0.17, 1, 0.2);
+  const heroScale = mapRange(
+    progress,
+    isMobileViewport ? 0.12 : 0,
+    isMobileViewport ? 0.42 : 0.16,
+    1,
+    isMobileViewport ? 0.985 : 0.95,
+  );
+  const heroY = mapRange(
+    progress,
+    isMobileViewport ? 0.12 : 0,
+    isMobileViewport ? 0.42 : 0.16,
+    0,
+    isMobileViewport ? -10 : -28,
+  );
+  const heroOpacity = mapRange(
+    progress,
+    isMobileViewport ? 0.16 : 0.04,
+    isMobileViewport ? 0.48 : 0.15,
+    1,
+    isMobileViewport ? 0.9 : 0.24,
+  );
+  const cardRotate = mapRange(
+    progress,
+    isMobileViewport ? 0.16 : 0,
+    isMobileViewport ? 0.48 : 0.16,
+    0,
+    isMobileViewport ? 4 : 14,
+  );
+  const cardX = mapRange(
+    progress,
+    isMobileViewport ? 0.16 : 0,
+    isMobileViewport ? 0.48 : 0.16,
+    0,
+    isMobileViewport ? 18 : 190,
+  );
+  const cardY = mapRange(
+    progress,
+    isMobileViewport ? 0.16 : 0,
+    isMobileViewport ? 0.48 : 0.16,
+    0,
+    isMobileViewport ? -8 : -24,
+  );
+  const cardScale = mapRange(
+    progress,
+    isMobileViewport ? 0.16 : 0,
+    isMobileViewport ? 0.48 : 0.16,
+    1,
+    isMobileViewport ? 0.98 : 0.92,
+  );
+  const cardOpacity = mapRange(
+    progress,
+    isMobileViewport ? 0 : 0.01,
+    isMobileViewport ? 1 : 0.17,
+    1,
+    isMobileViewport ? 1 : 0.2,
+  );
   const pulseColor = useTransform(progress, [0, 0.05, 0.1, 0.2], ["#E8533A", "#F97316", "#E8533A", "#E8533A"]);
 
   const stats = useMemo(
