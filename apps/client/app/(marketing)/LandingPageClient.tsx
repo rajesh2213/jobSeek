@@ -163,7 +163,7 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
     () =>
       [
         { k: "jobs", v: HERO_JOB_INDEX_TOTAL, numberSuffix: "+" as const },
-        { k: "More interviews", v: 2.7, suffix: "x" as const },
+        { k: "More Interviews", headlineOnly: true as const },
       ] as const,
     [],
   );
@@ -215,12 +215,17 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
               viewport={{ once: true }}
               transition={{ delay: i * 0.12 }}
             >
-              <p className="text-xl font-extrabold tabular-nums text-ink">
-                {s.v > 10 ? <CountUp to={s.v} /> : s.v}
-                {"numberSuffix" in s && s.numberSuffix ? s.numberSuffix : ""}
-                {"suffix" in s && s.suffix ? s.suffix : ""}
-              </p>
-              <p className="text-xs text-ink/60">{s.k}</p>
+              {"headlineOnly" in s && s.headlineOnly ? (
+                <p className="text-xl font-extrabold text-ink">{s.k}</p>
+              ) : (
+                <>
+                  <p className="text-xl font-extrabold tabular-nums text-ink">
+                    {"v" in s && s.v > 10 ? <CountUp to={s.v} /> : "v" in s ? s.v : null}
+                    {"numberSuffix" in s && s.numberSuffix ? s.numberSuffix : ""}
+                  </p>
+                  <p className="text-xs text-ink/60">{s.k}</p>
+                </>
+              )}
             </motion.div>
           ))}
         </div>
