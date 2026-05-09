@@ -10,6 +10,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -61,6 +62,8 @@ import {
 } from "../../lib/userLocalResetTime";
 import { UserLocalResetCaption } from "./UserLocalResetCaption";
 import { JobsListingEmailCapturePopup } from "./JobsListingEmailCapturePopup";
+import { SavedSearchManageBody } from "./SavedSearchManageBody";
+import { useIsLgUp } from "../../lib/useIsLgUp";
 
 const TimeAdvantageSimulator = dynamic(
   () => import("./TimeAdvantageSimulator").then((m) => m.TimeAdvantageSimulator),
@@ -552,6 +555,9 @@ export function JobsSearchClient({
   const savedSearchPopoverRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [alertUpdatingId, setAlertUpdatingId] = useState<string | null>(null);
   const [flashAppliedJobId, setFlashAppliedJobId] = useState<string | null>(null);
+  const [mobileSavedSheetId, setMobileSavedSheetId] = useState<string | null>(null);
+  const [savedSheetPortalReady, setSavedSheetPortalReady] = useState(false);
+  const isLgUp = useIsLgUp();
   const [isFilterPending, startFilterTransition] = useTransition();
   const scrollPromoChromeVisible = useScrollRevealPromos();
   /** Tracks which search the current `listJobs` / `listMeta` belong to; avoids wiping client "load more" on RSC refresh. */
@@ -650,6 +656,35 @@ export function JobsSearchClient({
       }
     };
   }, []);
+
+  useEffect(() => {
+    setSavedSheetPortalReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mobileSavedSheetId) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileSavedSheetId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [mobileSavedSheetId]);
+
+  useEffect(() => {
+    if (!mobileSavedSheetId) return;
+    if (!savedSearches.some((s) => s.id === mobileSavedSheetId)) {
+      setMobileSavedSheetId(null);
+    }
+  }, [savedSearches, mobileSavedSheetId]);
+
+  useEffect(() => {
+    if (isLgUp) setMobileSavedSheetId(null);
+  }, [isLgUp]);
 
   useEffect(() => {
     const params = new URLSearchParams(urlKey);
@@ -922,6 +957,14 @@ export function JobsSearchClient({
     return urlKey ? `/jobs?${urlKey}` : "/jobs";
   }, [urlKey]);
 
+  const mobileSheetSaved = useMemo(
+    () =>
+      mobileSavedSheetId
+        ? savedSearches.find((s) => s.id === mobileSavedSheetId) ?? null
+        : null,
+    [mobileSavedSheetId, savedSearches],
+  );
+
   const savedMatch = useMemo(() => {
     const current = normalizeQueryForMatch(canonicalQuery);
     return (
@@ -1010,6 +1053,7 @@ export function JobsSearchClient({
         setSavedSearchNotice("Could not delete saved search");
       } finally {
         setDeletingSavedId(null);
+        setMobileSavedSheetId((cur) => (cur === id ? null : cur));
       }
     },
     [deletingSavedId, getToken, isSignedIn, savedSearches],
@@ -1294,7 +1338,10 @@ export function JobsSearchClient({
                   normalizeQueryForMatch(canonicalQuery);
                 const displayName = saved.name?.trim() || "Saved search";
                 const isPopoverOpen =
-                  hoveredSavedId === saved.id || editingSavedId === saved.id;
+                  isLgUp &&
+                  (hoveredSavedId === saved.id || editingSavedId === saved.id);
+                const isMobileSheetForSaved =
+                  !isLgUp && mobileSavedSheetId === saved.id;
                 return (
                   <div
                     key={saved.id}
@@ -1311,16 +1358,37 @@ export function JobsSearchClient({
                         else m.delete(saved.id);
                       }}
                       type="button"
-                      onMouseEnter={() => onSavedSearchTriggerEnter(saved.id)}
-                      onMouseLeave={(e) => onSavedSearchTriggerLeave(saved.id, e)}
-                      onClick={() =>
-                        startFilterTransition(() => {
-                          signalProgrammaticNavigation(saved.query);
-                          router.push(saved.query);
-                        })
+                      onMouseEnter={
+                        isLgUp
+                          ? () => onSavedSearchTriggerEnter(saved.id)
+                          : undefined
                       }
+                      onMouseLeave={
+                        isLgUp
+                          ? (e) => onSavedSearchTriggerLeave(saved.id, e)
+                          : undefined
+                      }
+                      onClick={() => {
+                        if (isLgUp) {
+                          startFilterTransition(() => {
+                            signalProgrammaticNavigation(saved.query);
+                            router.push(saved.query);
+                          });
+                        } else {
+                          cancelSavedSearchHoverClose();
+                          setHoveredSavedId(null);
+                          setMobileSavedSheetId((prev) => {
+                            if (prev !== saved.id) {
+                              setEditingSavedId(null);
+                              setEditingName("");
+                            }
+                            return saved.id;
+                          });
+                        }
+                      }}
                       aria-current={isActiveSaved ? "page" : undefined}
-                      aria-expanded={isPopoverOpen}
+                      aria-expanded={isLgUp ? isPopoverOpen : isMobileSheetForSaved}
+                      aria-haspopup={isLgUp ? undefined : "dialog"}
                       className={cn(
                         "rounded-full border px-3 py-1.5 text-xs font-medium transition",
                         isActiveSaved
@@ -1349,178 +1417,27 @@ export function JobsSearchClient({
                         }}
                         onMouseEnter={() => onSavedSearchPanelEnter(saved.id)}
                         onMouseLeave={(e) => onSavedSearchPanelLeave(saved.id, e)}
-                        className="absolute left-0 top-full z-20 mt-1.5 w-80 max-w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-ink/10 bg-surface p-3.5 text-xs leading-relaxed text-ink shadow-lg ring-1 ring-ink/5"
+                        className="absolute left-0 top-full z-20 mt-1.5 w-80 max-w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-ink/10 bg-surface p-3.5 shadow-lg ring-1 ring-ink/5"
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="line-clamp-2 font-semibold text-ink">
-                            {displayName}
-                          </p>
-                          <div className="flex shrink-0 items-center gap-1">
-                            <button
-                              type="button"
-                              className="rounded-md p-1.5 text-ink transition-colors hover:bg-ink/10 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onStartRenameSavedSearch(saved);
-                              }}
-                              aria-label="Rename saved search"
-                              title="Rename saved search"
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                strokeWidth={1.75}
-                                stroke="currentColor"
-                                className="h-4 w-4"
-                                aria-hidden
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125"
-                                />
-                              </svg>
-                            </button>
-                            <button
-                              type="button"
-                              className="rounded-md p-1.5 text-ink transition-colors hover:bg-red-500/10 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40 disabled:pointer-events-none disabled:opacity-40"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                void onDeleteSavedSearch(saved.id);
-                              }}
-                              disabled={deletingSavedId === saved.id}
-                              aria-label="Delete saved search"
-                              title="Delete saved search"
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                strokeWidth={1.75}
-                                stroke="currentColor"
-                                className="h-4 w-4"
-                                aria-hidden
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                                />
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-                        {editingSavedId === saved.id ? (
-                          <div className="mt-2 flex items-center gap-2">
-                            <input
-                              value={editingName}
-                              onChange={(e) => setEditingName(e.target.value)}
-                              className="h-8 w-full rounded-lg border border-ink/20 bg-white px-2.5 text-xs text-ink placeholder:text-ink-muted shadow-sm focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
-                              placeholder="Saved search name"
-                              maxLength={80}
-                            />
-                            <button
-                              type="button"
-                              className="shrink-0 rounded-lg bg-brand px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-hover"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                void onRenameSavedSearch(saved.id);
-                              }}
-                              disabled={renamingSavedId === saved.id}
-                            >
-                              Save
-                            </button>
-                          </div>
-                        ) : null}
-                        {details.length > 0 ? (
-                          <div className="mt-3 max-h-40 space-y-2.5 overflow-y-auto pr-0.5">
-                            {details.map((row) => (
-                              <div
-                                key={`${saved.id}-${row.label}`}
-                                className="text-xs leading-snug"
-                              >
-                                <span className="block text-[11px] font-semibold uppercase tracking-wide text-ink/50">
-                                  {row.label}
-                                </span>
-                                <span className="mt-0.5 block break-words text-ink/90">
-                                  {row.value}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="mt-3 text-ink-muted">No filters</p>
-                        )}
-                        <div className="mt-3 rounded-lg border border-brand/25 bg-brand/5 p-3 ring-1 ring-brand/10">
-                          <p className="flex items-center gap-1.5 text-sm font-semibold text-brand">
-                            <span aria-hidden className="text-base leading-none">
-                              🔔
-                            </span>
-                            Job alerts
-                          </p>
-                          {isPro ? (
-                            <div className="mt-2.5 space-y-2">
-                              <label className="flex cursor-pointer items-start gap-2 text-ink">
-                                <input
-                                  type="checkbox"
-                                  checked={saved.alertEnabled}
-                                  disabled={alertUpdatingId === saved.id}
-                                  onChange={(e) => {
-                                    e.stopPropagation();
-                                    void onAlertSavedSearch(saved, e.target.checked);
-                                  }}
-                                  className="mt-0.5 rounded border-ink/30 text-brand focus:ring-brand/30"
-                                />
-                                <span className="leading-snug">
-                                  Email when new jobs match
-                                </span>
-                              </label>
-                              <div className="flex flex-wrap items-center gap-2 text-ink/80">
-                                <span>Notify every</span>
-                                <select
-                                  className="rounded-md border border-ink/15 bg-white px-2 py-1 text-xs font-medium text-ink shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
-                                  value={saved.alertThreshold === 10 ? 10 : 5}
-                                  disabled={
-                                    alertUpdatingId === saved.id || !saved.alertEnabled
-                                  }
-                                  onClick={(e) => e.stopPropagation()}
-                                  onChange={(e) => {
-                                    e.stopPropagation();
-                                    const v = (Number(e.target.value) === 10 ? 10 : 5) as 5 | 10;
-                                    void onAlertSavedSearch(saved, true, v);
-                                  }}
-                                >
-                                  <option value={5}>5</option>
-                                  <option value={10}>10</option>
-                                </select>
-                                <span>new jobs</span>
-                              </div>
-                              <p className="text-[11px] text-ink/55">
-                                Last sent: {formatAlertLastSent(saved.alertLastSentAt)}
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="mt-2.5 space-y-2">
-                              <p className="leading-snug text-ink/85">
-                                <span className="mr-1.5 inline-flex rounded bg-brand/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand">
-                                  Pro
-                                </span>
-                                Get notified when new jobs match this search
-                              </p>
-                              <Link
-                                href="/pricing"
-                                className="inline-block text-sm font-semibold text-brand underline underline-offset-2 hover:text-brand-hover"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                Upgrade to unlock →
-                              </Link>
-                            </div>
-                          )}
-                        </div>
+                        <SavedSearchManageBody
+                          saved={saved}
+                          details={details}
+                          displayName={displayName}
+                          isPro={isPro}
+                          editingSavedId={editingSavedId}
+                          editingName={editingName}
+                          setEditingName={setEditingName}
+                          renamingSavedId={renamingSavedId}
+                          onStartRename={onStartRenameSavedSearch}
+                          onRename={(id) => void onRenameSavedSearch(id)}
+                          onDelete={(id) => void onDeleteSavedSearch(id)}
+                          deletingSavedId={deletingSavedId}
+                          onAlert={(s, enabled, threshold) =>
+                            void onAlertSavedSearch(s, enabled, threshold)
+                          }
+                          alertUpdatingId={alertUpdatingId}
+                          formatAlertLastSent={formatAlertLastSent}
+                        />
                       </div>
                     ) : null}
                   </div>
@@ -1635,6 +1552,95 @@ export function JobsSearchClient({
               </Link>
             </div>
           ) : null}
+          {savedSheetPortalReady &&
+          !isLgUp &&
+          mobileSheetSaved &&
+          typeof document !== "undefined"
+            ? createPortal(
+                <div
+                  className="fixed inset-0 z-[240] flex flex-col justify-end bg-black/45"
+                  role="presentation"
+                  onClick={() => setMobileSavedSheetId(null)}
+                >
+                  <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="saved-search-sheet-title"
+                    className="flex max-h-[min(92dvh,100%)] w-full flex-col overflow-hidden rounded-t-2xl border border-ink/10 bg-surface shadow-[0_-12px_48px_rgba(0,0,0,0.2)]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex shrink-0 items-center justify-between border-b border-ink/10 px-4 py-3">
+                      <h2
+                        id="saved-search-sheet-title"
+                        className="pr-2 text-sm font-semibold text-ink"
+                      >
+                        Saved search
+                      </h2>
+                      <button
+                        type="button"
+                        className="rounded-lg p-2 text-ink/60 hover:bg-ink/10 hover:text-ink"
+                        aria-label="Close saved search"
+                        onClick={() => setMobileSavedSheetId(null)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
+                      <SavedSearchManageBody
+                        saved={mobileSheetSaved}
+                        details={buildSavedSearchDetails(mobileSheetSaved.query)}
+                        displayName={
+                          mobileSheetSaved.name?.trim() || "Saved search"
+                        }
+                        isPro={isPro}
+                        editingSavedId={editingSavedId}
+                        editingName={editingName}
+                        setEditingName={setEditingName}
+                        renamingSavedId={renamingSavedId}
+                        onStartRename={onStartRenameSavedSearch}
+                        onRename={(id) => void onRenameSavedSearch(id)}
+                        onDelete={(id) => void onDeleteSavedSearch(id)}
+                        deletingSavedId={deletingSavedId}
+                        onAlert={(s, enabled, threshold) =>
+                          void onAlertSavedSearch(s, enabled, threshold)
+                        }
+                        alertUpdatingId={alertUpdatingId}
+                        formatAlertLastSent={formatAlertLastSent}
+                      />
+                    </div>
+                    <div className="shrink-0 space-y-2 border-t border-ink/10 bg-surface px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                      <Button
+                        variant="primary"
+                        size="md"
+                        className="w-full font-bold"
+                        type="button"
+                        onClick={() => {
+                          const q = mobileSheetSaved.query;
+                          startFilterTransition(() => {
+                            signalProgrammaticNavigation(q);
+                            router.push(q);
+                          });
+                          setMobileSavedSheetId(null);
+                        }}
+                      >
+                        Run this search
+                      </Button>
+                      <Button
+                        variant="outline"
+                        outlineTone="teal"
+                        size="md"
+                        className="w-full font-semibold"
+                        type="button"
+                        onClick={() => setMobileSavedSheetId(null)}
+                      >
+                        Close
+                      </Button>
+                    </div>
+                  </div>
+                </div>,
+                document.body,
+              )
+            : null}
         </Container>
         {isFilterPending ? (
           <div

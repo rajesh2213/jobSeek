@@ -448,8 +448,9 @@ export function JobsInlineFilters({
   /** `overflow-visible` so the city typeahead list (absolute below the input) is not clipped. */
   const locationsPanelClass =
     "absolute left-0 top-full z-[100] mt-2 max-w-[min(100vw-2rem,380px)] rounded-xl border border-ink/10 bg-surface p-3 shadow-lg overflow-visible";
+  /** Mobile: full-width triggers; desktop (`lg:`): fixed-width toolbar chips in one wrapping row. */
   const triggerClass =
-    "flex h-10 min-h-10 w-full min-w-0 items-center whitespace-nowrap rounded-xl border border-ink/15 bg-surface px-3 text-left text-xs font-bold uppercase tracking-wide text-ink shadow-sm transition-colors hover:border-ink/30 focus:outline-none focus:ring-2 focus:ring-brand/20 sm:px-4 lg:h-10 lg:min-h-10 lg:w-auto lg:min-w-[140px] lg:max-w-[220px]";
+    "flex h-10 w-full min-w-0 shrink-0 items-center whitespace-nowrap rounded-xl border border-ink/15 bg-surface px-3 text-left text-xs font-bold uppercase tracking-wide text-ink shadow-sm transition-colors hover:border-ink/30 focus:outline-none focus:ring-2 focus:ring-brand/20 sm:px-4 lg:w-auto lg:min-w-[140px] lg:max-w-[220px]";
   const rolePanelClass = cn(
     panelClass,
     "min-w-[min(100vw-2rem,400px)] max-w-[min(100vw-2rem,460px)]",
@@ -482,13 +483,12 @@ export function JobsInlineFilters({
           "lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:ring-0",
         )}
       >
-        <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-ink/45 lg:sr-only">
+        <div className="grid grid-cols-2 gap-2 lg:flex lg:flex-wrap lg:items-center lg:gap-x-2 lg:gap-y-2">
+        <p className="col-span-2 mb-0.5 text-[10px] font-bold uppercase tracking-wide text-ink/45 lg:hidden">
           Refine results
         </p>
-        <div className="flex w-full flex-col gap-2.5 lg:flex-row lg:flex-wrap lg:items-start lg:gap-3">
-          <div className="grid w-full grid-cols-2 gap-2 lg:contents">
         <div
-          className="relative col-span-2 w-full min-w-0 lg:col-span-1 lg:w-auto lg:min-w-[140px] lg:max-w-[180px]"
+          className="relative col-span-2 w-full min-w-0 lg:w-auto lg:min-w-[140px] lg:max-w-[180px]"
           data-dropdown-id="role"
         >
           <button
@@ -593,7 +593,7 @@ export function JobsInlineFilters({
           </AnimatePresence>
         </div>
 
-        <div className="col-span-2 flex w-full min-w-0 items-center gap-0.5 rounded-xl border border-ink/15 bg-white p-1 lg:w-auto lg:min-w-[220px] lg:max-w-[260px] lg:gap-1">
+        <div className="col-span-2 flex w-full min-w-0 shrink-0 items-center gap-0.5 rounded-xl border border-ink/15 bg-white p-1 lg:w-auto lg:min-w-[220px] lg:max-w-[260px] lg:gap-1">
           {[
             { label: "Remote", value: "remote" },
             { label: "Onsite", value: "onsite" },
@@ -605,7 +605,7 @@ export function JobsInlineFilters({
               <button
                 key={item.label}
                 type="button"
-                className={`min-h-9 flex-1 rounded-lg px-1.5 py-1.5 text-center text-[11px] font-semibold leading-tight whitespace-nowrap transition sm:px-2.5 sm:text-sm ${active ? "bg-orange-500 text-white shadow-sm" : "text-ink/60 hover:bg-ink/5 hover:text-ink"}`}
+                className={`min-h-9 flex-1 rounded-lg px-1.5 py-1.5 text-center text-[11px] font-semibold leading-tight whitespace-nowrap transition sm:px-2.5 lg:text-sm ${active ? "bg-orange-500 text-white shadow-sm" : "text-ink/60 hover:bg-ink/5 hover:text-ink"}`}
                 onClick={() => toggleType(value)}
               >
                 {item.label}
@@ -615,7 +615,7 @@ export function JobsInlineFilters({
         </div>
 
         <div
-          className="relative col-span-1 w-full min-w-0 lg:min-w-[140px] lg:max-w-[220px]"
+          className="relative col-span-1 w-full min-w-0 lg:w-auto lg:min-w-[140px] lg:max-w-[220px]"
           data-dropdown-id="skills"
         >
           <button
@@ -706,7 +706,7 @@ export function JobsInlineFilters({
         </div>
 
         <div
-          className="relative col-span-1 w-full min-w-0 lg:min-w-[140px] lg:max-w-[220px]"
+          className="relative col-span-1 w-full min-w-0 lg:w-auto lg:min-w-[140px] lg:max-w-[220px]"
           data-dropdown-id="experience"
         >
           <button
@@ -741,7 +741,7 @@ export function JobsInlineFilters({
         </div>
 
         <div
-          className="relative col-span-1 w-full min-w-0 lg:min-w-[140px] lg:max-w-[220px]"
+          className="relative col-span-1 w-full min-w-0 lg:w-auto lg:min-w-[140px] lg:max-w-[220px]"
           data-dropdown-id="posted"
         >
           <button
@@ -782,7 +782,7 @@ export function JobsInlineFilters({
         </div>
 
         <div
-          className="relative col-span-1 w-full min-w-0 lg:min-w-[140px] lg:max-w-[220px]"
+          className="relative col-span-1 w-full min-w-0 lg:w-auto lg:min-w-[140px] lg:max-w-[220px]"
           data-dropdown-id="locations"
         >
           <button
@@ -1001,9 +1001,9 @@ export function JobsInlineFilters({
           </AnimatePresence>
         </div>
 
-        <div className="filter-chip col-span-2 w-full lg:flex lg:min-w-[8rem] lg:flex-none lg:transition-all lg:duration-300 lg:ease-chip lg:hover:-translate-y-0.5 lg:hover:scale-[1.03]">
+        <div className="filter-chip col-span-2 w-full shrink-0 transition-all duration-300 ease-chip hover:-translate-y-0.5 hover:scale-[1.03] lg:col-span-1 lg:w-auto">
           {onClearFilters ? (
-            <div className="flex w-full items-stretch justify-stretch gap-2">
+            <div className="flex w-full items-stretch justify-stretch gap-2 lg:w-auto">
               <Button
                 variant="outline"
                 outlineTone="rose"
@@ -1035,7 +1035,6 @@ export function JobsInlineFilters({
             </Button>
           )}
         </div>
-          </div>
         </div>
       </div>
 
