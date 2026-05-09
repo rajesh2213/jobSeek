@@ -28,6 +28,14 @@ import { recordJobBlockedNotReady } from "../../services/jobStatusMetrics.servic
 import { LIMITS } from "../../config/limits.js";
 import { enqueueGrowthEmailEvent } from "../growthEmail/growthEmail.service.js";
 import { isLikelyPrefetchRequest } from "../../utils/clientNavigationHints.js";
+import { jobListRequestDiag } from "./jobListRequestContext.js";
+import {
+  createEventLoopUtilizationOrigin,
+  eventLoopUtilizationSince,
+  getJobListMeteredSlowThresholdMs,
+  logJobListMeteredSlow,
+  summarizeJobDiscoveryFilters,
+} from "./jobListMeteredDiag.js";
 
 interface GetJobParams {
   id: string;
@@ -123,62 +131,95 @@ export function registerJobRoutes(
 
       const meteredLimit = isSafeToCache ? Math.min(limit, 50) : limit;
 
-      const out = await runMeteredJobsList<JobWithCompany>(
-        server.prisma,
-        redis,
-        capCtx,
-        bypassCap,
+      const durMs = (a: number, b: number) => Math.max(0, Math.round((b - a) * 100) / 100);
+      const eluOrigin = createEventLoopUtilizationOrigin();
+
+      return jobListRequestDiag.run(
         {
+          sort,
           page,
-          limit: meteredLimit,
-          offset,
-          fetchList: (effectiveLimit) =>
-            jobService.list({
+          limit,
+          meteredLimit,
+          filterSummary: summarizeJobDiscoveryFilters(filters),
+        },
+        async () => {
+          const out = await runMeteredJobsList<JobWithCompany>(
+            server.prisma,
+            redis,
+            capCtx,
+            bypassCap,
+            {
               page,
-              limit: effectiveLimit,
-              paginationStride: meteredLimit,
+              limit: meteredLimit,
               offset,
-              filters,
+              fetchList: (effectiveLimit) =>
+                jobService.list({
+                  page,
+                  limit: effectiveLimit,
+                  paginationStride: meteredLimit,
+                  offset,
+                  filters,
+                  sort,
+                  includeProcessing,
+                }),
+            },
+          );
+          const tAfterList = performance.now();
+
+          const meteredListMs = durMs(tAfterCapCtx, tAfterList);
+          reply.header(
+            "Server-Timing",
+            [
+              `rate_limit;dur=${durMs(tRouteStart, tAfterRateLimit)}`,
+              `cap_ctx;dur=${durMs(tAfterRateLimit, tAfterCapCtx)}`,
+              `metered_list;dur=${meteredListMs}`,
+            ].join(", "),
+          );
+
+          const meteredSlowTh = getJobListMeteredSlowThresholdMs();
+          if (meteredSlowTh > 0 && meteredListMs >= meteredSlowTh) {
+            const elu = eventLoopUtilizationSince(eluOrigin);
+            logJobListMeteredSlow({
+              meteredListMs,
+              rateLimitMs: durMs(tRouteStart, tAfterRateLimit),
+              capCtxMs: durMs(tAfterRateLimit, tAfterCapCtx),
               sort,
-              includeProcessing,
-            }),
+              page,
+              meteredLimit,
+              clientLimit: limit,
+              offset: offset ?? null,
+              eventLoopIdleMs: elu.idleMs,
+              eventLoopActiveMs: elu.activeMs,
+              eventLoopUtilization: elu.utilization,
+              filterSummary: summarizeJobDiscoveryFilters(filters),
+            });
+          }
+
+          if (isSafeToCache) {
+            reply.header("Cache-Control", "public, max-age=60, s-maxage=120");
+          } else {
+            const cacheableJobsList = false;
+            const cacheBypassReason = cacheableJobsList
+              ? "anonymous_public_listing"
+              : capCtx.internalUserId != null || hasAuthHeader
+                ? "authenticated_request"
+                : "metered_or_personalized";
+
+            setApiCacheHeader(reply, request, {
+              route: "/jobs",
+              cacheable: cacheableJobsList,
+              reason: cacheBypassReason,
+            });
+          }
+
+          return reply.send({
+            data: out.items.map((j) =>
+              toJobListJson(j as unknown as JobWithCompanyRow),
+            ),
+            meta: out.meta,
+          });
         },
       );
-      const tAfterList = performance.now();
-
-      const durMs = (a: number, b: number) => Math.max(0, Math.round((b - a) * 100) / 100);
-      reply.header(
-        "Server-Timing",
-        [
-          `rate_limit;dur=${durMs(tRouteStart, tAfterRateLimit)}`,
-          `cap_ctx;dur=${durMs(tAfterRateLimit, tAfterCapCtx)}`,
-          `metered_list;dur=${durMs(tAfterCapCtx, tAfterList)}`,
-        ].join(", "),
-      );
-
-      if (isSafeToCache) {
-        reply.header("Cache-Control", "public, max-age=60, s-maxage=120");
-      } else {
-        const cacheableJobsList = false;
-        const cacheBypassReason = cacheableJobsList
-          ? "anonymous_public_listing"
-          : capCtx.internalUserId != null || hasAuthHeader
-            ? "authenticated_request"
-            : "metered_or_personalized";
-
-        setApiCacheHeader(reply, request, {
-          route: "/jobs",
-          cacheable: cacheableJobsList,
-          reason: cacheBypassReason,
-        });
-      }
-
-      return reply.send({
-        data: out.items.map((j) =>
-          toJobListJson(j as unknown as JobWithCompanyRow),
-        ),
-        meta: out.meta,
-      });
     },
   );
 

@@ -46,6 +46,8 @@
     "diagnose:redis-viewcap": "tsx scripts/diagnose.redis.viewcap.ts",
     "metrics": "tsx src/scripts/metrics.snapshot.ts",
     "explain:job-listing": "tsx scripts/explain.jobListing.ts",
+    "probe:job-list-shadow": "tsx scripts/probe.jobListShadow.ts",
+    "diag:pg-activity": "tsx scripts/pgActivity.snapshot.ts",
     "metrics:ats": "tsx src/scripts/ats.metrics.snapshot.ts",
     "monitor:pipeline": "tsx src/scripts/monitorPipeline.ts",
     "smoke:15m": "tsx scripts/runSmokeTest15m.ts",

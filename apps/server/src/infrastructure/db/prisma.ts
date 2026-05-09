@@ -1,20 +1,39 @@
-import { PrismaClient } from "../../prisma/generatedClient.js";
+import { PrismaClient, type Prisma } from "../../prisma/generatedClient.js";
 import { loadRootEnv } from "../env/loadEnv.js";
 import { logger } from "../../utils/logger.js";
 import { registerPrismaReadInstrumentation } from "../../utils/prismaInstrumentation.js";
+import {
+  isPrismaQueryDiagEnabled,
+  registerPrismaQueryDiagnostics,
+} from "../../utils/prismaQueryDiag.js";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
 loadRootEnv();
 
+function buildPrismaLog(): Prisma.LogLevel[] | Prisma.LogDefinition[] {
+  const diag = isPrismaQueryDiagEnabled();
+  if (diag) {
+    return [
+      { emit: "event", level: "query" },
+      { emit: "stdout", level: "error" },
+    ];
+  }
+  if (process.env.NODE_ENV === "development") {
+    return ["query", "error", "warn"];
+  }
+  return ["error"];
+}
+
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
-        : ["error"],
+    log: buildPrismaLog(),
   });
+
+if (isPrismaQueryDiagEnabled()) {
+  registerPrismaQueryDiagnostics(prisma);
+}
 
 /** Outer middleware: read egress + slow-query timing applies to the full round-trip. */
 registerPrismaReadInstrumentation(prisma);

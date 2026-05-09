@@ -7,6 +7,14 @@ import { computeStoredScores } from "../../services/jobRanking.service.js";
 import { computeJobExpiresAt } from "../../services/jobRetentionPolicy.service.js";
 import { isValidJobUrl } from "../../utils/url.js";
 import { logger } from "../../utils/logger.js";
+import {
+  getJobListSlowThresholdMs,
+  isJobListPerfDebugEnabled,
+  logJobListPerf,
+  logJobListSlow,
+  nowPerfMs,
+} from "../../utils/jobListPerf.js";
+import { jobListRequestDiag } from "./jobListRequestContext.js";
 import { expandLocationFilter, getRegions } from "../../utils/locationResolver.js";
 import { computeLocationPatchFromReingest } from "../../services/jobCanonical.service.js";
 import { recordStatusTransition } from "../../services/jobStatusMetrics.service.js";
@@ -560,6 +568,143 @@ export function buildDiscoveryWhereSql(
   return Prisma.join(parts, " AND ");
 }
 
+/**
+ * Exact `SELECT j.id …` used by {@link createJobRepository}'s `findManyCanonicalFiltered`.
+ * For developer scripts only (manual EXPLAIN); keeps parity with production query shape.
+ */
+export function sqlForCanonicalListingIds(input: {
+  filters?: JobDiscoveryFilters;
+  sort: "latest" | "salary_desc";
+  limit: number;
+  offset: number;
+  includeProcessing?: boolean;
+}): Prisma.Sql {
+  const whereSql = buildDiscoveryWhereSql(input.filters, {
+    includeProcessing: input.includeProcessing ?? false,
+  });
+  if (input.sort === "latest") {
+    return Prisma.sql`
+      SELECT j.id FROM "Job" j
+      WHERE ${whereSql}
+      ORDER BY j."listingFreshnessAt" DESC, j."createdAt" DESC
+      LIMIT ${input.limit} OFFSET ${input.offset}
+    `;
+  }
+  return Prisma.sql`
+    SELECT j.id FROM "Job" j
+    WHERE ${whereSql}
+    ORDER BY j."salaryMin" DESC NULLS LAST, j."createdAt" DESC
+    LIMIT ${input.limit} OFFSET ${input.offset}
+  `;
+}
+
+function reorderJobsByCanonicalIds<T extends { id: string }>(jobs: T[], ids: string[]): void {
+  const order = new Map(ids.map((id, i) => [id, i]));
+  jobs.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+}
+
+function jobListHttpCorrelationFields(): Record<string, unknown> {
+  const ctx = jobListRequestDiag.getStore();
+  if (!ctx) return {};
+  return {
+    jobListHttpSort: ctx.sort,
+    jobListHttpPage: ctx.page,
+    jobListHttpLimit: ctx.limit,
+    jobListHttpMeteredLimit: ctx.meteredLimit,
+    jobListHttpFilterSummary: ctx.filterSummary,
+  };
+}
+
+function getCompanyListingSelect(includeCompanyJobCount: boolean) {
+  if (includeCompanyJobCount) {
+    return {
+      id: true,
+      name: true,
+      slug: true,
+      logoUrl: true,
+      domain: true,
+      careersUrl: true,
+      _count: { select: { jobs: true } },
+    } as const;
+  }
+  return {
+    id: true,
+    name: true,
+    slug: true,
+    logoUrl: true,
+    domain: true,
+    careersUrl: true,
+  } as const;
+}
+
+/**
+ * Prisma select for canonical listing hydrate (`findManyCanonicalFiltered` and shadow experiments).
+ */
+export function buildCanonicalListingJobSelect(includeCompanyJobCount: boolean) {
+  const companyInner = getCompanyListingSelect(includeCompanyJobCount);
+  return {
+    id: true,
+    title: true,
+    companyId: true,
+    country: true,
+    locationCity: true,
+    locationState: true,
+    locationCountry: true,
+    locationRegion: true,
+    category: true,
+    isRemote: true,
+    workType: true,
+    experienceLevel: true,
+    description: true,
+    source: true,
+    sourceUrl: true,
+    applyUrl: true,
+    postedAt: true,
+    effectivePostedAt: true,
+    createdAt: true,
+    updatedAt: true,
+    lastSeenAt: true,
+    expiresAt: true,
+    isActive: true,
+    salaryMin: true,
+    role: true,
+    skills: true,
+    status: true,
+    company: { select: companyInner },
+  } as const;
+}
+
+/** Row shape returned by {@link createJobRepository}'s trunc-description shadow hydrate SQL. */
+type ListingJobRawRow = {
+  id: string;
+  title: string;
+  companyId: string;
+  country: string;
+  locationCity: string | null;
+  locationState: string | null;
+  locationCountry: string;
+  locationRegion: string | null;
+  category: string;
+  isRemote: boolean;
+  workType: string;
+  experienceLevel: string | null;
+  description: string | null;
+  source: string;
+  sourceUrl: string;
+  applyUrl: string | null;
+  postedAt: Date | null;
+  effectivePostedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  lastSeenAt: Date;
+  expiresAt: Date | null;
+  isActive: boolean;
+  salaryMin: number | null;
+  role: string;
+  skills: string[];
+  status: string | null;
+};
+
 export function createJobRepository(prisma: PrismaClient) {
   function buildBaseJobData(input: DedupJobInput) {
     const now = new Date();
@@ -737,90 +882,211 @@ export function createJobRepository(prisma: PrismaClient) {
       includeProcessing?: boolean;
     }): Promise<JobWithCompany[]> {
       const sort = options.sort ?? "latest";
-      const companySelect = {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          logoUrl: true,
-          domain: true,
-          careersUrl: true,
-          _count: { select: { jobs: true } },
-        },
-      };
-      const listSelect = {
-        id: true,
-        title: true,
-        companyId: true,
-        country: true,
-        locationCity: true,
-        locationState: true,
-        locationCountry: true,
-        locationRegion: true,
-        category: true,
-        isRemote: true,
-        workType: true,
-        experienceLevel: true,
-        description: true,
-        source: true,
-        sourceUrl: true,
-        applyUrl: true,
-        postedAt: true,
-        effectivePostedAt: true,
-        createdAt: true,
-        updatedAt: true,
-        lastSeenAt: true,
-        expiresAt: true,
-        isActive: true,
-        salaryMin: true,
-        role: true,
-        skills: true,
-        status: true,
-        company: companySelect,
-      } as const;
+      const perfDebug = isJobListPerfDebugEnabled();
+      const slowThreshold = getJobListSlowThresholdMs();
+      const trackPerf = perfDebug || slowThreshold > 0;
+      const tFunc0 = trackPerf ? nowPerfMs() : 0;
 
-      if (sort === "latest") {
-        const whereSql = buildDiscoveryWhereSql(options.filters, {
-          includeProcessing: options.includeProcessing ?? false,
-        });
-        const idQuery = Prisma.sql`
-          SELECT j.id FROM "Job" j
-          WHERE ${whereSql}
-          ORDER BY j."listingFreshnessAt" DESC, j."createdAt" DESC
-          LIMIT ${options.limit} OFFSET ${options.offset}
-        `;
-        const idRows = await prisma.$queryRaw<{ id: string }[]>(idQuery);
-        const ids = idRows.map((r) => r.id);
-        if (ids.length === 0) return [];
-        const jobs = await prisma.job.findMany({
-          where: { id: { in: ids } },
-          select: listSelect,
-        });
-        const order = new Map(ids.map((id, i) => [id, i]));
-        jobs.sort((a, b) => (order.get(a.id)! - order.get(b.id)!));
-        return jobs as JobWithCompany[];
+      const listSelect = buildCanonicalListingJobSelect(true);
+
+      const idQuery = sqlForCanonicalListingIds({
+        filters: options.filters,
+        sort,
+        limit: options.limit,
+        offset: options.offset,
+        includeProcessing: options.includeProcessing,
+      });
+
+      const tBeforeIds = trackPerf ? nowPerfMs() : 0;
+      const idRows = await prisma.$queryRaw<{ id: string }[]>(idQuery);
+      const tAfterIds = trackPerf ? nowPerfMs() : 0;
+
+      const ids = idRows.map((r) => r.id);
+      if (ids.length === 0) {
+        if (trackPerf) {
+          const queryIdsMs = tAfterIds - tBeforeIds;
+          const totalMs = Math.round((nowPerfMs() - tFunc0) * 100) / 100;
+          if (perfDebug) {
+            logJobListPerf("JOB_LIST_QUERY_IDS", {
+              durationMs: Math.round(queryIdsMs * 100) / 100,
+              idRowCount: 0,
+              limit: options.limit,
+              offset: options.offset,
+              sort,
+            });
+            logJobListPerf("JOB_LIST_HYDRATE", { durationMs: 0, rowCount: 0 });
+            logJobListPerf("JOB_LIST_REORDER", { durationMs: 0 });
+            logJobListPerf("JOB_LIST_TOTAL", {
+              durationMs: totalMs,
+              queryIdsMs: Math.round(queryIdsMs * 100) / 100,
+              hydrateMs: 0,
+              reorderMs: 0,
+              approxHydratedBytes: 0,
+              rowCount: 0,
+              limit: options.limit,
+              offset: options.offset,
+              sort,
+            });
+          }
+          if (slowThreshold > 0 && totalMs >= slowThreshold) {
+            logJobListSlow({
+              queryIdsMs: Math.round(queryIdsMs * 100) / 100,
+              hydrateMs: 0,
+              reorderMs: 0,
+              approxHydratedBytes: 0,
+              rowCount: 0,
+              limit: options.limit,
+              offset: options.offset,
+              sort,
+              totalMs,
+              ...jobListHttpCorrelationFields(),
+            });
+          }
+        }
+        return [];
       }
 
-      // Salary: same filter SQL as "latest" (avoids Prisma `where` + `orderBy` nulls issues), then
-      // `ORDER BY salary NULLS LAST` (Postgres) so unknown salaries sort after high floors.
-      const whereSql = buildDiscoveryWhereSql(options.filters, {
-        includeProcessing: options.includeProcessing ?? false,
-      });
-      const idRows = await prisma.$queryRaw<{ id: string }[]>`
-        SELECT j.id FROM "Job" j
-        WHERE ${whereSql}
-        ORDER BY j."salaryMin" DESC NULLS LAST, j."createdAt" DESC
-        LIMIT ${options.limit} OFFSET ${options.offset}
-      `;
-      const ids = idRows.map((r) => r.id);
-      if (ids.length === 0) return [];
+      const tBeforeHydrate = trackPerf ? nowPerfMs() : 0;
       const jobs = await prisma.job.findMany({
         where: { id: { in: ids } },
         select: listSelect,
       });
-      const order = new Map(ids.map((id, i) => [id, i]));
-      jobs.sort((a, b) => (order.get(a.id)! - order.get(b.id)!));
-      return jobs as JobWithCompany[];
+      const tAfterHydrate = trackPerf ? nowPerfMs() : 0;
+
+      const tBeforeReorder = trackPerf ? nowPerfMs() : 0;
+      reorderJobsByCanonicalIds(jobs, ids);
+      const tAfterReorder = trackPerf ? nowPerfMs() : 0;
+
+      if (trackPerf) {
+        const queryIdsMs = tAfterIds - tBeforeIds;
+        const hydrateMs = tAfterHydrate - tBeforeHydrate;
+        const reorderMs = tAfterReorder - tBeforeReorder;
+        const approxHydratedBytes = Buffer.byteLength(JSON.stringify(jobs), "utf8");
+        const totalMs = Math.round((tAfterReorder - tFunc0) * 100) / 100;
+        if (perfDebug) {
+          logJobListPerf("JOB_LIST_QUERY_IDS", {
+            durationMs: Math.round(queryIdsMs * 100) / 100,
+            idRowCount: idRows.length,
+            limit: options.limit,
+            offset: options.offset,
+            sort,
+          });
+          logJobListPerf("JOB_LIST_HYDRATE", {
+            durationMs: Math.round(hydrateMs * 100) / 100,
+            rowCount: jobs.length,
+          });
+          logJobListPerf("JOB_LIST_REORDER", {
+            durationMs: Math.round(reorderMs * 100) / 100,
+          });
+          logJobListPerf("JOB_LIST_TOTAL", {
+            durationMs: totalMs,
+            queryIdsMs: Math.round(queryIdsMs * 100) / 100,
+            hydrateMs: Math.round(hydrateMs * 100) / 100,
+            reorderMs: Math.round(reorderMs * 100) / 100,
+            approxHydratedBytes,
+            rowCount: jobs.length,
+            limit: options.limit,
+            offset: options.offset,
+            sort,
+          });
+        }
+        if (slowThreshold > 0 && totalMs >= slowThreshold) {
+          logJobListSlow({
+            queryIdsMs: Math.round(queryIdsMs * 100) / 100,
+            hydrateMs: Math.round(hydrateMs * 100) / 100,
+            reorderMs: Math.round(reorderMs * 100) / 100,
+            approxHydratedBytes,
+            rowCount: jobs.length,
+            limit: options.limit,
+            offset: options.offset,
+            sort,
+            totalMs,
+            ...jobListHttpCorrelationFields(),
+          });
+        }
+      }
+
+      return jobs as unknown as JobWithCompany[];
+    },
+
+    /**
+     * Shadow / internal only: hydrate listing rows for id list (same shape as production listing).
+     */
+    async hydrateCanonicalListingForShadow(
+      ids: string[],
+      includeCompanyJobCount: boolean,
+    ): Promise<JobWithCompany[]> {
+      if (ids.length === 0) return [];
+      const listSelect = buildCanonicalListingJobSelect(includeCompanyJobCount);
+      const jobs = await prisma.job.findMany({
+        where: { id: { in: ids } },
+        select: listSelect,
+      });
+      reorderJobsByCanonicalIds(jobs, ids);
+      return jobs as unknown as JobWithCompany[];
+    },
+
+    /**
+     * Shadow / internal only: listing hydrate with `LEFT(description, truncChars)` in SQL, then company row + optional `_count`.
+     * Does not change public API; used to measure description I/O cost and JSON parity vs full description.
+     */
+    async hydrateCanonicalListingTruncDescriptionForShadow(
+      ids: string[],
+      truncChars: number,
+      includeCompanyJobCount: boolean,
+    ): Promise<JobWithCompany[]> {
+      if (ids.length === 0) return [];
+      const safeLen = Math.max(256, Math.min(500_000, Math.floor(truncChars)));
+      const rows = await prisma.$queryRaw<ListingJobRawRow[]>`
+        SELECT
+          j.id,
+          j.title,
+          j."companyId",
+          j.country,
+          j."locationCity",
+          j."locationState",
+          j."locationCountry",
+          j."locationRegion",
+          j.category,
+          j."isRemote",
+          j."workType",
+          j."experienceLevel",
+          SUBSTRING(j.description FROM 1 FOR (${safeLen})::integer) AS description,
+          j.source,
+          j."sourceUrl",
+          j."applyUrl",
+          j."postedAt",
+          j."effectivePostedAt",
+          j."createdAt",
+          j."updatedAt",
+          j."lastSeenAt",
+          j."expiresAt",
+          j."isActive",
+          j."salaryMin",
+          j.role,
+          j.skills,
+          j.status
+        FROM "Job" j
+        WHERE j.id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}`))})
+      `;
+      const companyIds = [...new Set(rows.map((r) => r.companyId))];
+      const companySelect = getCompanyListingSelect(includeCompanyJobCount);
+      const companies = await prisma.company.findMany({
+        where: { id: { in: companyIds } },
+        select: companySelect,
+      });
+      const cmap = new Map(companies.map((c) => [c.id, c]));
+      const jobs = rows.map((r) => {
+        const co = cmap.get(r.companyId);
+        if (!co) {
+          throw new Error(
+            `hydrateCanonicalListingTruncDescriptionForShadow: missing company ${r.companyId}`,
+          );
+        }
+        return { ...r, company: co };
+      });
+      reorderJobsByCanonicalIds(jobs, ids);
+      return jobs as unknown as JobWithCompany[];
     },
 
     async findById(
