@@ -353,6 +353,20 @@ export default function SmartApplyPage() {
 
   const handleSaveClick = async (continueNext = false) => {
     const ok = await patch(form);
+    if (ok) {
+      try {
+        if (
+          typeof window !== "undefined" &&
+          !window.sessionStorage.getItem("jl_meta_smart_apply_profile_save")
+        ) {
+          window.sessionStorage.setItem("jl_meta_smart_apply_profile_save", "1");
+          const { trackSmartApplyProfileSaveOnce } = await import("../../../lib/analytics/events");
+          void trackSmartApplyProfileSaveOnce({ getToken: () => getToken() });
+        }
+      } catch {
+        /* non-blocking */
+      }
+    }
     if (!ok || !continueNext) return;
     const idx = SECTION_ORDER.indexOf(activeSection);
     if (idx >= 0 && idx < SECTION_ORDER.length - 1) {

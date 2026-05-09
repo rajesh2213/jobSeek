@@ -13,6 +13,9 @@ export const HERO_JOB_INDEX_TOTAL = (() => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 2_300_000;
 })();
 
-/** Scrolling testimonial section — enable after MoR / legal readiness. */
+/**
+ * Extra homepage band: product-capability highlights (carousel).
+ * Not user testimonials — safe for reviewers when enabled.
+ */
 export const SHOW_LANDING_TESTIMONIALS =
   process.env.NEXT_PUBLIC_SHOW_LANDING_TESTIMONIALS === "true";

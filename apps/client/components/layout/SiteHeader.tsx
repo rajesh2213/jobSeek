@@ -97,6 +97,9 @@ export function SiteHeader() {
             <Link href="/companies" prefetch={false} className="no-underline hover:text-brand">
               Companies
             </Link>
+            <Link href="/about" prefetch={false} className="no-underline hover:text-brand">
+              About
+            </Link>
           </nav>
         </div>
 

@@ -59,10 +59,10 @@ function CountUp({ to, suffix = "" }: { to: number; suffix?: string }) {
 }
 
 const SIGNAL_MESSAGES = [
-  "Most users apply within first 10 minutes of posting",
   "Aggregate listings from career sites and boards in one place",
-  "Resume aware matching helps you spot gaps before you apply",
-  "See the newest roles before the crowd",
+  "Resume-aware matching helps you spot gaps before you apply",
+  "Designed to surface fresh posts as we ingest them",
+  "Track applications and saved searches in one workspace",
 ];
 
 function RotatingSignal() {
@@ -162,8 +162,12 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
   const stats = useMemo(
     () =>
       [
-        { k: "jobs", v: HERO_JOB_INDEX_TOTAL, numberSuffix: "+" as const },
-        { k: "More interviews", v: 2, suffix: "x" as const },
+        { type: "count" as const, k: "Roles in our index", v: HERO_JOB_INDEX_TOTAL, numberSuffix: "+" as const },
+        {
+          type: "tagline" as const,
+          k: "One workspace",
+          sub: "Search across sources, get personalised alerts, then track what you applied to",
+        },
       ] as const,
     [],
   );
@@ -175,13 +179,13 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
       <motion.div style={{ scale: heroScale, y: heroY, opacity: heroOpacity }}>
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full border border-brand/20 bg-brand/[0.06] px-3 py-1.5 text-xs font-semibold text-ink/70 shadow-sm sm:whitespace-nowrap sm:px-3.5">
-            <span className="font-extrabold text-brand">79%</span> of roles not on LinkedIn
+            Many roles start on <span className="font-extrabold text-brand">company career sites</span>
           </span>
           <span className="rounded-full border border-brand/20 bg-brand/[0.06] px-3 py-1.5 text-xs font-semibold text-ink/70 shadow-sm sm:whitespace-nowrap sm:px-3.5">
-            Apply within <span className="font-extrabold text-brand">5 mins</span>
+            <span className="font-extrabold text-brand">Faster triage</span> — less tab-hopping
           </span>
           <span className="rounded-full border border-brand/20 bg-brand/[0.06] px-3 py-1.5 text-xs font-semibold text-ink/70 shadow-sm sm:whitespace-nowrap sm:px-3.5">
-            <span className="font-extrabold text-brand">See the newest roles before the crowd</span>
+            Built for people who want to <span className="font-extrabold text-brand">move early &amp; stay organized</span>
           </span>
         </div>
         <h1 className="mt-4 font-display text-[clamp(2.7rem,12vw,3.9rem)] leading-[1.03] text-ink sm:text-6xl">
@@ -205,7 +209,7 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
           JobLoom helps you <span className="font-semibold text-ink">move earlier</span>, <span className="font-semibold text-ink">fix what's missing</span>, and{" "}
           <span className="font-semibold text-ink">track everything</span> - so nothing slips through.
         </p>
-        <div className="mt-2 grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="mt-2 grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
           {stats.map((s, i) => (
             <motion.div
               key={s.k}
@@ -215,12 +219,20 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
               viewport={{ once: true }}
               transition={{ delay: i * 0.12 }}
             >
-              <p className="text-xl font-extrabold tabular-nums text-ink">
-                {s.v > 10 ? <CountUp to={s.v} /> : s.v}
-                {"numberSuffix" in s && s.numberSuffix ? s.numberSuffix : ""}
-                {"suffix" in s && s.suffix ? s.suffix : ""}
-              </p>
-              <p className="text-xs text-ink/60">{s.k}</p>
+              {s.type === "count" ? (
+                <>
+                  <p className="text-xl font-extrabold tabular-nums text-ink">
+                    {s.v > 10 ? <CountUp to={s.v} /> : s.v}
+                    {s.numberSuffix ?? ""}
+                  </p>
+                  <p className="text-xs text-ink/60">{s.k}</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-base font-extrabold text-ink">{s.k}</p>
+                  <p className="mt-1 text-xs leading-snug text-ink/60">{s.sub}</p>
+                </>
+              )}
             </motion.div>
           ))}
         </div>
@@ -272,7 +284,7 @@ const PAIN_POINTS = [
     pain: "You find jobs hours late.",
     sub: "Hundreds have already applied.",
     fix: "Real-time job ingestion + Smart Apply",
-    outcome: "Be in the first 5 applicants, not the last 500.",
+    outcome: "See fresh posts sooner and apply with a clearer plan.",
   },
   {
     pain: "You jump between 5+ job boards daily.",
@@ -424,9 +436,9 @@ function SolutionSection() {
         viewport={{ once: true }}
         className="mt-6 rounded-xl border border-ink/10 bg-white/60 p-4"
       >
-        <p className="text-sm font-semibold text-ink">Apply before everyone else.</p>
+        <p className="text-sm font-semibold text-ink">Move while listings are fresh.</p>
         <p className="mt-1 text-sm text-ink/70">
-          Most people are still applying late across scattered boards. JobLoom helps you see fresh roles early and move while competition is still low.
+          Job search is noisy. JobLoom helps you centralize discovery, spot new posts faster, and stay organized—without promising interviews or offers.
         </p>
       </motion.div>
       </motion.div>
@@ -434,48 +446,43 @@ function SolutionSection() {
   );
 }
 
+/** Product-capability carousel — no named testimonials or outcome guarantees. */
 function SocialProofSection() {
   const ref = useRef<HTMLElement | null>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start 88%", "end 20%"],
   });
-  const testimonials = [
+  const highlights = [
     {
-      quote:
-        "I usually apply after my shift, so I was always late. Early alerts helped, but I still had to be disciplined about checking in.",
-      name: "Liam R., Backend Engineer · 3 interview loops in 2 weeks",
+      title: "Aggregated discovery",
+      body: "Pull roles from career sites and boards into one searchable place—so you spend less time tab-hopping.",
     },
     {
-      quote:
-        "First week felt normal, then I started applying earlier and finally got same-day recruiter replies.",
-      name: "Aarav S., Product Analyst · 5 callbacks in 11 days",
+      title: "Resume-aware matching",
+      body: "See fit signals and keyword gaps before you invest time in an application. You stay in control of what you send.",
     },
     {
-      quote:
-        "I thought my resume was fine. The missing-keyword prompts were annoying at first, but after updating it I got more screens.",
-      name: "Ethan K., Data Engineer · improved response rate",
+      title: "Apply on the employer’s site",
+      body: "JobLoom helps you find and prepare; you still submit applications through the company’s own flows.",
     },
     {
-      quote:
-        "I finally stopped losing track of where I applied. Having stages and notes in one place beats digging through threads.",
-      name: "Amelia J., Product Manager",
+      title: "Smart Apply (Pro)",
+      body: "Optional browser extension assists with form fields from your saved profile—you review everything before submitting.",
     },
     {
-      quote:
-        "I used to jump across five tabs and still apply to duplicates. The deduped feed cut the noise and saved me time every week.",
-      name: "Noah P., Frontend Engineer",
+      title: "Saved searches & alerts",
+      body: "Pro can email you when new roles match filters you care about—useful when you can’t watch the feed all day.",
     },
     {
-      quote:
-        "Not magic, just clearer timing and better targeting. I applied to fewer roles and got better conversations.",
-      name: "Priya N., ML Engineer · interviews with 4 teams",
+      title: "Application tracking",
+      body: "Keep stages and notes in one workspace so follow-ups don’t get lost in your inbox.",
     },
   ];
   const sectionY = mapRange(scrollYProgress, 0, 0.16, 56, 0);
   const sectionOpacity = mapRange(scrollYProgress, 0, 0.14, 0, 1);
-  const rowA = testimonials.slice(0, 3);
-  const rowB = testimonials.slice(3);
+  const rowA = highlights.slice(0, 3);
+  const rowB = highlights.slice(3);
   const parallaxA = mapRange(scrollYProgress, 0.08, 0.9, -26, 18);
   const parallaxB = mapRange(scrollYProgress, 0.08, 0.9, 20, -16);
 
@@ -486,9 +493,11 @@ function SocialProofSection() {
       className="border-y border-ink/10 bg-white/40 py-14"
     >
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:pl-[136px]">
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">Others are already winning</p>
-        <h2 className="mt-3 text-3xl font-semibold sm:text-4xl">Real users are landing interviews faster with JobLoom</h2>
-        <p className="mt-3 text-sm text-ink/65">More first-round calls. Better shortlist rates. Fewer missed opportunities.</p>
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">Built for serious job seekers</p>
+        <h2 className="mt-3 text-3xl font-semibold sm:text-4xl">What JobLoom is designed to help you do</h2>
+        <p className="mt-3 text-sm text-ink/65">
+          Software for discovery and organization—not a recruiting agency, and not a promise of interviews or offers.
+        </p>
         <div className="mt-6 space-y-4 overflow-hidden">
           <motion.div style={{ x: parallaxA }}>
             <motion.div
@@ -497,17 +506,17 @@ function SocialProofSection() {
               transition={{ duration: 34, repeat: Infinity, ease: "linear" }}
             >
               {[...rowA, ...rowA].map((t, i) => (
-                <motion.blockquote
-                  key={`a-${t.name}-${i}`}
+                <motion.div
+                  key={`a-${t.title}-${i}`}
                   initial={{ opacity: 0, y: 14, rotate: i % 2 === 0 ? -1.8 : 1.8 }}
                   whileInView={{ opacity: 1, y: 0, rotate: 0 }}
                   viewport={{ once: true, amount: 0.35 }}
                   transition={{ duration: 0.55, delay: Math.min(i, 2) * 0.08 }}
                   className="w-[320px] rounded-2xl border border-ink/10 bg-canvas p-4 text-sm text-ink/75"
                 >
-                  "{t.quote}"
-                  <footer className="mt-3 text-xs font-semibold text-ink/55">{t.name}</footer>
-                </motion.blockquote>
+                  <p className="font-semibold text-ink">{t.title}</p>
+                  <p className="mt-2 leading-snug">{t.body}</p>
+                </motion.div>
               ))}
             </motion.div>
           </motion.div>
@@ -519,17 +528,17 @@ function SocialProofSection() {
               transition={{ duration: 37, repeat: Infinity, ease: "linear" }}
             >
               {[...rowB, ...rowB].map((t, i) => (
-                <motion.blockquote
-                  key={`b-${t.name}-${i}`}
+                <motion.div
+                  key={`b-${t.title}-${i}`}
                   initial={{ opacity: 0, y: 14, rotate: i % 2 === 0 ? 1.8 : -1.8 }}
                   whileInView={{ opacity: 1, y: 0, rotate: 0 }}
                   viewport={{ once: true, amount: 0.35 }}
                   transition={{ duration: 0.55, delay: Math.min(i, 2) * 0.08 }}
                   className="w-[320px] rounded-2xl border border-ink/10 bg-canvas p-4 text-sm text-ink/75"
                 >
-                  "{t.quote}"
-                  <footer className="mt-3 text-xs font-semibold text-ink/55">{t.name}</footer>
-                </motion.blockquote>
+                  <p className="font-semibold text-ink">{t.title}</p>
+                  <p className="mt-2 leading-snug">{t.body}</p>
+                </motion.div>
               ))}
             </motion.div>
           </motion.div>
@@ -581,7 +590,7 @@ function PricingSection() {
           The difference is how early you move.
         </motion.h2>
         <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-ink/70">
-          Apply earlier, fix your resume gaps, and start getting interview responses faster.
+          Triage faster, tighten your resume with clear signals, and stay organized from discovery to submit.
         </p>
         <p className="mx-auto mt-2 max-w-2xl text-center text-xs font-medium text-ink/55">
           Pro is for unlimited browsing, resume insights, Smart Apply, and alerts-see the plan table for details.
@@ -628,7 +637,7 @@ function PricingSection() {
           </motion.div>
         </div>
         <p className="mx-auto mt-5 max-w-2xl text-center text-sm text-ink/65">
-          Most users upgrade when they start missing roles or losing track of applications.
+          Many people upgrade when they want unlimited browsing, resume-scoring, Smart Apply, or email alerts on saved searches.
         </p>
         <div className="mt-6 text-center">
           <motion.div
@@ -672,40 +681,38 @@ function FinalUrgencySection() {
       >
       <div className="px-4 sm:px-6 lg:pl-[6px] lg:pr-6">
       <div className="mx-auto max-w-3xl">
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand/80">Apply before everyone else</p>
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand/80">Timing still matters</p>
         <h3 className="mt-2 text-3xl font-semibold leading-snug text-white sm:text-4xl">
-          You're not competing with job seekers.
+          Job search rewards clarity—not chaos.
         </h3>
         <p className="mt-2 text-xl font-medium text-white/80 sm:text-2xl">
-          You're competing with people who applied 10 minutes before you.
+          When you discover roles earlier and stay organized, you can be more deliberate about where you invest effort.
         </p>
         <p className="mx-auto mt-4 max-w-xl text-sm text-white/50">
-          Earlier, targeted applications usually beat late, generic ones-timing and fit matter.
+          Illustrative comparison—not a guarantee about applicant counts or outcomes. Your results depend on your profile, market, and how employers hire.
         </p>
 
-        <div className="mx-auto mt-10 grid max-w-md gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-4">
+        <div className="mx-auto mt-10 grid max-w-lg gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-4 text-left">
             <p className="text-[10px] font-bold uppercase tracking-wider text-white/35">
-              Without JobLoom
+              Scattered discovery
             </p>
-            <p className="mt-2 text-2xl font-extrabold tabular-nums text-red-400">
-              127
+            <p className="mt-2 text-lg font-extrabold text-red-400">
+              Late to new posts
             </p>
-            <p className="mt-0.5 text-xs text-white/40">applicants ahead of you</p>
-            <p className="mt-2 text-[11px] font-semibold text-red-400/80">
-              You're invisible
+            <p className="mt-1 text-xs leading-relaxed text-white/45">
+              Easy to miss listings when you’re refreshing five sites—or to apply without a system for follow-ups.
             </p>
           </div>
-          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-5 py-4 shadow-[0_0_20px_rgba(16,185,129,0.08)]">
+          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-5 py-4 text-left shadow-[0_0_20px_rgba(16,185,129,0.08)]">
             <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/60">
-              With JobLoom
+              Centralized on JobLoom
             </p>
-            <p className="mt-2 text-2xl font-extrabold tabular-nums text-emerald-400">
-              3
+            <p className="mt-2 text-lg font-extrabold text-emerald-400">
+              Earlier triage
             </p>
-            <p className="mt-0.5 text-xs text-white/40">applicants total</p>
-            <p className="mt-2 text-[11px] font-semibold text-emerald-400/80">
-              You're first in line
+            <p className="mt-1 text-xs leading-relaxed text-white/45">
+              One place to search, prep, and track—so you can respond to fresh posts with intention instead of panic.
             </p>
           </div>
         </div>
@@ -725,7 +732,7 @@ function FinalUrgencySection() {
               href="/jobs"
               className="rounded-full bg-brand px-8 py-3 text-sm font-bold !text-white shadow-lg transition-colors hover:bg-brand-hover hover:!text-white"
             >
-              Start applying first →
+              Open the job feed →
             </Link>
           </motion.span>
         </motion.div>

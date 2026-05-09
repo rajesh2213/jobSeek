@@ -11,7 +11,7 @@ export default function PricingPage() {
           Unlock your full job search potential
         </p>
         <p className="mx-auto mt-4 max-w-2xl text-center text-base leading-relaxed text-ink-muted">
-          Join job seekers who get hired faster with unlimited access
+          Unlock unlimited browsing, deeper resume insights, Smart Apply, and email alerts—outcomes still depend on your market and fit.
         </p>
 
         <PricingPlansClient />

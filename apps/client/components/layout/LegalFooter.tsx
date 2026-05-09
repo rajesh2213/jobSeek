@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { getCompanyAddress, getSiteOperator, getSupportEmail } from "../../lib/siteIdentity";
 import { SITE_LOGO_FOOTER, SITE_LOGO_UI_SRC } from "../../lib/siteLogo";
+import { FooterAnalyticsPreferences } from "./FooterAnalyticsPreferences";
 
 /** Legal links, contact, and operator identity — used on marketing and app layouts. */
 export function LegalFooter() {
@@ -56,12 +57,16 @@ export function LegalFooter() {
           <Link href="/billing" className="hover:text-brand" prefetch={false}>
             Billing &amp; refunds
           </Link>
+          <Link href="/about" className="hover:text-brand" prefetch={false}>
+            About
+          </Link>
           {email ? (
             <a href={`mailto:${email}`} className="hover:text-brand">
               Contact
             </a>
           ) : null}
         </div>
+        <FooterAnalyticsPreferences />
         {address ? <p className="max-w-lg text-xs text-ink/55">{address}</p> : null}
       </div>
     </footer>

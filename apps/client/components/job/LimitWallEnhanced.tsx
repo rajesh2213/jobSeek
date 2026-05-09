@@ -16,13 +16,14 @@ const INK = "#1a1a1a";
 
 const ACCENTS: AccentTone[] = ["brand", "teal", "rose", "amber"];
 
+/** Fictional placeholders only—avoid real employer brands in blurred preview cards. */
 const FAKE_JOBS = [
-  { title: "Backend Engineer", company: "Stripe", location: "Remote · United States" },
-  { title: "Product Analyst", company: "Notion", location: "San Francisco, CA" },
-  { title: "Frontend Engineer", company: "Vercel", location: "Remote · Worldwide" },
-  { title: "Data Scientist", company: "OpenAI", location: "San Francisco, CA" },
-  { title: "Product Designer", company: "Linear", location: "Remote · US" },
-  { title: "Platform Engineer", company: "Datadog", location: "New York, NY" },
+  { title: "Backend Engineer", company: "Northwind Labs", location: "Remote · United States" },
+  { title: "Product Analyst", company: "Example Health Co.", location: "San Francisco, CA" },
+  { title: "Frontend Engineer", company: "Acme SaaS Inc.", location: "Remote · Worldwide" },
+  { title: "Data Scientist", company: "Contoso Analytics", location: "Austin, TX" },
+  { title: "Product Designer", company: "Sample Fintech Ltd.", location: "Remote · US" },
+  { title: "Platform Engineer", company: "Demo Systems LLC", location: "New York, NY" },
 ] as const;
 
 const POSTED_VARIANTS = ["Posted 2h ago", "Posted 1d ago", "Recently posted"] as const;

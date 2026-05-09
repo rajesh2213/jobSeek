@@ -23,8 +23,9 @@ export default function PrivacyPage() {
       <h2>1. Information we collect</h2>
       <h3>Account and authentication</h3>
       <p>
-        We use third-party authentication providers to manage sign-in. They may process your email address, identifiers, and
-        session data under their own policies. We receive the information we need to create and secure your account.
+        We use third-party authentication providers to manage sign-in (currently <strong>Clerk</strong>). They may process your
+        email address, identifiers, and session data under their own policies. We receive the information we need to create
+        and secure your account.
       </p>
       <h3>Profile and resume data</h3>
       <p>
@@ -74,11 +75,51 @@ export default function PrivacyPage() {
         Service</a> for acceptable use.
       </p>
 
-      <h2>4. Cookies and similar technologies</h2>
+      <h2 id="cookies">4. Cookies, storage, and measurement</h2>
+      <h3>Essential cookies and sessions</h3>
       <p>
-        We use cookies and similar technologies that are essential for authentication, security, and basic functionality. If we
-        introduce non-essential analytics or marketing technologies, we will update this policy and, where required, provide
-        appropriate choices.
+        We use first-party cookies and similar technologies that are needed for authentication (including Clerk sessions),
+        security, CSRF protection where applicable, and basic site functionality.
+      </p>
+      <h3>Attribution cookie (<code className="rounded bg-ink/[0.06] px-1 py-0.5 text-xs">jl_attr</code>)</h3>
+      <p>
+        When you land on JobLoom with campaign parameters (for example UTM tags or <code className="rounded bg-ink/[0.06] px-1 py-0.5 text-xs">fbclid</code>),
+        we may store a <strong>first-party</strong> cookie to remember that attribution for a limited time (currently up to about{" "}
+        <strong>180 days</strong>). We use it to understand how marketing campaigns perform and to attach coarse attribution
+        metadata to product analytics on our systems. It is not used to sell your data to third parties.
+      </p>
+      <h3>Local storage</h3>
+      <p>
+        We may store small values in <strong>browser localStorage</strong>, for example to remember marketing attribution
+        between visits and to record an optional analytics preference (see{" "}
+        <a href="#analytics-preferences" className="font-medium text-brand hover:underline">
+          Analytics &amp; advertising choices
+        </a>
+        ).
+      </p>
+      <h3 id="analytics-preferences">Meta (Facebook) Pixel and Conversions API</h3>
+      <p>
+        When enabled for our deployment, we use <strong>Meta&apos;s Pixel</strong> (browser) and the{" "}
+        <strong>Meta Conversions API</strong> (server-to-Meta) to measure activity such as page views, searches, and certain
+        product events (for example when you view a job or start checkout). These tools help us understand usage and improve our
+        marketing. Meta processes data under its own terms and policies. We configure server events to send hashed identifiers
+        where appropriate (for example email) rather than raw personal details in URLs.
+      </p>
+      <p>
+        You can learn more about Meta&apos;s practices in Meta&apos;s Data Policy. If you want to limit Meta measurement in
+        your browser, you can use controls Meta provides (for example ad preferences) and you may also enable{" "}
+        <strong>Do Not Track</strong> in your browser—our site treats common DNT signals as a request not to load optional
+        marketing measurement scripts where that logic is implemented.
+      </p>
+      <p>
+        You can also opt out of our optional marketing measurement storage by using the{" "}
+        <strong>Analytics preferences</strong> link in the site footer, which sets a JobLoom preference in localStorage and may
+        require a page refresh to apply fully.
+      </p>
+      <h3>Future changes</h3>
+      <p>
+        If we add new advertising or analytics partners beyond what is described here, we will update this policy and provide
+        choices where required by law.
       </p>
 
       <h2>5. Sharing of information</h2>
