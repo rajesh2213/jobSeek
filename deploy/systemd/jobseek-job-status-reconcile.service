@@ -1,0 +1,17 @@
+[Unit]
+Description=JobSeek Job Status Reconcile Worker (processing -> ready when parsed)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/jobSeek
+EnvironmentFile=/home/ubuntu/jobSeek/.env
+Environment=NODE_ENV=production
+Environment=WORKER_NAME=jobseek-job-status-reconcile
+ExecStart=/usr/bin/npm run worker:job-status-reconcile -w @jobseek/server
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

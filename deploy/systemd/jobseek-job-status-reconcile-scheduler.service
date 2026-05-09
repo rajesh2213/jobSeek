@@ -1,0 +1,16 @@
+[Unit]
+Description=JobSeek Job Status Reconcile Scheduler (registers BullMQ repeat tick)
+After=network.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/jobSeek
+EnvironmentFile=/home/ubuntu/jobSeek/.env
+Environment=NODE_ENV=production
+Environment=WORKER_NAME=jobseek-job-status-reconcile-scheduler
+ExecStart=/usr/bin/npm run scheduler:job-status-reconcile -w @jobseek/server
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

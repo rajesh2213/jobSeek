@@ -15,6 +15,8 @@ services=(
   jobseek-ats-discovery-worker
   jobseek-discovery-scheduler
   jobseek-discovery-worker
+  jobseek-job-status-reconcile-scheduler
+  jobseek-job-status-reconcile
   jobseek-job-alerts-worker
   jobseek-job-alerts-scheduler
   jobseek-growth-email-worker
