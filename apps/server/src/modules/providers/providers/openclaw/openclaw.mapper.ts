@@ -37,7 +37,8 @@ export function extractJobsArray(parsed: unknown): unknown[] {
   if (Array.isArray(parsed)) return parsed;
   const r = asRecord(parsed);
   if (!r) return [];
-  const jobs = r.jobs ?? r.data ?? r.results ?? r.items ?? r.records;
+  const jobs =
+    r.jobs ?? r.jobOpenings ?? r.data ?? r.results ?? r.items ?? r.records;
   if (Array.isArray(jobs)) return jobs;
   return [];
 }
@@ -200,7 +201,7 @@ export function tryMapOpenClawJobToNormalized(
   }
 
   const titleRaw =
-    pickString(r, ["title", "jobTitle", "name", "role", "position"]) ??
+    pickString(r, ["title", "roleTitle", "jobTitle", "name", "role", "position"]) ??
     pickNestedString(r, ["job", "title"]) ??
     "";
   const urlRaw =
@@ -226,7 +227,15 @@ export function tryMapOpenClawJobToNormalized(
     return { ok: false, reason: "invalid_listing_url" };
   }
 
-  const descRaw = pickString(r, ["description", "body", "summary", "jobDescriptionHtml"]) ?? undefined;
+  const descRaw =
+    pickString(r, [
+      "description",
+      "body",
+      "summary",
+      "jobDescriptionHtml",
+      "jobDescriptionSummary",
+      "twoLineJobDescriptionSummary",
+    ]) ?? undefined;
   const description =
     sanitizeHtml(descRaw ? truncate(descRaw, OPENCLAW_MAX_DESCRIPTION_LEN) : undefined) ?? undefined;
 
@@ -240,7 +249,9 @@ export function tryMapOpenClawJobToNormalized(
   const location =
     trimWhitespace(locRaw ? truncate(locRaw, OPENCLAW_MAX_LOCATION_LEN) : undefined) ?? undefined;
 
-  const postedRaw = pickString(r, ["postedAt", "createdAt", "publishedAt", "datePosted", "listedAt"]) ?? undefined;
+  const postedRaw =
+    pickString(r, ["postedAt", "created_at", "createdAt", "publishedAt", "datePosted", "listedAt"]) ??
+    undefined;
   const postedAt = safeOpenClawPostedAt(r, postedRaw);
 
   const applyRaw = pickString(r, ["applyUrl", "applicationUrl", "applicationLink"]) ?? undefined;

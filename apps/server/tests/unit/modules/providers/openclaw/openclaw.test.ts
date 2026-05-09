@@ -60,7 +60,28 @@ test("loadOpenClawEnv: parses flags", () => {
 test("extractJobsArray: tolerates partial shapes", () => {
   assert.deepEqual(extractJobsArray(null), []);
   assert.deepEqual(extractJobsArray({ jobs: [{ title: "a" }] }), [{ title: "a" }]);
+  assert.deepEqual(extractJobsArray({ jobOpenings: [{ id: 1 }] }), [{ id: 1 }]);
   assert.deepEqual(extractJobsArray([1, 2]), [1, 2]);
+});
+
+test("tryMap: Remote Rocketship row shape (roleTitle + created_at)", () => {
+  const r = tryMapOpenClawJobToNormalized(
+    {
+      id: 19045831,
+      roleTitle: "Engineer",
+      url: "https://example.com/gupy/jobs/1",
+      created_at: "2026-05-09T19:03:12.747+00:00",
+      jobDescriptionSummary: "Short summary",
+      company: { name: "Acme" },
+    },
+    "cid",
+    "Acme",
+  );
+  assert.equal(r.ok, true);
+  if (r.ok) {
+    assert.equal(r.job.title, "Engineer");
+    assert.ok(r.job.postedAt);
+  }
 });
 
 test("mapOpenClawJobToNormalized: maps minimal row", () => {
