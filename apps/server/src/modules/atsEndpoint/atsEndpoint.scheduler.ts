@@ -12,6 +12,11 @@ import {
 import { getEndpointPriority } from "./atsEndpointPriority.js";
 import { assertRequiredSelect, logQueryMetrics } from "../../utils/queryMetrics.js";
 
+/**
+ * TODO(provider-isolation): Today all crawlable endpoints share one Bull queue (`ingest-ats-endpoint`)
+ * and one worker concurrency budget. A long Workday ingest can starve other providers.
+ * Future: per-provider queues, weighted fair dispatch, or per-provider concurrency caps in the worker.
+ */
 const MIN_INTERVAL_MS = 5 * 60 * 1000;
 const MAX_INTERVAL_MS = 8 * 60 * 1000;
 

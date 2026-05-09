@@ -1,4 +1,4 @@
-import { Worker, type Job } from "bullmq";
+import { Worker, type Job, UnrecoverableError } from "bullmq";
 import { loadRootEnv } from "../infrastructure/env/loadEnv.js";
 import { prisma } from "../infrastructure/db/prisma.js";
 import { logger } from "../utils/logger.js";
@@ -58,9 +58,38 @@ let atsHashCacheMisses = 0;
 
 const ATS_WORKER_IDLE_MS = 5 * 60 * 1000;
 const ATS_HEARTBEAT_MS = 60_000;
+/** Populated while `runAtsIngestJob` is past endpoint load (for heartbeat observability). */
+let atsActiveJobMeta: { endpointId: string; atsType: string; startedAt: number } | null = null;
 let atsLastJobActivityAt = Date.now();
 let atsIsProcessingJob = false;
 let atsLastIdleEventAt = 0;
+
+const DEFAULT_ATS_FETCH_TIMEOUT_MS = 600_000;
+
+/**
+ * Hard cap on `createAtsCrawlerStandard(...).fetchJobs` (fetch + normalize in adapter).
+ * Uses `UnrecoverableError` on expiry so BullMQ does not retry the same hung fetch (avoids retry storms).
+ * Set `ATS_ENDPOINT_FETCH_TIMEOUT_MS=0` to disable (not recommended in production).
+ */
+function atsEndpointFetchTimeoutMs(): number {
+  const raw = process.env.ATS_ENDPOINT_FETCH_TIMEOUT_MS?.trim();
+  if (raw === "0") return 0;
+  const n = Number(raw ?? String(DEFAULT_ATS_FETCH_TIMEOUT_MS));
+  if (!Number.isFinite(n)) return DEFAULT_ATS_FETCH_TIMEOUT_MS;
+  return Math.max(30_000, Math.min(3_600_000, Math.floor(n)));
+}
+
+function heartbeatActiveWarnMs(): number {
+  const n = Number(process.env.ATS_HEARTBEAT_ACTIVE_WARN_MS ?? "300000");
+  if (!Number.isFinite(n)) return 300_000;
+  return Math.max(60_000, Math.min(3_600_000, Math.floor(n)));
+}
+
+function heartbeatQueueWaitWarn(): number {
+  const n = Number(process.env.ATS_HEARTBEAT_QUEUE_WAIT_WARN ?? "40");
+  if (!Number.isFinite(n)) return 40;
+  return Math.max(5, Math.min(10_000, Math.floor(n)));
+}
 
 function processingLookbackDays(): number {
   return Math.max(1, Number(process.env.PROCESSING_LOOKBACK_DAYS ?? "7") || 7);
@@ -78,6 +107,7 @@ function isPayload(data: unknown): data is IngestAtsEndpointPayload {
 }
 
 function classifyAtsIngestError(err: unknown): AtsIngestErrorKind {
+  if (err instanceof UnrecoverableError) return "crawler_error";
   if (err instanceof TypeError) return "network_error";
   if (err instanceof Error) {
     const m = err.message.toLowerCase();
@@ -151,6 +181,7 @@ async function start(): Promise<void> {
   const ingestPoolConcurrencyRaw = clampPoolSize("ATS_POOL_INGEST_CONCURRENCY", "3", 4);
   const ingestPoolConcurrency = Math.min(ingestPoolConcurrencyRaw, parsePoolConcurrency);
   const parseChunkSize = Math.max(10, Math.min(500, Number(process.env.ATS_PARSE_CHUNK_SIZE ?? "100") || 100));
+  /** Default 1: a single long-lived ingest blocks the whole queue; see incident runbooks. Ops may set 2 when VPS has headroom. */
   const bullConcurrency = Math.max(1, Math.min(4, Number(process.env.ATS_ENDPOINT_WORKER_CONCURRENCY ?? "1") || 1));
 
   logger.info(
@@ -162,6 +193,7 @@ async function start(): Promise<void> {
       atsPoolParseConcurrency: parsePoolConcurrency,
       atsParseChunkSize: parseChunkSize,
       atsEndpointBullConcurrency: bullConcurrency,
+      atsFetchTimeoutMs: atsEndpointFetchTimeoutMs(),
       jobWorkerConc: Number(process.env.WORKER_CONCURRENCY ?? "5"),
     },
     "worker_concurrency_config",
@@ -252,6 +284,7 @@ async function start(): Promise<void> {
       { event: "ats_ingestion_started", ...logBase },
       "ats_ingestion_started",
     );
+    atsActiveJobMeta = { endpointId, atsType: endpointRow.type, startedAt: Date.now() };
 
     const { companyId: resolvedCompanyId } = await companyService.ensureCompanyFromJob({
       preferredCompanyId: endpointRow.companyId ?? undefined,
@@ -288,11 +321,48 @@ async function start(): Promise<void> {
     };
 
     let normalizedJobs;
+    const fetchTimeoutMs = atsEndpointFetchTimeoutMs();
+    const fetchStartedAt = Date.now();
     try {
-      await throttleApiCall();
       const standard = createAtsCrawlerStandard(atsType);
-      normalizedJobs = await standard.fetchJobs(endpointForAdapter);
+      const fetchPromise = (async () => {
+        await throttleApiCall();
+        return standard.fetchJobs(endpointForAdapter);
+      })();
+
+      if (fetchTimeoutMs <= 0) {
+        normalizedJobs = await fetchPromise;
+      } else {
+        let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutHandle = setTimeout(() => {
+            reject(
+              new UnrecoverableError(
+                `ats_endpoint_fetch_timeout after ${fetchTimeoutMs}ms endpoint=${endpointId} type=${atsType}`,
+              ),
+            );
+          }, fetchTimeoutMs);
+        });
+        try {
+          normalizedJobs = await Promise.race([fetchPromise, timeoutPromise]);
+        } finally {
+          if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+        }
+      }
     } catch (err) {
+      if (err instanceof UnrecoverableError && err.message.startsWith("ats_endpoint_fetch_timeout")) {
+        logger.error(
+          {
+            event: "ats_endpoint_fetch_timeout",
+            ...logBase,
+            atsType,
+            timeoutMs: fetchTimeoutMs,
+            durationMs: Date.now() - fetchStartedAt,
+            err: err.message,
+          },
+          "ats_endpoint_fetch_timeout",
+        );
+      }
       const errorKind = classifyAtsIngestError(err);
       logger.error(
         {
@@ -602,6 +672,7 @@ async function start(): Promise<void> {
         );
         throw e;
       } finally {
+        atsActiveJobMeta = null;
         atsIsProcessingJob = false;
         atsLastJobActivityAt = Date.now();
         if (atsJobSuccess) {
@@ -629,6 +700,13 @@ async function start(): Promise<void> {
       }
       const now = Date.now();
       const mem = process.memoryUsage();
+      const activeMeta = atsActiveJobMeta;
+      const activeDurationMs =
+        activeMeta !== null && atsIsProcessingJob ? now - activeMeta.startedAt : null;
+      const slowThresholdMs = heartbeatActiveWarnMs();
+      const waitWarn = heartbeatQueueWaitWarn();
+      const waiting = jobCounts?.waiting ?? 0;
+      const activeCount = jobCounts?.active ?? 0;
       const idleMs = atsIsProcessingJob ? 0 : now - atsLastJobActivityAt;
       if (!atsIsProcessingJob && idleMs >= ATS_WORKER_IDLE_MS) {
         if (now - atsLastIdleEventAt >= ATS_WORKER_IDLE_MS) {
@@ -647,6 +725,42 @@ async function start(): Promise<void> {
       } else {
         atsLastIdleEventAt = 0;
       }
+      if (
+        activeMeta &&
+        activeDurationMs !== null &&
+        activeDurationMs > slowThresholdMs &&
+        waiting >= waitWarn
+      ) {
+        logger.warn(
+          {
+            event: "ats_worker_queue_starvation_risk",
+            timestamp: new Date().toISOString(),
+            activeEndpointId: activeMeta.endpointId,
+            activeAtsType: activeMeta.atsType,
+            activeDurationMs,
+            queueWaiting: waiting,
+            queueActive: activeCount,
+            slowThresholdMs,
+            waitWarnThreshold: waitWarn,
+          },
+          "ats_worker_queue_starvation_risk",
+        );
+      } else if (activeMeta && activeDurationMs !== null && activeDurationMs > slowThresholdMs) {
+        logger.warn(
+          {
+            event: "ats_worker_active_job_slow",
+            timestamp: new Date().toISOString(),
+            activeEndpointId: activeMeta.endpointId,
+            activeAtsType: activeMeta.atsType,
+            activeDurationMs,
+            queueWaiting: waiting,
+            queueActive: activeCount,
+            slowThresholdMs,
+          },
+          "ats_worker_active_job_slow",
+        );
+      }
+
       logger.info(
         {
           event: "ats_worker_heartbeat",
@@ -659,6 +773,11 @@ async function start(): Promise<void> {
             external: mem.external,
           },
           isProcessingJob: atsIsProcessingJob,
+          activeEndpointId: activeMeta?.endpointId ?? null,
+          activeAtsType: activeMeta?.atsType ?? null,
+          activeDurationMs,
+          queueWaiting: jobCounts?.waiting,
+          queueActive: jobCounts?.active,
           queueDepth: jobCounts !== undefined ? jobCounts.waiting + jobCounts.delayed : undefined,
           jobCounts,
         },

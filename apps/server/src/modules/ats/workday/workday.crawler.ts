@@ -15,6 +15,23 @@ const PAGE_LIMIT = 20;
 const SITE_FALLBACKS = ["Careers", "External", "Global"] as const;
 const WORKDAY_DETAIL_CONCURRENCY = 5;
 
+/** Max listing pages per Workday token attempt (20 jobs/page). Stops runaway pagination if the API never returns a short page. */
+function workdayListingMaxPages(): number {
+  const n = Number(process.env.WORKDAY_LISTING_MAX_PAGES ?? "2000");
+  if (!Number.isFinite(n)) return 2000;
+  return Math.max(50, Math.min(50_000, Math.floor(n)));
+}
+
+/**
+ * Wall-clock cap for Workday listing fetch (per token attempt + overall host/site sweep).
+ * Prevents a single board from monopolizing the ATS worker for hours when pagination misbehaves.
+ */
+function workdayFetchMaxMs(): number {
+  const n = Number(process.env.WORKDAY_FETCH_MAX_MS ?? "600000");
+  if (!Number.isFinite(n)) return 600_000;
+  return Math.max(60_000, Math.min(3_600_000, Math.floor(n)));
+}
+
 async function enrichWorkdayResults(jobs: WorkdayRawJob[]): Promise<WorkdayRawJob[]> {
   if (jobs.length === 0) return jobs;
   return asyncPool(jobs, WORKDAY_DETAIL_CONCURRENCY, (raw) => enrichWorkdayRawJobWithDetail(raw));
@@ -120,8 +137,27 @@ async function fetchJobsForToken(token: WorkdayToken): Promise<FetchAttemptResul
   const jobs: WorkdayRawJob[] = [];
   let offset = 0;
   let pagesFetched = 0;
+  const maxPages = workdayListingMaxPages();
+  const maxMs = workdayFetchMaxMs();
+  const tokenLoopStart = Date.now();
 
   while (true) {
+    if (pagesFetched >= maxPages) {
+      return {
+        jobs,
+        pagesFetched,
+        complete: false,
+        reason: "max_pages_exceeded",
+      };
+    }
+    if (Date.now() - tokenLoopStart > maxMs) {
+      return {
+        jobs,
+        pagesFetched,
+        complete: false,
+        reason: "max_duration_per_token_exceeded",
+      };
+    }
     let res: Response;
     try {
       res = await fetch(endpoint, {
@@ -201,12 +237,25 @@ class WorkdayCrawlerImpl implements AtsCrawler<WorkdayRawJob> {
     }
     const hostCandidates = withHostFallbacks(parsedToken.host);
     const siteCandidates = withUniqueSites(parsedToken.site);
+    const maxTotalMs = workdayFetchMaxMs();
 
     let bestJobs: WorkdayRawJob[] = [];
     let lastFailureReason = "unknown";
 
-    for (const host of hostCandidates) {
+    outer: for (const host of hostCandidates) {
       for (const site of siteCandidates) {
+        if (Date.now() - startedAt > maxTotalMs) {
+          logger.warn(
+            {
+              event: "workday_fetch_total_time_cap",
+              duration_ms: Date.now() - startedAt,
+              max_ms: maxTotalMs,
+              companyId: null,
+            },
+            "workday_fetch_total_time_cap",
+          );
+          break outer;
+        }
         const tokenCandidate: WorkdayToken = {
           host,
           tenant: parsedToken.tenant,

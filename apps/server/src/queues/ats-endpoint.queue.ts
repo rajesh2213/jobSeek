@@ -1,6 +1,7 @@
 import { Queue } from "bullmq";
 import { getRedisConnection } from "./job.queue.js";
 
+/** Single queue for all ATS boards; see worker timeouts / Workday caps to limit head-of-line blocking. */
 export const INGEST_ATS_ENDPOINT_QUEUE_NAME = "ingest-ats-endpoint";
 
 export const INGEST_ATS_ENDPOINT_JOB = "ingest-ats-endpoint";
