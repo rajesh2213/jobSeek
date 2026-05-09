@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   useTransition,
+  type MouseEvent,
   type ReactNode,
 } from "react";
 import dynamic from "next/dynamic";
@@ -546,6 +547,9 @@ export function JobsSearchClient({
   );
   const [hoveredSavedId, setHoveredSavedId] = useState<string | null>(null);
   const hoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Hit targets for saved-search UI only — used with relatedTarget so leave events don’t fight the open panel. */
+  const savedSearchTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const savedSearchPopoverRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [alertUpdatingId, setAlertUpdatingId] = useState<string | null>(null);
   const [flashAppliedJobId, setFlashAppliedJobId] = useState<string | null>(null);
   const [isFilterPending, startFilterTransition] = useTransition();
@@ -1071,16 +1075,23 @@ export function JobsSearchClient({
     [alertUpdatingId, getToken, isPro, isSignedIn],
   );
 
-  /** Hover open/close only on the pill and panel — not the `relative` wrapper (avoids a tall invisible hit box under flex layout). */
-  const onSavedSearchPopoverEnter = useCallback((id: string) => {
+  /**
+   * Saved-search popover — root cause (verified in layout):
+   * - Keeping the panel mounted with `position:absolute` + full intrinsic height while only hiding via
+   *   opacity/pointer-events still leaves a large rectangle in the scroll/sticky stack (and invited
+   *   hover listeners on that node). Unmount when closed so there is no ghost hit region.
+   * - The chip wrapper is shrink-wrapped (`inline-flex` + `w-fit` + `self-start`) so flex line boxes
+   *   cannot assign it a taller cross-size than the pill.
+   * - Pointer handlers stay on the trigger `button` and the panel only; the wrapper has none.
+   */
+  const cancelSavedSearchHoverClose = useCallback(() => {
     if (hoverCloseTimerRef.current) {
       clearTimeout(hoverCloseTimerRef.current);
       hoverCloseTimerRef.current = null;
     }
-    setHoveredSavedId(id);
   }, []);
 
-  const onSavedSearchPopoverLeave = useCallback((id: string) => {
+  const scheduleSavedSearchHoverClose = useCallback((id: string) => {
     if (hoverCloseTimerRef.current) {
       clearTimeout(hoverCloseTimerRef.current);
     }
@@ -1088,6 +1099,45 @@ export function JobsSearchClient({
       setHoveredSavedId((prev) => (prev === id ? null : prev));
     }, 180);
   }, []);
+
+  const onSavedSearchTriggerEnter = useCallback(
+    (id: string) => {
+      cancelSavedSearchHoverClose();
+      setHoveredSavedId(id);
+    },
+    [cancelSavedSearchHoverClose],
+  );
+
+  const onSavedSearchTriggerLeave = useCallback(
+    (id: string, e: MouseEvent<HTMLButtonElement>) => {
+      const next = e.relatedTarget;
+      const panel = savedSearchPopoverRefs.current.get(id);
+      if (next instanceof Node && panel?.contains(next)) return;
+      scheduleSavedSearchHoverClose(id);
+    },
+    [scheduleSavedSearchHoverClose],
+  );
+
+  const onSavedSearchPanelEnter = useCallback(
+    (id: string) => {
+      cancelSavedSearchHoverClose();
+      setHoveredSavedId(id);
+    },
+    [cancelSavedSearchHoverClose],
+  );
+
+  const onSavedSearchPanelLeave = useCallback(
+    (id: string, e: MouseEvent<HTMLDivElement>) => {
+      const next = e.relatedTarget;
+      const trigger = savedSearchTriggerRefs.current.get(id);
+      if (next instanceof Node && trigger?.contains(next)) return;
+      scheduleSavedSearchHoverClose(id);
+    },
+    [scheduleSavedSearchHoverClose],
+  );
+
+  const savedSearchHitboxDebug =
+    process.env.NEXT_PUBLIC_JOBSEEK_DEBUG_SAVED_SEARCH_HITBOX === "1";
 
   const hasAnyJobAlert = useMemo(
     () => savedSearches.some((s) => s.alertEnabled),
@@ -1242,11 +1292,23 @@ export function JobsSearchClient({
                 const isPopoverOpen =
                   hoveredSavedId === saved.id || editingSavedId === saved.id;
                 return (
-                  <div key={saved.id} className="relative self-start">
+                  <div
+                    key={saved.id}
+                    className={cn(
+                      "relative inline-flex w-fit max-w-full flex-col items-start self-start",
+                      savedSearchHitboxDebug &&
+                        "outline outline-2 outline-offset-2 outline-red-500/90",
+                    )}
+                  >
                     <button
+                      ref={(el) => {
+                        const m = savedSearchTriggerRefs.current;
+                        if (el) m.set(saved.id, el);
+                        else m.delete(saved.id);
+                      }}
                       type="button"
-                      onMouseEnter={() => onSavedSearchPopoverEnter(saved.id)}
-                      onMouseLeave={() => onSavedSearchPopoverLeave(saved.id)}
+                      onMouseEnter={() => onSavedSearchTriggerEnter(saved.id)}
+                      onMouseLeave={(e) => onSavedSearchTriggerLeave(saved.id, e)}
                       onClick={() =>
                         startFilterTransition(() => {
                           signalProgrammaticNavigation(saved.query);
@@ -1254,11 +1316,15 @@ export function JobsSearchClient({
                         })
                       }
                       aria-current={isActiveSaved ? "page" : undefined}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                      aria-expanded={isPopoverOpen}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-xs font-medium transition",
                         isActiveSaved
                           ? "border-brand bg-brand/10 text-brand shadow-sm"
-                          : "border-ink/15 bg-surface text-ink hover:border-brand/30 hover:text-brand"
-                      }`}
+                          : "border-ink/15 bg-surface text-ink hover:border-brand/30 hover:text-brand",
+                        savedSearchHitboxDebug &&
+                          "outline outline-2 outline-dashed outline-blue-600/90",
+                      )}
                       title={displayName}
                     >
                       <span className="inline-flex items-center gap-1">
@@ -1270,186 +1336,189 @@ export function JobsSearchClient({
                         {displayName}
                       </span>
                     </button>
-                    <div
-                      onMouseEnter={() => onSavedSearchPopoverEnter(saved.id)}
-                      onMouseLeave={() => onSavedSearchPopoverLeave(saved.id)}
-                      className={`absolute left-0 top-full z-20 mt-1.5 w-80 max-w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-ink/10 bg-surface p-3.5 text-xs leading-relaxed text-ink shadow-lg ring-1 ring-ink/5 transition ${
-                        isPopoverOpen
-                          ? "pointer-events-auto opacity-100"
-                          : "pointer-events-none opacity-0"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="line-clamp-2 font-semibold text-ink">
-                          {displayName}
-                        </p>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <button
-                            type="button"
-                            className="rounded-md p-1.5 text-ink transition-colors hover:bg-ink/10 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              onStartRenameSavedSearch(saved);
-                            }}
-                            aria-label="Rename saved search"
-                            title="Rename saved search"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              strokeWidth={1.75}
-                              stroke="currentColor"
-                              className="h-4 w-4"
-                              aria-hidden
+                    {isPopoverOpen ? (
+                      <div
+                        ref={(el) => {
+                          const m = savedSearchPopoverRefs.current;
+                          if (el) m.set(saved.id, el);
+                          else m.delete(saved.id);
+                        }}
+                        onMouseEnter={() => onSavedSearchPanelEnter(saved.id)}
+                        onMouseLeave={(e) => onSavedSearchPanelLeave(saved.id, e)}
+                        className="absolute left-0 top-full z-20 mt-1.5 w-80 max-w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-ink/10 bg-surface p-3.5 text-xs leading-relaxed text-ink shadow-lg ring-1 ring-ink/5"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="line-clamp-2 font-semibold text-ink">
+                            {displayName}
+                          </p>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <button
+                              type="button"
+                              className="rounded-md p-1.5 text-ink transition-colors hover:bg-ink/10 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onStartRenameSavedSearch(saved);
+                              }}
+                              aria-label="Rename saved search"
+                              title="Rename saved search"
                             >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125"
-                              />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded-md p-1.5 text-ink transition-colors hover:bg-red-500/10 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40 disabled:pointer-events-none disabled:opacity-40"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              void onDeleteSavedSearch(saved.id);
-                            }}
-                            disabled={deletingSavedId === saved.id}
-                            aria-label="Delete saved search"
-                            title="Delete saved search"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              strokeWidth={1.75}
-                              stroke="currentColor"
-                              className="h-4 w-4"
-                              aria-hidden
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                      {editingSavedId === saved.id ? (
-                        <div className="pointer-events-auto mt-2 flex items-center gap-2">
-                          <input
-                            value={editingName}
-                            onChange={(e) => setEditingName(e.target.value)}
-                            className="h-8 w-full rounded-lg border border-ink/20 bg-white px-2.5 text-xs text-ink placeholder:text-ink-muted shadow-sm focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
-                            placeholder="Saved search name"
-                            maxLength={80}
-                          />
-                          <button
-                            type="button"
-                            className="shrink-0 rounded-lg bg-brand px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-hover"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              void onRenameSavedSearch(saved.id);
-                            }}
-                            disabled={renamingSavedId === saved.id}
-                          >
-                            Save
-                          </button>
-                        </div>
-                      ) : null}
-                      {details.length > 0 ? (
-                        <div className="mt-3 max-h-40 space-y-2.5 overflow-y-auto pr-0.5">
-                          {details.map((row) => (
-                            <div
-                              key={`${saved.id}-${row.label}`}
-                              className="text-xs leading-snug"
-                            >
-                              <span className="block text-[11px] font-semibold uppercase tracking-wide text-ink/50">
-                                {row.label}
-                              </span>
-                              <span className="mt-0.5 block break-words text-ink/90">
-                                {row.value}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="mt-3 text-ink-muted">No filters</p>
-                      )}
-                      <div className="pointer-events-auto mt-3 rounded-lg border border-brand/25 bg-brand/5 p-3 ring-1 ring-brand/10">
-                        <p className="flex items-center gap-1.5 text-sm font-semibold text-brand">
-                          <span aria-hidden className="text-base leading-none">
-                            🔔
-                          </span>
-                          Job alerts
-                        </p>
-                        {isPro ? (
-                          <div className="mt-2.5 space-y-2">
-                            <label className="flex cursor-pointer items-start gap-2 text-ink">
-                              <input
-                                type="checkbox"
-                                checked={saved.alertEnabled}
-                                disabled={alertUpdatingId === saved.id}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  void onAlertSavedSearch(saved, e.target.checked);
-                                }}
-                                className="mt-0.5 rounded border-ink/30 text-brand focus:ring-brand/30"
-                              />
-                              <span className="leading-snug">
-                                Email when new jobs match
-                              </span>
-                            </label>
-                            <div className="flex flex-wrap items-center gap-2 text-ink/80">
-                              <span>Notify every</span>
-                              <select
-                                className="rounded-md border border-ink/15 bg-white px-2 py-1 text-xs font-medium text-ink shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
-                                value={saved.alertThreshold === 10 ? 10 : 5}
-                                disabled={
-                                  alertUpdatingId === saved.id || !saved.alertEnabled
-                                }
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  const v = (Number(e.target.value) === 10 ? 10 : 5) as 5 | 10;
-                                  void onAlertSavedSearch(saved, true, v);
-                                }}
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                strokeWidth={1.75}
+                                stroke="currentColor"
+                                className="h-4 w-4"
+                                aria-hidden
                               >
-                                <option value={5}>5</option>
-                                <option value={10}>10</option>
-                              </select>
-                              <span>new jobs</span>
-                            </div>
-                            <p className="text-[11px] text-ink/55">
-                              Last sent: {formatAlertLastSent(saved.alertLastSentAt)}
-                            </p>
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125"
+                                />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded-md p-1.5 text-ink transition-colors hover:bg-red-500/10 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40 disabled:pointer-events-none disabled:opacity-40"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                void onDeleteSavedSearch(saved.id);
+                              }}
+                              disabled={deletingSavedId === saved.id}
+                              aria-label="Delete saved search"
+                              title="Delete saved search"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                strokeWidth={1.75}
+                                stroke="currentColor"
+                                className="h-4 w-4"
+                                aria-hidden
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        {editingSavedId === saved.id ? (
+                          <div className="mt-2 flex items-center gap-2">
+                            <input
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              className="h-8 w-full rounded-lg border border-ink/20 bg-white px-2.5 text-xs text-ink placeholder:text-ink-muted shadow-sm focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
+                              placeholder="Saved search name"
+                              maxLength={80}
+                            />
+                            <button
+                              type="button"
+                              className="shrink-0 rounded-lg bg-brand px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-hover"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                void onRenameSavedSearch(saved.id);
+                              }}
+                              disabled={renamingSavedId === saved.id}
+                            >
+                              Save
+                            </button>
+                          </div>
+                        ) : null}
+                        {details.length > 0 ? (
+                          <div className="mt-3 max-h-40 space-y-2.5 overflow-y-auto pr-0.5">
+                            {details.map((row) => (
+                              <div
+                                key={`${saved.id}-${row.label}`}
+                                className="text-xs leading-snug"
+                              >
+                                <span className="block text-[11px] font-semibold uppercase tracking-wide text-ink/50">
+                                  {row.label}
+                                </span>
+                                <span className="mt-0.5 block break-words text-ink/90">
+                                  {row.value}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         ) : (
-                          <div className="mt-2.5 space-y-2">
-                            <p className="leading-snug text-ink/85">
-                              <span className="mr-1.5 inline-flex rounded bg-brand/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand">
-                                Pro
-                              </span>
-                              Get notified when new jobs match this search
-                            </p>
-                            <Link
-                              href="/pricing"
-                              className="inline-block text-sm font-semibold text-brand underline underline-offset-2 hover:text-brand-hover"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              Upgrade to unlock →
-                            </Link>
-                          </div>
+                          <p className="mt-3 text-ink-muted">No filters</p>
                         )}
+                        <div className="mt-3 rounded-lg border border-brand/25 bg-brand/5 p-3 ring-1 ring-brand/10">
+                          <p className="flex items-center gap-1.5 text-sm font-semibold text-brand">
+                            <span aria-hidden className="text-base leading-none">
+                              🔔
+                            </span>
+                            Job alerts
+                          </p>
+                          {isPro ? (
+                            <div className="mt-2.5 space-y-2">
+                              <label className="flex cursor-pointer items-start gap-2 text-ink">
+                                <input
+                                  type="checkbox"
+                                  checked={saved.alertEnabled}
+                                  disabled={alertUpdatingId === saved.id}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    void onAlertSavedSearch(saved, e.target.checked);
+                                  }}
+                                  className="mt-0.5 rounded border-ink/30 text-brand focus:ring-brand/30"
+                                />
+                                <span className="leading-snug">
+                                  Email when new jobs match
+                                </span>
+                              </label>
+                              <div className="flex flex-wrap items-center gap-2 text-ink/80">
+                                <span>Notify every</span>
+                                <select
+                                  className="rounded-md border border-ink/15 bg-white px-2 py-1 text-xs font-medium text-ink shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                                  value={saved.alertThreshold === 10 ? 10 : 5}
+                                  disabled={
+                                    alertUpdatingId === saved.id || !saved.alertEnabled
+                                  }
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    const v = (Number(e.target.value) === 10 ? 10 : 5) as 5 | 10;
+                                    void onAlertSavedSearch(saved, true, v);
+                                  }}
+                                >
+                                  <option value={5}>5</option>
+                                  <option value={10}>10</option>
+                                </select>
+                                <span>new jobs</span>
+                              </div>
+                              <p className="text-[11px] text-ink/55">
+                                Last sent: {formatAlertLastSent(saved.alertLastSentAt)}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="mt-2.5 space-y-2">
+                              <p className="leading-snug text-ink/85">
+                                <span className="mr-1.5 inline-flex rounded bg-brand/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand">
+                                  Pro
+                                </span>
+                                Get notified when new jobs match this search
+                              </p>
+                              <Link
+                                href="/pricing"
+                                className="inline-block text-sm font-semibold text-brand underline underline-offset-2 hover:text-brand-hover"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                Upgrade to unlock →
+                              </Link>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    ) : null}
                   </div>
                 );
               })}
