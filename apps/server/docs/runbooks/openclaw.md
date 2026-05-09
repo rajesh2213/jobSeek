@@ -18,15 +18,36 @@ OpenClaw is an **optional** integration for discovery acceleration and supplemen
 
 No core API or primary workers need restarting for rollback.
 
-## Dry-run limitations
+## Dry-run behavior (zero-write Postgres)
 
-When `OPENCLAW_DRY_RUN=true`:
+When `OPENCLAW_DRY_RUN=true`, OpenClaw runs in **full observational mode** for Postgres:
 
-- Remote API is still called (subject to quota).
-- Rows are normalized and **dedup outcome is simulated** (URL + fingerprint check only — **not** full `isSameJob` soft match).
-- Nothing is written via `ingestDeduplicated`.
+**Still happens**
 
-Use dry-run for staging validation only; production behavior can differ for borderline duplicates.
+- Outbound OpenClaw API calls (quota + circuit as usual).
+- Payload parse, mapper validation, `malformed_job_rows` metrics.
+- **Dedup simulation:** read-only `findBySourceUrl` on existing jobs + in-memory fingerprint (same as before — **not** full `isSameJob` soft match).
+- Redis: daily metrics hash (`openclaw:metrics:*`), quota counter (`openclaw:quota:*`), paging cursor (`openclaw:paging:next_page`).
+- In-process provider health / circuit state (`openclaw.state.ts`).
+
+**Intentionally skipped (no Postgres writes, no discovery/enrichment side effects)**
+
+- `Company` lookup/create, `ensureCompanyFromJob`, `DiscoveryService.processCompanyCandidate`, and any company **hint merge** (`mergeOpenClawHints`).
+- `JobService.ingestDeduplicated` / canonical mutations.
+- ATS endpoint creation (nothing in OpenClaw sync calls endpoint ingest).
+
+Each sync emits structured logs once per run: `openclaw_dry_run_skip_company_resolution`, `openclaw_dry_run_skip_discovery`, `openclaw_dry_run_skip_enrichment`. Row logs include `syntheticCompanyId: true` on `openclaw_dry_run_row`.
+
+**Synthetic company identity**
+
+- Mapper + metrics use a stable `dry-run:<hash>` id derived from payload company name + domain hint. It **never** matches a real `Company.id`.
+- `companyDomain` for fingerprinting prefers normalized payload `domain`, then `careersUrl` hostname, else `company:<syntheticId>`.
+
+**When `OPENCLAW_DRY_RUN=false`**
+
+- Prior behavior returns: real company resolution, optional discovery, optional hint merge, then `ingestDeduplicated`.
+
+Use dry-run for multi-day observation without polluting companies or jobs; expect `companies_discovered` **not** to increment while dry-run is on.
 
 ## Source weighting
 
@@ -59,8 +80,9 @@ OpenClaw aligns **5xx** backoff **base** with `DEFAULT_ATS_FETCH_RETRY.baseDelay
 
 1. **No distributed scheduler lock** — if multiple scheduler instances run, more than one sync job may enqueue per interval; queue job ids are time-based so work can duplicate until you run a single scheduler.
 2. **Per-process circuit state** — circuit breaker state is in-memory per worker; multiple workers do not share it.
-3. **Partial dry-run dedup** — see Dry-run limitations.
-4. **Isolated Redis metrics** — OpenClaw counters live in `openclaw:metrics:*` hashes, not the main dedup in-process metrics.
+3. **Partial dry-run dedup** — simulation is URL + fingerprint only; not full `isSameJob`.
+4. **Dry-run still reads jobs by URL** — `findBySourceUrl` hits Postgres read-only for duplicate check; no writes.
+5. **Isolated Redis metrics** — OpenClaw counters live in `openclaw:metrics:*` hashes, not the main dedup in-process metrics.
 
 ## Malformed payloads
 

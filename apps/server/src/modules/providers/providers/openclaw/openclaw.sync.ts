@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { Company, PrismaClient } from "@prisma/client";
 import type { JobService } from "../../../job/job.service.js";
 import type { CompanyService } from "../../../company/company.service.js";
@@ -119,6 +120,37 @@ async function simulateDedupOutcome(
   return "would_ingest";
 }
 
+/**
+ * Stable synthetic company id for zero-write dry-run — never matches a Postgres `Company.id`.
+ * Exported for unit tests.
+ */
+export function openclawDryRunSyntheticCompanyId(
+  hints: ReturnType<typeof extractCompanyHints>,
+): string {
+  const name = hints.companyName?.trim() ?? "";
+  const dom = hints.domain?.trim() ?? "";
+  const digest = createHash("sha256")
+    .update(`openclaw:dry-run\n${name}\n${dom}`, "utf8")
+    .digest("hex")
+    .slice(0, 24);
+  return `dry-run:${digest}`;
+}
+
+/**
+ * Company fields for mapper + dedup simulation without touching `Company` rows or discovery.
+ * Prefer payload `domain` / `careersUrl` hints for `companyDomain` so fingerprints stay realistic.
+ */
+export function buildOpenClawDryRunCompanyObservation(
+  hints: ReturnType<typeof extractCompanyHints>,
+): { companyId: string; displayName: string; companyDomain: string } {
+  const companyId = openclawDryRunSyntheticCompanyId(hints);
+  const displayName = hints.companyName?.trim() || "Unknown Company";
+  const companyDomain =
+    normalizeDomain(hints.domain ?? "") ||
+    extractCompanyDomain(hints.careersUrl, companyId);
+  return { companyId, displayName, companyDomain };
+}
+
 async function resolveCompanyIdForOpenClaw(
   cfg: OpenClawEnvConfig,
   companyService: CompanyService,
@@ -199,11 +231,14 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
       event: "sync_started",
       provider: "openclaw",
       dry_run: cfg.dryRun,
+      zero_write_postgres: cfg.dryRun,
       page_start: page,
       max_pages: cfg.maxPagesPerRun,
     },
     "openclaw_sync_started",
   );
+
+  let emittedDryRunSkipLogs = false;
 
   for (let i = 0; i < cfg.maxPagesPerRun; i++) {
     const fetched = await client.fetchJobsSearch({
@@ -255,33 +290,63 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
     for (const raw of rows) {
       const hints = extractCompanyHints(raw);
       let companyId: string;
-      try {
-        companyId = await resolveCompanyIdForOpenClaw(cfg, ctx.companyService, discoveryService, hints, redis);
-      } catch (err) {
-        logger.warn(
-          { event: "openclaw_company_resolve_failed", provider: "openclaw", err },
-          "openclaw_company_resolve_failed",
-        );
-        await incrOpenClawMetric(redis, "failures", 1);
-        continue;
-      }
+      let displayName: string;
+      let companyDomain: string;
 
-      const companyRow = await ctx.prisma.company.findUnique({
-        where: { id: companyId },
-        select: { name: true, careersUrl: true },
-      });
-      const displayName = companyRow?.name ?? hints.companyName ?? "Unknown Company";
-
-      if (cfg.enrichmentEnabled) {
-        try {
-          const merged = await mergeOpenClawHints(ctx.prisma, companyId, hints);
-          if (merged) await incrOpenClawMetric(redis, "ats_hints_applied", 1);
-        } catch (err) {
-          logger.warn(
-            { event: "openclaw_hint_merge_failed", provider: "openclaw", companyId, err },
-            "openclaw_hint_merge_failed",
+      if (cfg.dryRun) {
+        if (!emittedDryRunSkipLogs) {
+          emittedDryRunSkipLogs = true;
+          logger.info(
+            { event: "openclaw_dry_run_skip_company_resolution", provider: "openclaw" },
+            "openclaw_dry_run_skip_company_resolution",
+          );
+          logger.info(
+            { event: "openclaw_dry_run_skip_discovery", provider: "openclaw" },
+            "openclaw_dry_run_skip_discovery",
+          );
+          logger.info(
+            { event: "openclaw_dry_run_skip_enrichment", provider: "openclaw" },
+            "openclaw_dry_run_skip_enrichment",
           );
         }
+        ({ companyId, displayName, companyDomain } = buildOpenClawDryRunCompanyObservation(hints));
+      } else {
+        try {
+          companyId = await resolveCompanyIdForOpenClaw(cfg, ctx.companyService, discoveryService, hints, redis);
+        } catch (err) {
+          logger.warn(
+            { event: "openclaw_company_resolve_failed", provider: "openclaw", err },
+            "openclaw_company_resolve_failed",
+          );
+          await incrOpenClawMetric(redis, "failures", 1);
+          continue;
+        }
+
+        const companyRow = await ctx.prisma.company.findUnique({
+          where: { id: companyId },
+          select: { name: true, careersUrl: true },
+        });
+        displayName = companyRow?.name ?? hints.companyName ?? "Unknown Company";
+
+        if (cfg.enrichmentEnabled) {
+          try {
+            const merged = await mergeOpenClawHints(ctx.prisma, companyId, hints);
+            if (merged) await incrOpenClawMetric(redis, "ats_hints_applied", 1);
+          } catch (err) {
+            logger.warn(
+              { event: "openclaw_hint_merge_failed", provider: "openclaw", companyId, err },
+              "openclaw_hint_merge_failed",
+            );
+          }
+        }
+
+        const careersUrl = (
+          await ctx.prisma.company.findUnique({
+            where: { id: companyId },
+            select: { careersUrl: true },
+          })
+        )?.careersUrl;
+        companyDomain = extractCompanyDomain(careersUrl, companyId);
       }
 
       const mapped = tryMapOpenClawJobToNormalized(raw, companyId, displayName);
@@ -302,11 +367,6 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
 
       await incrOpenClawMetric(redis, "jobs_normalized", 1);
 
-      const careersUrl = (await ctx.prisma.company.findUnique({
-        where: { id: companyId },
-        select: { careersUrl: true },
-      }))?.careersUrl;
-      const companyDomain = extractCompanyDomain(careersUrl, companyId);
       const dedupInput = { ...normalized, companyDomain };
 
       if (cfg.dryRun) {
@@ -320,6 +380,7 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
             provider: "openclaw",
             outcome: sim,
             sourceUrl: dedupInput.sourceUrl,
+            syntheticCompanyId: true,
           },
           "openclaw_dry_run_row",
         );

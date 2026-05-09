@@ -11,7 +11,11 @@ import {
 } from "../../../../../src/modules/providers/providers/openclaw/openclaw.mapper.js";
 import { OpenClawClient } from "../../../../../src/modules/providers/providers/openclaw/openclaw.client.js";
 import { tryConsumeOpenClawQuotaSlot } from "../../../../../src/modules/providers/providers/openclaw/openclaw.quota.js";
-import { computeOpenClawCompanyHintPatch } from "../../../../../src/modules/providers/providers/openclaw/openclaw.sync.js";
+import {
+  buildOpenClawDryRunCompanyObservation,
+  computeOpenClawCompanyHintPatch,
+  openclawDryRunSyntheticCompanyId,
+} from "../../../../../src/modules/providers/providers/openclaw/openclaw.sync.js";
 import { getSourceQualityWeight } from "../../../../../src/services/jobRanking.service.js";
 import type { Redis } from "ioredis";
 
@@ -153,6 +157,22 @@ test("safeOpenClawPostedAt: ignores absurd dates", () => {
 
 test("getSourceQualityWeight: openclaw explicit", () => {
   assert.equal(getSourceQualityWeight("openclaw"), 0.62);
+});
+
+test("buildOpenClawDryRunCompanyObservation: stable synthetic id and domain from hints", () => {
+  const hints = { companyName: "Acme", domain: "acme.com" };
+  const a = buildOpenClawDryRunCompanyObservation(hints);
+  const b = buildOpenClawDryRunCompanyObservation(hints);
+  assert.equal(a.companyId, b.companyId);
+  assert.ok(a.companyId.startsWith("dry-run:"));
+  assert.equal(a.displayName, "Acme");
+  assert.equal(a.companyDomain, "acme.com");
+});
+
+test("openclawDryRunSyntheticCompanyId: different companies differ", () => {
+  const x = openclawDryRunSyntheticCompanyId({ companyName: "A" });
+  const y = openclawDryRunSyntheticCompanyId({ companyName: "B" });
+  assert.notEqual(x, y);
 });
 
 test("computeOpenClawCompanyHintPatch: fills empty only", () => {
