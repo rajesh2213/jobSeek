@@ -1071,6 +1071,24 @@ export function JobsSearchClient({
     [alertUpdatingId, getToken, isPro, isSignedIn],
   );
 
+  /** Hover open/close only on the pill and panel — not the `relative` wrapper (avoids a tall invisible hit box under flex layout). */
+  const onSavedSearchPopoverEnter = useCallback((id: string) => {
+    if (hoverCloseTimerRef.current) {
+      clearTimeout(hoverCloseTimerRef.current);
+      hoverCloseTimerRef.current = null;
+    }
+    setHoveredSavedId(id);
+  }, []);
+
+  const onSavedSearchPopoverLeave = useCallback((id: string) => {
+    if (hoverCloseTimerRef.current) {
+      clearTimeout(hoverCloseTimerRef.current);
+    }
+    hoverCloseTimerRef.current = setTimeout(() => {
+      setHoveredSavedId((prev) => (prev === id ? null : prev));
+    }, 180);
+  }, []);
+
   const hasAnyJobAlert = useMemo(
     () => savedSearches.some((s) => s.alertEnabled),
     [savedSearches],
@@ -1224,29 +1242,11 @@ export function JobsSearchClient({
                 const isPopoverOpen =
                   hoveredSavedId === saved.id || editingSavedId === saved.id;
                 return (
-                  <div
-                    key={saved.id}
-                    className="relative"
-                    onMouseEnter={() => {
-                      if (hoverCloseTimerRef.current) {
-                        clearTimeout(hoverCloseTimerRef.current);
-                        hoverCloseTimerRef.current = null;
-                      }
-                      setHoveredSavedId(saved.id);
-                    }}
-                    onMouseLeave={() => {
-                      if (hoverCloseTimerRef.current) {
-                        clearTimeout(hoverCloseTimerRef.current);
-                      }
-                      hoverCloseTimerRef.current = setTimeout(() => {
-                        setHoveredSavedId((prev) =>
-                          prev === saved.id ? null : prev,
-                        );
-                      }, 180);
-                    }}
-                  >
+                  <div key={saved.id} className="relative self-start">
                     <button
                       type="button"
+                      onMouseEnter={() => onSavedSearchPopoverEnter(saved.id)}
+                      onMouseLeave={() => onSavedSearchPopoverLeave(saved.id)}
                       onClick={() =>
                         startFilterTransition(() => {
                           signalProgrammaticNavigation(saved.query);
@@ -1271,6 +1271,8 @@ export function JobsSearchClient({
                       </span>
                     </button>
                     <div
+                      onMouseEnter={() => onSavedSearchPopoverEnter(saved.id)}
+                      onMouseLeave={() => onSavedSearchPopoverLeave(saved.id)}
                       className={`absolute left-0 top-full z-20 mt-1.5 w-80 max-w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-ink/10 bg-surface p-3.5 text-xs leading-relaxed text-ink shadow-lg ring-1 ring-ink/5 transition ${
                         isPopoverOpen
                           ? "pointer-events-auto opacity-100"
