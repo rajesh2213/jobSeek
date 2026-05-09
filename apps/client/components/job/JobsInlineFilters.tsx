@@ -449,7 +449,7 @@ export function JobsInlineFilters({
   const locationsPanelClass =
     "absolute left-0 top-full z-[100] mt-2 max-w-[min(100vw-2rem,380px)] rounded-xl border border-ink/10 bg-surface p-3 shadow-lg overflow-visible";
   const triggerClass =
-    "flex min-h-11 items-center whitespace-nowrap rounded-xl border border-ink/15 bg-surface px-4 text-left text-xs font-bold uppercase tracking-wide text-ink shadow-sm transition-colors hover:border-ink/30 focus:outline-none focus:ring-2 focus:ring-brand/20 sm:h-10 sm:min-h-0 min-w-[140px] max-w-[220px]";
+    "flex h-10 min-h-10 w-full min-w-0 items-center whitespace-nowrap rounded-xl border border-ink/15 bg-surface px-3 text-left text-xs font-bold uppercase tracking-wide text-ink shadow-sm transition-colors hover:border-ink/30 focus:outline-none focus:ring-2 focus:ring-brand/20 sm:px-4 lg:h-10 lg:min-h-10 lg:w-auto lg:min-w-[140px] lg:max-w-[220px]";
   const rolePanelClass = cn(
     panelClass,
     "min-w-[min(100vw-2rem,400px)] max-w-[min(100vw-2rem,460px)]",
@@ -476,8 +476,21 @@ export function JobsInlineFilters({
 
   return (
     <div ref={controlsRef} className="w-full">
-      <div className="flex flex-wrap items-start gap-3">
-        <div className="relative min-w-[140px] max-w-[180px]" data-dropdown-id="role">
+      <div
+        className={cn(
+          "rounded-xl border border-ink/10 bg-surface/70 p-3 shadow-sm ring-1 ring-black/[0.02]",
+          "lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:ring-0",
+        )}
+      >
+        <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-ink/45 lg:sr-only">
+          Refine results
+        </p>
+        <div className="flex w-full flex-col gap-2.5 lg:flex-row lg:flex-wrap lg:items-start lg:gap-3">
+          <div className="grid w-full grid-cols-2 gap-2 lg:contents">
+        <div
+          className="relative col-span-2 w-full min-w-0 lg:col-span-1 lg:w-auto lg:min-w-[140px] lg:max-w-[180px]"
+          data-dropdown-id="role"
+        >
           <button
             type="button"
             className={triggerClass}
@@ -580,7 +593,7 @@ export function JobsInlineFilters({
           </AnimatePresence>
         </div>
 
-        <div className="flex min-w-[220px] max-w-[260px] items-center gap-1 rounded-xl border border-ink/15 bg-white p-1">
+        <div className="col-span-2 flex w-full min-w-0 items-center gap-0.5 rounded-xl border border-ink/15 bg-white p-1 lg:w-auto lg:min-w-[220px] lg:max-w-[260px] lg:gap-1">
           {[
             { label: "Remote", value: "remote" },
             { label: "Onsite", value: "onsite" },
@@ -592,7 +605,7 @@ export function JobsInlineFilters({
               <button
                 key={item.label}
                 type="button"
-                className={`flex-1 rounded-lg px-2.5 py-1.5 text-center text-sm font-semibold whitespace-nowrap transition ${active ? "bg-orange-500 text-white shadow-sm" : "text-ink/60 hover:bg-ink/5 hover:text-ink"}`}
+                className={`min-h-9 flex-1 rounded-lg px-1.5 py-1.5 text-center text-[11px] font-semibold leading-tight whitespace-nowrap transition sm:px-2.5 sm:text-sm ${active ? "bg-orange-500 text-white shadow-sm" : "text-ink/60 hover:bg-ink/5 hover:text-ink"}`}
                 onClick={() => toggleType(value)}
               >
                 {item.label}
@@ -601,7 +614,10 @@ export function JobsInlineFilters({
           })}
         </div>
 
-        <div className="relative min-w-[140px] max-w-[220px]" data-dropdown-id="skills">
+        <div
+          className="relative col-span-1 w-full min-w-0 lg:min-w-[140px] lg:max-w-[220px]"
+          data-dropdown-id="skills"
+        >
           <button
             type="button"
             aria-expanded={openMenu === "skills"}
@@ -689,7 +705,10 @@ export function JobsInlineFilters({
           </AnimatePresence>
         </div>
 
-        <div className="relative min-w-[140px] max-w-[220px]" data-dropdown-id="experience">
+        <div
+          className="relative col-span-1 w-full min-w-0 lg:min-w-[140px] lg:max-w-[220px]"
+          data-dropdown-id="experience"
+        >
           <button
             type="button"
             className={triggerClass}
@@ -721,7 +740,10 @@ export function JobsInlineFilters({
           </AnimatePresence>
         </div>
 
-        <div className="relative min-w-[140px] max-w-[220px]" data-dropdown-id="posted">
+        <div
+          className="relative col-span-1 w-full min-w-0 lg:min-w-[140px] lg:max-w-[220px]"
+          data-dropdown-id="posted"
+        >
           <button
             type="button"
             className={triggerClass}
@@ -759,7 +781,10 @@ export function JobsInlineFilters({
           </AnimatePresence>
         </div>
 
-        <div className="relative min-w-[140px] max-w-[220px]" data-dropdown-id="locations">
+        <div
+          className="relative col-span-1 w-full min-w-0 lg:min-w-[140px] lg:max-w-[220px]"
+          data-dropdown-id="locations"
+        >
           <button
             type="button"
             className={triggerClass}
@@ -976,9 +1001,9 @@ export function JobsInlineFilters({
           </AnimatePresence>
         </div>
 
-        <div className="filter-chip min-w-[8rem] flex-1 transition-all duration-300 ease-chip hover:-translate-y-0.5 hover:scale-[1.03] sm:flex-none">
+        <div className="filter-chip col-span-2 w-full lg:flex lg:min-w-[8rem] lg:flex-none lg:transition-all lg:duration-300 lg:ease-chip lg:hover:-translate-y-0.5 lg:hover:scale-[1.03]">
           {onClearFilters ? (
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex w-full items-stretch justify-stretch gap-2">
               <Button
                 variant="outline"
                 outlineTone="rose"
@@ -986,7 +1011,7 @@ export function JobsInlineFilters({
                 type="button"
                 onClick={onClearFilters}
                 disabled={clearFiltersDisabled}
-                className="h-[42px] min-w-[5.5rem] font-semibold tracking-wide"
+                className="h-11 min-h-11 flex-1 font-semibold tracking-wide lg:h-[42px] lg:min-h-[42px] lg:min-w-[5.5rem] lg:flex-initial"
               >
                 Clear
               </Button>
@@ -994,7 +1019,7 @@ export function JobsInlineFilters({
                 variant="primary"
                 size="md"
                 onClick={onApply}
-                className="h-[42px] min-w-[5.5rem] font-bold tracking-wide sm:w-auto"
+                className="h-11 min-h-11 flex-[1.15] font-bold tracking-wide shadow-sm ring-1 ring-brand/20 lg:h-[42px] lg:min-h-[42px] lg:min-w-[5.5rem] lg:flex-initial lg:ring-0"
               >
                 Apply
               </Button>
@@ -1004,11 +1029,13 @@ export function JobsInlineFilters({
               variant="primary"
               size="md"
               onClick={onApply}
-              className="h-[42px] w-full font-bold tracking-wide sm:w-auto"
+              className="h-11 min-h-11 w-full font-bold tracking-wide lg:h-[42px] lg:min-h-[42px] lg:w-auto"
             >
               Apply
             </Button>
           )}
+        </div>
+          </div>
         </div>
       </div>
 

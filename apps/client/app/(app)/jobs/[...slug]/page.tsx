@@ -105,7 +105,7 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
       {indexable ? (
         <JsonLdScript data={buildJobListingItemListJsonLd(response.data.slice(0, 10), total)} />
       ) : null}
-      <section className="mt-4 rounded-xl border border-ink/10 bg-surface px-4 py-3 text-sm text-ink/75">
+      <section className="mt-3 rounded-xl border border-ink/10 bg-surface px-3 py-2 text-xs leading-snug text-ink/75 sm:mt-4 sm:px-4 sm:py-3 sm:text-sm sm:leading-normal">
         <p>
           <Link href="/" className="font-semibold text-brand hover:underline">
             JobLoom
@@ -113,9 +113,9 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
           helps you discover real-time jobs from company career sites in one place, then drill into focused listings like this page.
         </p>
       </section>
-      <section className="mt-4 rounded-xl border border-ink/10 bg-surface px-4 py-4">
-        <h3 className="text-sm font-semibold text-ink">Explore related searches</h3>
-        <div className="mt-2 flex flex-wrap gap-2">
+      <section className="mt-3 rounded-xl border border-ink/10 bg-surface px-3 py-3 sm:mt-4 sm:px-4 sm:py-4">
+        <h3 className="text-xs font-semibold text-ink sm:text-sm">Explore related searches</h3>
+        <div className="mt-1.5 flex flex-wrap gap-1.5 sm:mt-2 sm:gap-2">
           {relatedSearchLinks.map((item) => (
             <Link
               key={item.href}

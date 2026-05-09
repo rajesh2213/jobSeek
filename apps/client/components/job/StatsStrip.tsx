@@ -97,7 +97,7 @@ export function StatsStrip({
   ];
 
   const pillClassName = cn(
-    "relative isolate overflow-hidden rounded-full border border-ink/10 bg-surface/95 px-3.5 py-2 text-xs font-medium leading-snug text-ink/80 shadow-sm",
+    "relative isolate overflow-hidden rounded-full border border-ink/10 bg-surface/95 px-3 py-1.5 text-[11px] font-medium leading-snug text-ink/80 shadow-sm sm:px-3.5 sm:py-2 sm:text-xs",
     "will-change-transform",
     "hover:shadow-[0_0_22px_rgba(232,83,58,0.12)] hover:ring-1 hover:ring-brand/15",
   );
@@ -133,7 +133,7 @@ export function StatsStrip({
   if (variant === "hero-split") {
     return (
       <motion.div
-        className={cn("mb-6 mt-1", className)}
+        className={cn("mb-3 mt-0 sm:mb-4 sm:mt-1 lg:mb-6", className)}
         initial="hidden"
         animate="visible"
         variants={{
@@ -145,13 +145,13 @@ export function StatsStrip({
       >
         <div className="min-w-0 flex-1">
           <div className="min-w-0 max-w-xl">{heroFirstRowLeading}</div>
-          <div className="mt-3 flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-x-6">
-            <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-2.5">
+          <div className="mt-2 flex w-full min-w-0 flex-col gap-2 sm:mt-3 sm:flex-row sm:items-start sm:justify-between sm:gap-x-6 sm:gap-y-2 md:gap-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2 sm:gap-y-2 md:gap-2.5">
               {heroStatRowPrefix}
               {renderPill(0)}
               {renderPill(1)}
             </div>
-            <div className="flex w-full min-w-0 flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-start sm:justify-end sm:gap-x-4 sm:gap-y-2 sm:pt-0.5 md:items-center">
+            <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-start sm:justify-end sm:gap-x-4 sm:gap-y-2 sm:pt-0.5 md:items-center">
               {heroAside != null ? (
                 <div
                   key="hero-stats-email-aside"

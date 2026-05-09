@@ -105,7 +105,7 @@ export default async function JobDetailPage({ params }: Props) {
             { name: job.title },
           ]}
         />
-        <section className="mb-4 rounded-xl border border-ink/10 bg-surface px-4 py-3 text-sm text-ink/75">
+        <section className="mb-3 rounded-xl border border-ink/10 bg-surface px-3 py-2 text-xs leading-snug text-ink/75 sm:mb-4 sm:px-4 sm:py-3 sm:text-sm sm:leading-normal">
           <p>
             <Link href="/" className="font-semibold text-brand hover:underline">
               JobLoom

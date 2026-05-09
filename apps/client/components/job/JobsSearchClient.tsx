@@ -1166,7 +1166,7 @@ export function JobsSearchClient({
 
   return (
     <div className="relative z-0 flex min-h-screen flex-col">
-      <div className="-mb-6 w-full sm:-mb-8">
+      <div className="-mb-3 w-full sm:-mb-5 lg:-mb-8">
         <TimeAdvantageSimulator
           jobsPostedThisWeek={resolvedWeeklyJobsPosted}
           statRowPrefix={
@@ -1224,7 +1224,7 @@ export function JobsSearchClient({
       <div
         id="section-filters"
         className={cn(
-          "relative z-[50] bg-canvas/95 py-3 backdrop-blur-sm sm:py-4",
+          "relative z-[50] bg-canvas/95 py-2 backdrop-blur-sm sm:py-4",
           "lg:sticky lg:top-16 lg:backdrop-blur-sm",
         )}
       >
@@ -1256,8 +1256,12 @@ export function JobsSearchClient({
               }))
             }
           />
-          <div className="mb-3 mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <div className="mb-3 mt-4 flex flex-col gap-3 lg:mt-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between lg:gap-x-3 lg:gap-y-2">
+            <div className="rounded-lg border border-ink/10 bg-ink/[0.02] px-3 py-3 shadow-sm ring-1 ring-black/[0.02] lg:min-w-0 lg:flex-1 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:ring-0">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-ink/40 lg:sr-only">
+                Saved searches
+              </p>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
               <Button
                 variant={savedMatch ? "primary" : "outline"}
                 size="sm"
@@ -1534,8 +1538,9 @@ export function JobsSearchClient({
                   Cancel rename
                 </button>
               ) : null}
+              </div>
             </div>
-            <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:shrink-0 sm:gap-3">
+            <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 border-t border-ink/10 pt-3 max-lg:pb-0 sm:w-auto sm:shrink-0 sm:gap-3 lg:border-0 lg:pt-0">
               {!isPro && listMeta && listMeta.viewCapUnlimited === false ? (
                 <FreeDiscoveryQuotaStrip listMeta={listMeta} />
               ) : null}

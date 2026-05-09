@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { JobItem } from "../../lib/api";
 import { formatTimeAgo } from "../../lib/format";
-import { jobDetailPinLocationText, workTypeDisplayLabel } from "../../lib/jobDisplay";
+import { jobDetailPinLocationText } from "../../lib/jobDisplay";
 import { ApplyJobButton } from "./ApplyJobButton";
 import { AppliedToggleButton } from "./AppliedToggleButton";
+import { WorkTypeOutlinePill } from "./WorkTypeOutlinePill";
 import { buttonClassName } from "../ui/Button";
 
 interface Props {
@@ -31,11 +32,15 @@ export function JobHeader({ job, applyHref, applyUrlLocked }: Props) {
               {job.company.name}
             </Link>
           </p>
-          <p className="text-sm leading-relaxed text-black/50">
-            <span>📍 {jobDetailPinLocationText(job)}</span>
-            <span className="mx-2 text-ink/25">·</span>
-            <span>🏢 {workTypeDisplayLabel(job)}</span>
-          </p>
+          <div className="flex min-w-0 flex-row flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-snug text-black/50">
+            <span className="inline-flex min-w-0 max-w-full items-center gap-1">
+              <span className="shrink-0" aria-hidden>
+                📍
+              </span>
+              <span className="min-w-0 truncate">{jobDetailPinLocationText(job)}</span>
+            </span>
+            <WorkTypeOutlinePill job={job} className="shrink-0" />
+          </div>
         </div>
         <div className="shrink-0 flex items-center gap-2">
           {applyUrlLocked ? (

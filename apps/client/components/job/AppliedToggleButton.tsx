@@ -15,6 +15,8 @@ interface Props {
   outlineTone?: AccentTone;
   size?: "sm" | "md";
   className?: string;
+  /** Shorter visible label for dense rows (e.g. job cards); full meaning via aria-label. */
+  compact?: boolean;
 }
 
 export function AppliedToggleButton({
@@ -22,6 +24,7 @@ export function AppliedToggleButton({
   outlineTone = "brand",
   size = "sm",
   className,
+  compact = false,
 }: Props) {
   const { isSignedIn } = useAuth();
   const router = useRouter();
@@ -50,10 +53,17 @@ export function AppliedToggleButton({
     }
   };
 
+  const ariaLabel = pending
+    ? "Updating applied state"
+    : applied
+      ? "Applied — click to remove from applied list"
+      : "Mark job as applied";
+
   return (
     <button
       type="button"
       aria-pressed={applied}
+      aria-label={ariaLabel}
       onClick={() => void onToggle()}
       disabled={pending}
       className={cn(
@@ -71,7 +81,13 @@ export function AppliedToggleButton({
       )}
       title={isSignedIn ? "Toggle applied state" : "Sign in to track applied jobs"}
     >
-      {pending ? "Updating..." : applied ? "Applied" : "Mark applied"}
+      {pending
+        ? "Updating..."
+        : applied
+          ? "Applied"
+          : compact
+            ? "Mark"
+            : "Mark applied"}
     </button>
   );
 }

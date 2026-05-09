@@ -32,7 +32,7 @@ function VirtualizedJobList({ jobs, flashAppliedJobId }: Props) {
 
   const rowVirtualizer = useWindowVirtualizer({
     count: jobs.length,
-    estimateSize: () => 420,
+    estimateSize: () => 400,
     overscan: 8,
     scrollMargin,
   });
@@ -53,7 +53,7 @@ function VirtualizedJobList({ jobs, flashAppliedJobId }: Props) {
             className={rowWidthClass}
             style={{
               transform: `translateY(${virtualRow.start - scrollMargin}px)`,
-              paddingBottom: virtualRow.index === jobs.length - 1 ? 0 : "1.25rem",
+              paddingBottom: virtualRow.index === jobs.length - 1 ? 0 : "1rem",
             }}
           >
             <JobCard job={job} flashAppliedJobId={flashAppliedJobId} />

@@ -29,7 +29,7 @@ export function TimeAdvantageSimulator({
   return (
     <div
       id="section-hero"
-      className="relative w-full pt-10 pb-6 lg:pt-12 lg:pb-8"
+      className="relative w-full pt-4 pb-3 sm:pt-7 sm:pb-5 lg:pt-12 lg:pb-8"
       aria-labelledby="jobs-hero-heading"
     >
       <div className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden>
@@ -45,7 +45,7 @@ export function TimeAdvantageSimulator({
       <Container width="jobs" className="relative z-[1]">
         <h1
           id="jobs-hero-heading"
-          className="w-full max-w-none font-sans text-[clamp(1.45rem,3.2vw,2.1rem)] font-semibold leading-[1.2] tracking-tight text-ink"
+          className="w-full max-w-none font-sans text-[clamp(1.2rem,4.2vw,2.1rem)] font-semibold leading-[1.15] tracking-tight text-ink sm:leading-[1.2]"
         >
           Be early once — or <span className="text-brand">stay early</span> every{'\u00A0'}time.
         </h1>
@@ -53,11 +53,11 @@ export function TimeAdvantageSimulator({
         <StatsStrip
           variant="hero-split"
           jobsPostedThisWeek={jobsPostedThisWeek}
-          className="mb-0 mt-4"
+          className="mb-0 mt-2 sm:mt-3 lg:mt-4"
           heroAside={heroAside}
           heroStatRowPrefix={statRowPrefix}
           heroFirstRowLeading={
-            <p className="min-w-0 max-w-2xl shrink-0 text-[15px] leading-snug text-ink/55 sm:max-w-none sm:text-base">
+            <p className="min-w-0 max-w-2xl shrink-0 text-sm leading-snug text-ink/55 sm:max-w-none sm:text-[15px] sm:leading-snug md:text-base">
               That&apos;s the difference between browsing and getting interviews.
             </p>
           }

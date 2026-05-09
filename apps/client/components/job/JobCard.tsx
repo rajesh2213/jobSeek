@@ -242,25 +242,38 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
               </div>
             </div>
           </div>
-          <div className="mt-auto flex flex-wrap justify-end gap-2 border-t border-ink/5 pt-3">
+          <div
+            className="mt-auto grid w-full min-w-0 grid-cols-3 gap-1.5 border-t border-ink/5 pt-3"
+            role="group"
+            aria-label="Job actions"
+          >
             <ApplyJobButton
               jobId={job.id}
               applyUrl={applyHref}
               outlineTone={accent}
               size="sm"
               variant="outline"
+              className="h-10 min-h-10 w-full min-w-0 !px-2 text-[11px] font-bold leading-none"
             />
             <AppliedToggleButton
               jobId={job.id}
               outlineTone={accent}
               size="sm"
+              compact
+              className="h-10 min-h-10 w-full min-w-0 !px-2 text-[11px] font-bold leading-none"
             />
             <Link
               prefetch={false}
               href={`/job/${job.id}`}
-              className={buttonClassName({ variant: "primary", size: "sm" })}
+              aria-label="View role"
+              className={buttonClassName({
+                variant: "primary",
+                size: "sm",
+                className:
+                  "h-10 min-h-10 w-full min-w-0 !px-2 text-[11px] font-bold leading-none shadow-md ring-1 ring-brand/25",
+              })}
             >
-              View role
+              View
             </Link>
           </div>
         </div>
@@ -277,7 +290,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
       accent={accent}
       className={cn("h-full transition-shadow", cardHoverClass, isAppliedFlash && "ring-2 ring-teal/45 bg-teal-soft/35")}
     >
-      <div className="relative z-0 flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-5">
+      <div className="relative z-0 flex flex-col gap-3 lg:flex-row lg:items-start lg:gap-5">
         <div className="absolute right-6 top-6 z-10 hidden max-w-[min(100%,calc(100%-1rem))] min-w-0 flex-col gap-2 lg:flex">
           <div className="flex flex-nowrap justify-end gap-2">
             <ApplyJobButton
@@ -387,7 +400,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
               {job.company.name}
             </Link>
           </p>
-          <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-2 text-sm leading-snug text-black/50 sm:text-[13px]">
+          <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm leading-snug text-black/50 sm:text-[13px] lg:mb-4">
             {showLocation ? (
               <span className="min-w-0 break-words">
                 📍 <span className="break-words">{locationText}</span>
@@ -397,7 +410,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
           </div>
 
           {hasSalary && (
-            <div className="mb-4 inline-flex flex-col rounded-2xl bg-brand/10 px-5 py-3 ring-1 ring-brand/20">
+            <div className="mb-3 inline-flex flex-col rounded-2xl bg-brand/10 px-5 py-3 ring-1 ring-brand/20 lg:mb-4">
               <span className="text-[10px] font-bold uppercase tracking-wider text-brand">From</span>
               <span className="text-xl font-extrabold tabular-nums text-ink">
                 {formatSalaryUsd(job.salaryMin!)}
@@ -407,7 +420,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
           )}
 
           {tags.length > 0 ? (
-            <ul className="mb-4 flex flex-wrap items-center gap-1.5" aria-label="Skills">
+            <ul className="mb-3 flex flex-wrap items-center gap-1.5 lg:mb-4" aria-label="Skills">
               {tags.map((s) => (
                 <li key={s}>
                   <Badge tone="rose" caps={false}>
@@ -435,29 +448,42 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
             <ResumeScorePill job={job} />
           </div>
 
-          <div className="mt-4 flex w-full min-w-0 flex-wrap gap-2 border-t border-ink/10 pt-4 lg:hidden [&_a]:min-h-11 [&_button]:min-h-11 [&_a]:inline-flex [&_button]:inline-flex [&_a]:items-center [&_button]:items-center">
+          <div
+            className="mt-3 grid w-full min-w-0 grid-cols-3 gap-1.5 border-t border-ink/10 pt-3 lg:hidden"
+            role="group"
+            aria-label="Job actions"
+          >
             <ApplyJobButton
               jobId={job.id}
               applyUrl={applyHref}
               outlineTone={accent}
               size="sm"
               variant="outline"
-              className="min-h-11 shrink-0 sm:min-h-0"
+              className="h-10 min-h-10 w-full min-w-0 !px-2 text-[11px] font-bold leading-none"
             />
             <AppliedToggleButton
               jobId={job.id}
               outlineTone={accent}
               size="sm"
-              className="min-h-11 shrink-0 sm:min-h-0"
+              compact
+              className="h-10 min-h-10 w-full min-w-0 !px-2 text-[11px] font-bold leading-none"
             />
             <Link
               prefetch={false}
               href={`/job/${job.id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className={cn(buttonClassName({ variant: "primary", size: "sm" }), "min-h-11 shrink-0 sm:min-h-0")}
+              aria-label="View role (opens in new tab)"
+              className={cn(
+                buttonClassName({
+                  variant: "primary",
+                  size: "sm",
+                  className:
+                    "h-10 min-h-10 w-full min-w-0 !px-2 text-[11px] font-bold leading-none shadow-md ring-1 ring-brand/25",
+                }),
+              )}
             >
-              View role →
+              View
             </Link>
           </div>
         </div>
