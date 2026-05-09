@@ -11,6 +11,9 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   const operator = getSiteOperator();
   const support = getSupportEmail();
+  /** Avoid "JobLoom builds JobLoom…" when the legal operator name is the same as the product. */
+  const operatorIsProduct =
+    operator.trim().toLowerCase() === "jobloom";
 
   return (
     <div className={`min-h-screen bg-canvas pb-24 pt-10 text-ink ${DESKTOP_RAIL_INSET_CLASS}`}>
@@ -18,8 +21,18 @@ export default function AboutPage() {
         <header>
           <h1 className="font-display text-3xl font-normal tracking-tight text-ink sm:text-4xl">About JobLoom</h1>
           <p className="mt-4 text-base leading-relaxed text-ink-muted">
-            {operator} builds JobLoom as a <strong className="font-semibold text-ink">job discovery and organization</strong>{" "}
-            product—helping you find roles from many sources, prepare applications, and keep track of what you&apos;ve submitted.
+            {operatorIsProduct ? (
+              <>
+                JobLoom is a <strong className="font-semibold text-ink">job discovery and organization</strong> product—we
+                help you find roles from many sources, prepare applications, and keep track of what you&apos;ve submitted.
+              </>
+            ) : (
+              <>
+                {operator} builds JobLoom as a <strong className="font-semibold text-ink">job discovery and organization</strong>{" "}
+                product—helping you find roles from many sources, prepare applications, and keep track of what you&apos;ve
+                submitted.
+              </>
+            )}
           </p>
         </header>
 

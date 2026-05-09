@@ -1271,7 +1271,7 @@ export function JobsSearchClient({
                       </span>
                     </button>
                     <div
-                      className={`absolute left-1/2 top-full z-20 mt-1.5 w-80 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-xl border border-ink/10 bg-surface p-3.5 text-xs leading-relaxed text-ink shadow-lg ring-1 ring-ink/5 transition ${
+                      className={`absolute bottom-full left-1/2 top-auto z-20 mb-0 w-80 max-w-[calc(100vw-2rem)] -translate-x-1/2 translate-y-1 rounded-xl border border-ink/10 bg-surface p-3.5 text-xs leading-relaxed text-ink shadow-lg ring-1 ring-ink/5 transition ${
                         isPopoverOpen
                           ? "pointer-events-auto opacity-100"
                           : "pointer-events-none opacity-0"
