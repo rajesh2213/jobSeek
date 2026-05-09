@@ -41,6 +41,12 @@ const SOURCE_WEIGHTS: Record<string, number> = {
   remoteok: 0.65,
   wellfound: 0.72,
   careers_page: 0.55,
+  /**
+   * Remote Rocketship / OpenClaw feed: optional third-party acceleration, not a primary ATS board.
+   * Slightly above `careers_page` (structured remote listings) but below direct ATS (`remoteok`).
+   * Canonical title/description merge still prefers higher-weight sources when duplicates exist.
+   */
+  openclaw: 0.62,
 };
 
 /**

@@ -1,0 +1,360 @@
+import type { Company, PrismaClient } from "@prisma/client";
+import type { JobService } from "../../../job/job.service.js";
+import type { CompanyService } from "../../../company/company.service.js";
+import { DiscoveryService } from "../../../discovery/discovery.service.js";
+import { loadOpenClawEnv, type OpenClawEnvConfig } from "./openclaw.env.js";
+import { OpenClawClient } from "./openclaw.client.js";
+import {
+  extractJobsArray,
+  extractCompanyHints,
+  tryMapOpenClawJobToNormalized,
+} from "./openclaw.mapper.js";
+import { extractCompanyDomain } from "../../../../utils/jobFingerprint.js";
+import { getIoredis } from "../../../../queues/job.queue.js";
+import type { Redis } from "ioredis";
+import { logger } from "../../../../utils/logger.js";
+import { setOpenClawHealth } from "./openclaw.state.js";
+import { enrichDedupInput } from "../../../../utils/jobTaxonomyEnricher.js";
+import { fingerprintFromNormalized } from "../../../../services/jobDedup.service.js";
+import { normalizeJobUrl } from "../../../../utils/normalizeJobUrl.js";
+import type { JobRepository } from "../../../job/job.repository.js";
+import { CRAWLABLE_ATS_TYPES, type AtsType } from "../../../ats/ats.interface.js";
+import { normalizeDomain } from "../../../../utils/common.js";
+import { incrOpenClawMetric } from "./openclaw.analytics.js";
+
+const PAGING_KEY = "openclaw:paging:next_page";
+
+function tryRedis(): Redis | null {
+  try {
+    return getIoredis();
+  } catch {
+    return null;
+  }
+}
+
+function isCrawlableAts(value: string | null | undefined): value is AtsType {
+  if (!value?.trim()) return false;
+  return (CRAWLABLE_ATS_TYPES as readonly string[]).includes(value.trim());
+}
+
+async function readNextPage(redis: Redis | null): Promise<number> {
+  if (!redis) return 1;
+  try {
+    const raw = await redis.get(PAGING_KEY);
+    const n = Number(raw ?? "1");
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 1;
+  } catch {
+    return 1;
+  }
+}
+
+async function writeNextPage(redis: Redis | null, page: number, hasNext: boolean): Promise<void> {
+  if (!redis) return;
+  try {
+    const next = hasNext ? page + 1 : 1;
+    await redis.set(PAGING_KEY, String(next), "PX", 7 * 24 * 60 * 60 * 1000);
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * OpenClaw company hints are enrichment-only: fill gaps, never replace trusted ATS/domain data.
+ * If either `atsType` or `atsBoardToken` is already set (from JobLoom enrichment/crawl), skip both
+ * ATS hint fields so we never "patch" or contradict primary detection.
+ * Exported for unit tests.
+ */
+export function computeOpenClawCompanyHintPatch(
+  row: Pick<Company, "domain" | "careersUrl" | "atsType" | "atsBoardToken">,
+  hints: ReturnType<typeof extractCompanyHints>,
+): Partial<Pick<Company, "domain" | "careersUrl" | "atsType" | "atsBoardToken">> | null {
+  const data: Partial<Pick<Company, "domain" | "careersUrl" | "atsType" | "atsBoardToken">> = {};
+
+  if (hints.domain && !row.domain) {
+    const d = normalizeDomain(hints.domain);
+    if (d) data.domain = d;
+  }
+  if (hints.careersUrl?.trim() && !row.careersUrl) {
+    data.careersUrl = hints.careersUrl.trim();
+  }
+
+  const hasTrustedAts = Boolean(row.atsType?.trim() || row.atsBoardToken?.trim());
+  if (!hasTrustedAts) {
+    if (hints.atsType?.trim() && !row.atsType && isCrawlableAts(hints.atsType)) {
+      data.atsType = hints.atsType.trim();
+    }
+    if (hints.atsBoardToken?.trim() && !row.atsBoardToken) {
+      data.atsBoardToken = hints.atsBoardToken.trim();
+    }
+  }
+
+  if (Object.keys(data).length === 0) return null;
+  return data;
+}
+
+async function mergeOpenClawHints(
+  prisma: PrismaClient,
+  companyId: string,
+  hints: ReturnType<typeof extractCompanyHints>,
+): Promise<boolean> {
+  const row = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { domain: true, careersUrl: true, atsType: true, atsBoardToken: true },
+  });
+  if (!row) return false;
+  const data = computeOpenClawCompanyHintPatch(row, hints);
+  if (!data) return false;
+  await prisma.company.update({ where: { id: companyId }, data });
+  return true;
+}
+
+async function simulateDedupOutcome(
+  repo: JobRepository,
+  row: Parameters<JobService["ingestDeduplicated"]>[0],
+): Promise<"idempotent" | "would_ingest"> {
+  const input = enrichDedupInput({ ...row, sourceUrl: normalizeJobUrl(row.sourceUrl) });
+  const existingByUrl = await repo.findBySourceUrl(input.sourceUrl);
+  if (existingByUrl) return "idempotent";
+  void fingerprintFromNormalized(input);
+  return "would_ingest";
+}
+
+async function resolveCompanyIdForOpenClaw(
+  cfg: OpenClawEnvConfig,
+  companyService: CompanyService,
+  discoveryService: DiscoveryService,
+  hints: ReturnType<typeof extractCompanyHints>,
+  redis: Redis | null,
+): Promise<string> {
+  const name = hints.companyName?.trim() || "Unknown Company";
+  const existing = await companyService.findByName(name);
+  if (existing) return existing.id;
+
+  if (cfg.discoveryEnabled) {
+    const outcome = await discoveryService.processCompanyCandidate({
+      source: "openclaw",
+      name,
+      domain: hints.domain ?? undefined,
+    });
+    if (outcome === "added") await incrOpenClawMetric(redis, "companies_discovered", 1);
+    const created = await companyService.findByName(name);
+    if (created) return created.id;
+  }
+
+  const { companyId } = await companyService.ensureCompanyFromJob({ companyName: name });
+  return companyId;
+}
+
+export interface OpenClawSyncContext {
+  prisma: PrismaClient;
+  jobService: JobService;
+  companyService: CompanyService;
+  jobRepository: JobRepository;
+}
+
+export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
+  ok: boolean;
+  jobsProcessed: number;
+  dryRun: boolean;
+  stopReason?: string;
+}> {
+  const cfg = loadOpenClawEnv();
+  const redis = tryRedis();
+  const client = new OpenClawClient(cfg, () => redis);
+
+  if (!cfg.enabled) {
+    setOpenClawHealth("disabled", "OPENCLAW_ENABLED=false", null);
+    logger.info(
+      { event: "sync_skipped", provider: "openclaw", reason: "disabled_env" },
+      "openclaw_sync_skipped",
+    );
+    return { ok: true, jobsProcessed: 0, dryRun: cfg.dryRun, stopReason: "disabled" };
+  }
+
+  if (!cfg.syncEnabled) {
+    setOpenClawHealth("disabled", "OPENCLAW_SYNC_ENABLED=false", null);
+    logger.info(
+      { event: "sync_skipped", provider: "openclaw", reason: "sync_off" },
+      "openclaw_sync_skipped",
+    );
+    return { ok: true, jobsProcessed: 0, dryRun: cfg.dryRun, stopReason: "sync_disabled" };
+  }
+
+  if (!cfg.apiKey?.trim()) {
+    setOpenClawHealth("disabled", "missing_api_key", "missing_key");
+    logger.info(
+      { event: "sync_skipped", provider: "openclaw", reason: "missing_key" },
+      "openclaw_sync_skipped",
+    );
+    return { ok: true, jobsProcessed: 0, dryRun: cfg.dryRun, stopReason: "missing_key" };
+  }
+
+  const discoveryService = new DiscoveryService(ctx.companyService);
+  let jobsProcessed = 0;
+  let page = await readNextPage(redis);
+  let hasNext = false;
+
+  logger.info(
+    {
+      event: "sync_started",
+      provider: "openclaw",
+      dry_run: cfg.dryRun,
+      page_start: page,
+      max_pages: cfg.maxPagesPerRun,
+    },
+    "openclaw_sync_started",
+  );
+
+  for (let i = 0; i < cfg.maxPagesPerRun; i++) {
+    const fetched = await client.fetchJobsSearch({
+      filters: {
+        page,
+        itemsPerPage: cfg.itemsPerPage,
+      },
+      includeJobDescription: cfg.enrichmentEnabled,
+    });
+
+    await incrOpenClawMetric(redis, "requests", 1);
+
+    if (!fetched.ok) {
+      if (fetched.kind === "unauthorized") {
+        if (fetched.status === 403) await incrOpenClawMetric(redis, "http_403", 1);
+        else await incrOpenClawMetric(redis, "http_401", 1);
+      }
+      if (fetched.kind === "rate_limited") await incrOpenClawMetric(redis, "http_429", 1);
+      if (fetched.kind === "timeout") await incrOpenClawMetric(redis, "timeouts", 1);
+      await incrOpenClawMetric(redis, "failures", 1);
+
+      logger.warn(
+        {
+          event: "openclaw_fetch_failed",
+          provider: "openclaw",
+          kind: fetched.kind,
+          status: fetched.status,
+        },
+        "openclaw_fetch_failed",
+      );
+      return { ok: false, jobsProcessed, dryRun: cfg.dryRun, stopReason: fetched.kind };
+    }
+
+    const rows = extractJobsArray(fetched.json);
+    const meta = fetched.json && typeof fetched.json === "object" && !Array.isArray(fetched.json)
+      ? (fetched.json as Record<string, unknown>)
+      : {};
+    hasNext = Boolean(meta.hasNextPage ?? meta.nextPage ?? meta.has_more);
+
+    if (!rows.length) {
+      await writeNextPage(redis, page, false);
+      logger.info(
+        { event: "openclaw_empty_page", provider: "openclaw", page },
+        "openclaw_empty_page",
+      );
+      break;
+    }
+
+    for (const raw of rows) {
+      const hints = extractCompanyHints(raw);
+      let companyId: string;
+      try {
+        companyId = await resolveCompanyIdForOpenClaw(cfg, ctx.companyService, discoveryService, hints, redis);
+      } catch (err) {
+        logger.warn(
+          { event: "openclaw_company_resolve_failed", provider: "openclaw", err },
+          "openclaw_company_resolve_failed",
+        );
+        await incrOpenClawMetric(redis, "failures", 1);
+        continue;
+      }
+
+      const companyRow = await ctx.prisma.company.findUnique({
+        where: { id: companyId },
+        select: { name: true, careersUrl: true },
+      });
+      const displayName = companyRow?.name ?? hints.companyName ?? "Unknown Company";
+
+      if (cfg.enrichmentEnabled) {
+        try {
+          const merged = await mergeOpenClawHints(ctx.prisma, companyId, hints);
+          if (merged) await incrOpenClawMetric(redis, "ats_hints_applied", 1);
+        } catch (err) {
+          logger.warn(
+            { event: "openclaw_hint_merge_failed", provider: "openclaw", companyId, err },
+            "openclaw_hint_merge_failed",
+          );
+        }
+      }
+
+      const mapped = tryMapOpenClawJobToNormalized(raw, companyId, displayName);
+      if (!mapped.ok) {
+        await incrOpenClawMetric(redis, "malformed_job_rows", 1);
+        logger.warn(
+          {
+            event: "openclaw_mapper_reject",
+            provider: "openclaw",
+            reason: mapped.reason,
+            companyId,
+          },
+          "openclaw_mapper_reject",
+        );
+        continue;
+      }
+      const normalized = mapped.job;
+
+      await incrOpenClawMetric(redis, "jobs_normalized", 1);
+
+      const careersUrl = (await ctx.prisma.company.findUnique({
+        where: { id: companyId },
+        select: { careersUrl: true },
+      }))?.careersUrl;
+      const companyDomain = extractCompanyDomain(careersUrl, companyId);
+      const dedupInput = { ...normalized, companyDomain };
+
+      if (cfg.dryRun) {
+        const sim = await simulateDedupOutcome(ctx.jobRepository, dedupInput);
+        jobsProcessed += 1;
+        if (sim === "idempotent") await incrOpenClawMetric(redis, "jobs_merged", 1);
+        else await incrOpenClawMetric(redis, "jobs_new_canonical", 1);
+        logger.info(
+          {
+            event: "openclaw_dry_run_row",
+            provider: "openclaw",
+            outcome: sim,
+            sourceUrl: dedupInput.sourceUrl,
+          },
+          "openclaw_dry_run_row",
+        );
+        continue;
+      }
+
+      try {
+        const { inserted } = await ctx.jobService.ingestDeduplicated(dedupInput);
+        jobsProcessed += 1;
+        if (!inserted) await incrOpenClawMetric(redis, "jobs_merged", 1);
+        else await incrOpenClawMetric(redis, "jobs_new_canonical", 1);
+      } catch (err) {
+        logger.warn(
+          { event: "openclaw_ingest_failed", provider: "openclaw", sourceUrl: dedupInput.sourceUrl, err },
+          "openclaw_ingest_failed",
+        );
+        await incrOpenClawMetric(redis, "failures", 1);
+      }
+    }
+
+    await writeNextPage(redis, page, hasNext);
+    page = hasNext ? page + 1 : 1;
+    if (!hasNext) break;
+  }
+
+  logger.info(
+    {
+      event: "sync_completed",
+      provider: "openclaw",
+      jobsProcessed,
+      dry_run: cfg.dryRun,
+      hasNext,
+    },
+    "openclaw_sync_completed",
+  );
+
+  return { ok: true, jobsProcessed, dryRun: cfg.dryRun };
+}

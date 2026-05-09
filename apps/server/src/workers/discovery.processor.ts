@@ -31,7 +31,8 @@ function isDiscoverSourcePayload(value: unknown): value is DiscoverSourcePayload
     value.source === "github" ||
     value.source === "fortune500" ||
     value.source === "weworkremotely" ||
-    value.source === "remoteok"
+    value.source === "remoteok" ||
+    value.source === "openclaw"
   );
 }
 
@@ -45,7 +46,8 @@ function isProcessCompanyPayload(value: unknown): value is ProcessCompanyPayload
       value.source === "github" ||
       value.source === "fortune500" ||
       value.source === "weworkremotely" ||
-      value.source === "remoteok"
+      value.source === "remoteok" ||
+      value.source === "openclaw"
     )
   );
 }

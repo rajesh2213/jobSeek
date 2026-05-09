@@ -29,6 +29,8 @@ export const SUPPORTED_ATS_TYPES = [
   "wellfound",
   /** Company careers HTML: shallow link crawl from enrichment-discovered URL. */
   "careers_page",
+  /** Remote Rocketship OpenClaw feed — optional third-party source; not crawlable as an ATS board. */
+  "openclaw",
 ] as const;
 export type AtsType = (typeof SUPPORTED_ATS_TYPES)[number];
 export const CRAWLABLE_ATS_TYPES: AtsType[] = [
@@ -64,6 +66,7 @@ const ATS_RATE_LIMIT_MS: Record<AtsType, number> = {
   remoteok: 500,
   wellfound: 500,
   careers_page: 400,
+  openclaw: 400,
 };
 
 function delay(ms: number): Promise<void> {

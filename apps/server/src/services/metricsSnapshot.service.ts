@@ -3,6 +3,7 @@ import {
   getJobsBlockedNotReadyTotal,
   getStatusTransitionTotals,
 } from "./jobStatusMetrics.service.js";
+import { getOpenClawMetricsForInternalSnapshot } from "../modules/providers/provider.registry.js";
 
 export interface CompanyDensityRow {
   companyId: string;
@@ -44,6 +45,22 @@ export interface MetricsSnapshot {
   topCompaniesByJobs: CompanyDensityRow[];
   bottomCompaniesByJobs: CompanyDensityRow[];
   generatedAt: string;
+  /**
+   * Present when `OPENCLAW_ENABLED=true` (may still be health-disabled at runtime).
+   * `metricsToday` is Redis hash `openclaw:metrics:YYYY-MM-DD` (counters as strings). See runbook.
+   */
+  openclaw?: {
+    capabilities: { id: string; label: string; defaultRateLimitRequestsPerDay: number };
+    runtime: {
+      health: string;
+      lastSuccessAt: string | null;
+      quotaRemainingEstimate: number | null;
+      quotaUsedToday: number | null;
+      circuitOpenUntil: number | null;
+      disabledReason: string | null;
+    } | null;
+    metricsToday: Record<string, string>;
+  };
 }
 
 function pct(part: number, whole: number): number {
@@ -148,6 +165,8 @@ export async function buildMetricsSnapshot(prisma: PrismaClient): Promise<Metric
     : [];
   const namesById = new Map(companies.map((c) => [c.id, c.name]));
 
+  const openclaw = await getOpenClawMetricsForInternalSnapshot();
+
   return {
     companies: {
       totalCompanies,
@@ -182,5 +201,27 @@ export async function buildMetricsSnapshot(prisma: PrismaClient): Promise<Metric
     topCompaniesByJobs: toDensityRows(topCountRows, namesById),
     bottomCompaniesByJobs: toDensityRows(bottomCountRows, namesById),
     generatedAt: new Date().toISOString(),
+    ...(openclaw
+      ? {
+          openclaw: {
+            capabilities: {
+              id: openclaw.capabilities.id,
+              label: openclaw.capabilities.label,
+              defaultRateLimitRequestsPerDay: openclaw.capabilities.defaultRateLimitRequestsPerDay,
+            },
+            runtime: openclaw.runtime
+              ? {
+                  health: openclaw.runtime.health,
+                  lastSuccessAt: openclaw.runtime.lastSuccessAt,
+                  quotaRemainingEstimate: openclaw.runtime.quotaRemainingEstimate,
+                  quotaUsedToday: openclaw.runtime.quotaUsedToday,
+                  circuitOpenUntil: openclaw.runtime.circuitOpenUntil,
+                  disabledReason: openclaw.runtime.disabledReason,
+                }
+              : null,
+            metricsToday: openclaw.metricsToday,
+          },
+        }
+      : {}),
   };
 }

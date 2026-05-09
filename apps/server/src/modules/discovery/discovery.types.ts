@@ -6,7 +6,8 @@ export type DiscoverySourceType =
   | "github"
   | "fortune500"
   | "weworkremotely"
-  | "remoteok";
+  | "remoteok"
+  | "openclaw";
 
 export interface DiscoverySourceCompany {
   name: string;
