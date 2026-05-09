@@ -163,7 +163,7 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
     () =>
       [
         { k: "jobs", v: HERO_JOB_INDEX_TOTAL, numberSuffix: "+" as const },
-        { k: "Get More Interviews", headlineOnly: true as const },
+        { k: "More interviews", statText: "x" as const },
       ] as const,
     [],
   );
@@ -215,8 +215,11 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
               viewport={{ once: true }}
               transition={{ delay: i * 0.12 }}
             >
-              {"headlineOnly" in s && s.headlineOnly ? (
-                <p className="text-balance break-words text-lg font-extrabold leading-tight text-ink sm:text-xl">{s.k}</p>
+              {"statText" in s && s.statText ? (
+                <>
+                  <p className="text-xl font-extrabold tabular-nums text-ink">{s.statText}</p>
+                  <p className="text-xs text-ink/60">{s.k}</p>
+                </>
               ) : (
                 <>
                   <p className="text-xl font-extrabold tabular-nums text-ink">
