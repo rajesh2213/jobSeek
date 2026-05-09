@@ -205,18 +205,18 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
           JobLoom helps you <span className="font-semibold text-ink">move earlier</span>, <span className="font-semibold text-ink">fix what's missing</span>, and{" "}
           <span className="font-semibold text-ink">track everything</span> - so nothing slips through.
         </p>
-        <div className="mt-2 grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="mt-2 grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
           {stats.map((s, i) => (
             <motion.div
               key={s.k}
-              className="rounded-xl border border-ink/10 bg-white/55 p-3"
+              className="min-w-0 rounded-xl border border-ink/10 bg-white/55 p-3"
               initial={{ opacity: 0, y: 10 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.12 }}
             >
               {"headlineOnly" in s && s.headlineOnly ? (
-                <p className="whitespace-nowrap text-xl font-extrabold text-ink">{s.k}</p>
+                <p className="text-balance break-words text-lg font-extrabold leading-tight text-ink sm:text-xl">{s.k}</p>
               ) : (
                 <>
                   <p className="text-xl font-extrabold tabular-nums text-ink">
