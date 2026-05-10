@@ -18,6 +18,7 @@ import { jobListRequestDiag } from "./jobListRequestContext.js";
 import { expandLocationFilter, getRegions } from "../../utils/locationResolver.js";
 import { computeLocationPatchFromReingest } from "../../services/jobCanonical.service.js";
 import { recordStatusTransition } from "../../services/jobStatusMetrics.service.js";
+import { jobParsedNoopSkipEnabled } from "../../utils/jobWriteOptimization.js";
 import {
   LISTING_EXCLUDED_ROLE_SLUGS,
   ROLE_SUGGEST_EXTRA_EXCLUDED,
@@ -1661,6 +1662,22 @@ export function createJobRepository(prisma: PrismaClient) {
       const tech = computedEnriched.techStack;
       const techStack: string[] = Array.isArray(tech) ? tech.filter((x): x is string => typeof x === "string") : [];
       const mergedSkills = mergeJobSkillsList(existing.skills ?? [], techStack, maxMergedSkills());
+
+      if (jobParsedNoopSkipEnabled() && !shouldUpdateParsed) {
+        const sameParsed =
+          JSON.stringify(existingParsed) === JSON.stringify(finalParsed);
+        const sameEnriched =
+          JSON.stringify(mergedEnriched) === JSON.stringify(existingEnriched);
+        const prevSkills = existing.skills ?? [];
+        const skillsUnchanged =
+          prevSkills.length === mergedSkills.length &&
+          [...prevSkills].map((s) => s.trim().toLowerCase()).sort().join("\0") ===
+            [...mergedSkills].map((s) => s.trim().toLowerCase()).sort().join("\0");
+        if (sameParsed && sameEnriched && skillsUnchanged) {
+          await this.promoteJobToReadyIfParsedDescription(id, "parsed_description_present");
+          return;
+        }
+      }
 
       await prisma.job.update({
         where: { id },

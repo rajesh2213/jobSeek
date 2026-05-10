@@ -47,6 +47,12 @@ import {
   logUpdateReturnClassification,
   logUpdateReturnOptimized,
 } from "../utils/dbPayloadDebug.js";
+import {
+  atsFinalizeChunkedEnabled,
+  conditionalUpdateJobHashCacheHit,
+  finalizeIngestChunked,
+  jobHashCacheConditionalUpdateEnabled,
+} from "../utils/jobWriteOptimization.js";
 
 // Avoid back-to-back fetches when lastCrawledAt was just set.
 const MIN_MS_SINCE_LAST_CRAWL_FOR_INGEST = Math.floor(2.5 * 60 * 1000);
@@ -434,10 +440,18 @@ async function start(): Promise<void> {
                 });
               }
               await redis.set(hashCacheKey, newContentHash, "EX", HASH_CACHE_TTL_SECONDS);
-              await prisma.job.updateMany({
-                where: { sourceUrl: normalizedJob.sourceUrl },
-                data: { lastProcessedAt: seenAt, contentHash: newContentHash },
-              });
+              if (jobHashCacheConditionalUpdateEnabled()) {
+                await conditionalUpdateJobHashCacheHit(prisma, {
+                  sourceUrl: normalizedJob.sourceUrl,
+                  contentHash: newContentHash,
+                  processedAt: seenAt,
+                });
+              } else {
+                await prisma.job.updateMany({
+                  where: { sourceUrl: normalizedJob.sourceUrl },
+                  data: { lastProcessedAt: seenAt, contentHash: newContentHash },
+                });
+              }
               unchangedSkipped += 1;
               return null;
             }
@@ -452,10 +466,13 @@ async function start(): Promise<void> {
           } catch (err) {
             logger.warn({ event: "ats_job_hash_cache_read_failed", sourceUrl: normalizedJob.sourceUrl, err }, "ats_job_hash_cache_read_failed");
           }
-          const { inserted, canonical } = await jobService.ingestDeduplicated({
-            ...normalizedJob,
-            companyDomain,
-          });
+          const { inserted, canonical } = await jobService.ingestDeduplicated(
+            {
+              ...normalizedJob,
+              companyDomain,
+            },
+            { batchTouchAtMs: seenAt.getTime() },
+          );
           const shouldSkipParse = canonical.contentHash === newContentHash;
           if (inserted) jobsInserted += 1;
           else if (shouldSkipParse) unchangedSkipped += 1;
@@ -541,26 +558,48 @@ async function start(): Promise<void> {
         }
       });
     }
-    const processedCanonicalIds = Array.from(new Set(flatIngest.map((row) => row.canonicalId)));
     const processedAt = new Date();
-    if (processedCanonicalIds.length > 0) {
-      for (const row of flatIngest) {
-        const updateRes = await prisma.job.updateMany({
-          where: { id: row.canonicalId },
-          data: { lastProcessedAt: processedAt, contentHash: row.newContentHash },
-        });
-        if (updateRes.count === 0) {
-          throw new Error(`atsEndpoint.worker.finalize.missing_row:${row.canonicalId}`);
+    const finalizeByCanonical = new Map<string, { canonicalId: string; newContentHash: string }>();
+    for (const row of flatIngest) {
+      finalizeByCanonical.set(row.canonicalId, {
+        canonicalId: row.canonicalId,
+        newContentHash: row.newContentHash,
+      });
+    }
+    const finalizeRows = [...finalizeByCanonical.values()];
+    if (finalizeRows.length > 0) {
+      if (atsFinalizeChunkedEnabled()) {
+        await finalizeIngestChunked(prisma, finalizeRows, processedAt);
+        for (const row of finalizeRows) {
+          logUpdateReturnBytesEstimate({
+            location: "atsEndpoint.worker.finalize.chunked",
+            estimatedBytes: estimateJsonBytes({
+              id: row.canonicalId,
+              lastProcessedAt: processedAt,
+              contentHash: row.newContentHash,
+            }),
+            rows: 1,
+          });
         }
-        logUpdateReturnBytesEstimate({
-          location: "atsEndpoint.worker.finalize.perCanonical",
-          estimatedBytes: estimateJsonBytes({
-            id: row.canonicalId,
-            lastProcessedAt: processedAt,
-            contentHash: row.newContentHash,
-          }),
-          rows: 1,
-        });
+      } else {
+        for (const row of finalizeRows) {
+          const updateRes = await prisma.job.updateMany({
+            where: { id: row.canonicalId },
+            data: { lastProcessedAt: processedAt, contentHash: row.newContentHash },
+          });
+          if (updateRes.count === 0) {
+            throw new Error(`atsEndpoint.worker.finalize.missing_row:${row.canonicalId}`);
+          }
+          logUpdateReturnBytesEstimate({
+            location: "atsEndpoint.worker.finalize.perCanonical",
+            estimatedBytes: estimateJsonBytes({
+              id: row.canonicalId,
+              lastProcessedAt: processedAt,
+              contentHash: row.newContentHash,
+            }),
+            rows: 1,
+          });
+        }
       }
     }
 

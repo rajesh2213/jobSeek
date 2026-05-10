@@ -4,7 +4,10 @@ import type { JobDiscoveryFilters, JobWithCompany } from "./job.repository.js";
 import type { NormalizedJob } from "../crawler/crawler.types.js";
 import type { PaginatedResult } from "../../types/api.js";
 import { Prisma } from "@prisma/client";
-import { deduplicateAndInsert } from "../../services/jobDedup.service.js";
+import {
+  deduplicateAndInsert,
+  type DedupIngestOptions,
+} from "../../services/jobDedup.service.js";
 import { enrichDedupInput } from "../../utils/jobTaxonomyEnricher.js";
 
 function labelFromHyphenSlug(slug: string): string {
@@ -117,8 +120,10 @@ export class JobService {
    */
   async ingestDeduplicated(
     input: NormalizedJob & { companyDomain: string },
+    ingestOptions?: DedupIngestOptions,
   ): Promise<{ canonical: Job; inserted: boolean }> {
-    return deduplicateAndInsert(this.jobRepository, input);
+    const batchTouchAtMs = ingestOptions?.batchTouchAtMs ?? input.batchTouchAtMs;
+    return deduplicateAndInsert(this.jobRepository, input, { batchTouchAtMs });
   }
 
   async createNormalized(

@@ -608,6 +608,39 @@ Intervals are **hardcoded** in the server repo unless noted. Tune by changing co
 
 ---
 
+## 12. DB / WAL optimization (Supabase Nano, staged rollout)
+
+Baseline and monitoring SQL: [`apps/server/scripts/walOptimizationBaseline.sql`](apps/server/scripts/walOptimizationBaseline.sql).
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `JOB_HASH_CACHE_CONDITIONAL_UPDATE` | **off** (set `1` to enable) | Deploy **A**: single guarded `UPDATE … RETURNING` on Redis hash-cache hits; avoids no-op row rewrites. |
+| `JOB_PROCESSING_FRESHNESS_MINUTES` | `10` (clamped **5–15**) | How old `lastProcessedAt` may be before re-bumping when hash unchanged. |
+| `JOB_PARSED_NOOP_SKIP` | **off** (set `1` to enable) | Deploy **B**: skip `updateParsedDescription` when JSON/skills unchanged. |
+| `JOB_DEDUP_TOUCH_SKIP` | **off** (set `1` to enable) | Deploy **C**: skip redundant `updateLastSeenById` when batch touch already applied (`batchTouchAtMs` on crawl / ATS ingest). |
+| `JOB_DEDUP_TOUCH_SLACK_MS` | `5000` | Slack vs `batchTouchAtMs` for touch dedup (ms). |
+| `ATS_FINALIZE_CHUNKED` | **off** (set `1` to enable) | Deploy **D**: chunked multi-row finalize (`VALUES` batch) vs per-row updates. |
+| `ATS_FINALIZE_CHUNK_SIZE` | `500` (max **2000**) | Rows per finalize chunk when chunked mode is on. |
+
+Roll out **A → soak 12–24h → B → C → D**; see internal production plan for risk notes.
+
+### 12.1 Deploy A semantics audit (before prod enable)
+
+**Guarded SQL (`conditionalUpdateJobHashCacheHit`):** On a matching row, sets `lastProcessedAt`, `contentHash`, and `"updatedAt" = NOW()` in one statement. When the `WHERE` clause does not match (same hash and fresh `lastProcessedAt`), **no row is written** and `updatedAt` does not move—this is intentional.
+
+**Timezone / Prisma:** `NOW()` is database-local wall time for the column type (timestamptz in Postgres); Prisma `@updatedAt` uses the same clock for writes. Rows that update remain consistent with Prisma expectations.
+
+**Ordering / stale detection (code review):**
+
+- **SAFE:** ATS discovery and parse gating use `lastProcessedAt` / content change paths; correctness does not require bumping `updatedAt` on every ingest.
+- **POSSIBLE RISK:** `jobStatusReconcile.worker` batches with `ORDER BY "updatedAt" ASC` on `Job`—skipping no-op updates can change which rows surface first in that reconcile ordering (not status correctness).
+- **POSSIBLE RISK:** Ops scripts that list “recent” jobs by `updatedAt` may see fewer bumps on duplicate hash-cache hits when Deploy A is on.
+- **CONFIRMED DEPENDENCY:** None found on “every ingest must bump `Job.updatedAt`” for core ingestion or dedup; discovery metrics in `atsMetrics.service` use `AtsEndpoint.updatedAt`, not `Job.updatedAt`.
+
+**Higher-risk flags:** Leave `JOB_PARSED_NOOP_SKIP`, `JOB_DEDUP_TOUCH_SKIP`, and `ATS_FINALIZE_CHUNKED` unset or not `1` until after Deploy A is stable.
+
+---
+
 ## Related docs
 
 - Local development: `start.md`

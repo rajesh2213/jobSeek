@@ -55,6 +55,10 @@ import {
   logUpdateReturnClassification,
   logUpdateReturnOptimized,
 } from "../utils/dbPayloadDebug.js";
+import {
+  conditionalUpdateJobHashCacheHit,
+  jobHashCacheConditionalUpdateEnabled,
+} from "../utils/jobWriteOptimization.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -167,6 +171,11 @@ function validateNormalizedJob(data: unknown): NormalizedJob | null {
   const jobId =
     typeof data.jobId === "string" && data.jobId.trim() !== "" ? data.jobId.trim() : undefined;
 
+  const batchTouchAtMs =
+    typeof data.batchTouchAtMs === "number" && Number.isFinite(data.batchTouchAtMs)
+      ? data.batchTouchAtMs
+      : undefined;
+
   return {
     title,
     description,
@@ -180,6 +189,7 @@ function validateNormalizedJob(data: unknown): NormalizedJob | null {
     companyName,
     atsJobId,
     jobId,
+    ...(batchTouchAtMs !== undefined ? { batchTouchAtMs } : {}),
   };
 }
 
@@ -489,9 +499,11 @@ async function start(): Promise<void> {
           const sourceUrls = normalizedJobs.map((job) =>
             normalizeJobUrl(String(job.sourceUrl).trim()),
           );
+          const batchSeenAt = new Date();
+          const batchTouchAtMs = batchSeenAt.getTime();
           const jobsUpdated = await jobService.touchLastSeenBySourceUrls(
             sourceUrls,
-            new Date(),
+            batchSeenAt,
           );
 
           let enqueueFailures = 0;
@@ -515,7 +527,11 @@ async function start(): Promise<void> {
                   );
                   return;
                 }
-                await queue.add(PROCESS_JOB, { ...j, sourceUrl: normalizedUrl });
+                await queue.add(PROCESS_JOB, {
+                  ...j,
+                  sourceUrl: normalizedUrl,
+                  batchTouchAtMs,
+                });
               }),
             );
             for (let k = 0; k < results.length; k++) {
@@ -651,18 +667,28 @@ async function start(): Promise<void> {
               });
             }
             await redis.set(hashCacheKey, newContentHash, "EX", HASH_CACHE_TTL_SECONDS);
-            await prisma.job.updateMany({
-              where: { sourceUrl: payload.sourceUrl },
-              data: {
-                lastProcessedAt: new Date(),
+            const processedAt = new Date();
+            let didUpdate = true;
+            if (jobHashCacheConditionalUpdateEnabled()) {
+              didUpdate = await conditionalUpdateJobHashCacheHit(prisma, {
+                sourceUrl: payload.sourceUrl,
                 contentHash: newContentHash,
-              } as Prisma.JobUpdateManyMutationInput,
-            });
+                processedAt,
+              });
+            } else {
+              await prisma.job.updateMany({
+                where: { sourceUrl: payload.sourceUrl },
+                data: {
+                  lastProcessedAt: processedAt,
+                  contentHash: newContentHash,
+                } as Prisma.JobUpdateManyMutationInput,
+              });
+            }
             logEfficiencyMetrics({
               name: "jobWorker.processJob.cachedSkip",
-              readRows: 1,
-              updatedRows: 0,
-              skippedRows: 1,
+              readRows: 0,
+              updatedRows: didUpdate ? 1 : 0,
+              skippedRows: didUpdate ? 0 : 1,
             });
             return;
           }
@@ -696,11 +722,14 @@ async function start(): Promise<void> {
         );
         let result: { canonical: { id: string }; inserted: boolean };
         try {
-          result = await jobService.ingestDeduplicated({
-            ...payload,
-            companyId: resolvedCompanyId,
-            companyDomain,
-          });
+          result = await jobService.ingestDeduplicated(
+            {
+              ...payload,
+              companyId: resolvedCompanyId,
+              companyDomain,
+            },
+            { batchTouchAtMs: payload.batchTouchAtMs },
+          );
         } catch (err) {
           if (
             err instanceof Prisma.PrismaClientKnownRequestError &&

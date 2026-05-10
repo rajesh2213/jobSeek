@@ -12,8 +12,13 @@ import {
   getJobDedupMetricsSnapshot,
   recordIngestionOutcome,
 } from "./jobMetrics.service.js";
+import { shouldSkipRedundantLastSeenAfterBatchTouch } from "../utils/jobWriteOptimization.js";
 
 export type { DedupJobInput } from "../modules/crawler/crawler.types.js";
+
+export type DedupIngestOptions = {
+  batchTouchAtMs?: number;
+};
 
 const URL_IDENTITY_LOG_FIRST = 200;
 let urlIdentityLogCount = 0;
@@ -64,7 +69,9 @@ function logDedupMetrics(): void {
 export async function deduplicateAndInsert(
   repo: JobRepository,
   raw: NormalizedJob & { companyDomain: string },
+  ingestOptions?: DedupIngestOptions,
 ): Promise<{ canonical: Job; inserted: boolean }> {
+  const batchTouchAtMs = ingestOptions?.batchTouchAtMs ?? raw.batchTouchAtMs;
   const rawSourceUrl = String(raw.sourceUrl).trim();
   const normalizedSourceUrl = normalizeJobUrl(rawSourceUrl);
   if (shouldLogUrlIdentityCheck()) {
@@ -86,7 +93,11 @@ export async function deduplicateAndInsert(
       { event: "job_duplicate_sourceUrl", sourceUrl: input.sourceUrl },
       "job_duplicate_sourceUrl",
     );
-    await repo.updateLastSeenById(existingByUrl.id, new Date());
+    if (
+      !shouldSkipRedundantLastSeenAfterBatchTouch(existingByUrl.lastSeenAt, batchTouchAtMs)
+    ) {
+      await repo.updateLastSeenById(existingByUrl.id, new Date());
+    }
     const postedMerged = await repo.mergePostedAtIfEarlier(
       existingByUrl.id,
       input.postedAt,
@@ -189,7 +200,9 @@ export async function deduplicateAndInsert(
       );
       const existing = await repo.findBySourceUrl(input.sourceUrl);
       if (existing) {
-        await repo.updateLastSeenById(existing.id, new Date());
+        if (!shouldSkipRedundantLastSeenAfterBatchTouch(existing.lastSeenAt, batchTouchAtMs)) {
+          await repo.updateLastSeenById(existing.id, new Date());
+        }
         const postedMerged = await repo.mergePostedAtIfEarlier(
           existing.id,
           input.postedAt,

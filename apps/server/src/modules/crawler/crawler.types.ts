@@ -49,6 +49,11 @@ export interface NormalizedJob {
   atsJobId?: string;
   /** Optional: canonical Job id for traceability (e.g. requeue scripts, logs). */
   jobId?: string;
+  /**
+   * Queue / worker metadata: epoch ms of a prior `touchLastSeenBySourceUrls` in the same ingest batch.
+   * When `JOB_DEDUP_TOUCH_SKIP=1`, dedup may skip a redundant `updateLastSeenById`. Not persisted to DB.
+   */
+  batchTouchAtMs?: number;
 }
 
 /**
