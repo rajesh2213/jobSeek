@@ -19,13 +19,6 @@ const RETENTION_DAYS = Math.max(
 
 const LOG_TO_FILE = process.env.LOG_TO_FILE !== "false";
 
-function toDateStamp(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}${m}${day}`;
-}
-
 function detectProcessRole(): string {
   const script = (process.argv[1] || "").toLowerCase().replace(/\\/g, "/");
   if (script.endsWith("/src/index.ts") || script.endsWith("/dist/index.js")) return "server";
@@ -41,17 +34,45 @@ function detectProcessRole(): string {
 }
 
 /**
- * Active log file name defaults to `jobseek-<role>-<yyyymmdd>.log`.
- * This makes files readable by process role while avoiding one shared file for all processes.
- * Override with `LOG_FILE_NAME` for custom naming.
+ * `LOG_FILE_NAME` sometimes mistakenly ends with `.log.txt`. The real log basename must be
+ * `*.log` for rotating-file-stream; `.log.txt` was never a valid primary log name.
  */
-const ACTIVE_LOG_BASENAME =
-  process.env.LOG_FILE_NAME?.trim() ||
-  `jobseek-${detectProcessRole()}-${toDateStamp(new Date())}.log`;
+function normalizeLogFileBasename(name: string): string {
+  const t = name.trim();
+  if (t.endsWith(".log.txt")) return `${t.slice(0, -".log.txt".length)}.log`;
+  return t;
+}
+
+/**
+ * Basename for the rotating file stream (must end with `.log`).
+ *
+ * - `LOG_FILE_NAME` wins if set (explicit override).
+ * - Else `WORKER_NAME` (e.g. systemd `jobseek-worker` → `jobseek-worker.log`): one stable name per
+ *   unit so the **active** file is always `{WORKER_NAME}.log` and **rotated** files are
+ *   `YYYYMMDD-HHMM-NN-{WORKER_NAME}.log`. Avoids mixing `jobseek-role-20260422.log` (startup date
+ *   in the tail) with prefixed archives that embed a different date.
+ * - Else `jobseek-{role}.log` for ad-hoc runs (tsx scripts, local dev without WORKER_NAME).
+ */
+function resolveActiveLogBasename(): string {
+  const fromEnv = process.env.LOG_FILE_NAME?.trim();
+  if (fromEnv) return normalizeLogFileBasename(fromEnv);
+  const workerName = process.env.WORKER_NAME?.trim();
+  if (workerName) {
+    const withExt = workerName.endsWith(".log") ? workerName : `${workerName}.log`;
+    return normalizeLogFileBasename(withExt);
+  }
+  return `jobseek-${detectProcessRole()}.log`;
+}
+
+const ACTIVE_LOG_BASENAME = resolveActiveLogBasename();
 
 /**
  * Persistent rotation ledger for `maxFiles`. Scoped per active basename so multiple
  * processes (server, workers, schedulers) do not corrupt a single shared history file.
+ *
+ * **Do not** point `history` at `${ACTIVE_LOG_BASENAME}.txt`: that creates `jobseek-*.log.txt`
+ * files (newline-separated paths), which look like double-extension logs and are easy to confuse
+ * with real log output. Use this hidden `.rfs-history-<stem>` path only.
  */
 const RFS_HISTORY_PATH = path.join(
   LOG_DIR,
@@ -63,7 +84,16 @@ fs.mkdirSync(LOG_DIR, { recursive: true });
 type PurgeStats = { scanned: number; deleted: number; skipped: number; errors: number };
 
 /**
- * Remove `.log` files in LOG_DIR older than retention (mtime). Does not rely on filename shape.
+ * Purge targets: normal `*.log`, plus legacy `*.log.txt`.
+ * Those `.log.txt` files are almost always old rotating-file-stream **history** paths where
+ * `history` was set to `${basename}.txt` (full name already ended in `.log`).
+ */
+function isPurgeableLogFilename(name: string): boolean {
+  return name.endsWith(".log") || name.endsWith(".log.txt");
+}
+
+/**
+ * Remove log-like files in LOG_DIR older than retention (mtime). Does not rely on archive filename shape.
  * Never deletes the current process active file, dotfiles, or directories.
  */
 function purgeStaleLogFiles(): PurgeStats {
@@ -84,7 +114,7 @@ function purgeStaleLogFiles(): PurgeStats {
       stats.skipped++;
       continue;
     }
-    if (!name.endsWith(".log")) {
+    if (!isPurgeableLogFilename(name)) {
       stats.skipped++;
       continue;
     }
@@ -161,7 +191,7 @@ function attachRotatingStreamGuards(stream: RotatingFileStream): void {
     );
     if (err?.code === "ENOENT" || err?.code === "EPERM") {
       console.error(
-        "[logger] Hint: use role-based logs (default jobseek-<role>-<yyyymmdd>.log) or LOG_TO_FILE=false; avoid multiple processes sharing LOG_FILE_NAME.",
+        "[logger] Hint: set distinct WORKER_NAME or LOG_FILE_NAME per process, or LOG_TO_FILE=false; avoid multiple processes sharing the same log basename.",
       );
     }
   });
