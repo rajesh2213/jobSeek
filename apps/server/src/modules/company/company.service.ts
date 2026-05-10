@@ -6,6 +6,8 @@ import type { CompaniesListingSort, CompanyListingRow } from "./companyListing.t
 import type { JobRepository, JobDiscoveryFilters, JobWithCompany } from "../job/job.repository.js";
 import type { PaginatedResult } from "../../types/api.js";
 import { logger } from "../../utils/logger.js";
+
+const DEBUG_COMPANY_CONCURRENCY = process.env.DEBUG_COMPANY_CONCURRENCY === "1";
 import {
   getEnrichCompanyQueue,
   ENRICH_COMPANY_JOB,
@@ -182,11 +184,31 @@ export class CompanyService {
       limit: input.limit,
       offset,
     };
-    const [items, total, stats] = await Promise.all([
-      this.companyRepository.listCompaniesDiscovery(filter),
-      this.companyRepository.countCompaniesListing(filter),
-      this.companyRepository.getCompaniesListingStats(),
-    ]);
+    /** Sequential DB work avoids Prisma pool starvation (pgBouncer connection_limit is small). */
+    const t0 = Date.now();
+    const items = await this.companyRepository.listCompaniesDiscovery(filter);
+    if (DEBUG_COMPANY_CONCURRENCY) {
+      logger.info(
+        { event: "COMPANY_LIST_PHASE_MS", phase: "items", ms: Date.now() - t0 },
+        "COMPANY_LIST_PHASE_MS",
+      );
+    }
+    const t1 = Date.now();
+    const total = await this.companyRepository.countCompaniesListing(filter);
+    if (DEBUG_COMPANY_CONCURRENCY) {
+      logger.info(
+        { event: "COMPANY_LIST_PHASE_MS", phase: "count", ms: Date.now() - t1 },
+        "COMPANY_LIST_PHASE_MS",
+      );
+    }
+    const t2 = Date.now();
+    const stats = await this.companyRepository.getCompaniesListingStats();
+    if (DEBUG_COMPANY_CONCURRENCY) {
+      logger.info(
+        { event: "COMPANY_LIST_PHASE_MS", phase: "stats", ms: Date.now() - t2 },
+        "COMPANY_LIST_PHASE_MS",
+      );
+    }
     const totalPages = Math.ceil(total / input.limit) || 1;
     const hasMore = offset + items.length < total;
     return {

@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { cache } from "react";
 import { fetchCompanies, fetchJobs, fetchSeoLandingPages } from "../lib/api";
 import { getSiteBaseUrl } from "../lib/seoSite";
 import { normalizeRelatedSlugPath } from "../lib/slug-parser";
@@ -16,6 +17,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = getSiteBaseUrl();
   const now = new Date();
   const internalSeoSecret = process.env.INTERNAL_SEO_SECRET ?? null;
+  /** Per-request memo: duplicate page fetches in the same generation share one HTTP call (no URL/coverage change). */
+  const fetchJobsForSitemap = cache((page: number, limit: number) =>
+    fetchJobs({ page, limit }, { internalSeoSecret, ssrPage: "sitemap" }),
+  );
+  const fetchCompaniesForSitemap = cache((page: number, limit: number) =>
+    fetchCompanies({ page, limit, sort: "jobs", ssrPage: "sitemap" }),
+  );
   const seen = new Set<string>();
 
   const staticEntries: MetadataRoute.Sitemap = [
@@ -50,10 +58,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     let page = 1;
     const limit = 1000;
     for (;;) {
-      const jobs = await fetchJobs(
-        { page, limit },
-        { internalSeoSecret, ssrPage: "sitemap" },
-      );
+      const jobs = await fetchJobsForSitemap(page, limit);
       for (const job of jobs.data) {
         jobEntries.push({
           url: `${base}/job/${job.id}`,
@@ -76,7 +81,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     let page = 1;
     const limit = 100;
     for (;;) {
-      const res = await fetchCompanies({ page, limit, sort: "jobs", ssrPage: "sitemap" });
+      const res = await fetchCompaniesForSitemap(page, limit);
       for (const c of res.data) {
         if ((c.jobCount ?? 0) >= 1) {
           companyEntries.push({

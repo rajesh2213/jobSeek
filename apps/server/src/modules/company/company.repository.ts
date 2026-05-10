@@ -397,10 +397,8 @@ export function createCompanyRepository(prisma: PrismaClient) {
         `;
 
       if (!DEBUG_COMPANY_AGG) {
-        const [totalTracked, aggRows] = await Promise.all([
-          prisma.company.count(),
-          countDistinctHiringCompaniesSql(),
-        ]);
+        const totalTracked = await prisma.company.count();
+        const aggRows = await countDistinctHiringCompaniesSql();
         return {
           totalTracked,
           hiringThisWeek: Number(aggRows[0]?.c ?? 0),
@@ -408,15 +406,10 @@ export function createCompanyRepository(prisma: PrismaClient) {
       }
 
       let executionMsNew = 0;
-      const [totalTracked, aggRows] = await Promise.all([
-        prisma.company.count(),
-        (async () => {
-          const started = Date.now();
-          const rows = await countDistinctHiringCompaniesSql();
-          executionMsNew = Date.now() - started;
-          return rows;
-        })(),
-      ]);
+      const totalTracked = await prisma.company.count();
+      const aggStarted = Date.now();
+      const aggRows = await countDistinctHiringCompaniesSql();
+      executionMsNew = Date.now() - aggStarted;
       const newCount = Number(aggRows[0]?.c ?? 0);
       let hiringThisWeek = newCount;
 

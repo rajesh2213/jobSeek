@@ -24,6 +24,22 @@ const COMPANY_AGG_CACHE_TTL_SECONDS = Math.max(
   Number(process.env.COMPANY_AGG_CACHE_TTL_SECONDS ?? "60") || 60,
 );
 const DEBUG_COMPANY_AGG = process.env.DEBUG_COMPANY_AGG === "1";
+const DEBUG_COMPANY_CONCURRENCY = process.env.DEBUG_COMPANY_CONCURRENCY === "1";
+
+type CompaniesAggResponseBody = {
+  data: ReturnType<typeof toCompanyListingPublicJson>[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+    stats: { totalTracked: number; hiringThisWeek: number };
+  };
+};
+
+/** Coalesce concurrent anonymous cache misses for the same query (sitemap bursts, double-fetch). */
+const inflightAnonymousCompanyAgg = new Map<string, Promise<CompaniesAggResponseBody>>();
 
 function parseCompaniesSort(raw: unknown): CompaniesListingSort {
   const s = typeof raw === "string" ? raw : "jobs";
@@ -147,17 +163,7 @@ export function registerCompanyRoutes(
       if (!hasAuthHeader && COMPANY_AGG_CACHE_ENABLED) {
         const hit = await redis.get(cacheKey);
         if (hit) {
-          const parsed = JSON.parse(hit) as {
-            data: ReturnType<typeof toCompanyListingPublicJson>[];
-            meta: {
-              page: number;
-              limit: number;
-              total: number;
-              totalPages: number;
-              hasMore: boolean;
-              stats: { totalTracked: number; hiringThisWeek: number };
-            };
-          };
+          const parsed = JSON.parse(hit) as CompaniesAggResponseBody;
           if (DEBUG_COMPANY_AGG) {
             request.log.info(
               {
@@ -175,6 +181,69 @@ export function registerCompanyRoutes(
           }
           return reply.send(parsed);
         }
+
+        let inflight = inflightAnonymousCompanyAgg.get(cacheKey);
+        const isInflightJoiner = Boolean(inflight);
+        if (!inflight) {
+          inflight = (async (): Promise<CompaniesAggResponseBody> => {
+            try {
+              const result = await companyService.listCompaniesDiscovery({
+                q: search,
+                sort,
+                hiring,
+                remote,
+                page,
+                limit,
+              });
+              const body: CompaniesAggResponseBody = {
+                data: result.items.map(toCompanyListingPublicJson),
+                meta: {
+                  page: result.page,
+                  limit: result.limit,
+                  total: result.total,
+                  totalPages: result.totalPages,
+                  hasMore: result.hasMore,
+                  stats: result.stats,
+                },
+              };
+              await redis.set(cacheKey, JSON.stringify(body), "EX", COMPANY_AGG_CACHE_TTL_SECONDS);
+              return body;
+            } finally {
+              inflightAnonymousCompanyAgg.delete(cacheKey);
+            }
+          })();
+          inflightAnonymousCompanyAgg.set(cacheKey, inflight);
+        } else if (DEBUG_COMPANY_CONCURRENCY) {
+          request.log.info(
+            {
+              event: "COMPANY_AGG_INFLIGHT_JOIN",
+              route: "/companies",
+              cacheKey,
+              callerType,
+              ssrPage,
+              sitemap: ssrPage === "sitemap",
+            },
+            "COMPANY_AGG_INFLIGHT_JOIN",
+          );
+        }
+
+        const responsePayload = await inflight;
+        if (DEBUG_COMPANY_AGG) {
+          request.log.info(
+            {
+              event: "COMPANY_AGG_TRIGGER",
+              route: "/companies",
+              cacheStatus: isInflightJoiner ? "INFLIGHT_JOIN" : "MISS",
+              callerType,
+              ssrPage,
+              sitemap: ssrPage === "sitemap",
+              executionMs: Date.now() - startedAt,
+              cacheKey,
+            },
+            "COMPANY_AGG_TRIGGER",
+          );
+        }
+        return reply.send(responsePayload);
       }
 
       const result = await companyService.listCompaniesDiscovery({
@@ -185,7 +254,7 @@ export function registerCompanyRoutes(
         page,
         limit,
       });
-      const responsePayload = {
+      const responsePayload: CompaniesAggResponseBody = {
         data: result.items.map(toCompanyListingPublicJson),
         meta: {
           page: result.page,
@@ -196,14 +265,6 @@ export function registerCompanyRoutes(
           stats: result.stats,
         },
       };
-      if (!hasAuthHeader && COMPANY_AGG_CACHE_ENABLED) {
-        await redis.set(
-          cacheKey,
-          JSON.stringify(responsePayload),
-          "EX",
-          COMPANY_AGG_CACHE_TTL_SECONDS,
-        );
-      }
       if (DEBUG_COMPANY_AGG) {
         request.log.info(
           {
