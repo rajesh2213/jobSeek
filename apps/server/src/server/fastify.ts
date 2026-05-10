@@ -1,4 +1,5 @@
 import Fastify, { type FastifyError } from "fastify";
+import pino from "pino";
 import compress from "@fastify/compress";
 import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
@@ -11,7 +12,10 @@ import { registerApiRequestMetrics } from "../utils/apiRequestMetrics.js";
 
 export async function buildServer() {
   const server = Fastify({
-    logger: { level: process.env.LOG_LEVEL ?? "info" },
+    logger: {
+      level: process.env.LOG_LEVEL ?? "info",
+      timestamp: pino.stdTimeFunctions.isoTime,
+    },
     /** Required so `request.ip` reflects the client behind nginx (`X-Forwarded-For`). */
     trustProxy: true,
   });

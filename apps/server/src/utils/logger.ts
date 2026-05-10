@@ -181,6 +181,9 @@ emitStartupDiagnostics();
 
 const level = process.env.LOG_LEVEL ?? (isDev ? "debug" : "info");
 
+/** JSON logs: ISO-8601 `time` (e.g. `2026-05-10T20:48:02.372Z`) instead of epoch ms. */
+const pinoTime = pino.stdTimeFunctions.isoTime;
+
 function attachRotatingStreamGuards(stream: RotatingFileStream): void {
   stream.on("error", (err: NodeJS.ErrnoException) => {
     const msg = err?.message ?? String(err);
@@ -201,14 +204,14 @@ function buildLogger(): pino.Logger {
   if (!LOG_TO_FILE) {
     if (isDev) {
       return pino(
-        { level },
+        { level, timestamp: pinoTime },
         build({
           colorize: true,
           translateTime: "SYS:yyyy-mm-dd HH:MM:ss.l",
         }),
       );
     }
-    return pino({ level });
+    return pino({ level, timestamp: pinoTime });
   }
 
   const fileStream = createStream(ACTIVE_LOG_BASENAME, {
@@ -225,7 +228,7 @@ function buildLogger(): pino.Logger {
       translateTime: "SYS:yyyy-mm-dd HH:MM:ss.l",
     });
     return pino(
-      { level },
+      { level, timestamp: pinoTime },
       pino.multistream([
         { level: "trace" as const, stream: prettyStream },
         { level: "trace" as const, stream: fileStream },
@@ -234,7 +237,7 @@ function buildLogger(): pino.Logger {
   }
 
   return pino(
-    { level },
+    { level, timestamp: pinoTime },
     pino.multistream([
       { level: "trace" as const, stream: process.stdout },
       { level: "trace" as const, stream: fileStream },
