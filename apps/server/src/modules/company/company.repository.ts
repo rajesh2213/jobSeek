@@ -8,6 +8,9 @@ import type {
 import { slugifyCompanyName } from "../../utils/slugify.js";
 import { getDomainFromUrl, normalizeDomain } from "../../utils/common.js";
 import type { JobWithCompany } from "../job/job.repository.js";
+import { logger } from "../../utils/logger.js";
+
+const DEBUG_COMPANY_AGG = process.env.DEBUG_COMPANY_AGG === "1";
 
 export interface CreateCompanyInput {
   name: string;
@@ -383,21 +386,86 @@ export function createCompanyRepository(prisma: PrismaClient) {
       hiringThisWeek: number;
     }> {
       const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      const [totalTracked, distinctCompanies] = await Promise.all([
+
+      const countDistinctHiringCompaniesSql = () =>
+        prisma.$queryRaw<[{ c: bigint }]>`
+          SELECT COUNT(DISTINCT "companyId")::bigint AS c
+          FROM "Job"
+          WHERE "canonicalJobId" IS NULL
+            AND "status" = 'ready'
+            AND "lastSeenAt" >= ${weekAgo}
+        `;
+
+      if (!DEBUG_COMPANY_AGG) {
+        const [totalTracked, aggRows] = await Promise.all([
+          prisma.company.count(),
+          countDistinctHiringCompaniesSql(),
+        ]);
+        return {
+          totalTracked,
+          hiringThisWeek: Number(aggRows[0]?.c ?? 0),
+        };
+      }
+
+      let executionMsNew = 0;
+      const [totalTracked, aggRows] = await Promise.all([
         prisma.company.count(),
-        prisma.job.findMany({
-          where: {
-            canonicalJobId: null,
-            status: "ready",
-            lastSeenAt: { gte: weekAgo },
-          },
-          distinct: ["companyId"],
-          select: { companyId: true },
-        }),
+        (async () => {
+          const started = Date.now();
+          const rows = await countDistinctHiringCompaniesSql();
+          executionMsNew = Date.now() - started;
+          return rows;
+        })(),
       ]);
+      const newCount = Number(aggRows[0]?.c ?? 0);
+      let hiringThisWeek = newCount;
+
+      const startedOld = Date.now();
+      const legacyDistinct = await prisma.job.findMany({
+        where: {
+          canonicalJobId: null,
+          status: "ready",
+          lastSeenAt: { gte: weekAgo },
+        },
+        distinct: ["companyId"],
+        select: { companyId: true },
+      });
+      const executionMsOld = Date.now() - startedOld;
+      const oldCount = legacyDistinct.length;
+      const diff = newCount - oldCount;
+
+      if (oldCount !== newCount) {
+        logger.warn(
+          {
+            event: "COMPANY_STATS_SHADOW_MISMATCH",
+            oldCount,
+            newCount,
+            diff,
+            executionMsOld,
+            executionMsNew,
+            weekAgo: weekAgo.toISOString(),
+          },
+          "COMPANY_STATS_SHADOW_MISMATCH",
+        );
+        hiringThisWeek = oldCount;
+      }
+
+      logger.info(
+        {
+          event: "COMPANY_STATS_SHADOW_COMPARE",
+          oldCount,
+          newCount,
+          diff,
+          executionMsOld,
+          executionMsNew,
+          weekAgo: weekAgo.toISOString(),
+        },
+        "COMPANY_STATS_SHADOW_COMPARE",
+      );
+
       return {
         totalTracked,
-        hiringThisWeek: distinctCompanies.length,
+        hiringThisWeek,
       };
     },
   };
