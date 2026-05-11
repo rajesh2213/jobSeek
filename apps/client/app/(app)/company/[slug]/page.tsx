@@ -6,6 +6,7 @@ import {
 } from "../../../../lib/api";
 import { buildBreadcrumbListJsonLd } from "../../../../lib/seo";
 import { absoluteUrl } from "../../../../lib/seoSite";
+import { decideCompanySeoPolicy } from "../../../../lib/seoIndexability";
 import { CompanyHubPage } from "../../../../components/company/CompanyHubPage";
 import { JsonLdScript } from "../../../../components/seo/JsonLdScript";
 import { SeoBreadcrumbs } from "../../../../components/seo/SeoBreadcrumbs";
@@ -27,11 +28,26 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = `${company.name} Jobs & Careers | JobLoom`;
   const description = `Explore open roles at ${company.name}. Browse engineering, product, and remote jobs—verified listings with early apply links.`;
   const canonical = absoluteUrl(`/company/${slug}`);
+  const companyGateEnabled = process.env.SEO_COMPANY_QUALITY_GATE_ENABLED === "true";
+  const forceNoindexAll = process.env.SEO_FORCE_NOINDEX_ALL === "true";
+  const disableAllNoindex = process.env.SEO_DISABLE_ALL_NOINDEX === "true";
+  let decision = decideCompanySeoPolicy({
+    gateEnabled: companyGateEnabled,
+    company: { id: company.id, name: company.name, slug: company.slug },
+    requestedSlug: slug,
+  });
+  if (forceNoindexAll) {
+    decision = { ...decision, index: false, follow: true, sitemapEligible: false };
+  } else if (disableAllNoindex) {
+    decision = { ...decision, index: true, follow: true };
+  }
+
   return {
     title,
     description,
     alternates: { canonical },
     openGraph: { title, description, url: canonical },
+    robots: { index: decision.index, follow: decision.follow },
   };
 }
 

@@ -3,6 +3,11 @@ import type { JobItem } from "./api";
 import type { JobFilters } from "./slug-parser";
 import { getCanonicalJobListingUrl, hasActiveJobFilters } from "./slug-parser";
 import { absoluteUrl, getSiteBaseUrl } from "./seoSite";
+import {
+  decideJobsListingSeoPolicy,
+  type SeoPolicyDecision,
+  type SeoPolicyReason,
+} from "./seoIndexability";
 
 function toTitleCase(value: string): string {
   return value
@@ -115,15 +120,47 @@ export function jobsRouteMetadata(
   filters: JobFilters,
   options: {
     canonicalPath: string;
+    routeKind: "jobs-root" | "jobs-slug";
+    searchParamKeys: string[];
+    validCanonicalSlugPath?: boolean;
     total?: number;
   },
 ): Metadata {
   const { title, description } = buildJobsSeo(filters, options.total);
   const canonical = absoluteUrl(options.canonicalPath);
-  const min = getSeoMinJobsIndex();
-  const indexable =
-    options.total === undefined ||
-    (options.total >= min && options.total > 0 && !hasDuplicateLikeFilters(filters));
+  const indexMatrixEnabled = process.env.SEO_INDEX_MATRIX_ENABLED === "true";
+  const forceNoindexAll = process.env.SEO_FORCE_NOINDEX_ALL === "true";
+  const disableAllNoindex = process.env.SEO_DISABLE_ALL_NOINDEX === "true";
+  let decision: SeoPolicyDecision;
+  if (!indexMatrixEnabled) {
+    const min = getSeoMinJobsIndex();
+    const indexable =
+      options.total === undefined ||
+      (options.total >= min && options.total > 0 && !hasDuplicateLikeFilters(filters));
+    decision = {
+      index: indexable,
+      follow: true,
+      sitemapEligible: indexable,
+      action: indexable ? "allow" : "noindex",
+      reason: indexable ? "allow_jobs_canonical_leaf" : "exclude_sitemap_noindex",
+      policyVersion: "v1",
+    };
+  } else {
+    decision = decideJobsListingSeoPolicy({
+      routeKind: options.routeKind,
+      filters,
+      searchParamKeys: options.searchParamKeys,
+      canonicalPath: options.canonicalPath,
+      validCanonicalSlugPath: options.validCanonicalSlugPath,
+    });
+  }
+
+  if (forceNoindexAll) {
+    decision = { ...decision, index: false, follow: true, sitemapEligible: false };
+  } else if (disableAllNoindex) {
+    decision = { ...decision, index: true, follow: true };
+  }
+  recordSeoDecisionCounter("jobs", decision.reason);
 
   return {
     title,
@@ -134,10 +171,22 @@ export function jobsRouteMetadata(
       description,
       url: canonical,
     },
-    robots: indexable
-      ? { index: true, follow: true }
-      : { index: false, follow: true },
+    robots: { index: decision.index, follow: decision.follow },
   };
+}
+
+const seoDecisionCounters = new Map<string, number>();
+let seoDecisionCounterLogs = 0;
+
+function recordSeoDecisionCounter(surface: "jobs", reason: SeoPolicyReason): void {
+  if (process.env.SEO_INDEX_MATRIX_ENABLED !== "true") return;
+  const key = `${surface}:${reason}`;
+  seoDecisionCounters.set(key, (seoDecisionCounters.get(key) ?? 0) + 1);
+  seoDecisionCounterLogs += 1;
+  if (seoDecisionCounterLogs % 50 !== 0) return;
+  const compact: Record<string, number> = {};
+  for (const [k, v] of seoDecisionCounters.entries()) compact[k] = v;
+  console.info("[seo-policy] decision-counters", compact);
 }
 
 export function buildJobListingItemListJsonLd(

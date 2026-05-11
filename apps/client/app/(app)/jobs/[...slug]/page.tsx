@@ -22,6 +22,7 @@ import {
 import { JsonLdScript } from "../../../../components/seo/JsonLdScript";
 import { JobsListingFaq } from "../../../../components/seo/JobsListingFaq";
 import { SeoBreadcrumbs } from "../../../../components/seo/SeoBreadcrumbs";
+import { decideJobsListingSeoPolicy } from "../../../../lib/seoIndexability";
 
 const FALLBACK_RELATED_SLUGS = [
   "role/data-engineer/location/remote",
@@ -46,7 +47,11 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     surface: "seo" as const,
   };
   const response = await loadJobsDiscoveryPage(stableJobFiltersKey(filters));
+  const searchParamKeys = Object.keys(sp).filter(Boolean).sort();
   return jobsRouteMetadata(filters, {
+    routeKind: "jobs-slug",
+    searchParamKeys,
+    validCanonicalSlugPath: parsed.validCanonical,
     canonicalPath: getCanonicalJobListingUrl(filters),
     total: response.meta?.total ?? undefined,
   });
@@ -88,8 +93,17 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
     .filter(Boolean);
 
   const total = response.meta?.total ?? 0;
+  const policy = decideJobsListingSeoPolicy({
+    routeKind: "jobs-slug",
+    filters,
+    searchParamKeys: Object.keys(sp).filter(Boolean).sort(),
+    canonicalPath,
+    validCanonicalSlugPath: parsed.validCanonical,
+  });
+  const forceNoindexAll = process.env.SEO_FORCE_NOINDEX_ALL === "true";
+  const disableAllNoindex = process.env.SEO_DISABLE_ALL_NOINDEX === "true";
+  const indexable = forceNoindexAll ? false : disableAllNoindex ? true : policy.index;
   const minIndex = getSeoMinJobsIndex();
-  const indexable = total >= minIndex;
   const role = typeof filters.role === "string" && filters.role ? filters.role : "frontend-engineer";
   const relatedSearchLinks = [
     { href: `/jobs/role/${role}/location/remote`, label: `Explore remote ${toTitle(role)} jobs` },

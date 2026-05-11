@@ -16,6 +16,7 @@ import {
 } from "../../../lib/seo";
 import { JobsSearchPage } from "../../../components/job/JobsSearchPage";
 import { getCanonicalJobListingUrl, parseJobFiltersFromSearch } from "../../../lib/slug-parser";
+import { decideJobsListingSeoPolicy } from "../../../lib/seoIndexability";
 import { JsonLdScript } from "../../../components/seo/JsonLdScript";
 import { JobsListingFaq } from "../../../components/seo/JobsListingFaq";
 import { SeoBreadcrumbs } from "../../../components/seo/SeoBreadcrumbs";
@@ -36,7 +37,10 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   const sp = await searchParams;
   const filters = parseJobFiltersFromSearch(sp);
   const response = await loadJobsDiscoveryPage(stableJobFiltersKey(filters));
+  const searchParamKeys = Object.keys(sp).filter(Boolean).sort();
   return jobsRouteMetadata(filters, {
+    routeKind: "jobs-root",
+    searchParamKeys,
     canonicalPath: getCanonicalJobListingUrl(filters),
     total: response.meta?.total ?? undefined,
   });
@@ -51,8 +55,16 @@ export default async function JobsPage({ searchParams }: Props) {
   const response = await jobsDataPromise;
 
   const total = response.meta?.total ?? 0;
+  const policy = decideJobsListingSeoPolicy({
+    routeKind: "jobs-root",
+    filters,
+    searchParamKeys: Object.keys(sp).filter(Boolean).sort(),
+    canonicalPath: getCanonicalJobListingUrl(filters),
+  });
+  const forceNoindexAll = process.env.SEO_FORCE_NOINDEX_ALL === "true";
+  const disableAllNoindex = process.env.SEO_DISABLE_ALL_NOINDEX === "true";
+  const indexable = forceNoindexAll ? false : disableAllNoindex ? true : policy.index;
   const minIndex = getSeoMinJobsIndex();
-  const indexable = total >= minIndex;
 
   const listingTop = (
     <>
