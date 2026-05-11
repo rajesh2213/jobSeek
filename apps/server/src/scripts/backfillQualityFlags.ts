@@ -43,6 +43,17 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** stderr-only progress (stdout stays final JSON summary for tooling). */
+function logBackfillProgress(payload: Record<string, unknown>): void {
+  console.error(
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      event: "backfill_quality_flags_progress",
+      ...payload,
+    }),
+  );
+}
+
 async function checkpointGet(key: string): Promise<string | null> {
   const row = await prisma.$queryRaw<Array<{ value: string }>>`
     SELECT "value" FROM "BackfillCheckpoint" WHERE "key" = ${key} LIMIT 1
@@ -74,7 +85,9 @@ async function runJobBackfill(args: Args): Promise<{ scanned: number; changed: n
   let scanned = 0;
   let changed = 0;
   let batches = 0;
+  const runStarted = Date.now();
   while (batches < args.maxBatches) {
+    const batchStarted = Date.now();
     const rows = await prisma.job.findMany({
       where: {
         id: cursor ? { gt: cursor } : undefined,
@@ -97,6 +110,7 @@ async function runJobBackfill(args: Args): Promise<{ scanned: number; changed: n
     if (rows.length === 0) break;
     batches += 1;
     scanned += rows.length;
+    let changedThisBatch = 0;
     for (const row of rows) {
       const flags = computeJobQualityFlags({
         source: row.source,
@@ -112,6 +126,7 @@ async function runJobBackfill(args: Args): Promise<{ scanned: number; changed: n
         row.requiresRepair !== flags.requiresRepair;
       if (hasDelta) {
         changed += 1;
+        changedThisBatch += 1;
         if (!args.dryRun) {
           await prisma.job.update({
             where: { id: row.id },
@@ -128,6 +143,28 @@ async function runJobBackfill(args: Args): Promise<{ scanned: number; changed: n
       cursor = row.id;
     }
     if (!args.dryRun && cursor) await checkpointSet("job_quality_flags:last_id", cursor);
+    const batchMs = Date.now() - batchStarted;
+    const elapsedSec = (Date.now() - runStarted) / 1000;
+    const rowsPerSec = batchMs > 0 ? rows.length / (batchMs / 1000) : null;
+    const batchesRemaining = Math.max(0, args.maxBatches - batches);
+    const etaSec =
+      batchesRemaining > 0 && batchMs > 0 ? (batchesRemaining * (batchMs + args.sleepMs)) / 1000 : 0;
+    logBackfillProgress({
+      model: "job",
+      phase: "batch_done",
+      dryRun: args.dryRun,
+      batch: batches,
+      maxBatches: args.maxBatches,
+      rowsThisBatch: rows.length,
+      changedThisBatch,
+      cumulativeScanned: scanned,
+      cumulativeChanged: changed,
+      checkpoint: cursor,
+      batchDurationMs: batchMs,
+      rowsPerSec: rowsPerSec != null ? Number(rowsPerSec.toFixed(2)) : null,
+      elapsedSec: Number(elapsedSec.toFixed(2)),
+      etaRemainingSec: batchesRemaining ? Number(etaSec.toFixed(1)) : 0,
+    });
     if (args.sleepMs > 0) await sleep(args.sleepMs);
   }
   return { scanned, changed, batches };
@@ -138,7 +175,9 @@ async function runCompanyBackfill(args: Args): Promise<{ scanned: number; change
   let scanned = 0;
   let changed = 0;
   let batches = 0;
+  const runStarted = Date.now();
   while (batches < args.maxBatches) {
+    const batchStarted = Date.now();
     const rows = await prisma.company.findMany({
       where: {
         id: cursor ? { gt: cursor } : undefined,
@@ -159,6 +198,7 @@ async function runCompanyBackfill(args: Args): Promise<{ scanned: number; change
     if (rows.length === 0) break;
     batches += 1;
     scanned += rows.length;
+    let changedThisBatch = 0;
     for (const row of rows) {
       const flags = computeCompanyQualityFlags({
         name: row.name,
@@ -172,6 +212,7 @@ async function runCompanyBackfill(args: Args): Promise<{ scanned: number; change
         row.requiresCompanyRepair !== flags.requiresCompanyRepair;
       if (hasDelta) {
         changed += 1;
+        changedThisBatch += 1;
         if (!args.dryRun) {
           await prisma.company.update({
             where: { id: row.id },
@@ -186,6 +227,28 @@ async function runCompanyBackfill(args: Args): Promise<{ scanned: number; change
       cursor = row.id;
     }
     if (!args.dryRun && cursor) await checkpointSet("company_quality_flags:last_id", cursor);
+    const batchMs = Date.now() - batchStarted;
+    const elapsedSec = (Date.now() - runStarted) / 1000;
+    const rowsPerSec = batchMs > 0 ? rows.length / (batchMs / 1000) : null;
+    const batchesRemaining = Math.max(0, args.maxBatches - batches);
+    const etaSec =
+      batchesRemaining > 0 && batchMs > 0 ? (batchesRemaining * (batchMs + args.sleepMs)) / 1000 : 0;
+    logBackfillProgress({
+      model: "company",
+      phase: "batch_done",
+      dryRun: args.dryRun,
+      batch: batches,
+      maxBatches: args.maxBatches,
+      rowsThisBatch: rows.length,
+      changedThisBatch,
+      cumulativeScanned: scanned,
+      cumulativeChanged: changed,
+      checkpoint: cursor,
+      batchDurationMs: batchMs,
+      rowsPerSec: rowsPerSec != null ? Number(rowsPerSec.toFixed(2)) : null,
+      elapsedSec: Number(elapsedSec.toFixed(2)),
+      etaRemainingSec: batchesRemaining ? Number(etaSec.toFixed(1)) : 0,
+    });
     if (args.sleepMs > 0) await sleep(args.sleepMs);
   }
   return { scanned, changed, batches };
