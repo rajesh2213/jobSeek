@@ -670,24 +670,35 @@ export default function SmartApplyPage() {
             <h2 className="text-sm font-bold text-ink">How to use Smart Apply</h2>
             <ol className="mt-2 list-decimal space-y-2 pl-4 text-xs text-ink-muted">
               <li>
-                Upload a resume first (required), then import your profile from it—Smart Apply treats your resume as
-                the primary source for answers.
+                Upload a resume (required), then use <strong className="font-semibold text-ink">import from resume</strong>{" "}
+                so your profile matches your CV—Smart Apply uses that as the main source for answers.
               </li>
               <li>
-                Treat this page as optional context: add as much or as little detail as you want so answers match how you
-                sound.
-              </li>
-              <li>Install the Chrome extension and stay signed in with the same JobLoom account on the site and in the extension.</li>
-              <li>
-                From JobLoom job listings, click Apply to open the employer&apos;s application in a new tab—any ATS page
-                works.
+                Use the rest of this page as optional context: add detail if you want answers to match your voice and
+                priorities.
               </li>
               <li>
-                On the form, run the extension&apos;s one-click field detection and autofill using this saved profile.
+                Install the Chrome extension (section above). Use JobLoom only in{" "}
+                <strong className="font-semibold text-ink">this same Chrome profile</strong>—the extension reads the
+                account you use on jobloom.tech, not a different browser or profile.
               </li>
               <li>
-                Review generated long answers and every autofilled field; edit where needed, then submit manually—you stay
-                in control.
+                <strong className="font-semibold text-ink">Sync your session:</strong> after you install the extension or
+                change JobLoom accounts, open any signed-in JobLoom tab (this page works) and focus it for a few seconds.
+                That pushes your current login to the extension. If Smart Apply on an employer site cannot load your plan
+                or profile, come back here while signed in, focus this tab again, then retry the extension.
+              </li>
+              <li>
+                From JobLoom job listings, click <strong className="font-semibold text-ink">Apply</strong> to open the
+                employer&apos;s application in a new tab—common ATS pages are supported.
+              </li>
+              <li>
+                On the application page, open the extension and run field detection and autofill using the profile you
+                saved here.
+              </li>
+              <li>
+                Review generated long answers and every autofilled field; edit where needed, then submit yourself—you
+                stay in control.
               </li>
             </ol>
           </section>
