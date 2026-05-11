@@ -41,6 +41,7 @@ import {
   logQueryMetrics,
 } from "../utils/queryMetrics.js";
 import { hashedCacheKey } from "../utils/cacheKey.js";
+import { parseWorkdaySlug } from "../modules/atsDiscovery/atsUrlParser.js";
 import {
   estimateJsonBytes,
   logUpdateReturnBytesEstimate,
@@ -157,6 +158,33 @@ async function throttleApiCall(): Promise<void> {
 function clampPoolSize(envName: string, fallback: string, hardMax: number): number {
   const n = Math.max(1, Math.min(hardMax, Number(process.env[envName] ?? fallback)));
   return Number.isFinite(n) ? n : Number(fallback);
+}
+
+function titleCaseWords(value: string): string {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function slugToHumanLabel(value: string): string {
+  return titleCaseWords(value.replace(/[._-]+/g, " ").trim());
+}
+
+function fallbackCompanyNameFromEndpoint(type: string, slug: string): string {
+  if (type === "workday") {
+    const parsed = parseWorkdaySlug(slug);
+    if (parsed?.tenant?.trim()) {
+      return slugToHumanLabel(parsed.tenant);
+    }
+    if (parsed?.host?.trim()) {
+      const first = parsed.host.split(".")[0]?.trim();
+      if (first) return slugToHumanLabel(first);
+    }
+  }
+  const base = slug.split("__")[0]?.trim() || slug;
+  return slugToHumanLabel(base).slice(0, 80) || `${type}:${slug.slice(0, 48)}`;
 }
 
 async function start(): Promise<void> {
@@ -296,7 +324,7 @@ async function start(): Promise<void> {
       preferredCompanyId: endpointRow.companyId ?? undefined,
       companyName:
         endpointRow.companyName?.trim() ||
-        `${endpointRow.type}:${endpointRow.slug.slice(0, 48)}`,
+        fallbackCompanyNameFromEndpoint(endpointRow.type, endpointRow.slug),
     });
 
     const company = await companyService.findById(resolvedCompanyId);

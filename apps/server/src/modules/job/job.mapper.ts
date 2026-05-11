@@ -2,6 +2,7 @@ import type { Job } from "@prisma/client";
 import { cleanJobDescription } from "../../utils/cleanJobDescription.js";
 import { LIST_JOB_DESCRIPTION_MAX_CHARS } from "./jobListing.constants.js";
 import { buildJobPreviewLines } from "./jobPreviewLines.js";
+import { companyDisplayName } from "../../utils/companyDisplayName.js";
 
 export type JobCompanyPublic = {
   id: string;
@@ -35,7 +36,7 @@ function truncateJobDescriptionForList(
 function toCompanyPublic(company: JobCompanyPublic): Record<string, unknown> {
   return {
     id: company.id,
-    name: company.name,
+    name: companyDisplayName(company.name, company.domain),
     slug: company.slug,
     logoUrl: company.logoUrl ?? null,
     domain: company.domain ?? null,

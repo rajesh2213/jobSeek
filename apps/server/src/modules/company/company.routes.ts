@@ -4,6 +4,7 @@ import { CompanyService } from "./company.service.js";
 import { parseJobDiscoveryQuery } from "../../utils/taxonomyQuery.js";
 import type { ApiError } from "../../types/api.js";
 import { getIoredis } from "../../queues/job.queue.js";
+import { companyDisplayName } from "../../utils/companyDisplayName.js";
 import {
   runMeteredJobsList,
   clientIp,
@@ -76,7 +77,7 @@ function setApiCacheHeader(
 function toCompanyListingPublicJson(row: CompanyListingRow) {
   return {
     id: row.id,
-    name: row.name,
+    name: companyDisplayName(row.name, row.domain),
     slug: row.slug,
     domain: row.domain,
     logoUrl: row.logoUrl,
