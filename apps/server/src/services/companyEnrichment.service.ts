@@ -43,6 +43,7 @@ import {
   recordJobsExpandedFromCompany,
   recordPartialEnrichment,
 } from "./companyDiscoveryMetrics.service.js";
+import { computeCompanyQualityFlags } from "./qualityFlags.service.js";
 
 export function isTransientEnrichmentError(err: unknown): boolean {
   if (err instanceof TypeError) return true;
@@ -125,6 +126,29 @@ let careers_page_detected = 0;
 let html_fetched_success = 0;
 let ats_detected = 0;
 let token_extracted = 0;
+
+function companyQualityPatch(input: {
+  name: string;
+  domain: string | null;
+  atsType: string | null;
+  atsBoardToken: string | null;
+}): {
+  isPlaceholderCompany: boolean;
+  isCompanyVerified: boolean;
+  requiresCompanyRepair: boolean;
+} {
+  const flags = computeCompanyQualityFlags({
+    name: input.name,
+    domain: input.domain,
+    atsType: input.atsType,
+    atsBoardToken: input.atsBoardToken,
+  });
+  return {
+    isPlaceholderCompany: flags.isPlaceholderCompany,
+    isCompanyVerified: flags.isCompanyVerified,
+    requiresCompanyRepair: flags.requiresCompanyRepair,
+  };
+}
 
 function recordEnrichmentDebugAndCounters(params: {
   companyId: string;
@@ -273,7 +297,15 @@ export async function processEnrichCompany(
       if (domain) {
         await prisma.company.update({
           where: { id: companyId },
-          data: { domain },
+          data: {
+            domain,
+            ...companyQualityPatch({
+              name: company.name,
+              domain,
+              atsType,
+              atsBoardToken,
+            }),
+          },
         });
         logger.info({ event: "domain_resolved", companyId, domain }, "domain_resolved");
       } else {
@@ -287,7 +319,15 @@ export async function processEnrichCompany(
         if (logoUrl) {
           await prisma.company.update({
             where: { id: companyId },
-            data: { logoUrl },
+            data: {
+              logoUrl,
+              ...companyQualityPatch({
+                name: company.name,
+                domain,
+                atsType,
+                atsBoardToken,
+              }),
+            },
           });
         }
       } catch (err) {
@@ -325,7 +365,15 @@ export async function processEnrichCompany(
             links = homepageLinks;
             await prisma.company.update({
               where: { id: companyId },
-              data: { atsType },
+              data: {
+                atsType,
+                ...companyQualityPatch({
+                  name: company.name,
+                  domain,
+                  atsType,
+                  atsBoardToken,
+                }),
+              },
             });
             recordAtsDetected();
             logger.info(
@@ -347,7 +395,15 @@ export async function processEnrichCompany(
           careersUrl = careers.careersUrl;
           await prisma.company.update({
             where: { id: companyId },
-            data: { careersUrl },
+            data: {
+              careersUrl,
+              ...companyQualityPatch({
+                name: company.name,
+                domain,
+                atsType,
+                atsBoardToken,
+              }),
+            },
           });
           logger.info(
             { event: "careers_detected", companyId, careersUrl },
@@ -387,7 +443,15 @@ export async function processEnrichCompany(
         atsDetectedFrom = "careers";
         await prisma.company.update({
           where: { id: companyId },
-          data: { atsType },
+          data: {
+            atsType,
+            ...companyQualityPatch({
+              name: company.name,
+              domain,
+              atsType,
+              atsBoardToken,
+            }),
+          },
         });
         recordAtsDetected();
         logger.info(
@@ -405,7 +469,15 @@ export async function processEnrichCompany(
         atsBoardToken = token;
         await prisma.company.update({
           where: { id: companyId },
-          data: { atsBoardToken: token },
+          data: {
+            atsBoardToken: token,
+            ...companyQualityPatch({
+              name: company.name,
+              domain,
+              atsType,
+              atsBoardToken: token,
+            }),
+          },
         });
         logger.info({ event: "token_extracted", companyId, atsType }, "token_extracted");
       }
@@ -597,6 +669,12 @@ export async function processEnrichCompany(
       ...(status === CompanyStatus.ready
         ? { enrichmentAttempts: 0 }
         : { enrichmentAttempts: { increment: 1 } }),
+      ...companyQualityPatch({
+        name: company.name,
+        domain,
+        atsType,
+        atsBoardToken,
+      }),
     },
     select: { enrichmentAttempts: true, discoverySource: true },
   });
@@ -610,6 +688,12 @@ export async function processEnrichCompany(
       where: { id: companyId },
       data: {
         discoverySource: mergeDiscoveryTag(updated.discoverySource ?? company.discoverySource, "enrich_exhausted"),
+        ...companyQualityPatch({
+          name: company.name,
+          domain,
+          atsType,
+          atsBoardToken,
+        }),
       },
     });
     logger.warn(

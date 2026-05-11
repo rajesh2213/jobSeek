@@ -11,6 +11,7 @@ import { prisma } from "../infrastructure/db/prisma.js";
 import type { ParsedJobDescriptionAI } from "../modules/ai/ai.types.js";
 import { emptyParsedJobDescription } from "../modules/ai/ai.types.js";
 import { asyncPool } from "../utils/asyncPool.js";
+import { computeJobQualityFlags } from "../services/qualityFlags.service.js";
 
 const BATCH_SIZE = 100;
 const CONCURRENCY = 5;
@@ -93,13 +94,25 @@ async function main(): Promise<void> {
   let processed = 0;
 
   for (;;) {
-    const batch: { id: string; parsedDescription: unknown }[] = await prisma.job.findMany({
+    const batch: {
+      id: string;
+      source: string;
+      sourceUrl: string;
+      description: string | null;
+      parsedDescription: unknown;
+    }[] = await prisma.job.findMany({
       where: {
         canonicalJobId: null,
         NOT: { parsedDescription: { equals: Prisma.DbNull } },
         ...(cursorId ? { id: { gt: cursorId } } : {}),
       },
-      select: { id: true, parsedDescription: true },
+      select: {
+        id: true,
+        source: true,
+        sourceUrl: true,
+        description: true,
+        parsedDescription: true,
+      },
       orderBy: { id: "asc" },
       take: BATCH_SIZE,
     });
@@ -127,9 +140,22 @@ async function main(): Promise<void> {
           return { kind: "unchanged", id: row.id, lineChanges: 0, linesTouched: lt };
         }
         if (!dryRun) {
+          const flags = computeJobQualityFlags({
+            source: row.source,
+            sourceUrl: row.sourceUrl,
+            description: row.description,
+            parsedDescription: next,
+          });
           await prisma.job.update({
             where: { id: row.id },
-            data: { parsedDescription: next as unknown as Prisma.InputJsonValue },
+            data: {
+              parsedDescription: next as unknown as Prisma.InputJsonValue,
+              hasNonemptyDescription: flags.hasNonemptyDescription,
+              hasUsableParsed: flags.hasUsableParsed,
+              hasValidWorkdayUrlShape: flags.hasValidWorkdayUrlShape,
+              isPublishable: flags.isPublishable,
+              requiresRepair: flags.requiresRepair,
+            },
           });
         }
         return { kind: "cleaned", id: row.id, lineChanges, linesTouched: lt };

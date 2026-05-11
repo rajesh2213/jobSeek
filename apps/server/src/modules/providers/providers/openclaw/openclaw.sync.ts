@@ -22,6 +22,7 @@ import type { JobRepository } from "../../../job/job.repository.js";
 import { CRAWLABLE_ATS_TYPES, type AtsType } from "../../../ats/ats.interface.js";
 import { normalizeDomain } from "../../../../utils/common.js";
 import { incrOpenClawMetric } from "./openclaw.analytics.js";
+import { computeCompanyQualityFlags } from "../../../../services/qualityFlags.service.js";
 
 const PAGING_KEY = "openclaw:paging:next_page";
 
@@ -100,12 +101,30 @@ async function mergeOpenClawHints(
 ): Promise<boolean> {
   const row = await prisma.company.findUnique({
     where: { id: companyId },
-    select: { domain: true, careersUrl: true, atsType: true, atsBoardToken: true },
+    select: { name: true, domain: true, careersUrl: true, atsType: true, atsBoardToken: true },
   });
   if (!row) return false;
   const data = computeOpenClawCompanyHintPatch(row, hints);
   if (!data) return false;
-  await prisma.company.update({ where: { id: companyId }, data });
+  const nextDomain = data.domain !== undefined ? data.domain : row.domain;
+  const nextAtsType = data.atsType !== undefined ? data.atsType : row.atsType;
+  const nextAtsBoardToken =
+    data.atsBoardToken !== undefined ? data.atsBoardToken : row.atsBoardToken;
+  const flags = computeCompanyQualityFlags({
+    name: row.name,
+    domain: nextDomain ?? null,
+    atsType: nextAtsType ?? null,
+    atsBoardToken: nextAtsBoardToken ?? null,
+  });
+  await prisma.company.update({
+    where: { id: companyId },
+    data: {
+      ...data,
+      isPlaceholderCompany: flags.isPlaceholderCompany,
+      isCompanyVerified: flags.isCompanyVerified,
+      requiresCompanyRepair: flags.requiresCompanyRepair,
+    },
+  });
   return true;
 }
 
