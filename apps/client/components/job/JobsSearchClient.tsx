@@ -465,25 +465,6 @@ export function JobsSearchClient({
   }, [resolvedWeeklyJobsPosted]);
 
   useEffect(() => {
-    let cancelled = false;
-    void fetchSeoLandingPages({ minCount: 5, maxSlugs: 150 })
-      .then((seo) => {
-        if (cancelled) return;
-        const next = seo.data
-          .map((e) => normalizeRelatedSlugPath(e.slug).replace(/^\/jobs\/?/, ""))
-          .filter(Boolean)
-          .slice(0, 8);
-        if (next.length > 0) setResolvedRelatedSlugs(next);
-      })
-      .catch(() => {
-        /* non-critical */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
     const tick = () => {
       if (typeof window === "undefined") return;
       setExtensionPresent(window.__JOBSEEK_EXTENSION__ === true);
@@ -495,6 +476,35 @@ export function JobsSearchClient({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    let cancelled = false;
+    const normalizedCurrent =
+      pathname === "/jobs" || pathname === "/jobs/"
+        ? ""
+        : normalizeRelatedSlugPath(pathname).replace(/^\/jobs\/?/, "").replace(/\/$/, "");
+    void fetchSeoLandingPages({ minCount: 5, maxSlugs: 80 })
+      .then((seo) => {
+        if (cancelled) return;
+        const next = (seo.data ?? [])
+          .map((e) => ({
+            slug: normalizeRelatedSlugPath(e.slug).replace(/^\/jobs\/?/, "").replace(/\/$/, ""),
+            count: e.count,
+          }))
+          .filter((e) => e.slug && e.slug !== normalizedCurrent)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 8)
+          .map((e) => e.slug);
+        if (next.length > 0) setResolvedRelatedSlugs(next);
+      })
+      .catch(() => {
+        /* non-critical */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
+
   const urlKey = searchParams.toString();
   const urlFilters = useMemo(
     () => parseJobFiltersFromSearch(Object.fromEntries(searchParams.entries())),

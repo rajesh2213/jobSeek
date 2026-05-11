@@ -2,8 +2,10 @@ import { fetchSeoLandingPages } from "./api";
 import { normalizeRelatedSlugPath } from "./slug-parser";
 
 /**
- * Related search links for jobs listing footers. Runs in parallel with `GET /jobs` on the page.
- * Caps SEO payload size so the API responds quickly.
+ * Related search links for jobs listing footers (optional SSR helper).
+ *
+ * Avoid awaiting this on hot App Router paths: `/seo/landing-pages` can take tens of seconds
+ * under load. `JobsSearchClient` already loads related slugs after paint via `fetchSeoLandingPages`.
  */
 export async function fetchJobsRelatedSlugs(opts: {
   currentSlug: string;

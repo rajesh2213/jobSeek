@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { loadJobsDiscoveryPage, stableJobFiltersKey } from "../../../../lib/jobsPageData";
-import { fetchJobsRelatedSlugs } from "../../../../lib/jobsRelatedSlugs";
 import {
   buildJobDiscoveryCrumbItems,
   buildBreadcrumbListJsonLd,
@@ -17,7 +16,6 @@ import {
   normalizeRelatedSlugPath,
   parseJobFiltersFromSearch,
   parseSlugWithMeta,
-  filtersToSlug,
 } from "../../../../lib/slug-parser";
 import { JsonLdScript } from "../../../../components/seo/JsonLdScript";
 import { JobsListingFaq } from "../../../../components/seo/JobsListingFaq";
@@ -73,24 +71,15 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
     redirect(canonicalPath);
   }
   const filtersKey = stableJobFiltersKey(filters);
-  const currentSlug = filtersToSlug({
-    category: filters.category,
-    role: filters.role,
-    skills: filters.skills,
-    country: filters.country,
-    location: filters.location,
-    isRemote: filters.isRemote,
-    workType: filters.workType,
-    experience: filters.experience,
-  });
-
-  const [response, relatedSlugsRaw] = await Promise.all([
-    loadJobsDiscoveryPage(filtersKey),
-    fetchJobsRelatedSlugs({ currentSlug, fallback: FALLBACK_RELATED_SLUGS }),
-  ]);
-  const relatedSlugs = relatedSlugsRaw
-    .map((s) => normalizeRelatedSlugPath(s).replace(/^\/jobs\/?/, ""))
-    .filter(Boolean);
+  /**
+   * Do not await `fetchSeoLandingPages` on the server for slug SEO routes: it fans out into the
+   * same expensive `/seo/landing-pages` work as the sitemap and can dominate TTFB (~30s+), while
+   * `JobsSearchClient` already hydrates related links from the same API after paint.
+   */
+  const response = await loadJobsDiscoveryPage(filtersKey);
+  const relatedSlugs = FALLBACK_RELATED_SLUGS.map((s) =>
+    normalizeRelatedSlugPath(s).replace(/^\/jobs\/?/, ""),
+  ).filter(Boolean);
 
   const total = response.meta?.total ?? 0;
   const policy = decideJobsListingSeoPolicy({
