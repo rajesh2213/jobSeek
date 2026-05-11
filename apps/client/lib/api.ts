@@ -906,6 +906,8 @@ export async function fetchSeoLandingPages(options?: {
     minCount: number;
     maxSlugs: number;
     count: number;
+    unauthorized?: boolean;
+    authHeaderSent?: boolean;
     rolesConsidered?: number;
     locationsConsidered?: number;
     experiencesConsidered?: number;
@@ -920,6 +922,7 @@ export async function fetchSeoLandingPages(options?: {
   const url = `${API_BASE_URL}/seo/landing-pages${qs ? `?${qs}` : ""}`;
   const headers = new Headers();
   const secret = (options?.internalSeoSecret ?? process.env.INTERNAL_SEO_SECRET)?.trim();
+  const authHeaderSent = Boolean(secret && typeof window === "undefined");
   if (secret && typeof window === "undefined") {
     headers.set("x-internal-seo", "true");
     headers.set("x-internal-seo-secret", secret);
@@ -929,7 +932,22 @@ export async function fetchSeoLandingPages(options?: {
     next: { revalidate: 300 },
   });
   if (res.status === 401) {
-    return { data: [], meta: { minCount: 0, maxSlugs: 0, count: 0 } };
+    console.warn("[seo] landing-pages unauthorized", {
+      apiBaseUrl: API_BASE_URL,
+      authHeaderSent,
+      minCount: options?.minCount ?? null,
+      maxSlugs: options?.maxSlugs ?? null,
+    });
+    return {
+      data: [],
+      meta: {
+        minCount: options?.minCount ?? 0,
+        maxSlugs: options?.maxSlugs ?? 0,
+        count: 0,
+        unauthorized: true,
+        authHeaderSent,
+      },
+    };
   }
   if (!res.ok) {
     throw new Error(`fetchSeoLandingPages: ${res.status}`);

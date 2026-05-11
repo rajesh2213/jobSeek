@@ -43,6 +43,12 @@ const MAX_JOB_SITEMAP_PAGES = parseBoundedIntEnv(
   1,
   5000,
 );
+const JOBS_FETCH_LIMIT = parseBoundedIntEnv(
+  process.env.SEO_SITEMAP_JOB_FETCH_LIMIT,
+  100,
+  1,
+  100,
+);
 const MAX_COMPANY_SITEMAP_PAGES = parseBoundedIntEnv(
   process.env.SEO_SITEMAP_MAX_COMPANY_PAGES,
   100,
@@ -67,6 +73,7 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
   const base = getSiteBaseUrl();
   const now = new Date();
   const internalSeoSecret = process.env.INTERNAL_SEO_SECRET ?? null;
+  const internalSeoSecretPresent = Boolean(internalSeoSecret?.trim());
   const sitemapPruningEnabled = process.env.SEO_SITEMAP_PRUNING_ENABLED === "true";
   const companyGateEnabled = process.env.SEO_COMPANY_QUALITY_GATE_ENABLED === "true";
   const forceNoindexAll = process.env.SEO_FORCE_NOINDEX_ALL === "true";
@@ -95,6 +102,14 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
   let landingDurationMs = 0;
   let landingEstimatedCountQueries = 0;
   let landingEstimatedTotalQueries = 0;
+  const sections = {
+    landing: { ok: true, error: null as string | null, unauthorized: false },
+    jobs: { ok: true, error: null as string | null },
+    companies: { ok: true, error: null as string | null },
+  };
+  if (!internalSeoSecretPresent) {
+    console.warn("[sitemap] missing INTERNAL_SEO_SECRET in runtime");
+  }
   try {
     const landingStartedAt = Date.now();
     const res = await fetchSeoLandingPages({
@@ -104,6 +119,11 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
     });
     landingEstimatedCountQueries = res.meta?.estimatedCountQueries ?? 0;
     landingEstimatedTotalQueries = res.meta?.estimatedTotalQueries ?? 0;
+    sections.landing.unauthorized = res.meta?.unauthorized === true;
+    if (sections.landing.unauthorized) {
+      sections.landing.ok = false;
+      sections.landing.error = "landing_unauthorized";
+    }
     for (const e of res.data) {
       const normalized = normalizeRelatedSlugPath(e.slug);
       if (normalized === "/jobs" || seen.has(normalized)) continue;
@@ -129,8 +149,10 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
       });
     }
     landingDurationMs = Date.now() - landingStartedAt;
-  } catch {
-    /* sitemap still useful without programmatic slugs */
+  } catch (err) {
+    sections.landing.ok = false;
+    sections.landing.error = err instanceof Error ? err.message : "landing_fetch_failed";
+    console.warn("[sitemap] landing section failed", { error: sections.landing.error });
   }
 
   const jobEntries: MetadataRoute.Sitemap = [];
@@ -138,7 +160,7 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
   try {
     const jobsStartedAt = Date.now();
     let page = 1;
-    const limit = 1000;
+    const limit = JOBS_FETCH_LIMIT;
     for (;;) {
       const jobs = await fetchJobsForSitemap(page, limit);
       for (const job of jobs.data) {
@@ -164,8 +186,10 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
       if (page > MAX_JOB_SITEMAP_PAGES) break;
     }
     jobsDurationMs = Date.now() - jobsStartedAt;
-  } catch {
-    /* ignore */
+  } catch (err) {
+    sections.jobs.ok = false;
+    sections.jobs.error = err instanceof Error ? err.message : "jobs_fetch_failed";
+    console.warn("[sitemap] jobs section failed", { error: sections.jobs.error });
   }
 
   const companyEntries: MetadataRoute.Sitemap = [];
@@ -202,8 +226,10 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
       if (page > MAX_COMPANY_SITEMAP_PAGES) break;
     }
     companiesDurationMs = Date.now() - companiesStartedAt;
-  } catch {
-    /* ignore */
+  } catch (err) {
+    sections.companies.ok = false;
+    sections.companies.error = err instanceof Error ? err.message : "companies_fetch_failed";
+    console.warn("[sitemap] companies section failed", { error: sections.companies.error });
   }
 
   const output = [...staticEntries, ...landing, ...companyEntries, ...jobEntries];
@@ -230,9 +256,12 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
     pruningEnabled: sitemapPruningEnabled,
     maxLandingSlugs: MAX_LANDING_SITEMAP_SLUGS,
     minLandingCount: LANDING_MIN_COUNT,
+    jobsFetchLimit: JOBS_FETCH_LIMIT,
     maxJobPages: MAX_JOB_SITEMAP_PAGES,
     maxCompanyPages: MAX_COMPANY_SITEMAP_PAGES,
     revalidateSeconds: SITEMAP_REVALIDATE_SECONDS,
+    internalSeoSecretPresent,
+    sections,
   });
   return output;
 }
