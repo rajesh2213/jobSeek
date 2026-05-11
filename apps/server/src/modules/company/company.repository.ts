@@ -9,8 +9,22 @@ import { slugifyCompanyName } from "../../utils/slugify.js";
 import { getDomainFromUrl, normalizeDomain } from "../../utils/common.js";
 import type { JobWithCompany } from "../job/job.repository.js";
 import { logger } from "../../utils/logger.js";
+import { computeCompanyQualityFlags } from "../../services/qualityFlags.service.js";
 
 const DEBUG_COMPANY_AGG = process.env.DEBUG_COMPANY_AGG === "1";
+const WORKDAY_ROOT_JOB_PATH_SNIPPET = "myworkdayjobs.com/job/";
+
+function publicVisibilityGuardEnabled(): boolean {
+  return process.env.PUBLIC_JOB_VISIBILITY_GUARD_ENABLED !== "0";
+}
+
+function publicVisibilityJobJoinGuardSql(): Prisma.Sql {
+  if (!publicVisibilityGuardEnabled()) return Prisma.empty;
+  return Prisma.sql`
+    AND j.description IS NOT NULL
+    AND j.description <> ''
+  `;
+}
 
 export interface CreateCompanyInput {
   name: string;
@@ -52,6 +66,25 @@ function listingOrderBy(sort: CompaniesListingSort): Prisma.Sql {
     default:
       return Prisma.sql`sub."jobCount" DESC, sub.name ASC`;
   }
+}
+
+function companyQualityData(input: {
+  name: string;
+  domain?: string | null;
+  atsType?: string | null;
+  atsBoardToken?: string | null;
+}): Record<string, boolean> {
+  const flags = computeCompanyQualityFlags({
+    name: input.name,
+    domain: input.domain ?? null,
+    atsType: input.atsType ?? null,
+    atsBoardToken: input.atsBoardToken ?? null,
+  });
+  return {
+    isPlaceholderCompany: flags.isPlaceholderCompany,
+    isCompanyVerified: flags.isCompanyVerified,
+    requiresCompanyRepair: flags.requiresCompanyRepair,
+  };
 }
 
 export function createCompanyRepository(prisma: PrismaClient) {
@@ -219,11 +252,28 @@ export function createCompanyRepository(prisma: PrismaClient) {
       companyId: string,
       options: { limit: number; offset: number },
     ): Promise<JobWithCompany[]> {
+      const whereGuard = publicVisibilityGuardEnabled()
+        ? {
+            description: { not: null as string | null },
+            NOT: {
+              OR: [
+                { description: "" },
+                {
+                  AND: [
+                    { source: "workday" },
+                    { sourceUrl: { contains: WORKDAY_ROOT_JOB_PATH_SNIPPET, mode: "insensitive" as const } },
+                  ],
+                },
+              ],
+            },
+          }
+        : {};
       const rows = await prisma.job.findMany({
         where: {
           companyId,
           canonicalJobId: null,
           status: "ready",
+          ...whereGuard,
         },
         include: {
           company: { select: { id: true, name: true, slug: true } },
@@ -239,11 +289,28 @@ export function createCompanyRepository(prisma: PrismaClient) {
     },
 
     async countCanonicalJobsByCompanyId(companyId: string): Promise<number> {
+      const whereGuard = publicVisibilityGuardEnabled()
+        ? {
+            description: { not: null as string | null },
+            NOT: {
+              OR: [
+                { description: "" },
+                {
+                  AND: [
+                    { source: "workday" },
+                    { sourceUrl: { contains: WORKDAY_ROOT_JOB_PATH_SNIPPET, mode: "insensitive" as const } },
+                  ],
+                },
+              ],
+            },
+          }
+        : {};
       return prisma.job.count({
         where: {
           companyId,
           canonicalJobId: null,
           status: "ready",
+          ...whereGuard,
         },
       });
     },
@@ -269,6 +336,10 @@ export function createCompanyRepository(prisma: PrismaClient) {
           name: trimmed,
           slug,
           domain: normalizedDomain,
+          ...companyQualityData({
+            name: trimmed,
+            domain: normalizedDomain,
+          }),
           status: CompanyStatus.raw,
           discoverySource: input.discoverySource,
         },
@@ -304,6 +375,12 @@ export function createCompanyRepository(prisma: PrismaClient) {
           careersUrl: input.careersUrl ?? null,
           atsBoardToken: input.atsBoardToken ?? null,
           atsType: input.atsType ?? null,
+          ...companyQualityData({
+            name: input.name.trim(),
+            domain: normalizedDomain,
+            atsType: input.atsType ?? null,
+            atsBoardToken: input.atsBoardToken ?? null,
+          }),
           status,
           discoverySource: input.discoverySource ?? "api_manual",
         },
@@ -320,15 +397,38 @@ export function createCompanyRepository(prisma: PrismaClient) {
         status?: CompanyStatus;
       },
     ): Promise<void> {
+      const current = await prisma.company.findUnique({
+        where: { id: companyId },
+        select: {
+          name: true,
+          domain: true,
+          atsType: true,
+          atsBoardToken: true,
+        },
+      });
+      if (!current) return;
+      const nextDomain = data.domain !== undefined ? data.domain : current.domain;
+      const nextAtsType = data.atsType !== undefined ? data.atsType : current.atsType;
+      const nextAtsBoardToken =
+        data.atsBoardToken !== undefined ? data.atsBoardToken : current.atsBoardToken;
       await prisma.company.update({
         where: { id: companyId },
-        data,
+        data: {
+          ...data,
+          ...companyQualityData({
+            name: current.name,
+            domain: nextDomain ?? null,
+            atsType: nextAtsType ?? null,
+            atsBoardToken: nextAtsBoardToken ?? null,
+          }),
+        },
       });
     },
 
     async countCompaniesListing(input: CompaniesListingInput): Promise<number> {
       const nameCond = nameSearchCondition(input.q);
       const havingSql = listingHavingClause(input.hiring, input.remote);
+      const visibilityGuard = publicVisibilityJobJoinGuardSql();
       const rows = await prisma.$queryRaw<[{ count: bigint }]>`
         SELECT COUNT(*)::bigint AS count
         FROM (
@@ -337,6 +437,7 @@ export function createCompanyRepository(prisma: PrismaClient) {
           LEFT JOIN "Job" j ON j."companyId" = c.id
             AND j."canonicalJobId" IS NULL
             AND (j."status" = 'ready' OR j."status" IS NULL)
+            ${visibilityGuard}
           WHERE 1 = 1
           ${nameCond}
           GROUP BY c.id
@@ -350,6 +451,7 @@ export function createCompanyRepository(prisma: PrismaClient) {
       const nameCond = nameSearchCondition(input.q);
       const havingSql = listingHavingClause(input.hiring, input.remote);
       const orderSql = listingOrderBy(input.sort);
+      const visibilityGuard = publicVisibilityJobJoinGuardSql();
       const limit = input.limit;
       const offset = input.offset;
       return prisma.$queryRaw<CompanyListingRow[]>`
@@ -370,6 +472,7 @@ export function createCompanyRepository(prisma: PrismaClient) {
           LEFT JOIN "Job" j ON j."companyId" = c.id
             AND j."canonicalJobId" IS NULL
             AND (j."status" = 'ready' OR j."status" IS NULL)
+            ${visibilityGuard}
           WHERE 1 = 1
           ${nameCond}
           GROUP BY c.id
@@ -393,6 +496,8 @@ export function createCompanyRepository(prisma: PrismaClient) {
           FROM "Job"
           WHERE "canonicalJobId" IS NULL
             AND "status" = 'ready'
+            AND description IS NOT NULL
+            AND description <> ''
             AND "lastSeenAt" >= ${weekAgo}
         `;
 

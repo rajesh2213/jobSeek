@@ -32,6 +32,37 @@ export interface MetricsSnapshot {
     failed_jobs_count: number;
     status_transition_total: Record<string, number>;
     jobs_blocked_not_ready_total: number;
+    public_visibility_guard: {
+      bad_workday_url: number;
+      empty_description: number;
+      empty_parsed: number;
+      by_source: Array<{
+        source: string;
+        bad_workday_url: number;
+        empty_description: number;
+        empty_parsed: number;
+      }>;
+      top_companies_bad_workday_url: Array<{
+        companyId: string;
+        companyName: string;
+        bad_workday_url: number;
+      }>;
+    };
+    quality_flags_shadow: {
+      compared_rows: number;
+      publishable_runtime_true: number;
+      publishable_flag_true: number;
+      mismatches_total: number;
+      false_positive_flag: number;
+      false_negative_flag: number;
+      by_source: Array<{
+        source: string;
+        compared_rows: number;
+        mismatches_total: number;
+        false_positive_flag: number;
+        false_negative_flag: number;
+      }>;
+    };
   };
   density: {
     avgJobsPerCompany: number;
@@ -113,6 +144,11 @@ export async function buildMetricsSnapshot(prisma: PrismaClient): Promise<Metric
     topCountRows,
     bottomCountRows,
     allCompanyJobCountRows,
+    guardBySourceRows,
+    guardTopBadWorkdayCompaniesRows,
+    guardTotalsRows,
+    qualityShadowTotalsRows,
+    qualityShadowBySourceRows,
   ] = await Promise.all([
     prisma.company.count(),
     prisma.company.count({ where: { domain: { not: null } } }),
@@ -145,7 +181,182 @@ export async function buildMetricsSnapshot(prisma: PrismaClient): Promise<Metric
       _count: { companyId: true },
       orderBy: { _count: { companyId: "asc" } },
     }),
+    prisma.$queryRaw<
+      Array<{
+        source: string;
+        bad_workday_url: bigint;
+        empty_description: bigint;
+        empty_parsed: bigint;
+      }>
+    >`
+      SELECT
+        j.source,
+        COUNT(*) FILTER (
+          WHERE j.source = 'workday'
+            AND LOWER(j."sourceUrl") LIKE '%myworkdayjobs.com/job/%'
+        )::bigint AS bad_workday_url,
+        COUNT(*) FILTER (
+          WHERE j.description IS NULL OR BTRIM(j.description) = ''
+        )::bigint AS empty_description,
+        COUNT(*) FILTER (
+          WHERE j."parsedDescription" IS NOT NULL
+            AND COALESCE(jsonb_array_length(j."parsedDescription"->'position'), 0) = 0
+            AND COALESCE(jsonb_array_length(j."parsedDescription"->'responsibility'), 0) = 0
+            AND COALESCE(jsonb_array_length(j."parsedDescription"->'requirement'), 0) = 0
+            AND COALESCE(jsonb_array_length(j."parsedDescription"->'experience'), 0) = 0
+            AND COALESCE(jsonb_array_length(j."parsedDescription"->'benefit'), 0) = 0
+            AND COALESCE(jsonb_array_length(j."parsedDescription"->'contact'), 0) = 0
+            AND COALESCE(jsonb_array_length(j."parsedDescription"->'other'), 0) = 0
+        )::bigint AS empty_parsed
+      FROM "Job" j
+      GROUP BY j.source
+      ORDER BY j.source ASC
+    `,
+    prisma.$queryRaw<
+      Array<{ companyId: string; companyName: string; bad_workday_url: bigint }>
+    >`
+      SELECT
+        c.id AS "companyId",
+        c.name AS "companyName",
+        COUNT(*)::bigint AS bad_workday_url
+      FROM "Job" j
+      JOIN "Company" c ON c.id = j."companyId"
+      WHERE j.source = 'workday'
+        AND LOWER(j."sourceUrl") LIKE '%myworkdayjobs.com/job/%'
+      GROUP BY c.id, c.name
+      ORDER BY bad_workday_url DESC
+      LIMIT 10
+    `,
+    prisma.$queryRaw<
+      Array<{ bad_workday_url: bigint; empty_description: bigint; empty_parsed: bigint }>
+    >`
+      SELECT
+        COUNT(*) FILTER (
+          WHERE j.source = 'workday'
+            AND LOWER(j."sourceUrl") LIKE '%myworkdayjobs.com/job/%'
+        )::bigint AS bad_workday_url,
+        COUNT(*) FILTER (
+          WHERE j.description IS NULL OR BTRIM(j.description) = ''
+        )::bigint AS empty_description,
+        COUNT(*) FILTER (
+          WHERE j."parsedDescription" IS NOT NULL
+            AND COALESCE(jsonb_array_length(j."parsedDescription"->'position'), 0) = 0
+            AND COALESCE(jsonb_array_length(j."parsedDescription"->'responsibility'), 0) = 0
+            AND COALESCE(jsonb_array_length(j."parsedDescription"->'requirement'), 0) = 0
+            AND COALESCE(jsonb_array_length(j."parsedDescription"->'experience'), 0) = 0
+            AND COALESCE(jsonb_array_length(j."parsedDescription"->'benefit'), 0) = 0
+            AND COALESCE(jsonb_array_length(j."parsedDescription"->'contact'), 0) = 0
+            AND COALESCE(jsonb_array_length(j."parsedDescription"->'other'), 0) = 0
+        )::bigint AS empty_parsed
+      FROM "Job" j
+    `,
+    prisma.$queryRaw<
+      Array<{
+        compared_rows: bigint;
+        publishable_runtime_true: bigint;
+        publishable_flag_true: bigint;
+        mismatches_total: bigint;
+        false_positive_flag: bigint;
+        false_negative_flag: bigint;
+      }>
+    >`
+      WITH eval AS (
+        SELECT
+          j.source,
+          j."isPublishable" AS flag_publishable,
+          (
+            j.description IS NOT NULL
+            AND BTRIM(j.description) <> ''
+            AND NOT (
+              j.source = 'workday'
+              AND LOWER(j."sourceUrl") LIKE '%myworkdayjobs.com/job/%'
+            )
+            AND (
+              j."parsedDescription" IS NULL
+              OR NOT (
+                COALESCE(jsonb_array_length(j."parsedDescription"->'position'), 0) = 0
+                AND COALESCE(jsonb_array_length(j."parsedDescription"->'responsibility'), 0) = 0
+                AND COALESCE(jsonb_array_length(j."parsedDescription"->'requirement'), 0) = 0
+                AND COALESCE(jsonb_array_length(j."parsedDescription"->'experience'), 0) = 0
+                AND COALESCE(jsonb_array_length(j."parsedDescription"->'benefit'), 0) = 0
+                AND COALESCE(jsonb_array_length(j."parsedDescription"->'contact'), 0) = 0
+                AND COALESCE(jsonb_array_length(j."parsedDescription"->'other'), 0) = 0
+              )
+            )
+          ) AS runtime_publishable
+        FROM "Job" j
+        WHERE j."isPublishable" IS NOT NULL
+      )
+      SELECT
+        COUNT(*)::bigint AS compared_rows,
+        COUNT(*) FILTER (WHERE runtime_publishable)::bigint AS publishable_runtime_true,
+        COUNT(*) FILTER (WHERE flag_publishable = true)::bigint AS publishable_flag_true,
+        COUNT(*) FILTER (WHERE flag_publishable IS DISTINCT FROM runtime_publishable)::bigint AS mismatches_total,
+        COUNT(*) FILTER (WHERE flag_publishable = true AND runtime_publishable = false)::bigint AS false_positive_flag,
+        COUNT(*) FILTER (WHERE flag_publishable = false AND runtime_publishable = true)::bigint AS false_negative_flag
+      FROM eval
+    `,
+    prisma.$queryRaw<
+      Array<{
+        source: string;
+        compared_rows: bigint;
+        mismatches_total: bigint;
+        false_positive_flag: bigint;
+        false_negative_flag: bigint;
+      }>
+    >`
+      WITH eval AS (
+        SELECT
+          j.source,
+          j."isPublishable" AS flag_publishable,
+          (
+            j.description IS NOT NULL
+            AND BTRIM(j.description) <> ''
+            AND NOT (
+              j.source = 'workday'
+              AND LOWER(j."sourceUrl") LIKE '%myworkdayjobs.com/job/%'
+            )
+            AND (
+              j."parsedDescription" IS NULL
+              OR NOT (
+                COALESCE(jsonb_array_length(j."parsedDescription"->'position'), 0) = 0
+                AND COALESCE(jsonb_array_length(j."parsedDescription"->'responsibility'), 0) = 0
+                AND COALESCE(jsonb_array_length(j."parsedDescription"->'requirement'), 0) = 0
+                AND COALESCE(jsonb_array_length(j."parsedDescription"->'experience'), 0) = 0
+                AND COALESCE(jsonb_array_length(j."parsedDescription"->'benefit'), 0) = 0
+                AND COALESCE(jsonb_array_length(j."parsedDescription"->'contact'), 0) = 0
+                AND COALESCE(jsonb_array_length(j."parsedDescription"->'other'), 0) = 0
+              )
+            )
+          ) AS runtime_publishable
+        FROM "Job" j
+        WHERE j."isPublishable" IS NOT NULL
+      )
+      SELECT
+        source,
+        COUNT(*)::bigint AS compared_rows,
+        COUNT(*) FILTER (WHERE flag_publishable IS DISTINCT FROM runtime_publishable)::bigint AS mismatches_total,
+        COUNT(*) FILTER (WHERE flag_publishable = true AND runtime_publishable = false)::bigint AS false_positive_flag,
+        COUNT(*) FILTER (WHERE flag_publishable = false AND runtime_publishable = true)::bigint AS false_negative_flag
+      FROM eval
+      GROUP BY source
+      ORDER BY mismatches_total DESC, compared_rows DESC
+    `,
   ]);
+
+  const guardTotals = guardTotalsRows[0] ?? {
+    bad_workday_url: BigInt(0),
+    empty_description: BigInt(0),
+    empty_parsed: BigInt(0),
+  };
+  const qualityShadowTotals = qualityShadowTotalsRows[0] ?? {
+    compared_rows: BigInt(0),
+    publishable_runtime_true: BigInt(0),
+    publishable_flag_true: BigInt(0),
+    mismatches_total: BigInt(0),
+    false_positive_flag: BigInt(0),
+    false_negative_flag: BigInt(0),
+  };
 
   const companiesCreatedFromDataset = totalCompanies - companiesCreatedFromJobs;
   const avgJobsPerCompany = totalCompanies ? Number((totalJobs / totalCompanies).toFixed(2)) : 0;
@@ -188,6 +399,37 @@ export async function buildMetricsSnapshot(prisma: PrismaClient): Promise<Metric
       failed_jobs_count: failedJobsCount,
       status_transition_total: getStatusTransitionTotals(),
       jobs_blocked_not_ready_total: getJobsBlockedNotReadyTotal(),
+      public_visibility_guard: {
+        bad_workday_url: Number(guardTotals.bad_workday_url),
+        empty_description: Number(guardTotals.empty_description),
+        empty_parsed: Number(guardTotals.empty_parsed),
+        by_source: guardBySourceRows.map((r) => ({
+          source: r.source,
+          bad_workday_url: Number(r.bad_workday_url),
+          empty_description: Number(r.empty_description),
+          empty_parsed: Number(r.empty_parsed),
+        })),
+        top_companies_bad_workday_url: guardTopBadWorkdayCompaniesRows.map((r) => ({
+          companyId: r.companyId,
+          companyName: r.companyName,
+          bad_workday_url: Number(r.bad_workday_url),
+        })),
+      },
+      quality_flags_shadow: {
+        compared_rows: Number(qualityShadowTotals.compared_rows),
+        publishable_runtime_true: Number(qualityShadowTotals.publishable_runtime_true),
+        publishable_flag_true: Number(qualityShadowTotals.publishable_flag_true),
+        mismatches_total: Number(qualityShadowTotals.mismatches_total),
+        false_positive_flag: Number(qualityShadowTotals.false_positive_flag),
+        false_negative_flag: Number(qualityShadowTotals.false_negative_flag),
+        by_source: qualityShadowBySourceRows.map((r) => ({
+          source: r.source,
+          compared_rows: Number(r.compared_rows),
+          mismatches_total: Number(r.mismatches_total),
+          false_positive_flag: Number(r.false_positive_flag),
+          false_negative_flag: Number(r.false_negative_flag),
+        })),
+      },
     },
     density: {
       avgJobsPerCompany,

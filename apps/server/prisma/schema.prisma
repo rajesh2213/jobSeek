@@ -59,6 +59,9 @@ model Company {
   name                String
   slug                String                @unique
   domain              String?               @unique
+  isPlaceholderCompany Boolean?
+  isCompanyVerified    Boolean?
+  requiresCompanyRepair Boolean?
   logoUrl             String?
   careersUrl          String?
   atsBoardToken       String?
@@ -129,8 +132,13 @@ model Job {
   experienceLevel    String?
   category           String    @default("other")
   description        String?   @db.Text
+  hasNonemptyDescription Boolean?
   /// AI / ML structured parse of description (line buckets). Null until worker or backfill runs.
   parsedDescription  Json?
+  hasUsableParsed    Boolean?
+  hasValidWorkdayUrlShape Boolean?
+  isPublishable      Boolean?
+  requiresRepair     Boolean?
   /// Rule-based signals from parsedDescription (tech stack, salary text, remote hints).
   enriched           Json?
   /// Visibility lifecycle: processing -> ready -> failed.

@@ -23,12 +23,14 @@ import {
   LISTING_EXCLUDED_ROLE_SLUGS,
   ROLE_SUGGEST_EXTRA_EXCLUDED,
 } from "./jobListing.constants.js";
+import { computeJobQualityFlags } from "../../services/qualityFlags.service.js";
 
 export type JobStatus = "processing" | "ready" | "failed";
 
 const JOB_STATUS_PROCESSING: JobStatus = "processing";
 const JOB_STATUS_READY: JobStatus = "ready";
 const JOB_STATUS_FAILED: JobStatus = "failed";
+const WORKDAY_ROOT_JOB_PATH_SNIPPET = "myworkdayjobs.com/job/";
 
 function maxMergedSkills(): number {
   const n = Number(process.env.MAX_MERGED_SKILLS ?? "60");
@@ -71,6 +73,34 @@ function mergeJobSkillsList(taxonomySkills: string[], techStack: string[], max: 
 function safeApplyUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   return isValidJobUrl(url) ? url : null;
+}
+
+function jobQualityData(input: {
+  source: string;
+  sourceUrl: string;
+  description: string | null | undefined;
+  parsedDescription?: unknown;
+}): Pick<
+  Prisma.JobUncheckedCreateInput,
+  | "hasNonemptyDescription"
+  | "hasUsableParsed"
+  | "hasValidWorkdayUrlShape"
+  | "isPublishable"
+  | "requiresRepair"
+> {
+  const flags = computeJobQualityFlags({
+    source: input.source,
+    sourceUrl: input.sourceUrl,
+    description: input.description,
+    parsedDescription: input.parsedDescription ?? null,
+  });
+  return {
+    hasNonemptyDescription: flags.hasNonemptyDescription,
+    hasUsableParsed: flags.hasUsableParsed,
+    hasValidWorkdayUrlShape: flags.hasValidWorkdayUrlShape,
+    isPublishable: flags.isPublishable,
+    requiresRepair: flags.requiresRepair,
+  };
 }
 
 const PARSED_DESCRIPTION_SCORE_KEYS = [
@@ -224,6 +254,55 @@ function readyStatusSql(includeProcessing?: boolean): Prisma.Sql | null {
   return Prisma.sql`(j."status" = ${JOB_STATUS_READY} OR j."status" IS NULL)`;
 }
 
+function publicVisibilityGuardEnabled(): boolean {
+  return process.env.PUBLIC_JOB_VISIBILITY_GUARD_ENABLED !== "0";
+}
+
+/**
+ * Public-only quality gate to hide known-bad listings while preserving raw DB rows for repair.
+ * Keeps ingestion/canonicalization untouched and is reversible via env flag.
+ */
+function discoveryVisibilityQualityWhere(): Prisma.JobWhereInput {
+  return {
+    AND: [
+      { description: { not: null } },
+      { NOT: { description: "" } },
+      {
+        NOT: {
+          AND: [
+            { source: "workday" },
+            { sourceUrl: { contains: WORKDAY_ROOT_JOB_PATH_SNIPPET, mode: "insensitive" } },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+/** SQL equivalent of {@link discoveryVisibilityQualityWhere}. */
+function discoveryVisibilityQualitySql(): Prisma.Sql {
+  return Prisma.sql`(
+    j.description IS NOT NULL
+    AND BTRIM(j.description) <> ''
+    AND NOT (
+      j.source = 'workday'
+      AND LOWER(j."sourceUrl") LIKE ${`%${WORKDAY_ROOT_JOB_PATH_SNIPPET}%`}
+    )
+    AND (
+      j."parsedDescription" IS NULL
+      OR NOT (
+        COALESCE(jsonb_array_length(j."parsedDescription"->'position'), 0) = 0
+        AND COALESCE(jsonb_array_length(j."parsedDescription"->'responsibility'), 0) = 0
+        AND COALESCE(jsonb_array_length(j."parsedDescription"->'requirement'), 0) = 0
+        AND COALESCE(jsonb_array_length(j."parsedDescription"->'experience'), 0) = 0
+        AND COALESCE(jsonb_array_length(j."parsedDescription"->'benefit'), 0) = 0
+        AND COALESCE(jsonb_array_length(j."parsedDescription"->'contact'), 0) = 0
+        AND COALESCE(jsonb_array_length(j."parsedDescription"->'other'), 0) = 0
+      )
+    )
+  )`;
+}
+
 /** Match stored country when legacy `country` was populated before `locationCountry`. */
 function whereResolvedCountryIn(codes: string[]): Prisma.JobWhereInput {
   return {
@@ -324,6 +403,9 @@ export function buildDiscoveryWhere(
   ];
   const statusFilter = readyStatusWhere(includeProcessing);
   if (statusFilter) and.push(statusFilter);
+  if (publicVisibilityGuardEnabled()) {
+    and.push(discoveryVisibilityQualityWhere());
+  }
 
   if (!filters) return { AND: and };
 
@@ -452,6 +534,9 @@ export function buildDiscoveryWhereSql(
   ];
   const statusFilter = readyStatusSql(includeProcessing);
   if (statusFilter) parts.push(statusFilter);
+  if (publicVisibilityGuardEnabled()) {
+    parts.push(discoveryVisibilityQualitySql());
+  }
 
   if (!filters) {
     return Prisma.join(parts, " AND ");
@@ -734,6 +819,11 @@ export function createJobRepository(prisma: PrismaClient) {
       description: input.description ?? null,
       source: input.source,
       sourceUrl: input.sourceUrl,
+      ...jobQualityData({
+        source: input.source,
+        sourceUrl: input.sourceUrl,
+        description: input.description ?? null,
+      }),
       applyUrl: safeApplyUrl(input.applyUrl),
       postedAt: input.postedAt ?? null,
       effectivePostedAt: deriveEffectivePostedAt(input.postedAt ?? null, createdAt),
@@ -1162,6 +1252,11 @@ export function createJobRepository(prisma: PrismaClient) {
             lastSeenAt: seenAt,
           }),
           isActive: true,
+          ...jobQualityData({
+            source: input.source,
+            sourceUrl: input.sourceUrl,
+            description: input.description ?? null,
+          }),
         } as Prisma.JobUpdateInput,
         create: {
           ...buildBaseJobData(input),
@@ -1276,7 +1371,12 @@ export function createJobRepository(prisma: PrismaClient) {
     ): Promise<void> {
       const row = await prisma.job.findUnique({
         where: { id },
-        select: { createdAt: true },
+        select: {
+          createdAt: true,
+          source: true,
+          sourceUrl: true,
+          parsedDescription: true,
+        },
       });
       if (!row) return;
       await prisma.job.update({
@@ -1289,6 +1389,12 @@ export function createJobRepository(prisma: PrismaClient) {
           isRemote: data.isRemote,
           postedAt: data.postedAt,
           effectivePostedAt: deriveEffectivePostedAt(data.postedAt, row.createdAt),
+          ...jobQualityData({
+            source: row.source,
+            sourceUrl: row.sourceUrl,
+            description: data.description,
+            parsedDescription: row.parsedDescription,
+          }),
         },
       });
     },
@@ -1342,6 +1448,12 @@ export function createJobRepository(prisma: PrismaClient) {
           skills: data.skills,
           salaryMin: data.salaryMin,
           effectivePostedAt: deriveEffectivePostedAt(data.postedAt, row.createdAt),
+          ...jobQualityData({
+            source: data.source,
+            sourceUrl: row.sourceUrl,
+            description: data.description,
+            parsedDescription: row.parsedDescription,
+          }),
         },
       });
     },
@@ -1627,7 +1739,14 @@ export function createJobRepository(prisma: PrismaClient) {
     ): Promise<void> {
       const existing = await prisma.job.findUnique({
         where: { id },
-        select: { parsedDescription: true, enriched: true, skills: true },
+        select: {
+          parsedDescription: true,
+          enriched: true,
+          skills: true,
+          source: true,
+          sourceUrl: true,
+          description: true,
+        },
       });
       if (!existing) {
         logger.warn(
@@ -1685,6 +1804,12 @@ export function createJobRepository(prisma: PrismaClient) {
           parsedDescription: finalParsed as Prisma.InputJsonValue,
           enriched: mergedEnriched as Prisma.InputJsonValue,
           skills: mergedSkills,
+          ...jobQualityData({
+            source: existing.source,
+            sourceUrl: existing.sourceUrl,
+            description: existing.description,
+            parsedDescription: finalParsed,
+          }),
         },
       });
       await this.promoteJobToReadyIfParsedDescription(id, "parsed_description_present");
