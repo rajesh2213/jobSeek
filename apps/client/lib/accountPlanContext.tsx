@@ -10,7 +10,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { fetchAccountSummary, fetchBillingStatus, type AccountSummary } from "./api";
+import {
+  fetchAccountSummary,
+  fetchBillingStatus,
+  type AccountSummary,
+  type ResumeMatchAiQuotaState,
+} from "./api";
 import { isBillingSubscriptionEntitled } from "./billingEntitlement";
 import { isPro as planIsPro } from "./planLimits";
 
@@ -21,6 +26,8 @@ export interface AccountPlanContextValue {
   isPro: boolean;
   isLoaded: boolean;
   pendingUpgrade: boolean;
+  /** Free-tier AI resume match quota from `/account/summary`; null when Pro or unavailable. */
+  resumeMatchAi: ResumeMatchAiQuotaState | null;
   refresh: () => Promise<AccountSummary | null>;
   markPendingUpgrade: () => void;
   clearPendingUpgrade: () => void;
@@ -134,11 +141,13 @@ export function AccountPlanProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AccountPlanContextValue>(() => {
     const plan = summary?.plan ?? "free";
+    const pro = planIsPro(plan);
     return {
       plan,
-      isPro: planIsPro(plan),
+      isPro: pro,
       isLoaded: authLoaded && loaded,
       pendingUpgrade,
+      resumeMatchAi: pro ? null : (summary?.resumeMatchAi ?? null),
       refresh,
       markPendingUpgrade,
       clearPendingUpgrade,

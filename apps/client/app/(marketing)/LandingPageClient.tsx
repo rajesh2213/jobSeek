@@ -21,7 +21,7 @@ import {
 } from "../../components/layout/railInset";
 import { HERO_JOB_INDEX_TOTAL, SHOW_LANDING_TESTIMONIALS } from "../../lib/landingPublic";
 import { PRO_ANNUAL_USD_PER_MONTH } from "../../lib/pricingDisplay";
-import { FREE_DAILY_JOBS } from "../../lib/planLimits";
+import { FREE_DAILY_JOBS, FREE_RESUME_MATCH_AI_PER_24H } from "../../lib/planLimits";
 
 const sectionReveal = {
   initial: { opacity: 0, y: 20 },
@@ -605,7 +605,7 @@ function PricingSection() {
             <p className="mt-1 text-4xl font-bold">$0</p>
             <ul className="mt-3 space-y-1.5 text-sm text-ink/75">
               <li>- Explore jobs - {FREE_DAILY_JOBS} jobs per day (midnight UTC)</li>
-              <li className="text-ink/45">x No AI resume match</li>
+              <li>- AI resume match — overall score ({FREE_RESUME_MATCH_AI_PER_24H} free per rolling 24h)</li>
               <li className="text-ink/45">x No Smart Apply</li>
               <li className="text-ink/45">x No email job alerts</li>
             </ul>
@@ -629,7 +629,7 @@ function PricingSection() {
             </p>
             <ul className="mt-3 space-y-1.5 text-sm text-ink/80">
               <li>- Unlimited jobs browsing</li>
-              <li>- AI resume match (score + gaps)</li>
+              <li>- Unlimited AI resume match + full gap breakdown</li>
               <li>- Smart Apply</li>
               <li>- Email job alerts on saved searches</li>
             </ul>

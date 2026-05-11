@@ -212,11 +212,20 @@ export type JobDetailFetchResult = {
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? "http://localhost:3000";
 
+/** Free-tier AI resume–job match quota (rolling ~24h, server Redis). Null for Pro or when unavailable. */
+export interface ResumeMatchAiQuotaState {
+  limit: number;
+  used: number;
+  remaining: number;
+  resetAt: string;
+}
+
 export interface AccountSummary {
   plan: "free" | "pro";
   jobViewsToday: number;
   jobViewsLimit: number | null;
   resetAt: string;
+  resumeMatchAi?: ResumeMatchAiQuotaState | null;
 }
 
 /** Response from `GET /api/user/me` (proxies Fastify `/account/summary`). */
@@ -254,12 +263,15 @@ export interface SavedSearchListResponse {
 export class ApiRequestError extends Error {
   status: number;
   code?: string;
+  /** Populated for HTTP 429 + `RESUME_MATCH_AI_QUOTA_EXCEEDED` from semantic-match. */
+  resumeMatchAiQuota?: ResumeMatchAiQuotaState;
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(message: string, status: number, code?: string, resumeMatchAiQuota?: ResumeMatchAiQuotaState) {
     super(message);
     this.name = "ApiRequestError";
     this.status = status;
     this.code = code;
+    this.resumeMatchAiQuota = resumeMatchAiQuota;
   }
 }
 
@@ -1228,6 +1240,17 @@ export async function fetchJobById(
 
 export type SemanticMatchMap = Record<string, { bullet: string; similarity: number }>;
 
+export interface ResumeSemanticMatchMeta {
+  tier: "free" | "pro";
+  breakdownAllowed: boolean;
+  quota: ResumeMatchAiQuotaState | null;
+}
+
+export interface ResumeSemanticMatchResponse {
+  matches: SemanticMatchMap;
+  matchMeta: ResumeSemanticMatchMeta;
+}
+
 export interface ApplicationJobSummary {
   id: string;
   title: string;
@@ -1395,7 +1418,7 @@ export async function deleteApplication(token: string, id: string): Promise<void
 export async function fetchResumeSemanticMatch(
   token: string,
   body: { keywords: string[]; bullets: string[] },
-): Promise<SemanticMatchMap> {
+): Promise<ResumeSemanticMatchResponse> {
   const t = token.trim();
   if (!t) throw new ApiRequestError("Unauthorized", 401, "UNAUTHORIZED");
 
@@ -1414,14 +1437,44 @@ export async function fetchResumeSemanticMatch(
       error?: string;
       message?: string;
       code?: string;
+      limit?: number;
+      used?: number;
+      remaining?: number;
+      resetAt?: string;
     };
+    const quota =
+      res.status === 429 &&
+      errBody.code === "RESUME_MATCH_AI_QUOTA_EXCEEDED" &&
+      typeof errBody.limit === "number" &&
+      typeof errBody.used === "number" &&
+      typeof errBody.remaining === "number" &&
+      typeof errBody.resetAt === "string"
+        ? {
+            limit: errBody.limit,
+            used: errBody.used,
+            remaining: errBody.remaining,
+            resetAt: errBody.resetAt,
+          }
+        : undefined;
     throw new ApiRequestError(
       errBody.message ?? errBody.error ?? "Semantic match failed",
       res.status,
       errBody.code,
+      quota,
     );
   }
-  return (await res.json()) as SemanticMatchMap;
+  const json = (await res.json()) as ResumeSemanticMatchResponse | SemanticMatchMap;
+  if (json && typeof json === "object" && "matches" in json && "matchMeta" in json) {
+    return json as ResumeSemanticMatchResponse;
+  }
+  return {
+    matches: json as SemanticMatchMap,
+    matchMeta: {
+      tier: "pro",
+      breakdownAllowed: true,
+      quota: null,
+    },
+  };
 }
 
 export async function subscribeGrowthEmail(input: {

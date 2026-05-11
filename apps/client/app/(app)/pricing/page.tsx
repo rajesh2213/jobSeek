@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PricingPlansClient } from "../../../components/pricing/PricingPlansClient";
 import { FAQ } from "../../../components/pricing/pricingCopy";
-import { FREE_DAILY_JOBS, PLAN_LIMITS } from "../../../lib/planLimits";
+import { FREE_DAILY_JOBS, FREE_RESUME_MATCH_AI_PER_24H, PLAN_LIMITS } from "../../../lib/planLimits";
 
 export default function PricingPage() {
   return (
@@ -53,8 +53,10 @@ export default function PricingPage() {
                 </tr>
                 <tr className="border-b border-line">
                   <td className="px-4 py-3">AI resume match</td>
-                  <td className="px-4 py-3 text-ink-muted">—</td>
-                  <td className="px-4 py-3 font-medium text-ink">✓</td>
+                  <td className="px-4 py-3 text-ink-muted">
+                    Overall score · up to {FREE_RESUME_MATCH_AI_PER_24H} per rolling 24h
+                  </td>
+                  <td className="px-4 py-3 font-medium text-ink">Unlimited + full gap analysis</td>
                 </tr>
                 <tr className="border-b border-line">
                   <td className="px-4 py-3">Saved searches</td>
@@ -68,7 +70,10 @@ export default function PricingPage() {
                 </tr>
               </tbody>
             </table>
-            <p className="mt-3 text-center text-xs text-ink/55">Free limits reset at midnight UTC.</p>
+            <p className="mt-3 text-center text-xs text-ink/55">
+              Job browse limits reset at midnight UTC. Free AI resume match uses a rolling 24-hour window (see Free
+              column).
+            </p>
           </div>
         </div>
 

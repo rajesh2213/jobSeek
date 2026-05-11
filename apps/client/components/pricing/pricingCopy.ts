@@ -1,4 +1,4 @@
-import { PLAN_LIMITS } from "../../lib/planLimits";
+import { FREE_RESUME_MATCH_AI_PER_24H, PLAN_LIMITS } from "../../lib/planLimits";
 
 export const CORAL = "#E8533A";
 export const CREAM_TINT =
@@ -6,7 +6,7 @@ export const CREAM_TINT =
 
 export const PRO_FEATURES = [
   "Unlimited job browsing (search, company pages, full job posts)",
-  "AI resume match — score, matched keywords, and gap analysis",
+  `Unlimited AI resume match — full score, matched keywords, and gap analysis (free tier: overall score + up to ${FREE_RESUME_MATCH_AI_PER_24H} AI matches per rolling 24h)`,
   "⚡ Smart Apply (Chrome extension) — unlimited auto-fill for standard ATS fields (name, contact, experience, etc.)",
   `AI-written answers for open-ended fields — up to ${PLAN_LIMITS.pro.smartApplyJobs} job applications per day (UTC); resets at midnight UTC (not a per-question cap)`,
   "Job alerts — email when new roles match a saved search (5 or 10 new jobs threshold · instant delivery)",
@@ -19,7 +19,7 @@ export const FAQ = [
   },
   {
     q: "What happens to my data if I downgrade?",
-    a: "Your saved searches and account stay intact. Free limits apply again for daily job views and resume scoring, but nothing is deleted just for downgrading.",
+    a: "Your saved searches and account stay intact. Free limits apply again for daily job views and AI resume match volume, but nothing is deleted just for downgrading.",
   },
   {
     q: "Is there a free trial?",

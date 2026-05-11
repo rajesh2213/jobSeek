@@ -2,8 +2,14 @@ import type { FastifyInstance } from "fastify";
 import { Prisma } from "@prisma/client";
 import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
 import { getResumeObjectStore } from "../../infrastructure/storage/resumeObjectStore.js";
-import { getPlanLimits } from "../../config/plans.js";
+import { getPlanLimits, isPro as planIsPro } from "../../config/plans.js";
+import { getIoredis } from "../../queues/job.queue.js";
 import { resolveProPlan } from "../../utils/userPlan.js";
+import {
+  peekFreeResumeMatchAiQuota,
+  releaseFreeResumeMatchAiReservation,
+  reserveFreeResumeMatchAiQuota,
+} from "../usageQuota/resumeMatchAiQuota.js";
 import { embedBullets, matchKeywordsToBullets } from "../../utils/resumeEmbedder.js";
 import {
   hashResumeText,
@@ -308,22 +314,20 @@ export function registerAccountResumeRoutes(server: FastifyInstance): void {
     }
 
     const { plan } = await resolveProPlan(server.prisma, ctx.internalUserId, ctx.email);
-    if (!getPlanLimits(plan).resumeScore) {
+    const limits = getPlanLimits(plan);
+    if (!limits.resumeScore) {
       return reply.status(403).send({
-        error: "Resume scoring requires Pro",
-        code: "PRO_REQUIRED",
+        error: "Resume scoring is not available on your plan",
+        code: "PLAN_BLOCKED",
       });
     }
 
+    const pro = planIsPro(plan);
     const body = request.body as { keywords?: string[]; bullets?: string[] };
     const keywords = body.keywords ?? [];
     const fallbackBullets = body.bullets ?? [];
 
     const out: Record<string, { bullet: string; similarity: number }> = {};
-
-    if (!keywords.length) {
-      return reply.send(out);
-    }
 
     const row = await server.prisma.user.findUnique({
       where: { id: ctx.internalUserId },
@@ -333,8 +337,80 @@ export function registerAccountResumeRoutes(server: FastifyInstance): void {
       },
     });
     const storedBullets = (row?.resumeBullets as string[] | null) ?? [];
-    let bullets = storedBullets.length > 0 ? storedBullets : fallbackBullets;
-    if (!bullets.length) return reply.send(out);
+    const bullets = storedBullets.length > 0 ? storedBullets : fallbackBullets;
+
+    const sendEmpty = async () => {
+      if (pro) {
+        return reply.send({
+          matches: out,
+          matchMeta: {
+            tier: "pro" as const,
+            breakdownAllowed: limits.resumeBreakdown,
+            quota: null,
+          },
+        });
+      }
+      try {
+        const redis = getIoredis();
+        const peek = await peekFreeResumeMatchAiQuota(redis, ctx.internalUserId);
+        return reply.send({
+          matches: out,
+          matchMeta: {
+            tier: "free" as const,
+            breakdownAllowed: limits.resumeBreakdown,
+            quota: {
+              limit: peek.limit,
+              used: peek.used,
+              remaining: peek.remaining,
+              resetAt: new Date(peek.resetAtMs).toISOString(),
+            },
+          },
+        });
+      } catch (err) {
+        server.log.error(
+          { event: "resume_match_ai_quota_redis_error", userId: ctx.internalUserId, err },
+          "resume_match_ai_quota_redis_error",
+        );
+        return reply.status(503).send({
+          error: "Service unavailable",
+          message: "Could not verify usage limits. Please try again shortly.",
+          code: "QUOTA_SERVICE_UNAVAILABLE",
+        });
+      }
+    };
+
+    if (!keywords.length || !bullets.length) {
+      return sendEmpty();
+    }
+
+    let reservedMemberId: string | null = null;
+    if (!pro) {
+      try {
+        const redis = getIoredis();
+        const resv = await reserveFreeResumeMatchAiQuota(redis, ctx.internalUserId);
+        if (!resv.ok) {
+          return reply.status(429).send({
+            error: "Free AI resume match limit reached for the last 24 hours.",
+            code: "RESUME_MATCH_AI_QUOTA_EXCEEDED",
+            limit: resv.limit,
+            used: resv.used,
+            remaining: 0,
+            resetAt: new Date(resv.resetAtMs).toISOString(),
+          });
+        }
+        reservedMemberId = resv.memberId;
+      } catch (err) {
+        server.log.error(
+          { event: "resume_match_ai_quota_redis_error", userId: ctx.internalUserId, err },
+          "resume_match_ai_quota_redis_error",
+        );
+        return reply.status(503).send({
+          error: "Service unavailable",
+          message: "Could not verify usage limits. Please try again shortly.",
+          code: "QUOTA_SERVICE_UNAVAILABLE",
+        });
+      }
+    }
 
     let embeddings = (row?.resumeBulletEmbeddings as number[][] | null) ?? [];
     const embeddingsValid =
@@ -342,22 +418,84 @@ export function registerAccountResumeRoutes(server: FastifyInstance): void {
       embeddings.length === bullets.length &&
       embeddings.every((v) => Array.isArray(v) && v.length > 0);
 
-    if (!embeddingsValid) {
-      // Backfill once for legacy rows to avoid per-request bullet re-embedding.
-      embeddings = await embedBullets(bullets);
-      if (storedBullets.length > 0 && embeddings.length === storedBullets.length) {
-        await server.prisma.user.update({
-          where: { id: ctx.internalUserId },
-          data: { resumeBulletEmbeddings: embeddings as unknown as Prisma.InputJsonValue },
-        });
+    try {
+      if (!embeddingsValid) {
+        embeddings = await embedBullets(bullets);
+        if (storedBullets.length > 0 && embeddings.length === storedBullets.length) {
+          await server.prisma.user.update({
+            where: { id: ctx.internalUserId },
+            data: { resumeBulletEmbeddings: embeddings as unknown as Prisma.InputJsonValue },
+          });
+        }
       }
+
+      const matches = await matchKeywordsToBullets(keywords, bullets, embeddings);
+      for (const [keyword, match] of Object.entries(matches)) {
+        out[keyword] = { bullet: match.bullet, similarity: match.similarity };
+      }
+    } catch (err) {
+      if (reservedMemberId) {
+        try {
+          const redis = getIoredis();
+          await releaseFreeResumeMatchAiReservation(redis, ctx.internalUserId, reservedMemberId);
+        } catch (releaseErr) {
+          server.log.warn(
+            {
+              event: "resume_match_ai_quota_release_failed",
+              userId: ctx.internalUserId,
+              err: releaseErr,
+            },
+            "resume_match_ai_quota_release_failed",
+          );
+        }
+      }
+      server.log.error(
+        { event: "resume_semantic_match_failed", userId: ctx.internalUserId, err },
+        "resume_semantic_match_failed",
+      );
+      return reply.status(503).send({
+        error: "Service unavailable",
+        message: "Embedding or match service unavailable",
+      });
     }
 
-    const matches = await matchKeywordsToBullets(keywords, bullets, embeddings);
-    for (const [keyword, match] of Object.entries(matches)) {
-      out[keyword] = { bullet: match.bullet, similarity: match.similarity };
+    if (!pro) {
+      server.log.info(
+        {
+          event: "resume_match_ai_consumed",
+          userId: ctx.internalUserId,
+          plan: "free",
+          keywordCount: keywords.length,
+        },
+        "smart_apply_event",
+      );
     }
 
-    return reply.send(out);
+    if (pro) {
+      return reply.send({
+        matches: out,
+        matchMeta: {
+          tier: "pro" as const,
+          breakdownAllowed: limits.resumeBreakdown,
+          quota: null,
+        },
+      });
+    }
+
+    const redis = getIoredis();
+    const peek = await peekFreeResumeMatchAiQuota(redis, ctx.internalUserId);
+    return reply.send({
+      matches: out,
+      matchMeta: {
+        tier: "free" as const,
+        breakdownAllowed: limits.resumeBreakdown,
+        quota: {
+          limit: peek.limit,
+          used: peek.used,
+          remaining: peek.remaining,
+          resetAt: new Date(peek.resetAtMs).toISOString(),
+        },
+      },
+    });
   });
 }

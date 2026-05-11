@@ -11,6 +11,8 @@ import {
 } from "../viewCap/viewCap.service.js";
 import { resolveProPlan } from "../../utils/userPlan.js";
 import { LIMITS } from "../../config/limits.js";
+import { getIoredis } from "../../queues/job.queue.js";
+import { peekFreeResumeMatchAiQuota } from "../usageQuota/resumeMatchAiQuota.js";
 
 export function registerAccountRoutes(server: FastifyInstance): void {
   registerAccountResumeRoutes(server);
@@ -46,11 +48,36 @@ export function registerAccountRoutes(server: FastifyInstance): void {
       entitlementResult: plan,
     });
 
+    let resumeMatchAi: {
+      limit: number;
+      used: number;
+      remaining: number;
+      resetAt: string;
+    } | null = null;
+    if (!pro) {
+      try {
+        const redis = getIoredis();
+        const peek = await peekFreeResumeMatchAiQuota(redis, ctx.internalUserId);
+        resumeMatchAi = {
+          limit: peek.limit,
+          used: peek.used,
+          remaining: peek.remaining,
+          resetAt: new Date(peek.resetAtMs).toISOString(),
+        };
+      } catch (err) {
+        server.log.warn(
+          { event: "account_summary_resume_match_quota_peek_failed", userId: ctx.internalUserId, err },
+          "account_summary_resume_match_quota_peek_failed",
+        );
+      }
+    }
+
     return reply.send({
       plan,
       jobViewsToday: row.jobViewsToday,
       jobViewsLimit: pro ? null : LIMITS.FREE_TIER_DAILY_LIMIT,
       resetAt: nextUtcMidnight().toISOString(),
+      resumeMatchAi,
     });
   });
 }

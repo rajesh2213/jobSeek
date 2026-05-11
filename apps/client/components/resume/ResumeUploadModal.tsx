@@ -1,6 +1,8 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import { useCallback, useRef, useState } from "react";
+import { trackResumeUploaded } from "../../lib/analytics/resumeMatchFunnel";
 import { useResume } from "../../lib/resumeContext";
 import { ResumeBodyPortal } from "./ResumeBodyPortal";
 
@@ -22,6 +24,7 @@ export function ResumeUploadModal({
   onClose: () => void;
   onUploadSuccess?: () => void;
 }) {
+  const { getToken } = useAuth();
   const { uploadResume, isUploading, uploadError } = useResume();
   const [file, setFile] = useState<File | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -76,6 +79,7 @@ export function ResumeUploadModal({
     try {
       await uploadResume(file);
       setSuccess(true);
+      void trackResumeUploaded({ getToken, source: "resume_upload_modal" });
       onUploadSuccess?.();
       onClose();
       setFile(null);
@@ -101,9 +105,9 @@ export function ResumeUploadModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="resume-upload-title" className="text-xl font-bold text-ink">
-          Score your resume match
+          Upload your resume
         </h2>
-        <p className="mt-1 text-sm text-ink-muted">Upload once, score every job</p>
+        <p className="mt-1 text-sm text-ink-muted">Upload once — get AI match scores on jobs (free tier limits apply)</p>
 
         <div
           className="mt-6 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-ink/20 bg-ink/[0.02] px-4 py-10 text-center transition-colors hover:border-brand/40 hover:bg-brand/[0.02]"

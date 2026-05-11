@@ -9,6 +9,12 @@ export const FREE_DAILY_JOBS = intFromEnv(
   75,
 );
 
+/** Free signed-in: AI resume–job semantic scores per rolling ~24h (must match server `FREE_RESUME_MATCH_AI_PER_24H`). */
+export const FREE_RESUME_MATCH_AI_PER_24H = intFromEnv(
+  process.env.NEXT_PUBLIC_FREE_RESUME_MATCH_AI_PER_24H,
+  3,
+);
+
 const _FREE_DISCOVERY_PREVIEW_ROWS = intFromEnv(
   process.env.NEXT_PUBLIC_FREE_DISCOVERY_PREVIEW_ROWS,
   10,

@@ -1206,7 +1206,7 @@ export function JobsSearchClient({
   }, []);
 
   const showSmartApplyInstallBanner =
-    isSignedIn && isPro && !extensionPresent && !smartApplyBannerDismissed;
+    isSignedIn && !extensionPresent && !smartApplyBannerDismissed;
 
   return (
     <div className="relative z-0 flex min-h-screen flex-col">
@@ -1239,9 +1239,10 @@ export function JobsSearchClient({
               ⚡
             </span>
             <div className="min-w-0 flex-1 basis-[min(100%,16rem)]">
-              <p className="text-base font-semibold text-ink sm:text-sm">Smart Apply is ready</p>
+              <p className="text-base font-semibold text-ink sm:text-sm">Smart Apply extension</p>
               <p className="m-0 text-sm text-[#666] sm:text-[13px]">
-                Install the Chrome extension to auto-fill job applications
+                Install the Chrome extension to speed up applications. Free accounts get standard auto-fill; Pro unlocks
+                full Smart Apply AI limits.
               </p>
             </div>
             <a

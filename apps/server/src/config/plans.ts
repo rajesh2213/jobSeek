@@ -5,7 +5,8 @@ export const PLAN_LIMITS = {
     dailyJobViews: LIMITS.FREE_TIER_DAILY_LIMIT,
     smartApplyJobs: 0,
     savedSearches: 3,
-    resumeScore: false,
+    /** Semantic match API allowed for free (volume capped via Redis quota; see resumeBreakdown). */
+    resumeScore: true,
     resumeBreakdown: false,
   },
   pro: {

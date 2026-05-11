@@ -5,9 +5,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { JobItem } from "../../lib/api";
-import type { ScoringResult, KeywordResult } from "../../lib/resumeScorer";
+import { trackResumeMatchUpgradeClick } from "../../lib/analytics/resumeMatchFunnel";
 import { resumeGradeLabel } from "../../lib/resumeGradeLabel";
-import { useAccountPlan } from "../../lib/useAccountPlan";
+import type { ScoringResult, KeywordResult } from "../../lib/resumeScorer";
 import { ResumeBodyPortal } from "./ResumeBodyPortal";
 
 function ScoreCircle({ score }: { score: number }) {
@@ -91,15 +91,17 @@ export function ResumeScorePanel({
   onClose,
   job,
   result,
+  breakdownAllowed,
   onReuploadResume,
 }: {
   open: boolean;
   onClose: () => void;
   job: JobItem;
   result: ScoringResult | null;
+  /** Pro (or entitled): full keyword-level breakdown and gap copy. */
+  breakdownAllowed: boolean;
   onReuploadResume: () => void;
 }) {
-  const { isPro } = useAccountPlan();
   const [toast, setToast] = useState<string | null>(null);
   const [toastMounted, setToastMounted] = useState(false);
 
@@ -126,7 +128,7 @@ export function ResumeScorePanel({
     (result?.matched.length ?? 0) + (result?.partial.length ?? 0);
 
   const copyMissing = useCallback(async () => {
-    if (!result || !isPro) return;
+    if (!result || !breakdownAllowed) return;
     const lines: string[] = [];
     lines.push(`Missing keywords for ${job.title} at ${job.company.name}:`);
     lines.push("");
@@ -141,7 +143,7 @@ export function ResumeScorePanel({
     } catch {
       setToast("Could not copy");
     }
-  }, [isPro, job.company.name, job.title, result]);
+  }, [breakdownAllowed, job.company.name, job.title, result]);
 
   const toastNode =
     toast && toastMounted && typeof document !== "undefined"
@@ -199,7 +201,7 @@ export function ResumeScorePanel({
                 <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-5 py-4">
                   {result ? (
                     <>
-                      <section className="flex flex-col gap-3">
+                      <section className="relative flex flex-col gap-3">
                         <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold leading-snug text-ink">
                           <span className="inline-flex items-center gap-2">
                             <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" aria-hidden />
@@ -207,30 +209,64 @@ export function ResumeScorePanel({
                           </span>
                           <span className="font-semibold text-ink-muted">({workingCount} matched)</span>
                         </h3>
-                        <div className="flex flex-wrap gap-1.5">
-                          {workingItems.matched.map((k) => (
-                            <WorkingChip
-                              key={`m-${k.keyword}`}
-                              variant="matched"
-                              title={k.foundIn ? `Found in: ${k.foundIn}` : undefined}
-                            >
-                              {k.keyword}
-                            </WorkingChip>
-                          ))}
-                          {workingItems.partial.map((k) => (
-                            <WorkingChip
-                              key={`p-${k.keyword}`}
-                              variant="partial"
-                              title={k.closestBullet ? `~ ${k.closestBullet}` : undefined}
-                            >
-                              {k.keyword}≈
-                            </WorkingChip>
-                          ))}
-                          {workingItems.matched.length === 0 &&
-                          workingItems.partial.length === 0 ? (
-                            <p className="text-sm text-ink-muted">No matches yet — keep tailoring.</p>
-                          ) : null}
-                        </div>
+                        {breakdownAllowed ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {workingItems.matched.map((k) => (
+                              <WorkingChip
+                                key={`m-${k.keyword}`}
+                                variant="matched"
+                                title={k.foundIn ? `Found in: ${k.foundIn}` : undefined}
+                              >
+                                {k.keyword}
+                              </WorkingChip>
+                            ))}
+                            {workingItems.partial.map((k) => (
+                              <WorkingChip
+                                key={`p-${k.keyword}`}
+                                variant="partial"
+                                title={k.closestBullet ? `~ ${k.closestBullet}` : undefined}
+                              >
+                                {k.keyword}≈
+                              </WorkingChip>
+                            ))}
+                            {workingItems.matched.length === 0 &&
+                            workingItems.partial.length === 0 ? (
+                              <p className="text-sm text-ink-muted">No matches yet — keep tailoring.</p>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <div className="relative overflow-hidden rounded-xl border border-ink/10 bg-ink/[0.02] p-4">
+                            <div className="pointer-events-none select-none blur-sm" aria-hidden>
+                              <div className="flex flex-wrap gap-1.5 opacity-60">
+                                {workingItems.matched.slice(0, 6).map((k) => (
+                                  <WorkingChip key={`blur-m-${k.keyword}`} variant="matched" title="">
+                                    {k.keyword}
+                                  </WorkingChip>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-surface via-surface/70 to-transparent" />
+                            <div className="relative z-10 flex flex-col gap-2 pt-2">
+                              <p className="text-sm font-semibold text-ink">Keyword-level fit is a Pro feature</p>
+                              <p className="text-sm text-ink-muted">
+                                Your overall score uses the same AI signals. Upgrade to see matched skills, partial
+                                matches, and line-level context.
+                              </p>
+                              <Link
+                                href="/pricing"
+                                onClick={() =>
+                                  trackResumeMatchUpgradeClick({
+                                    surface: "resume_score_panel_working",
+                                    jobId: job.id,
+                                  })
+                                }
+                                className="pointer-events-auto inline-flex w-fit items-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white no-underline hover:bg-brand-hover"
+                              >
+                                Upgrade to Pro →
+                              </Link>
+                            </div>
+                          </div>
+                        )}
                       </section>
 
                       <section className="flex flex-col gap-3 rounded-xl border border-red-500/15 bg-red-500/[0.06] p-4">
@@ -241,7 +277,7 @@ export function ResumeScorePanel({
                           </span>
                           <span className="font-semibold text-ink">({missingCount} missing)</span>
                         </h3>
-                        {isPro ? (
+                        {breakdownAllowed ? (
                           <div className="flex flex-wrap gap-1.5">
                             {result.missing.map((k) => (
                               <GapChip
@@ -255,13 +291,19 @@ export function ResumeScorePanel({
                         ) : (
                           <div className="flex flex-col gap-3">
                             <p className="text-sm font-semibold text-ink">
-                              {missingCount} {missingCount === 1 ? "gap" : "gaps"} found
+                              {missingCount} {missingCount === 1 ? "gap" : "gaps"} detected
                             </p>
                             <p className="text-sm leading-relaxed text-ink-muted">
-                              Upgrade to Pro to see missing keywords and suggested edits.
+                              Detailed gap analysis and AI-tailored recommendations are included with Pro.
                             </p>
                             <Link
                               href="/pricing"
+                              onClick={() =>
+                                trackResumeMatchUpgradeClick({
+                                  surface: "resume_score_panel_gaps",
+                                  jobId: job.id,
+                                })
+                              }
                               className="inline-flex w-fit items-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white no-underline hover:bg-brand-hover"
                             >
                               Upgrade to Pro →
@@ -275,7 +317,7 @@ export function ResumeScorePanel({
 
                 <div className="shrink-0 border-t border-ink/10 px-5 py-4">
                   <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:gap-3">
-                    {isPro && result && result.missing.length > 0 ? (
+                    {breakdownAllowed && result && result.missing.length > 0 ? (
                       <button
                         type="button"
                         onClick={() => void copyMissing()}

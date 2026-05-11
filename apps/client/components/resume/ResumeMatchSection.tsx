@@ -3,8 +3,13 @@
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { JobItem } from "../../lib/api";
-import { fetchResumeSemanticMatch } from "../../lib/api";
+import type { JobItem, ResumeMatchAiQuotaState, ResumeSemanticMatchMeta } from "../../lib/api";
+import { ApiRequestError, fetchResumeSemanticMatch } from "../../lib/api";
+import {
+  trackResumeFirstMatchViewedOnce,
+  trackResumeMatchQuotaHit,
+  trackResumeMatchUpgradeClick,
+} from "../../lib/analytics/resumeMatchFunnel";
 import { resumeMatchSubtitle } from "../../lib/resumeGradeLabel";
 import {
   extractJobKeywords,
@@ -15,6 +20,7 @@ import {
 import { extractJobSkills, jobSkillCanonicalsForSemantic } from "../../lib/skillExtractor";
 import { useResume } from "../../lib/resumeContext";
 import { useAccountPlan } from "../../lib/useAccountPlan";
+import { formatUserLocalResetForMessage } from "../../lib/userLocalResetTime";
 import { ResumeScorePanel } from "./ResumeScorePanel";
 import { ResumeUploadModal } from "./ResumeUploadModal";
 
@@ -50,18 +56,36 @@ function MiniRing({ score }: { score: number }) {
   );
 }
 
+function quotaHintLine(
+  isPro: boolean,
+  meta: ResumeSemanticMatchMeta | null,
+  resumeMatchAi: ResumeMatchAiQuotaState | null,
+): string | null {
+  if (isPro) return null;
+  const q = meta?.quota ?? resumeMatchAi;
+  if (!q) return null;
+  if (q.remaining <= 0) {
+    return `Free AI matches used — next slot opens after ${formatUserLocalResetForMessage(q.resetAt)}.`;
+  }
+  return `${q.remaining} free AI match${q.remaining === 1 ? "" : "es"} left in your current window.`;
+}
+
 export function ResumeMatchSection({ job }: { job: JobItem }) {
   const { isSignedIn, getToken } = useAuth();
-  const { isPro, isLoaded: planLoaded } = useAccountPlan();
+  const { isPro, isLoaded: planLoaded, resumeMatchAi, refresh } = useAccountPlan();
   const { hasResume, resumeText, resumeBullets } = useResume();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ScoringResult | null>(null);
+  const [matchMeta, setMatchMeta] = useState<ResumeSemanticMatchMeta | null>(null);
+  const [quotaWall, setQuotaWall] = useState<{ resetAt: string } | null>(null);
   const pendingScoreAfterUploadRef = useRef(false);
 
   useEffect(() => {
     setResult(null);
+    setMatchMeta(null);
+    setQuotaWall(null);
   }, [job.id]);
 
   const runScore = useCallback(async () => {
@@ -73,20 +97,46 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
     const token = await getToken();
     if (!token) return;
 
+    if (!isPro && resumeMatchAi && resumeMatchAi.remaining <= 0) {
+      setQuotaWall({ resetAt: resumeMatchAi.resetAt });
+      trackResumeMatchQuotaHit({ remaining: 0, jobId: job.id });
+      return;
+    }
+
     let semantic: Record<string, { bullet: string; similarity: number }> = {};
+    let meta: ResumeSemanticMatchMeta | null = null;
     if (keywordStrings.length && bullets.length) {
       try {
-        semantic = await fetchResumeSemanticMatch(token, {
+        const res = await fetchResumeSemanticMatch(token, {
           keywords: keywordStrings,
           bullets,
         });
-      } catch {
+        semantic = res.matches;
+        meta = res.matchMeta;
+        setMatchMeta(meta);
+        void refresh();
+      } catch (e) {
+        if (e instanceof ApiRequestError && e.code === "RESUME_MATCH_AI_QUOTA_EXCEEDED" && e.resumeMatchAiQuota) {
+          setQuotaWall({ resetAt: e.resumeMatchAiQuota.resetAt });
+          trackResumeMatchQuotaHit({ remaining: 0, jobId: job.id });
+          void refresh();
+        }
         semantic = {};
+        setMatchMeta(null);
       }
     }
 
-    setResult(scoreResume(text, bullets, job, semantic));
-  }, [getToken, job, resumeBullets, resumeText]);
+    const scored = scoreResume(text, bullets, job, semantic);
+    setResult(scored);
+    if (meta && scored.score > 0) {
+      void trackResumeFirstMatchViewedOnce({
+        getToken,
+        jobId: job.id,
+        planTier: meta.tier,
+        score: scored.score,
+      });
+    }
+  }, [getToken, isPro, job, refresh, resumeBullets, resumeMatchAi, resumeText]);
 
   const onCheck = async () => {
     if (!hasResume) {
@@ -94,6 +144,7 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
       return;
     }
     setBusy(true);
+    setQuotaWall(null);
     try {
       await runScore();
     } finally {
@@ -120,35 +171,44 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
     );
   }
 
-  if (!isPro) {
-    return (
-      <section className="rounded-2xl border border-ink/10 bg-surface/80 p-5 shadow-sm ring-1 ring-ink/5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+  const breakdownAllowed = matchMeta?.breakdownAllowed ?? isPro;
+  const hint = quotaHintLine(isPro, matchMeta, resumeMatchAi);
+
+  const openBreakdown = () => {
+    if (!breakdownAllowed) {
+      trackResumeMatchUpgradeClick({ surface: "resume_match_section_drawer", jobId: job.id });
+    }
+    setPanelOpen(true);
+  };
+
+  return (
+    <section className="rounded-2xl border border-ink/10 bg-surface/80 p-5 shadow-sm ring-1 ring-ink/5">
+      {quotaWall ? (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-base font-semibold text-ink">
               <span aria-hidden className="mr-1.5">
                 📄
               </span>
-              AI resume match
+              Free AI match limit reached
             </p>
             <p className="mt-1 text-sm text-ink-muted">
-              See your fit score, matched keywords, and gaps for this role — Pro only.
+              You have used all free AI resume matches in your current 24-hour window. Upgrade for unlimited matches,
+              full gap analysis, and Smart Apply.
+            </p>
+            <p className="mt-2 text-xs font-medium text-ink/70">
+              Next free slot no earlier than {formatUserLocalResetForMessage(quotaWall.resetAt)}.
             </p>
           </div>
           <Link
             href="/pricing"
+            onClick={() => trackResumeMatchUpgradeClick({ surface: "resume_match_section_quota_wall", jobId: job.id })}
             className="shrink-0 rounded-lg bg-brand px-4 py-2.5 text-center text-sm font-semibold text-white no-underline transition-colors hover:bg-brand-hover sm:self-center"
           >
             Upgrade to Pro →
           </Link>
         </div>
-      </section>
-    );
-  }
-
-  return (
-    <section className="rounded-2xl border border-ink/10 bg-surface/80 p-5 shadow-sm ring-1 ring-ink/5">
-      {!result ? (
+      ) : !result ? (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-base font-semibold text-ink">
@@ -157,7 +217,12 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
               </span>
               Check your resume match
             </p>
-            <p className="mt-1 text-sm text-ink-muted">See how well your profile fits</p>
+            <p className="mt-1 text-sm text-ink-muted">
+              {isPro
+                ? "See how well your profile fits this role."
+                : "See your AI match score for this role on the free tier — deeper keyword and gap breakdown is Pro-only."}
+            </p>
+            {hint ? <p className="mt-2 text-xs font-semibold text-brand/90">{hint}</p> : null}
           </div>
           <button
             type="button"
@@ -173,22 +238,25 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <MiniRing score={result.score} />
             <div className="min-w-0 flex-1">
-              <p className="text-lg font-bold text-ink">{result.score}% match</p>
+              <p className="text-lg font-bold text-ink">You match {result.score}%</p>
               <p className="mt-1 text-sm font-medium text-ink/90">
                 &ldquo;{resumeMatchSubtitle(result.grade)}&rdquo;
               </p>
-              <p className="mt-2 text-sm text-ink-muted">
-                {result.matched.length} matched · {result.missing.length} gaps
-              </p>
+              {isPro ? (
+                <p className="mt-2 text-sm text-ink-muted">
+                  {result.matched.length} matched · {result.missing.length} gaps
+                </p>
+              ) : null}
+              {hint ? <p className="mt-2 text-xs font-semibold text-brand/90">{hint}</p> : null}
             </div>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
             <button
               type="button"
-              onClick={() => setPanelOpen(true)}
+              onClick={() => openBreakdown()}
               className="w-full flex-1 rounded-lg border border-ink/15 bg-white py-3 text-center text-sm font-semibold text-ink transition-colors hover:bg-ink/5 dark:bg-surface"
             >
-              See full breakdown →
+              {breakdownAllowed ? "See full breakdown →" : "Preview breakdown (Pro) →"}
             </button>
             <button
               type="button"
@@ -213,6 +281,7 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
         onClose={() => setPanelOpen(false)}
         job={job}
         result={result}
+        breakdownAllowed={breakdownAllowed}
         onReuploadResume={() => {
           setPanelOpen(false);
           setUploadOpen(true);
