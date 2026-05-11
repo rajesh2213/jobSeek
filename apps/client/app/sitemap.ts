@@ -39,9 +39,9 @@ const SITEMAP_REVALIDATE_SECONDS = parseBoundedIntEnv(
 );
 const MAX_JOB_SITEMAP_PAGES = parseBoundedIntEnv(
   process.env.SEO_SITEMAP_MAX_JOB_PAGES,
-  200,
+  30,
   1,
-  5000,
+  40,
 );
 const JOBS_FETCH_LIMIT = parseBoundedIntEnv(
   process.env.SEO_SITEMAP_JOB_FETCH_LIMIT,
