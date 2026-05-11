@@ -5,10 +5,8 @@ declare const __LOCAL_API_FALLBACK__: string;
 
 const fallbackProd = "https://api.jobloom.tech";
 
-const LOOP_LOCALHOST = [108, 111, 99, 97, 108, 104, 111, 115, 116]
-  .map((n) => String.fromCharCode(n))
-  .join("");
-const LOOP_NUMERIC = [49, 50, 55, 46, 48, 46, 48, 46, 49].map((n) => String.fromCharCode(n)).join("");
+const LOOP_LOCALHOST = "localhost";
+const LOOP_NUMERIC = "127.0.0.1";
 
 export function getDefaultApiBase(): string {
   if (typeof __EXTENSION_API_BASE__ === "string" && __EXTENSION_API_BASE__) {

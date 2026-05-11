@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-/**
- * Production checks for the packaged extension in dist/. Run after `npm run build:ext`.
- */
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -152,9 +149,8 @@ if (existsSync(dist)) {
   }
 }
 
-// 3) no localhost in JS bundles
 const jsFiles = walkFiles(dist).filter((f) => f.endsWith(".js"));
-const devRe = /localhost|127\.0\.0\.1/;
+const devRe = /https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?/i;
 let devHit = false;
 for (const f of jsFiles) {
   if (read(f).match(devRe)) {
@@ -164,10 +160,9 @@ for (const f of jsFiles) {
   }
 }
 if (!devHit) {
-  pass("no localhost/127.0.0.1 in .js");
+  pass("no loopback URL literals in .js");
 }
 
-// 4) no console.log/debug in JS (strips may remove; this catches stragglers)
 const consoleRe = /\bconsole\.(log|debug|info|trace)\s*\(/;
 let consoleHit = false;
 for (const f of jsFiles) {

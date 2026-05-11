@@ -1,7 +1,6 @@
 const path = require("path");
 const CopyPlugin = require("copy-webpack-plugin");
 const webpack = require("webpack");
-const TerserPlugin = require("terser-webpack-plugin");
 
 const analyze = process.env.ANALYZE === "1";
 
@@ -28,7 +27,8 @@ module.exports = (env, argv) => {
       presenceBeacon: "./src/presenceBeacon.ts",
       popup: "./src/popup/popup.tsx",
     },
-    devtool: isProd ? false : "cheap-module-source-map",
+    /** Keep production bundles reviewer-readable for Chrome Web Store policy checks. */
+    devtool: isProd ? "source-map" : "cheap-module-source-map",
     module: {
       rules: [
         {
@@ -46,20 +46,10 @@ module.exports = (env, argv) => {
       path: path.resolve(__dirname, "dist"),
       filename: "[name].js",
     },
-    optimization: isProd
-      ? {
-          minimize: true,
-          minimizer: [
-            new TerserPlugin({
-              terserOptions: {
-                compress: { drop_console: true, drop_debugger: true },
-                format: { comments: false },
-              },
-              extractComments: false,
-            }),
-          ],
-        }
-      : { minimize: false },
+    optimization: {
+      /** Avoid minification/mangling to keep code readable for manual review. */
+      minimize: false,
+    },
     plugins: [
       new webpack.DefinePlugin({
         __EXTENSION_API_BASE__: JSON.stringify(String(extApiBase).replace(/\/+$/, "")),
