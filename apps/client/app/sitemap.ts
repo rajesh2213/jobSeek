@@ -67,6 +67,42 @@ const LANDING_MIN_COUNT = parseBoundedIntEnv(
   1,
   100,
 );
+const LANDING_SECTION_BUDGET_MS = parseBoundedIntEnv(
+  process.env.SEO_SITEMAP_LANDING_BUDGET_MS,
+  12000,
+  2000,
+  60000,
+);
+const JOBS_SECTION_BUDGET_MS = parseBoundedIntEnv(
+  process.env.SEO_SITEMAP_JOBS_BUDGET_MS,
+  45000,
+  5000,
+  120000,
+);
+const COMPANIES_SECTION_BUDGET_MS = parseBoundedIntEnv(
+  process.env.SEO_SITEMAP_COMPANIES_BUDGET_MS,
+  15000,
+  5000,
+  120000,
+);
+
+function createTimeoutError(label: string, timeoutMs: number): Error {
+  return new Error(`${label}_timeout_${timeoutMs}ms`);
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(createTimeoutError(label, timeoutMs)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 let sitemapGenerationRuns = 0;
 let lastGenerationCompletedAtMs: number | null = null;
@@ -111,13 +147,32 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
   const sections = {
     landing: {
       ok: true,
+      degraded: false,
       error: null as string | null,
       unauthorized: false,
+      budgetMs: LANDING_SECTION_BUDGET_MS,
+      budgetExceeded: false,
       inputCount: 0,
       outputCount: 0,
     },
-    jobs: { ok: true, error: null as string | null, pages: 0, outputCount: 0 },
-    companies: { ok: true, error: null as string | null, pages: 0, outputCount: 0 },
+    jobs: {
+      ok: true,
+      degraded: false,
+      error: null as string | null,
+      budgetMs: JOBS_SECTION_BUDGET_MS,
+      budgetExceeded: false,
+      pages: 0,
+      outputCount: 0,
+    },
+    companies: {
+      ok: true,
+      degraded: false,
+      error: null as string | null,
+      budgetMs: COMPANIES_SECTION_BUDGET_MS,
+      budgetExceeded: false,
+      pages: 0,
+      outputCount: 0,
+    },
   };
   if (!internalSeoSecretPresent) {
     console.warn("[sitemap] missing INTERNAL_SEO_SECRET in runtime");
@@ -125,16 +180,21 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
   console.info("[sitemap] section_start", {
     section: "landing",
     generationRun,
+    budgetMs: LANDING_SECTION_BUDGET_MS,
     maxSlugs: MAX_LANDING_SITEMAP_SLUGS,
     minCount: LANDING_MIN_COUNT,
   });
   try {
     const landingFetchStartedAt = Date.now();
-    const res = await fetchSeoLandingPages({
-      minCount: LANDING_MIN_COUNT,
-      maxSlugs: MAX_LANDING_SITEMAP_SLUGS,
-      internalSeoSecret,
-    });
+    const res = await withTimeout(
+      fetchSeoLandingPages({
+        minCount: LANDING_MIN_COUNT,
+        maxSlugs: MAX_LANDING_SITEMAP_SLUGS,
+        internalSeoSecret,
+      }),
+      LANDING_SECTION_BUDGET_MS,
+      "landing_fetch",
+    );
     landingFetchDurationMs = Date.now() - landingFetchStartedAt;
     landingEstimatedCountQueries = res.meta?.estimatedCountQueries ?? 0;
     landingEstimatedTotalQueries = res.meta?.estimatedTotalQueries ?? 0;
@@ -142,6 +202,7 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
     sections.landing.inputCount = res.data.length;
     if (sections.landing.unauthorized) {
       sections.landing.ok = false;
+      sections.landing.degraded = true;
       sections.landing.error = "landing_unauthorized";
     }
     const landingTransformStartedAt = Date.now();
@@ -175,6 +236,8 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
       section: "landing",
       generationRun,
       ok: sections.landing.ok,
+      degraded: sections.landing.degraded,
+      budgetExceeded: sections.landing.budgetExceeded,
       unauthorized: sections.landing.unauthorized,
       inputCount: sections.landing.inputCount,
       outputCount: sections.landing.outputCount,
@@ -184,11 +247,16 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
     });
   } catch (err) {
     sections.landing.ok = false;
+    sections.landing.degraded = true;
     sections.landing.error = err instanceof Error ? err.message : "landing_fetch_failed";
+    sections.landing.budgetExceeded = sections.landing.error.includes("landing_fetch_timeout_");
     console.warn("[sitemap] section_failed", {
       section: "landing",
       generationRun,
       error: sections.landing.error,
+      degraded: sections.landing.degraded,
+      budgetMs: LANDING_SECTION_BUDGET_MS,
+      budgetExceeded: sections.landing.budgetExceeded,
       fetchDurationMs: landingFetchDurationMs,
       transformDurationMs: landingTransformDurationMs,
     });
@@ -199,6 +267,7 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
   console.info("[sitemap] section_start", {
     section: "jobs",
     generationRun,
+    budgetMs: JOBS_SECTION_BUDGET_MS,
     fetchLimit: JOBS_FETCH_LIMIT,
     maxPages: MAX_JOB_SITEMAP_PAGES,
   });
@@ -207,7 +276,28 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
     let page = 1;
     const limit = JOBS_FETCH_LIMIT;
     for (;;) {
-      const jobs = await fetchJobsForSitemap(page, limit);
+      const elapsedMs = Date.now() - jobsStartedAt;
+      const remainingBudgetMs = JOBS_SECTION_BUDGET_MS - elapsedMs;
+      if (remainingBudgetMs <= 0) {
+        sections.jobs.ok = false;
+        sections.jobs.degraded = true;
+        sections.jobs.budgetExceeded = true;
+        sections.jobs.error = "jobs_budget_exceeded";
+        console.warn("[sitemap] section_budget_exceeded", {
+          section: "jobs",
+          generationRun,
+          budgetMs: JOBS_SECTION_BUDGET_MS,
+          elapsedMs,
+          pages: sections.jobs.pages,
+          outputCount: sections.jobs.outputCount,
+        });
+        break;
+      }
+      const jobs = await withTimeout(
+        fetchJobsForSitemap(page, limit),
+        remainingBudgetMs,
+        "jobs_fetch",
+      );
       for (const job of jobs.data) {
         if (sitemapPruningEnabled) {
           let detailDecision = decideJobDetailSeoPolicy();
@@ -237,17 +327,25 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
       section: "jobs",
       generationRun,
       ok: sections.jobs.ok,
+      degraded: sections.jobs.degraded,
+      budgetExceeded: sections.jobs.budgetExceeded,
       pages: sections.jobs.pages,
       outputCount: sections.jobs.outputCount,
       durationMs: jobsDurationMs,
     });
   } catch (err) {
     sections.jobs.ok = false;
+    sections.jobs.degraded = true;
     sections.jobs.error = err instanceof Error ? err.message : "jobs_fetch_failed";
+    sections.jobs.budgetExceeded =
+      sections.jobs.error.includes("jobs_fetch_timeout_") || sections.jobs.error === "jobs_budget_exceeded";
     console.warn("[sitemap] section_failed", {
       section: "jobs",
       generationRun,
       error: sections.jobs.error,
+      degraded: sections.jobs.degraded,
+      budgetMs: JOBS_SECTION_BUDGET_MS,
+      budgetExceeded: sections.jobs.budgetExceeded,
       pages: sections.jobs.pages,
       outputCount: sections.jobs.outputCount,
       durationMs: jobsDurationMs,
@@ -259,6 +357,7 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
   console.info("[sitemap] section_start", {
     section: "companies",
     generationRun,
+    budgetMs: COMPANIES_SECTION_BUDGET_MS,
     maxPages: MAX_COMPANY_SITEMAP_PAGES,
   });
   try {
@@ -266,7 +365,28 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
     let page = 1;
     const limit = 100;
     for (;;) {
-      const res = await fetchCompaniesForSitemap(page, limit);
+      const elapsedMs = Date.now() - companiesStartedAt;
+      const remainingBudgetMs = COMPANIES_SECTION_BUDGET_MS - elapsedMs;
+      if (remainingBudgetMs <= 0) {
+        sections.companies.ok = false;
+        sections.companies.degraded = true;
+        sections.companies.budgetExceeded = true;
+        sections.companies.error = "companies_budget_exceeded";
+        console.warn("[sitemap] section_budget_exceeded", {
+          section: "companies",
+          generationRun,
+          budgetMs: COMPANIES_SECTION_BUDGET_MS,
+          elapsedMs,
+          pages: sections.companies.pages,
+          outputCount: sections.companies.outputCount,
+        });
+        break;
+      }
+      const res = await withTimeout(
+        fetchCompaniesForSitemap(page, limit),
+        remainingBudgetMs,
+        "companies_fetch",
+      );
       for (const c of res.data) {
         if ((c.jobCount ?? 0) < 1) continue;
         if (sitemapPruningEnabled) {
@@ -299,17 +419,26 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
       section: "companies",
       generationRun,
       ok: sections.companies.ok,
+      degraded: sections.companies.degraded,
+      budgetExceeded: sections.companies.budgetExceeded,
       pages: sections.companies.pages,
       outputCount: sections.companies.outputCount,
       durationMs: companiesDurationMs,
     });
   } catch (err) {
     sections.companies.ok = false;
+    sections.companies.degraded = true;
     sections.companies.error = err instanceof Error ? err.message : "companies_fetch_failed";
+    sections.companies.budgetExceeded =
+      sections.companies.error.includes("companies_fetch_timeout_") ||
+      sections.companies.error === "companies_budget_exceeded";
     console.warn("[sitemap] section_failed", {
       section: "companies",
       generationRun,
       error: sections.companies.error,
+      degraded: sections.companies.degraded,
+      budgetMs: COMPANIES_SECTION_BUDGET_MS,
+      budgetExceeded: sections.companies.budgetExceeded,
       pages: sections.companies.pages,
       outputCount: sections.companies.outputCount,
       durationMs: companiesDurationMs,
@@ -325,6 +454,14 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
   const payloadBytes = Buffer.byteLength(payloadJson, "utf8");
   const mem = process.memoryUsage();
   const totalDurationMs = Date.now() - startedAt;
+  const degraded =
+    sections.landing.degraded ||
+    sections.jobs.degraded ||
+    sections.companies.degraded ||
+    !sections.landing.ok ||
+    !sections.jobs.ok ||
+    !sections.companies.ok;
+  const partialResponse = degraded;
   lastGenerationCompletedAtMs = Date.now();
   console.info("[sitemap] generation", {
     generationRun,
@@ -335,6 +472,8 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
     durationJobsMs: jobsDurationMs,
     durationCompaniesMs: companiesDurationMs,
     durationSerializeMs: payloadSerializeDurationMs,
+    degraded,
+    partialResponse,
     countTotal: output.length,
     countStatic: staticEntries.length,
     countLanding: landing.length,
@@ -352,6 +491,9 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
     jobsFetchLimit: JOBS_FETCH_LIMIT,
     maxJobPages: MAX_JOB_SITEMAP_PAGES,
     maxCompanyPages: MAX_COMPANY_SITEMAP_PAGES,
+    sectionBudgetLandingMs: LANDING_SECTION_BUDGET_MS,
+    sectionBudgetJobsMs: JOBS_SECTION_BUDGET_MS,
+    sectionBudgetCompaniesMs: COMPANIES_SECTION_BUDGET_MS,
     revalidateSeconds: SITEMAP_REVALIDATE_SECONDS,
     internalSeoSecretPresent,
     sections,
