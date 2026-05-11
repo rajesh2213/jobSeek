@@ -11,6 +11,14 @@ import {
   type SeoPolicyReason,
 } from "../lib/seoIndexability";
 
+/**
+ * Deployment stabilization:
+ * - Prevent build-time prerender execution for /sitemap.xml.
+ * - Keep runtime generation on Node where Buffer/process telemetry is used.
+ */
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 function parseBoundedIntEnv(
   raw: string | undefined,
   fallback: number,
