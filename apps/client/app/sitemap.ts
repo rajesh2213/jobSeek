@@ -68,8 +68,12 @@ const LANDING_MIN_COUNT = parseBoundedIntEnv(
   100,
 );
 
+let sitemapGenerationRuns = 0;
+let lastGenerationCompletedAtMs: number | null = null;
+
 async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
   const startedAt = Date.now();
+  const generationRun = ++sitemapGenerationRuns;
   const base = getSiteBaseUrl();
   const now = new Date();
   const internalSeoSecret = process.env.INTERNAL_SEO_SECRET ?? null;
@@ -97,33 +101,50 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/jobs/browse`, lastModified: now },
     { url: `${base}/companies`, lastModified: now },
   ];
+  const staticPhaseDurationMs = Date.now() - startedAt;
 
   const landing: MetadataRoute.Sitemap = [];
-  let landingDurationMs = 0;
+  let landingFetchDurationMs = 0;
+  let landingTransformDurationMs = 0;
   let landingEstimatedCountQueries = 0;
   let landingEstimatedTotalQueries = 0;
   const sections = {
-    landing: { ok: true, error: null as string | null, unauthorized: false },
-    jobs: { ok: true, error: null as string | null },
-    companies: { ok: true, error: null as string | null },
+    landing: {
+      ok: true,
+      error: null as string | null,
+      unauthorized: false,
+      inputCount: 0,
+      outputCount: 0,
+    },
+    jobs: { ok: true, error: null as string | null, pages: 0, outputCount: 0 },
+    companies: { ok: true, error: null as string | null, pages: 0, outputCount: 0 },
   };
   if (!internalSeoSecretPresent) {
     console.warn("[sitemap] missing INTERNAL_SEO_SECRET in runtime");
   }
+  console.info("[sitemap] section_start", {
+    section: "landing",
+    generationRun,
+    maxSlugs: MAX_LANDING_SITEMAP_SLUGS,
+    minCount: LANDING_MIN_COUNT,
+  });
   try {
-    const landingStartedAt = Date.now();
+    const landingFetchStartedAt = Date.now();
     const res = await fetchSeoLandingPages({
       minCount: LANDING_MIN_COUNT,
       maxSlugs: MAX_LANDING_SITEMAP_SLUGS,
       internalSeoSecret,
     });
+    landingFetchDurationMs = Date.now() - landingFetchStartedAt;
     landingEstimatedCountQueries = res.meta?.estimatedCountQueries ?? 0;
     landingEstimatedTotalQueries = res.meta?.estimatedTotalQueries ?? 0;
     sections.landing.unauthorized = res.meta?.unauthorized === true;
+    sections.landing.inputCount = res.data.length;
     if (sections.landing.unauthorized) {
       sections.landing.ok = false;
       sections.landing.error = "landing_unauthorized";
     }
+    const landingTransformStartedAt = Date.now();
     for (const e of res.data) {
       const normalized = normalizeRelatedSlugPath(e.slug);
       if (normalized === "/jobs" || seen.has(normalized)) continue;
@@ -148,15 +169,39 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
         lastModified: now,
       });
     }
-    landingDurationMs = Date.now() - landingStartedAt;
+    landingTransformDurationMs = Date.now() - landingTransformStartedAt;
+    sections.landing.outputCount = landing.length;
+    console.info("[sitemap] section_complete", {
+      section: "landing",
+      generationRun,
+      ok: sections.landing.ok,
+      unauthorized: sections.landing.unauthorized,
+      inputCount: sections.landing.inputCount,
+      outputCount: sections.landing.outputCount,
+      fetchDurationMs: landingFetchDurationMs,
+      transformDurationMs: landingTransformDurationMs,
+      estimatedCountQueries: landingEstimatedCountQueries,
+    });
   } catch (err) {
     sections.landing.ok = false;
     sections.landing.error = err instanceof Error ? err.message : "landing_fetch_failed";
-    console.warn("[sitemap] landing section failed", { error: sections.landing.error });
+    console.warn("[sitemap] section_failed", {
+      section: "landing",
+      generationRun,
+      error: sections.landing.error,
+      fetchDurationMs: landingFetchDurationMs,
+      transformDurationMs: landingTransformDurationMs,
+    });
   }
 
   const jobEntries: MetadataRoute.Sitemap = [];
   let jobsDurationMs = 0;
+  console.info("[sitemap] section_start", {
+    section: "jobs",
+    generationRun,
+    fetchLimit: JOBS_FETCH_LIMIT,
+    maxPages: MAX_JOB_SITEMAP_PAGES,
+  });
   try {
     const jobsStartedAt = Date.now();
     let page = 1;
@@ -178,6 +223,8 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
           lastModified: job.postedAt ? new Date(job.postedAt) : now,
         });
       }
+      sections.jobs.pages = page;
+      sections.jobs.outputCount = jobEntries.length;
       const hasMore =
         jobs.meta?.hasMore === true ||
         ((jobs.meta?.totalPages ?? 1) > (jobs.meta?.page ?? page));
@@ -186,14 +233,34 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
       if (page > MAX_JOB_SITEMAP_PAGES) break;
     }
     jobsDurationMs = Date.now() - jobsStartedAt;
+    console.info("[sitemap] section_complete", {
+      section: "jobs",
+      generationRun,
+      ok: sections.jobs.ok,
+      pages: sections.jobs.pages,
+      outputCount: sections.jobs.outputCount,
+      durationMs: jobsDurationMs,
+    });
   } catch (err) {
     sections.jobs.ok = false;
     sections.jobs.error = err instanceof Error ? err.message : "jobs_fetch_failed";
-    console.warn("[sitemap] jobs section failed", { error: sections.jobs.error });
+    console.warn("[sitemap] section_failed", {
+      section: "jobs",
+      generationRun,
+      error: sections.jobs.error,
+      pages: sections.jobs.pages,
+      outputCount: sections.jobs.outputCount,
+      durationMs: jobsDurationMs,
+    });
   }
 
   const companyEntries: MetadataRoute.Sitemap = [];
   let companiesDurationMs = 0;
+  console.info("[sitemap] section_start", {
+    section: "companies",
+    generationRun,
+    maxPages: MAX_COMPANY_SITEMAP_PAGES,
+  });
   try {
     const companiesStartedAt = Date.now();
     let page = 1;
@@ -220,28 +287,54 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
           lastModified: now,
         });
       }
+      sections.companies.pages = page;
+      sections.companies.outputCount = companyEntries.length;
       const totalPages = res.meta.totalPages ?? 1;
       if (!res.meta.hasMore || page >= totalPages) break;
       page += 1;
       if (page > MAX_COMPANY_SITEMAP_PAGES) break;
     }
     companiesDurationMs = Date.now() - companiesStartedAt;
+    console.info("[sitemap] section_complete", {
+      section: "companies",
+      generationRun,
+      ok: sections.companies.ok,
+      pages: sections.companies.pages,
+      outputCount: sections.companies.outputCount,
+      durationMs: companiesDurationMs,
+    });
   } catch (err) {
     sections.companies.ok = false;
     sections.companies.error = err instanceof Error ? err.message : "companies_fetch_failed";
-    console.warn("[sitemap] companies section failed", { error: sections.companies.error });
+    console.warn("[sitemap] section_failed", {
+      section: "companies",
+      generationRun,
+      error: sections.companies.error,
+      pages: sections.companies.pages,
+      outputCount: sections.companies.outputCount,
+      durationMs: companiesDurationMs,
+    });
   }
 
   const output = [...staticEntries, ...landing, ...companyEntries, ...jobEntries];
   const excludedCounts: Record<string, number> = {};
   for (const [k, v] of excludedByReason.entries()) excludedCounts[k] = v;
-  const payloadBytes = Buffer.byteLength(JSON.stringify(output), "utf8");
+  const serializeStartedAt = Date.now();
+  const payloadJson = JSON.stringify(output);
+  const payloadSerializeDurationMs = Date.now() - serializeStartedAt;
+  const payloadBytes = Buffer.byteLength(payloadJson, "utf8");
   const mem = process.memoryUsage();
+  const totalDurationMs = Date.now() - startedAt;
+  lastGenerationCompletedAtMs = Date.now();
   console.info("[sitemap] generation", {
-    durationMs: Date.now() - startedAt,
-    durationLandingMs: landingDurationMs,
+    generationRun,
+    durationMs: totalDurationMs,
+    durationStaticMs: staticPhaseDurationMs,
+    durationLandingFetchMs: landingFetchDurationMs,
+    durationLandingTransformMs: landingTransformDurationMs,
     durationJobsMs: jobsDurationMs,
     durationCompaniesMs: companiesDurationMs,
+    durationSerializeMs: payloadSerializeDurationMs,
     countTotal: output.length,
     countStatic: staticEntries.length,
     countLanding: landing.length,
@@ -271,5 +364,15 @@ const getCachedSitemap = unstable_cache(generateSitemapData, ["sitemap-v2"], {
 });
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  return getCachedSitemap();
+  const requestStartedAt = Date.now();
+  const beforeRuns = sitemapGenerationRuns;
+  const out = await getCachedSitemap();
+  const afterRuns = sitemapGenerationRuns;
+  console.info("[sitemap] request", {
+    durationMs: Date.now() - requestStartedAt,
+    cacheStatus: afterRuns > beforeRuns ? "miss_regenerated" : "hit_cached",
+    generationRuns: afterRuns,
+    lastGenerationCompletedAtMs,
+  });
+  return out;
 }
