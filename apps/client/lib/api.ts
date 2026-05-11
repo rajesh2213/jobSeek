@@ -900,7 +900,19 @@ export async function fetchSeoLandingPages(options?: {
   minCount?: number;
   maxSlugs?: number;
   internalSeoSecret?: string | null;
-}): Promise<{ data: SeoLandingEntry[]; meta?: { minCount: number; maxSlugs: number; count: number } }> {
+}): Promise<{
+  data: SeoLandingEntry[];
+  meta?: {
+    minCount: number;
+    maxSlugs: number;
+    count: number;
+    rolesConsidered?: number;
+    locationsConsidered?: number;
+    experiencesConsidered?: number;
+    estimatedCountQueries?: number;
+    estimatedTotalQueries?: number;
+  };
+}> {
   const params = new URLSearchParams();
   if (options?.minCount !== undefined) params.set("minCount", String(options.minCount));
   if (options?.maxSlugs !== undefined) params.set("maxSlugs", String(options.maxSlugs));
@@ -924,7 +936,16 @@ export async function fetchSeoLandingPages(options?: {
   }
   return (await res.json()) as {
     data: SeoLandingEntry[];
-    meta?: { minCount: number; maxSlugs: number; count: number };
+    meta?: {
+      minCount: number;
+      maxSlugs: number;
+      count: number;
+      rolesConsidered?: number;
+      locationsConsidered?: number;
+      experiencesConsidered?: number;
+      estimatedCountQueries?: number;
+      estimatedTotalQueries?: number;
+    };
   };
 }
 

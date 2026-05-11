@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { fetchCompanies, fetchJobs, fetchSeoLandingPages } from "../lib/api";
 import { getSiteBaseUrl } from "../lib/seoSite";
@@ -10,16 +11,50 @@ import {
   type SeoPolicyReason,
 } from "../lib/seoIndexability";
 
-/**
- * This route paginates jobs/companies across many HTTP requests. Static generation during
- * `next build` exceeds Vercel's per-route timeout (~60s). Generate at request time instead.
- */
-export const dynamic = "force-dynamic";
+function parseBoundedIntEnv(
+  raw: string | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
 
-const MAX_JOB_SITEMAP_PAGES = 10000;
-const MAX_COMPANY_SITEMAP_PAGES = 500;
+const SITEMAP_REVALIDATE_SECONDS = parseBoundedIntEnv(
+  process.env.SEO_SITEMAP_REVALIDATE_SECONDS,
+  300,
+  60,
+  3600,
+);
+const MAX_JOB_SITEMAP_PAGES = parseBoundedIntEnv(
+  process.env.SEO_SITEMAP_MAX_JOB_PAGES,
+  200,
+  1,
+  5000,
+);
+const MAX_COMPANY_SITEMAP_PAGES = parseBoundedIntEnv(
+  process.env.SEO_SITEMAP_MAX_COMPANY_PAGES,
+  100,
+  1,
+  1000,
+);
+const MAX_LANDING_SITEMAP_SLUGS = parseBoundedIntEnv(
+  process.env.SEO_SITEMAP_MAX_LANDING_SLUGS,
+  1500,
+  50,
+  10000,
+);
+const LANDING_MIN_COUNT = parseBoundedIntEnv(
+  process.env.SEO_SITEMAP_LANDING_MIN_COUNT,
+  5,
+  1,
+  100,
+);
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
   const startedAt = Date.now();
   const base = getSiteBaseUrl();
   const now = new Date();
@@ -49,12 +84,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   const landing: MetadataRoute.Sitemap = [];
+  let landingDurationMs = 0;
+  let landingEstimatedCountQueries = 0;
+  let landingEstimatedTotalQueries = 0;
   try {
+    const landingStartedAt = Date.now();
     const res = await fetchSeoLandingPages({
-      minCount: 5,
-      maxSlugs: 20000,
+      minCount: LANDING_MIN_COUNT,
+      maxSlugs: MAX_LANDING_SITEMAP_SLUGS,
       internalSeoSecret,
     });
+    landingEstimatedCountQueries = res.meta?.estimatedCountQueries ?? 0;
+    landingEstimatedTotalQueries = res.meta?.estimatedTotalQueries ?? 0;
     for (const e of res.data) {
       const normalized = normalizeRelatedSlugPath(e.slug);
       if (normalized === "/jobs" || seen.has(normalized)) continue;
@@ -79,12 +120,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: now,
       });
     }
+    landingDurationMs = Date.now() - landingStartedAt;
   } catch {
     /* sitemap still useful without programmatic slugs */
   }
 
   const jobEntries: MetadataRoute.Sitemap = [];
+  let jobsDurationMs = 0;
   try {
+    const jobsStartedAt = Date.now();
     let page = 1;
     const limit = 1000;
     for (;;) {
@@ -111,12 +155,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       page += 1;
       if (page > MAX_JOB_SITEMAP_PAGES) break;
     }
+    jobsDurationMs = Date.now() - jobsStartedAt;
   } catch {
     /* ignore */
   }
 
   const companyEntries: MetadataRoute.Sitemap = [];
+  let companiesDurationMs = 0;
   try {
+    const companiesStartedAt = Date.now();
     let page = 1;
     const limit = 100;
     for (;;) {
@@ -146,6 +193,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       page += 1;
       if (page > MAX_COMPANY_SITEMAP_PAGES) break;
     }
+    companiesDurationMs = Date.now() - companiesStartedAt;
   } catch {
     /* ignore */
   }
@@ -157,16 +205,34 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const mem = process.memoryUsage();
   console.info("[sitemap] generation", {
     durationMs: Date.now() - startedAt,
+    durationLandingMs: landingDurationMs,
+    durationJobsMs: jobsDurationMs,
+    durationCompaniesMs: companiesDurationMs,
     countTotal: output.length,
     countStatic: staticEntries.length,
     countLanding: landing.length,
     countCompany: companyEntries.length,
     countJob: jobEntries.length,
     excludedByReason: excludedCounts,
+    estimatedLandingCountQueries: landingEstimatedCountQueries,
+    estimatedLandingTotalQueries: landingEstimatedTotalQueries,
     payloadBytes,
     rssBytes: mem.rss,
     heapUsedBytes: mem.heapUsed,
     pruningEnabled: sitemapPruningEnabled,
+    maxLandingSlugs: MAX_LANDING_SITEMAP_SLUGS,
+    minLandingCount: LANDING_MIN_COUNT,
+    maxJobPages: MAX_JOB_SITEMAP_PAGES,
+    maxCompanyPages: MAX_COMPANY_SITEMAP_PAGES,
+    revalidateSeconds: SITEMAP_REVALIDATE_SECONDS,
   });
   return output;
+}
+
+const getCachedSitemap = unstable_cache(generateSitemapData, ["sitemap-v2"], {
+  revalidate: SITEMAP_REVALIDATE_SECONDS,
+});
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  return getCachedSitemap();
 }

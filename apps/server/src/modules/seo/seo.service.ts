@@ -22,6 +22,26 @@ export interface SeoLandingEntry {
   count: number;
 }
 
+export interface SeoLandingGenerationStats {
+  rolesConsidered: number;
+  locationsConsidered: number;
+  experiencesConsidered: number;
+  estimatedCountQueries: number;
+  estimatedTotalQueries: number;
+}
+
+function parsePositiveIntEnv(
+  raw: string | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  if (!raw) return fallback;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
 /**
  * Builds slugs that match client `parseSlug` / `filtersToSlug`: category must lead the path
  * (see `apps/client/lib/slug-parser.ts`). Bare skill-only URLs are not supported by the parser.
@@ -81,10 +101,25 @@ export function createSeoService(prisma: PrismaClient) {
   async function listSeoLandingEntries(input: {
     minCount: number;
     maxSlugs: number;
-  }): Promise<SeoLandingEntry[]> {
+  }): Promise<{ entries: SeoLandingEntry[]; stats: SeoLandingGenerationStats }> {
     const { minCount, maxSlugs } = input;
     const seen = new Set<string>();
     const out: SeoLandingEntry[] = [];
+    const roleLimit = parsePositiveIntEnv(process.env.SEO_LANDING_MAX_ROLE_SLUGS, 20, 5, 100);
+    const locationLimit = parsePositiveIntEnv(
+      process.env.SEO_LANDING_MAX_LOCATION_DIMENSIONS,
+      8,
+      1,
+      SEO_DIMENSIONS.locations.length,
+    );
+    const experienceLimit = parsePositiveIntEnv(
+      process.env.SEO_LANDING_MAX_EXPERIENCE_DIMENSIONS,
+      2,
+      1,
+      SEO_DIMENSIONS.experience.length,
+    );
+    const selectedLocations = SEO_DIMENSIONS.locations.slice(0, locationLimit);
+    const selectedExperiences = SEO_DIMENSIONS.experience.slice(0, experienceLimit);
 
     const push = (slug: string, count: number) => {
       if (!slug || seen.has(slug) || out.length >= maxSlugs) return;
@@ -92,7 +127,7 @@ export function createSeoService(prisma: PrismaClient) {
       out.push({ slug, count });
     };
 
-    const roles = await topRoleSlugs(Math.min(100, maxSlugs));
+    const roles = await topRoleSlugs(Math.min(roleLimit, maxSlugs));
     for (const r of roles) {
       if (out.length >= maxSlugs) break;
       // role only
@@ -100,7 +135,7 @@ export function createSeoService(prisma: PrismaClient) {
         push(filtersToJobListingSlug({ role: r.role }), r.count);
       }
 
-      for (const loc of SEO_DIMENSIONS.locations) {
+      for (const loc of selectedLocations) {
         if (out.length >= maxSlugs) break;
         const c = await countByDimensions({ role: r.role, location: loc });
         if (c >= minCount) {
@@ -117,7 +152,7 @@ export function createSeoService(prisma: PrismaClient) {
         }
       }
 
-      for (const exp of SEO_DIMENSIONS.experience) {
+      for (const exp of selectedExperiences) {
         if (out.length >= maxSlugs) break;
         const c = await countByDimensions({ role: r.role, experience: exp });
         if (c >= minCount) {
@@ -125,9 +160,9 @@ export function createSeoService(prisma: PrismaClient) {
         }
       }
 
-      for (const loc of SEO_DIMENSIONS.locations) {
+      for (const loc of selectedLocations) {
         if (out.length >= maxSlugs) break;
-        for (const exp of SEO_DIMENSIONS.experience) {
+        for (const exp of selectedExperiences) {
           if (out.length >= maxSlugs) break;
           const c = await countByDimensions({ role: r.role, location: loc, experience: exp });
           if (c >= minCount) {
@@ -137,7 +172,21 @@ export function createSeoService(prisma: PrismaClient) {
       }
     }
 
-    return out.slice(0, maxSlugs);
+    const rolesConsidered = roles.length;
+    const locationsConsidered = selectedLocations.length;
+    const experiencesConsidered = selectedExperiences.length;
+    const estimatedCountQueries =
+      rolesConsidered * (locationsConsidered + experiencesConsidered + locationsConsidered * experiencesConsidered);
+    return {
+      entries: out.slice(0, maxSlugs),
+      stats: {
+        rolesConsidered,
+        locationsConsidered,
+        experiencesConsidered,
+        estimatedCountQueries,
+        estimatedTotalQueries: estimatedCountQueries + 1, // +1 for topRoleSlugs()
+      },
+    };
   }
 
   return { listSeoLandingEntries, topRoleSlugs };

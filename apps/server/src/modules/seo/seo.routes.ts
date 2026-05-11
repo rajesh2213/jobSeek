@@ -13,6 +13,18 @@ function parseIntSafe(v: unknown, fallback: number): number {
   return fallback;
 }
 
+function parseBoundedEnvInt(
+  raw: string | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
 export function registerSeoRoutes(server: FastifyInstance, seo: SeoService): void {
   function isInternalSeoAuthorized(request: FastifyRequest): boolean {
     const marker = request.headers["x-internal-seo"];
@@ -39,12 +51,33 @@ export function registerSeoRoutes(server: FastifyInstance, seo: SeoService): voi
 
       const q = request.query as Record<string, unknown>;
       const minCount = Math.max(1, parseIntSafe(q.minCount, 5));
-      const maxSlugs = Math.min(50000, Math.max(10, parseIntSafe(q.maxSlugs, 5000)));
+      const defaultMaxSlugs = parseBoundedEnvInt(
+        process.env.SEO_LANDING_DEFAULT_MAX_SLUGS,
+        1500,
+        50,
+        5000,
+      );
+      const absoluteMaxSlugs = parseBoundedEnvInt(
+        process.env.SEO_LANDING_ABSOLUTE_MAX_SLUGS,
+        3000,
+        100,
+        10000,
+      );
+      const maxSlugs = Math.min(absoluteMaxSlugs, Math.max(10, parseIntSafe(q.maxSlugs, defaultMaxSlugs)));
 
-      const entries = await seo.listSeoLandingEntries({ minCount, maxSlugs });
+      const { entries, stats } = await seo.listSeoLandingEntries({ minCount, maxSlugs });
       return reply.send({
         data: entries,
-        meta: { minCount, maxSlugs, count: entries.length },
+        meta: {
+          minCount,
+          maxSlugs,
+          count: entries.length,
+          rolesConsidered: stats.rolesConsidered,
+          locationsConsidered: stats.locationsConsidered,
+          experiencesConsidered: stats.experiencesConsidered,
+          estimatedCountQueries: stats.estimatedCountQueries,
+          estimatedTotalQueries: stats.estimatedTotalQueries,
+        },
       });
     },
   );
