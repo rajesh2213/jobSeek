@@ -23,6 +23,8 @@ export function buildJobPostingJsonLd(
   const country = (job.locationCountry || job.country || "").trim();
   const cc = country.length === 2 ? country.toUpperCase() : "";
   const currency = cc ? COUNTRY_CURRENCY[cc] ?? "USD" : "USD";
+  const datePosted = firstValidDateIso(job.postedAt, job.effectivePostedAt, job.createdAt);
+  const resolvedDescription = resolveDescription(job, description);
 
   const org: Record<string, unknown> = {
     "@type": "Organization",
@@ -45,15 +47,20 @@ export function buildJobPostingJsonLd(
         addressCountry: cc || country || undefined,
       },
     },
-    datePosted:
-      job.postedAt && !Number.isNaN(Date.parse(job.postedAt)) ? job.postedAt : undefined,
+    datePosted,
     validThrough: computeValidThrough(job.postedAt, job.createdAt),
     employmentType: employmentType(job.workType),
-    description: description || undefined,
+    description: resolvedDescription || undefined,
   };
 
   if (job.isRemote || job.workType === "remote") {
     base.jobLocationType = "TELECOMMUTE";
+    if (cc || country) {
+      base.applicantLocationRequirements = {
+        "@type": "Country",
+        name: cc || country,
+      };
+    }
   }
 
   if (job.salaryMin != null && job.salaryMin > 0) {
@@ -86,4 +93,55 @@ function computeValidThrough(postedAt: string | null, createdAt: string | undefi
   if (Number.isNaN(d.getTime())) return undefined;
   d.setUTCDate(d.getUTCDate() + 45);
   return d.toISOString();
+}
+
+function firstValidDateIso(...values: Array<string | null | undefined>): string | undefined {
+  for (const raw of values) {
+    if (!raw) continue;
+    if (!Number.isNaN(Date.parse(raw))) return raw;
+  }
+  return undefined;
+}
+
+function resolveDescription(job: JobItem, preferred: string | undefined): string | undefined {
+  const extras = job as JobItem & {
+    descriptionText?: string | null;
+    rawDescription?: string | null;
+    descriptionHtml?: string | null;
+  };
+  const candidates = [
+    preferred,
+    job.description ?? undefined,
+    extras.descriptionText ?? undefined,
+    extras.rawDescription ?? undefined,
+    extras.descriptionHtml ?? undefined,
+  ];
+  for (const candidate of candidates) {
+    const normalized = normalizeDescription(candidate);
+    if (normalized) return normalized;
+  }
+  return undefined;
+}
+
+function normalizeDescription(input: string | undefined): string | undefined {
+  if (!input) return undefined;
+  const stripped = stripHtmlToText(input);
+  const collapsed = stripped.replace(/\s+/g, " ").trim();
+  if (!collapsed) return undefined;
+  return collapsed.slice(0, 12000);
+}
+
+function stripHtmlToText(input: string): string {
+  return input
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#39;/gi, "'");
 }
