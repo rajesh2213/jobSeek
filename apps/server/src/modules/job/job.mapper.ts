@@ -94,6 +94,8 @@ export function toJobPublicJsonOverDailyCap(job: JobWithCompanyRow): Record<stri
   const full = toJobDetailJson(job);
   return {
     ...full,
+    /** SSR-only structured data fallback while keeping capped UI payload redacted. */
+    structuredDataDescription: full.description,
     description: null,
     parsedDescription: null,
     previewLines: [],

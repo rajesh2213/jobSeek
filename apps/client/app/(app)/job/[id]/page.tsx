@@ -104,7 +104,8 @@ export default async function JobDetailPage({ params, searchParams }: Props) {
   );
 
   const applyHref = job.applyUrl?.trim() || job.sourceUrl?.trim() || "";
-  const jsonLdDescription = structuredText || job.description || undefined;
+  const jsonLdDescription =
+    structuredText || job.description || job.structuredDataDescription || undefined;
 
   const jsonLd = buildJobPostingJsonLd(job, jsonLdDescription, jsonLdMode);
 

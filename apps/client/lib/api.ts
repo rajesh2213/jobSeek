@@ -69,6 +69,8 @@ export interface JobItem {
   id: string;
   title: string;
   description: string | null;
+  /** Capped-detail fallback for SSR JobPosting JSON-LD only (UI remains redacted). */
+  structuredDataDescription?: string | null;
   /** Card/list preview derived from parsed buckets (server). */
   previewLines?: string[];
   previewLinesSource?: JobPreviewLinesSource;
