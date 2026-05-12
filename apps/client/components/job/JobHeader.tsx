@@ -55,7 +55,14 @@ export function JobHeader({ job, applyHref, applyUrlLocked }: Props) {
               Upgrade to view & apply
             </Link>
           ) : (
-            <ApplyJobButton jobId={job.id} applyUrl={applyHref} variant="primary" size="md" />
+            <ApplyJobButton
+              jobId={job.id}
+              company={job.company.name}
+              source="job_detail_header"
+              applyUrl={applyHref}
+              variant="primary"
+              size="md"
+            />
           )}
           <AppliedToggleButton jobId={job.id} size="md" />
         </div>

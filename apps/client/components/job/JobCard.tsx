@@ -249,6 +249,8 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
           >
             <ApplyJobButton
               jobId={job.id}
+              company={job.company.name}
+              source="job_card"
               applyUrl={applyHref}
               outlineTone={accent}
               size="sm"
@@ -295,6 +297,8 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
           <div className="flex flex-nowrap justify-end gap-2">
             <ApplyJobButton
               jobId={job.id}
+              company={job.company.name}
+              source="job_card"
               applyUrl={applyHref}
               outlineTone={accent}
               size="sm"
@@ -455,6 +459,8 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
           >
             <ApplyJobButton
               jobId={job.id}
+              company={job.company.name}
+              source="job_card"
               applyUrl={applyHref}
               outlineTone={accent}
               size="sm"

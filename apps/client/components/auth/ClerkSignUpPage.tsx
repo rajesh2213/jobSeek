@@ -4,6 +4,11 @@ import { SignUp } from "@clerk/nextjs";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import {
+  captureEvent,
+  usePosthogStableMicrotask,
+  withPosthogAttribution,
+} from "../../lib/posthog";
 import { returnPathFromSearchParams, signInWithNext } from "../../lib/signInUrl";
 
 function SignUpBody() {
@@ -15,6 +20,18 @@ function SignUpBody() {
     if (typeof window === "undefined") return;
     setForceUrl(new URL(returnPath, window.location.origin).href);
   }, [returnPath]);
+
+  usePosthogStableMicrotask(() => {
+    if (forceUrl == null) return;
+    try {
+      const k = `jobseek:ph_signup_started:${forceUrl}`;
+      if (sessionStorage.getItem(k) === "1") return;
+      sessionStorage.setItem(k, "1");
+    } catch {
+      /* ignore */
+    }
+    captureEvent("signup_started", withPosthogAttribution({ source: "sign_up_page" }));
+  }, [forceUrl]);
 
   if (forceUrl == null) {
     return (

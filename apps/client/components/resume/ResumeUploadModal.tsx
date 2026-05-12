@@ -3,6 +3,7 @@
 import { useAuth } from "@clerk/nextjs";
 import { useCallback, useRef, useState } from "react";
 import { trackResumeUploaded } from "../../lib/analytics/resumeMatchFunnel";
+import { captureEvent } from "../../lib/posthog";
 import { useResume } from "../../lib/resumeContext";
 import { ResumeBodyPortal } from "./ResumeBodyPortal";
 
@@ -79,6 +80,13 @@ export function ResumeUploadModal({
     try {
       await uploadResume(file);
       setSuccess(true);
+      const ext = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() ?? "" : "";
+      const fileType = file.type?.trim() || (ext === "pdf" ? "application/pdf" : "") || ext || "unknown";
+      captureEvent("resume_uploaded", {
+        fileType,
+        fileSize: file.size,
+        parseSuccess: true,
+      });
       void trackResumeUploaded({ getToken, source: "resume_upload_modal" });
       onUploadSuccess?.();
       onClose();

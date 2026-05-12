@@ -23,6 +23,7 @@ import {
 } from "../../lib/userLocalResetTime";
 import { clearExtensionAuth } from "../../lib/extensionAuthBridge";
 import { isBillingSubscriptionEntitled } from "../../lib/billingEntitlement";
+import { resetPosthog } from "../../lib/posthog";
 
 function formatRelativeTime(iso: string): string {
   const t = new Date(iso).getTime();
@@ -217,6 +218,7 @@ export function AccountDashboard() {
     try {
       await clearExtensionAuth();
       await signOut({ redirectUrl: "/jobs" });
+      resetPosthog();
     } catch {
       setSignOutError("Could not sign out right now. Please try again.");
       setIsSigningOut(false);

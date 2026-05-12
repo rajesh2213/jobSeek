@@ -3,11 +3,16 @@
 import { useAuth } from "@clerk/nextjs";
 import type { AccentTone } from "../ui/types";
 import { useApplications } from "../../lib/applicationsContext";
+import { captureEvent, withPosthogAttribution } from "../../lib/posthog";
 import { buttonClassName } from "../ui/Button";
 import { cn } from "../../lib/cn";
 
 interface Props {
   jobId: string;
+  /** Company display name for analytics */
+  company: string;
+  /** Where the apply CTA lives, e.g. `job_detail_header` or `job_card` */
+  source: string;
   applyUrl: string;
   /** Card accent for outline Apply button */
   outlineTone?: AccentTone;
@@ -18,6 +23,8 @@ interface Props {
 
 export function ApplyJobButton({
   jobId,
+  company,
+  source,
   applyUrl,
   outlineTone = "brand",
   size = "sm",
@@ -31,6 +38,15 @@ export function ApplyJobButton({
   const openApply = () => {
     const url = applyUrl.trim();
     if (!url) return;
+    captureEvent(
+      "job_apply_clicked",
+      withPosthogAttribution({
+        jobId,
+        company,
+        source,
+        isAuthenticated: Boolean(isSignedIn),
+      }),
+    );
     if (track) {
       try {
         const current = new URL(window.location.href);

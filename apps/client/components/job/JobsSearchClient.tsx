@@ -39,6 +39,12 @@ import {
   normalizeRelatedSlugPath,
   type JobFilters,
 } from "../../lib/slug-parser";
+import {
+  buildJobSearchEventProps,
+  captureEvent,
+  usePosthogStableMicrotask,
+  withPosthogAttribution,
+} from "../../lib/posthog";
 import { signInWithNext } from "../../lib/signInUrl";
 import { signalProgrammaticNavigation } from "../layout/RouteLoader";
 import { Container } from "../ui/Container";
@@ -573,6 +579,20 @@ export function JobsSearchClient({
   /** Tracks which search the current `listJobs` / `listMeta` belong to; avoids wiping client "load more" on RSC refresh. */
   const listServerSyncKeyRef = useRef<string | null>(null);
 
+  const urlFiltersRef = useRef(urlFilters);
+  const listMetaRef = useRef(listMeta);
+  urlFiltersRef.current = urlFilters;
+  listMetaRef.current = listMeta;
+
+  usePosthogStableMicrotask(() => {
+    captureEvent(
+      "job_search",
+      withPosthogAttribution({
+        ...buildJobSearchEventProps(urlFiltersRef.current, listMetaRef.current),
+      }),
+    );
+  }, [jobListFiltersKey]);
+
   useEffect(() => {
     setDraft(urlFilters);
     setUiFilters({
@@ -1019,6 +1039,13 @@ export function JobsSearchClient({
         query: canonicalQuery,
         name: autoName,
       });
+      captureEvent(
+        "saved_search_created",
+        withPosthogAttribution({
+          query: created.query,
+          alertEnabled: Boolean(created.alertEnabled),
+        }),
+      );
       setSavedSearches((prev) =>
         prev.some((item) => item.query === created.query)
           ? prev

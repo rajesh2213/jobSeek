@@ -29,6 +29,8 @@ import { SeoFooterLinks } from "../../../../components/seo/SeoFooterLinks";
 import { SeoBreadcrumbs } from "../../../../components/seo/SeoBreadcrumbs";
 import { UserLocalResetCaption } from "../../../../components/job/UserLocalResetCaption";
 import { EmailCaptureCard } from "../../../../components/email/EmailCaptureCard";
+import { JobDetailPosthogTracker } from "../../../../components/analytics/JobDetailPosthogTracker";
+import { jobDetailPinLocationText } from "../../../../lib/jobDisplay";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -98,6 +100,13 @@ export default async function JobDetailPage({ params }: Props) {
 
   return (
     <main className="min-h-screen">
+      <JobDetailPosthogTracker
+        jobId={job.id}
+        company={job.company.name}
+        location={jobDetailPinLocationText(job)}
+        remote={Boolean(job.isRemote || job.enriched?.remote)}
+        source="job_detail_page"
+      />
       <Container width="wide" className="py-8">
         <SeoBreadcrumbs
           items={[
