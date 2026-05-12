@@ -120,6 +120,8 @@ function resolveDescription(
   const candidates = [
     preferred,
     job.description ?? undefined,
+    /** Capped-detail API: UI `description` is null; this field preserves SSR JSON-LD only. */
+    job.structuredDataDescription ?? undefined,
     extras.descriptionText ?? undefined,
     extras.rawDescription ?? undefined,
     extras.descriptionHtml ?? undefined,

@@ -46,6 +46,15 @@ test("capped path still emits description via structuredDataDescription fallback
   assert.equal(jsonLd.description, "Capped-safe structured data description.");
 });
 
+test("capped path uses structuredDataDescription when preferred is omitted", () => {
+  const job = sampleJob({
+    description: null,
+    structuredDataDescription: "Resolver picks this without page wiring.",
+  });
+  const jsonLd = buildJobPostingJsonLd(job, undefined, "flat");
+  assert.equal(jsonLd.description, "Resolver picks this without page wiring.");
+});
+
 test("remote job keeps applicantLocationRequirements and description", () => {
   const job = sampleJob({
     description: null,
