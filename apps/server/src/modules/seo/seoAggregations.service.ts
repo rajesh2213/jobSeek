@@ -48,14 +48,27 @@ export function createSeoAggregationsService(prisma: PrismaClient) {
         AND j."salaryMin" > 0
     `;
 
+    /**
+     * Strategy A (freshness-overhaul Phase 6): hiring-trend buckets are
+     * supposed to mean "jobs posted per day". Mixing in crawl timestamps as
+     * "posted on the crawl date" inflated the chart for sources that don't
+     * supply postedAt (wellfound, careers_page) — visible on SEO landing
+     * pages as a flat plateau coinciding with our crawl cadence.
+     *
+     * Bucket strictly by `postedAt`. Rows without a real publish date are
+     * excluded — they don't represent dated hiring activity. Sources where
+     * coverage is poor will show empty plateaus until adapter improvements
+     * (Phase 6 follow-up: careers_page JSON-LD datePosted extraction).
+     */
     const trendRows = await prisma.$queryRaw<Array<{ day: string; count: bigint }>>`
-      SELECT TO_CHAR(DATE_TRUNC('day', COALESCE(j."postedAt", j."createdAt")), 'YYYY-MM-DD') AS day,
+      SELECT TO_CHAR(DATE_TRUNC('day', j."postedAt"), 'YYYY-MM-DD') AS day,
              COUNT(*)::bigint AS count
       FROM "Job" j
       WHERE ${whereSql}
-        AND COALESCE(j."postedAt", j."createdAt") >= NOW() - INTERVAL '14 days'
-      GROUP BY DATE_TRUNC('day', COALESCE(j."postedAt", j."createdAt"))
-      ORDER BY DATE_TRUNC('day', COALESCE(j."postedAt", j."createdAt")) DESC
+        AND j."postedAt" IS NOT NULL
+        AND j."postedAt" >= NOW() - INTERVAL '14 days'
+      GROUP BY DATE_TRUNC('day', j."postedAt")
+      ORDER BY DATE_TRUNC('day', j."postedAt") DESC
       LIMIT 14
     `;
 

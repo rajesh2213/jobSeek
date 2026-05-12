@@ -23,7 +23,17 @@ export function buildJobPostingJsonLd(
   const country = (job.locationCountry || job.country || "").trim();
   const cc = country.length === 2 ? country.toUpperCase() : "";
   const currency = cc ? COUNTRY_CURRENCY[cc] ?? "USD" : "USD";
-  const datePosted = firstValidDateIso(job.postedAt, job.effectivePostedAt, job.createdAt);
+  /**
+   * Strategy A (freshness-overhaul Phase 6): only emit `datePosted` when we have a
+   * real employer-supplied publish date. We MUST NOT pass crawl/discovery
+   * timestamps to Google as if they were `datePosted` — that contaminates Rich
+   * Results with fake freshness and harms long-term SEO trust.
+   *
+   * Schema.org allows `datePosted` to be omitted; Google treats missing `datePosted`
+   * as "use crawl-time-of-page" which is the correct fallback for discovery-only rows.
+   */
+  const datePosted = firstValidPostedIso(job.postedAt);
+  const validThrough = computeValidThrough(job.postedAt);
   const resolvedDescription = resolveDescription(job, description);
 
   const org: Record<string, unknown> = {
@@ -47,8 +57,10 @@ export function buildJobPostingJsonLd(
         addressCountry: cc || country || undefined,
       },
     },
-    datePosted,
-    validThrough: computeValidThrough(job.postedAt, job.createdAt),
+    /** Only when freshnessSource === POSTED. Omit otherwise. */
+    ...(datePosted ? { datePosted } : {}),
+    /** validThrough mirrors datePosted: only emit when we actually have a publish date to extend from. */
+    ...(validThrough ? { validThrough } : {}),
     employmentType: employmentType(job.workType),
     description: resolvedDescription || undefined,
   };
@@ -86,21 +98,22 @@ function employmentType(workType: string | undefined): string | undefined {
   return undefined;
 }
 
-function computeValidThrough(postedAt: string | null, createdAt: string | undefined): string | undefined {
-  const raw = postedAt ?? createdAt;
-  if (!raw) return undefined;
-  const d = new Date(raw);
+/**
+ * Strategy A: validThrough is only meaningful when `datePosted` is emitted.
+ * Returns `postedAt + 45 days` when postedAt is a valid ISO string, else `undefined`.
+ */
+function computeValidThrough(postedAt: string | null): string | undefined {
+  if (!postedAt) return undefined;
+  const d = new Date(postedAt);
   if (Number.isNaN(d.getTime())) return undefined;
   d.setUTCDate(d.getUTCDate() + 45);
   return d.toISOString();
 }
 
-function firstValidDateIso(...values: Array<string | null | undefined>): string | undefined {
-  for (const raw of values) {
-    if (!raw) continue;
-    if (!Number.isNaN(Date.parse(raw))) return raw;
-  }
-  return undefined;
+function firstValidPostedIso(value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  if (Number.isNaN(Date.parse(value))) return undefined;
+  return value;
 }
 
 function resolveDescription(job: JobItem, preferred: string | undefined): string | undefined {
