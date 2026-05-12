@@ -21,7 +21,14 @@ import { normalizeJobUrl } from "../../../../utils/normalizeJobUrl.js";
 import type { JobRepository } from "../../../job/job.repository.js";
 import { CRAWLABLE_ATS_TYPES, type AtsType } from "../../../ats/ats.interface.js";
 import { normalizeDomain } from "../../../../utils/common.js";
-import { incrOpenClawMetric } from "./openclaw.analytics.js";
+import { incrOpenClawMetric, recordOpenClawShadowParseEval } from "./openclaw.analytics.js";
+import {
+  createEmptyOpenClawShadowSummary,
+  evaluateOpenClawShadowParseEligibility,
+  mergeOpenClawShadowEvalIntoSummary,
+  sourceUrlHost,
+} from "./openclaw.parseShadow.js";
+import { peekRecentSeenBlocksEnqueue } from "../../../../services/recentJobSeen.service.js";
 import { computeCompanyQualityFlags } from "../../../../services/qualityFlags.service.js";
 
 const PAGING_KEY = "openclaw:paging:next_page";
@@ -258,6 +265,7 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
   );
 
   let emittedDryRunSkipLogs = false;
+  const shadowSummary = createEmptyOpenClawShadowSummary();
 
   for (let i = 0; i < cfg.maxPagesPerRun; i++) {
     const fetched = await client.fetchJobsSearch({
@@ -407,10 +415,73 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
       }
 
       try {
-        const { inserted } = await ctx.jobService.ingestDeduplicated(dedupInput);
+        const { inserted, canonical } = await ctx.jobService.ingestDeduplicated(dedupInput);
         jobsProcessed += 1;
         if (!inserted) await incrOpenClawMetric(redis, "jobs_merged", 1);
         else await incrOpenClawMetric(redis, "jobs_new_canonical", 1);
+
+        try {
+          const now = new Date();
+          const jobRow = await ctx.prisma.job.findUnique({
+            where: { id: canonical.id },
+            select: {
+              id: true,
+              status: true,
+              title: true,
+              sourceUrl: true,
+              description: true,
+              applyUrl: true,
+              parsedDescription: true,
+              lastSeenAt: true,
+              lastProcessedAt: true,
+              contentHash: true,
+              companyId: true,
+            },
+          });
+          const companyRow = jobRow
+            ? await ctx.prisma.company.findUnique({
+                where: { id: jobRow.companyId },
+                select: { atsType: true },
+              })
+            : null;
+          const recentSeenBlocks = await peekRecentSeenBlocksEnqueue(
+            jobRow?.sourceUrl ?? dedupInput.sourceUrl,
+          );
+          const shadowEval = evaluateOpenClawShadowParseEligibility(jobRow, {
+            now,
+            recentSeenBlocks,
+          });
+          await recordOpenClawShadowParseEval(redis, shadowEval);
+          mergeOpenClawShadowEvalIntoSummary(shadowSummary, shadowEval, companyRow?.atsType);
+
+          const descriptionLen = jobRow?.description?.trim().length ?? 0;
+          logger.info(
+            {
+              event: "openclaw_parse_shadow_eval",
+              provider: "openclaw",
+              canonical_id: canonical.id,
+              source_host: sourceUrlHost(jobRow?.sourceUrl ?? dedupInput.sourceUrl),
+              company_ats_type: companyRow?.atsType ?? null,
+              source: "openclaw",
+              inserted,
+              eligible: shadowEval.eligible,
+              reason: shadowEval.reason,
+              processor_would_skip_parse: shadowEval.processorWouldSkipParse,
+              description_len: descriptionLen,
+            },
+            "openclaw_parse_shadow_eval",
+          );
+        } catch (shadowErr) {
+          logger.warn(
+            {
+              event: "openclaw_parse_shadow_eval_failed",
+              provider: "openclaw",
+              canonical_id: canonical.id,
+              err: shadowErr,
+            },
+            "openclaw_parse_shadow_eval_failed",
+          );
+        }
       } catch (err) {
         logger.warn(
           { event: "openclaw_ingest_failed", provider: "openclaw", sourceUrl: dedupInput.sourceUrl, err },
@@ -435,6 +506,22 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
     },
     "openclaw_sync_completed",
   );
+
+  if (!cfg.dryRun && shadowSummary.jobs_shadow_evaluated > 0) {
+    logger.info(
+      {
+        event: "openclaw_parse_shadow_summary",
+        provider: "openclaw",
+        dry_run: cfg.dryRun,
+        jobs_shadow_evaluated: shadowSummary.jobs_shadow_evaluated,
+        parse_eligible: shadowSummary.parse_eligible,
+        parse_ineligible: shadowSummary.parse_ineligible,
+        reject_counts: shadowSummary.reject_counts,
+        ats_breakdown: shadowSummary.ats_breakdown,
+      },
+      "openclaw_parse_shadow_summary",
+    );
+  }
 
   return { ok: true, jobsProcessed, dryRun: cfg.dryRun };
 }

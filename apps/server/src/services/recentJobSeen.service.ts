@@ -13,6 +13,28 @@ function recentSeenKey(sourceUrl: string): string {
   return `job:seen:${sourceUrl}`;
 }
 
+/**
+ * Read-only: true if the crawl enqueue dedupe key exists (another path recently claimed this URL).
+ * Does **not** mutate Redis. Used for OpenClaw shadow parse eligibility only.
+ */
+export async function peekRecentSeenBlocksEnqueue(sourceUrl: string): Promise<boolean> {
+  const trimmed = sourceUrl.trim();
+  if (!trimmed) return false;
+  const normalizedUrl = normalizeJobUrl(trimmed);
+  try {
+    const redis = getIoredis();
+    const key = recentSeenKey(normalizedUrl);
+    const v = await redis.get(key);
+    return v != null && v !== "";
+  } catch (err) {
+    logger.warn(
+      { event: "job_recent_seen_peek_failed", sourceUrl: normalizedUrl, err },
+      "job_recent_seen_peek_failed",
+    );
+    return false;
+  }
+}
+
 export async function shouldEnqueueJob(sourceUrl: string): Promise<boolean> {
   const trimmed = sourceUrl.trim();
   if (!trimmed) return true;

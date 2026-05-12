@@ -30,8 +30,9 @@ function isNullishParsedField(value: unknown): boolean {
 /**
  * Stricter than plain truthiness: JSON `null`, empty object, and all-empty bucket arrays
  * are **not** usable; at least one bucket must contain a non-blank string line.
+ * Exported for OpenClaw shadow eligibility (read-only; must stay aligned with enrich skips).
  */
-function hasUsableParsedPayloadStrict(payload: unknown): boolean {
+export function hasUsableParsedPayloadStrict(payload: unknown): boolean {
   if (isNullishParsedField(payload)) return false;
   if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return false;
   const obj = payload as Record<string, unknown>;
