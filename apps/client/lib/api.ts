@@ -65,6 +65,28 @@ export type JobPreviewLinesSource =
   | "other"
   | "fallback";
 
+/**
+ * Backend-owned freshness contract.
+ *
+ * Mirrors the `Freshness` type in `apps/server/src/utils/freshness.ts`. The
+ * server emits this on every job mapper output (list + detail + capped detail).
+ * Clients MUST consume this object instead of inferring "Posted" vs "Added"
+ * themselves from `postedAt != null` — that inference is unreliable due to
+ * historical proxy contamination and per-adapter inconsistency.
+ */
+export type FreshnessSource = "POSTED" | "DISCOVERED";
+
+export interface JobFreshness {
+  /** POSTED = job has a real employer-supplied publish date; DISCOVERED = we only know when we found it. */
+  source: FreshnessSource;
+  /** Prefix word for UI. Localizable later. */
+  label: "Posted" | "Added";
+  /** ISO 8601 timestamp paired with the label. For POSTED this is `postedAt`; for DISCOVERED this is `createdAt`. */
+  timestamp: string;
+  /** Server-rendered "Posted 3 hours ago" — safe for SSR / JSON-LD / email; client ticker can override on long-lived pages. */
+  relative: string;
+}
+
 export interface JobItem {
   id: string;
   title: string;
@@ -90,10 +112,14 @@ export interface JobItem {
   salaryMin: number | null;
   sourceUrl: string;
   applyUrl?: string | null;
+  /** @deprecated Prefer `freshness.timestamp` + `freshness.source === "POSTED"`. Still present for backward compatibility with v1 clients. */
   postedAt: string | null;
-  /** Same instant as listing freshness / DB `listingFreshnessAt` (ISO string from API). */
+  /** @deprecated Same instant as listing freshness / DB `listingFreshnessAt`. Prefer `freshness.timestamp`. */
   effectivePostedAt?: string | null;
+  /** @deprecated Prefer `freshness.timestamp` when `freshness.source === "DISCOVERED"`. */
   createdAt?: string;
+  /** Backend-owned freshness contract — Phase 7 of the freshness-integrity overhaul. */
+  freshness?: JobFreshness;
   status?: "processing" | "ready" | "failed" | null;
   companyId: string;
   company: JobCompany;
