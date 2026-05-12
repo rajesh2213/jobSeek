@@ -30,7 +30,7 @@ function sampleJob(overrides: Partial<JobItem> = {}): JobItem {
 
 test("uncapped path includes description and datePosted fallback", () => {
   const job = sampleJob({ description: "Readable role details.", postedAt: null });
-  const jsonLd = buildJobPostingJsonLd(job, job.description ?? undefined, "flat");
+  const jsonLd = buildJobPostingJsonLd(job, job.description ?? undefined);
   assert.equal(jsonLd.description, "Readable role details.");
   assert.equal(jsonLd.datePosted, "2026-05-12T06:57:21.746Z");
 });
@@ -42,7 +42,7 @@ test("capped path still emits description via structuredDataDescription fallback
   });
   const jsonLdDescription =
     (job.description ?? undefined) || job.structuredDataDescription || undefined;
-  const jsonLd = buildJobPostingJsonLd(job, jsonLdDescription, "flat");
+  const jsonLd = buildJobPostingJsonLd(job, jsonLdDescription);
   assert.equal(jsonLd.description, "Capped-safe structured data description.");
 });
 
@@ -51,7 +51,7 @@ test("capped path uses structuredDataDescription when preferred is omitted", () 
     description: null,
     structuredDataDescription: "Resolver picks this without page wiring.",
   });
-  const jsonLd = buildJobPostingJsonLd(job, undefined, "flat");
+  const jsonLd = buildJobPostingJsonLd(job, undefined);
   assert.equal(jsonLd.description, "Resolver picks this without page wiring.");
 });
 
@@ -63,11 +63,7 @@ test("remote job keeps applicantLocationRequirements and description", () => {
     workType: "remote",
     locationCountry: "MX",
   });
-  const jsonLd = buildJobPostingJsonLd(
-    job,
-    job.structuredDataDescription ?? undefined,
-    "structured",
-  );
+  const jsonLd = buildJobPostingJsonLd(job, job.structuredDataDescription ?? undefined);
   assert.equal(jsonLd.jobLocationType, "TELECOMMUTE");
   assert.deepEqual(jsonLd.applicantLocationRequirements, { "@type": "Country", name: "MX" });
   assert.equal(jsonLd.description, "Remote role description");
