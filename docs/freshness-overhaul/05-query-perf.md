@@ -66,33 +66,64 @@ DATABASE_URL=... npm run -s explain:job-listing -- --analyze --compare-legacy \
 ```
 
 This runs `EXPLAIN (ANALYZE, BUFFERS)` for the new and the legacy `ORDER BY`
-back-to-back. Three expected outcomes by candidate set size:
+back-to-back.
 
-1. **Small/medium candidates (<~50k after WHERE).** Plan is `Bitmap Heap Scan →
-   Sort → Limit`. Sort cost is in the single-digit ms — negligible.
-2. **Bare listing (no filters), millions of rows.** Plan likely uses
-   `idx_jobs_listing_freshness_at` for an Index Scan and adds a small Sort node
-   to enforce the new leading `postedAt DESC NULLS LAST` key. The Sort node has
-   bounded cost because the LIMIT short-circuits it once the top-N are seen.
-3. **Worst case: full Seq Scan.** Only happens if WHERE clause is incompatible
-   with available indexes — same behavior as today.
+### Pre-rollout EXPLAIN against production (95k canonical rows) — index required
 
-If POST-cutover EXPLAIN shows the Sort dominating wall time on the bare-list
-path (>20 ms p95), apply this **CONCURRENTLY-built** composite (additive, zero-
-lock once `CONCURRENTLY` is honored):
+Production baseline (`deploy-snapshots/freshness-rollout-pre/`) showed the new
+ORDER BY **could not be served** by any of the existing 10 partial indexes on
+`Job`:
+
+| Index | Why it didn't help |
+|---|---|
+| `idx_jobs_posted_ready_canonical_null`           | `(postedAt DESC)` — defaults to `NULLS FIRST`; our query needs `NULLS LAST`. |
+| `idx_jobs_posted_created_ready_canonical_null`   | Same `NULLS FIRST` mismatch. |
+| `idx_jobs_listing_order_fast`                    | `NULLS LAST` order matches, but predicate includes a `role NOT IN (...)` exclusion that our listing query doesn't carry. |
+| `idx_jobs_listing_freshness_at`                  | Sorts by `listingFreshnessAt` only — wrong leading key. |
+| `Job_listing_sort_coalesce_idx`                  | Indexed on `COALESCE(postedAt, createdAt)`, no `postedAt` prefix. |
+
+Result before mitigation:
+
+| Plan           | Method                              | Buffers   | Exec time |
+|----------------|-------------------------------------|-----------|-----------|
+| Legacy         | Index Scan + Incremental Sort       | hit=61    |  2.3 ms   |
+| New            | **Parallel Seq Scan** + top-N Sort  | hit=15171 | **95.4 ms** (~40× worse) |
+| New, force idx | Parallel Bitmap → out-of-order Sort | hit=15372 | **3039 ms** (worst) |
+
+A new partial index — promoted from "deferred" to required — is applied as
+migration `20260512170000_job_canonical_latest_partial_index`:
 
 ```sql
--- Run during a quiet window; CONCURRENTLY requires no transaction.
-CREATE INDEX CONCURRENTLY idx_jobs_posted_freshness
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_jobs_canonical_latest_v2
   ON "Job" ("postedAt" DESC NULLS LAST, "listingFreshnessAt" DESC, "createdAt" DESC, id)
   WHERE "canonicalJobId" IS NULL
     AND "isActive" = true
     AND ("status" = 'ready' OR "status" IS NULL);
 ```
 
-This index exactly matches the new ORDER BY tuple, so a properly chosen plan can
-return rows pre-sorted with zero Sort cost. Deferred until measurement proves
-it's needed.
+Result after applying:
+
+| Plan           | Method                                          | Buffers | Exec time |
+|----------------|-------------------------------------------------|---------|-----------|
+| Legacy         | Index Scan + Incremental Sort *(unchanged)*     | hit=61  |  2.3 ms   |
+| New            | **Index Only Scan** on `idx_jobs_canonical_latest_v2` — no Sort node | hit=42 | **0.235 ms** |
+| Cursor page 2  | Index Only Scan with `ROW(...) <` Index Cond     | hit=38  |  0.318 ms |
+
+The new sort is now **10× faster than the legacy plan**. The legacy plan is
+unaffected because it uses a different index; the new index simply sits idle
+until code is deployed that emits the new ORDER BY.
+
+### Deployment order
+
+Migration must apply **before** the code that emits the new ORDER BY. Both are
+zero-downtime: the migration is `CREATE INDEX CONCURRENTLY` (no table lock,
+small `ShareUpdateExclusiveLock` only), and the code is backward-compatible
+once the index exists. Practical order on this VPS:
+
+1. `npx prisma migrate deploy` — applies the new partial index. Legacy code
+   continues running, unchanged plan.
+2. `npm run build:server` — compile `dist/` with the new ORDER BY.
+3. `cd deploy/ && ./restart-jobseek.sh` — restart workers, picks up new code.
 
 ## What else I audited
 
@@ -111,6 +142,13 @@ The new ORDER BY is in a single Prisma SQL template literal. Reverting is one
 commit's worth of `git revert`. The Phase 4 mapper's `freshness` field is
 backward compatible (additive). Rolling back Phase 5 alone leaves Phase 4
 intact and harmless.
+
+If the index itself ever needs removal (it won't impact correctness either way):
+
+```sql
+-- Run in a direct (non-pgbouncer) session; CONCURRENTLY cannot run in a tx:
+DROP INDEX CONCURRENTLY IF EXISTS "idx_jobs_canonical_latest_v2";
+```
 
 ## Validation checklist (Phase 11 will re-run)
 
