@@ -30,6 +30,11 @@ export interface CrawlCompanyJobsPayload {
   atsType?: AtsType;
   atsBoardToken?: string;
   greenhouseBoardToken: string;
+  /**
+   * Epoch ms when the crawl job was enqueued (scheduler). Used only for queue-wait / lag logs;
+   * optional for backward compatibility with in-flight jobs.
+   */
+  crawlEnqueuedAtMs?: number;
 }
 
 export interface NormalizedJob {

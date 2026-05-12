@@ -50,19 +50,59 @@ async function reconcileBatch(limit: number): Promise<number> {
   return rows.length;
 }
 
+/**
+ * Aligns with `backfillJobStatus` heuristic: long plain-text description can be listed without AI parse.
+ * **Opt-in** (`JOB_STATUS_RECONCILE_LONG_DESC_READY=true`) to avoid behavior change until validated in canary.
+ */
+async function reconcileBatchLongDescription(limit: number): Promise<number> {
+  const rows = await prisma.$queryRaw<Array<{ id: string; previous_status: string | null }>>`
+    WITH target AS (
+      SELECT id, "status" AS previous_status
+      FROM "Job"
+      WHERE "canonicalJobId" IS NULL
+        AND ("status" = 'processing' OR "status" IS NULL)
+        AND "parsedDescription" IS NULL
+        AND char_length(BTRIM(COALESCE("description", ''))) > 100
+        AND char_length(BTRIM(COALESCE("title", ''))) > 0
+      ORDER BY "updatedAt" ASC
+      LIMIT ${limit}
+    )
+    UPDATE "Job" AS j
+    SET "status" = 'ready'
+    FROM target
+    WHERE j.id = target.id
+    RETURNING j.id, target.previous_status
+  `;
+  for (const row of rows) {
+    recordStatusTransition(row.previous_status, "ready", "reconcile_long_description_heuristic");
+  }
+  return rows.length;
+}
+
 async function runReconcile(): Promise<{
   batches: number;
   reconciledToReady: number;
+  reconciledLongDesc: number;
 }> {
   let batches = 0;
   let reconciledToReady = 0;
+  let reconciledLongDesc = 0;
   while (batches < MAX_BATCHES_PER_RUN) {
     const updated = await reconcileBatch(BATCH_SIZE);
     batches += 1;
     reconciledToReady += updated;
     if (updated === 0) break;
   }
-  return { batches, reconciledToReady };
+  if (process.env.JOB_STATUS_RECONCILE_LONG_DESC_READY?.trim() === "true") {
+    let ldBatches = 0;
+    while (ldBatches < MAX_BATCHES_PER_RUN) {
+      const updated = await reconcileBatchLongDescription(BATCH_SIZE);
+      ldBatches += 1;
+      reconciledLongDesc += updated;
+      if (updated === 0) break;
+    }
+  }
+  return { batches, reconciledToReady, reconciledLongDesc };
 }
 
 async function main(): Promise<void> {
@@ -88,6 +128,7 @@ async function main(): Promise<void> {
           event: "job_status_reconcile_run",
           batches: out.batches,
           reconciled_to_ready_count: out.reconciledToReady,
+          reconciled_long_description_count: out.reconciledLongDesc,
         },
         "job_status_reconcile_run",
       );

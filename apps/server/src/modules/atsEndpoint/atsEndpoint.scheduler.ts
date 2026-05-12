@@ -15,7 +15,8 @@ import { assertRequiredSelect, logQueryMetrics } from "../../utils/queryMetrics.
 /**
  * TODO(provider-isolation): Today all crawlable endpoints share one Bull queue (`ingest-ats-endpoint`)
  * and one worker concurrency budget. A long Workday ingest can starve other providers.
- * Future: per-provider queues, weighted fair dispatch, or per-provider concurrency caps in the worker.
+ * Set `ATS_ENDPOINT_SCHEDULER_MAX_PER_TYPE` (1–50, default **0** = off) to cap each `type` in the
+ * first pass of a batch, then fill remaining slots by global priority — reduces Workday monopolization.
  */
 const MIN_INTERVAL_MS = 5 * 60 * 1000;
 const MAX_INTERVAL_MS = 8 * 60 * 1000;
@@ -27,6 +28,7 @@ const MAX_BATCH_SIZE = 100;
 // REQUIRED_SELECT
 const ATS_ENDPOINT_SCHED_SELECT = {
   id: true,
+  type: true,
   score: true,
   successCount: true,
   lastCrawledAt: true,
@@ -40,6 +42,52 @@ function endpointCooldownMs(score: number): number {
 
 function randomIntInclusive(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+type SchedEp = {
+  id: string;
+  type: string;
+  score: number;
+  successCount: number;
+  lastCrawledAt: Date | null;
+};
+
+/**
+ * Starvation guard: first pass respects global priority order but caps each `type`
+ * at `maxPerType`. Second pass fills up to `maxTotal` with remaining rows (preserves
+ * global priority order) **without** per-type caps so low-volume providers cannot be
+ * permanently starved when the pool is larger than `maxTotal`. Set
+ * `ATS_ENDPOINT_SCHEDULER_MAX_PER_TYPE=0` to disable fairness slicing.
+ */
+function fairBatchSlice(
+  sorted: SchedEp[],
+  maxTotal: number,
+  maxPerType: number,
+): { batch: SchedEp[]; skippedFirstPassByType: Record<string, number> } {
+  if (maxPerType <= 0 || sorted.length === 0) {
+    return { batch: sorted.slice(0, maxTotal), skippedFirstPassByType: {} };
+  }
+  const perType = new Map<string, number>();
+  const skippedFirstPassByType: Record<string, number> = {};
+  const out: SchedEp[] = [];
+  for (const row of sorted) {
+    if (out.length >= maxTotal) break;
+    const c = perType.get(row.type) ?? 0;
+    if (c >= maxPerType) {
+      skippedFirstPassByType[row.type] = (skippedFirstPassByType[row.type] ?? 0) + 1;
+      continue;
+    }
+    perType.set(row.type, c + 1);
+    out.push(row);
+  }
+  if (out.length < maxTotal) {
+    for (const row of sorted) {
+      if (out.length >= maxTotal) break;
+      if (out.some((o) => o.id === row.id)) continue;
+      out.push(row);
+    }
+  }
+  return { batch: out, skippedFirstPassByType };
 }
 
 async function enqueuePrioritizedIngests(): Promise<void> {
@@ -67,11 +115,40 @@ async function enqueuePrioritizedIngests(): Promise<void> {
     countTowardEgress: false,
   });
 
-  pool.sort((a, b) => getEndpointPriority(b) - getEndpointPriority(a));
+  pool.sort((a, b) => {
+    const d = getEndpointPriority(b) - getEndpointPriority(a);
+    if (d !== 0) return d;
+    return a.id.localeCompare(b.id);
+  });
   let adaptiveBatchSize = baseBatchSize;
   if (queryMetrics.estimatedKB > 500) adaptiveBatchSize = Math.max(MIN_BATCH_SIZE, Math.floor(baseBatchSize / 2));
   else if (queryMetrics.estimatedKB < 100) adaptiveBatchSize = Math.min(MAX_BATCH_SIZE, baseBatchSize + 20);
-  const top = pool.slice(0, adaptiveBatchSize);
+  const maxPerTypeRaw = Number(process.env.ATS_ENDPOINT_SCHEDULER_MAX_PER_TYPE ?? "0");
+  const maxPerType = Number.isFinite(maxPerTypeRaw)
+    ? Math.max(0, Math.min(50, Math.floor(maxPerTypeRaw)))
+    : 12;
+  const fair = fairBatchSlice(pool as SchedEp[], adaptiveBatchSize, maxPerType);
+  const top = fair.batch;
+
+  if (maxPerType > 0 && top.length > 0) {
+    const byType: Record<string, number> = {};
+    for (const row of top) {
+      byType[row.type] = (byType[row.type] ?? 0) + 1;
+    }
+    const skippedTypes = Object.entries(fair.skippedFirstPassByType).filter(([, n]) => n > 0);
+    logger.info(
+      {
+        event: "ats_endpoint_scheduler_fairness",
+        maxPerType,
+        enqueued: top.length,
+        poolSize: pool.length,
+        enqueueByType: byType,
+        skippedFirstPassTotal: skippedTypes.reduce((a, [, n]) => a + n, 0),
+        skippedFirstPassByType: Object.fromEntries(skippedTypes),
+      },
+      "ats_endpoint_scheduler_fairness",
+    );
+  }
 
   for (let i = 0; i < top.length; i++) {
     const ep = top[i]!;
@@ -94,6 +171,7 @@ async function enqueuePrioritizedIngests(): Promise<void> {
       batchSize: adaptiveBatchSize,
       baseBatchSize,
       poolLimit,
+      maxPerTypeFairness: maxPerType,
       estimatedKB: Number(queryMetrics.estimatedKB.toFixed(2)),
     },
     "ats_endpoint_scheduler_run",

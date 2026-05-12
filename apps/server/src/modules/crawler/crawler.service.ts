@@ -17,15 +17,17 @@ const MAX_COMPANIES_PER_RUN_PER_ATS = 500;
 const SHUFFLE_TOP_FRACTION = 0.3;
 
 /**
- * Order crawl candidates: higher score, then less-recently crawled (nulls = never, then oldest),
- * then lower recent-job volume (explore “empty” companies), then name.
- * Uses `canonicalJobsLast7d` (persisted) as a proxy for per-company job volume.
+ * Order crawl candidates: higher score, then less-recently **completed** activity, then job volume, then name.
+ *
+ * Recency uses `lastAttemptAt` when set (updated on successful/failed ingest completion in
+ * `recordIngestionFinished`) — completion-oriented. Falls back to `lastCrawledAt` for legacy rows
+ * where `lastAttemptAt` is still null.
  */
 function compareCrawlSelection(a: Company, b: Company): number {
   if (b.score !== a.score) return b.score - a.score;
 
-  const aLast = a.lastCrawledAt ? new Date(a.lastCrawledAt).getTime() : 0;
-  const bLast = b.lastCrawledAt ? new Date(b.lastCrawledAt).getTime() : 0;
+  const aLast = (a.lastAttemptAt ?? a.lastCrawledAt)?.getTime() ?? 0;
+  const bLast = (b.lastAttemptAt ?? b.lastCrawledAt)?.getTime() ?? 0;
   if (aLast !== bLast) return aLast - bLast;
 
   const aJobs = a.canonicalJobsLast7d;
@@ -115,6 +117,7 @@ export class CrawlerService {
         selected: companies.slice(0, 10).map((c) => ({
           name: c.name,
           score: c.score,
+          lastAttemptAt: c.lastAttemptAt,
           lastCrawledAt: c.lastCrawledAt,
           // Proxy for “job count” when selecting for exploration; schema has no aggregate jobCount.
           jobCount: c.canonicalJobsLast7d,
@@ -159,6 +162,7 @@ export class CrawlerService {
           continue;
         }
 
+        const enqueueMs = now.getTime();
         const payload: CrawlCompanyJobsPayload = {
           companyId: company.id,
           companyName: company.name,
@@ -167,12 +171,12 @@ export class CrawlerService {
             : undefined,
           atsBoardToken: boardToken,
           greenhouseBoardToken: boardToken,
+          crawlEnqueuedAtMs: enqueueMs,
         };
 
         const jobId = `crawl-${company.id}`;
         try {
           await this.jobQueue.add(CRAWL_COMPANY_JOBS, payload, { jobId });
-          await this.companyService.markCrawled(company.id, now);
           stats.jobsEnqueued += 1;
         } catch (err) {
           if (

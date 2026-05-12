@@ -327,6 +327,11 @@ export class CompanyService {
     return this.companyRepository.findBySlug(slug);
   }
 
+  /**
+   * Updates `Company.lastCrawledAt` only. Prefer `recordIngestionFinished` on ingest
+   * completion so `lastAttemptAt` / success stamps stay aligned; use this for legacy
+   * paths that intentionally stamp crawl time outside the worker completion hook.
+   */
   async markCrawled(companyId: string, crawledAt: Date): Promise<void> {
     await this.companyRepository.updateLastCrawledAt(companyId, crawledAt);
   }

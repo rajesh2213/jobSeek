@@ -15,9 +15,14 @@ export type CompanyScoreUpdatePayload = Pick<
   "score" | "priority" | "canonicalJobsLast7d"
 >;
 
-/** After ingestion: required counters plus optional last success timestamp. */
+/**
+ * After ingestion: required counters plus optional last success timestamp.
+ * `lastCrawledAt` on Company = last **successful** ingest/crawl completion (worker),
+ * not scheduler enqueue time (see `recordIngestionFinished` callers).
+ */
 export type IngestionFinishedUpdate = {
   lastAttemptAt: Date;
   ingestionAttempts: { increment: number };
   lastIngestionSuccessAt?: Date;
+  lastCrawledAt?: Date;
 };
