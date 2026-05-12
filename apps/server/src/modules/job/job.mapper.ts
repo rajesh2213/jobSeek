@@ -3,6 +3,7 @@ import { cleanJobDescription } from "../../utils/cleanJobDescription.js";
 import { LIST_JOB_DESCRIPTION_MAX_CHARS } from "./jobListing.constants.js";
 import { buildJobPreviewLines } from "./jobPreviewLines.js";
 import { companyDisplayName } from "../../utils/companyDisplayName.js";
+import { deriveFreshness, type Freshness } from "../../utils/freshness.js";
 
 export type JobCompanyPublic = {
   id: string;
@@ -31,6 +32,17 @@ function truncateJobDescriptionForList(
   if (t.length <= maxChars) return t;
   const slice = t.slice(0, Math.max(1, maxChars - 1)).trimEnd();
   return `${slice}…`;
+}
+
+/**
+ * Backend-owned freshness contract. Frontends must consume this rather than
+ * inferring "Posted" vs "Added" from `postedAt != null` themselves.
+ *
+ * `now` is parameterized to keep serializers deterministic under test; production
+ * callers pass nothing and we sample `Date.now()` once per serialization.
+ */
+function buildFreshness(job: Pick<Job, "postedAt" | "createdAt">, now: Date = new Date()): Freshness {
+  return deriveFreshness({ postedAt: job.postedAt, createdAt: job.createdAt }, now);
 }
 
 function toCompanyPublic(company: JobCompanyPublic): Record<string, unknown> {
@@ -65,6 +77,8 @@ export function toJobListJson(job: JobWithCompanyRow): Record<string, unknown> {
     company: toCompanyPublic(company),
     /** Listing sort key; aligns with DB `listingFreshnessAt` (= COALESCE(effectivePostedAt, createdAt)). */
     effectivePostedAt: job.effectivePostedAt ?? null,
+    /** Backend-owned freshness semantics — see apps/server/src/utils/freshness.ts */
+    freshness: buildFreshness(job),
   };
 }
 
@@ -84,6 +98,7 @@ export function toJobDetailJson(job: JobWithCompanyRow): Record<string, unknown>
     previewLines: preview.previewLines,
     previewLinesSource: preview.previewLinesSource,
     company: toCompanyPublic(company),
+    freshness: buildFreshness(job),
   };
 }
 

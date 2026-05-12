@@ -66,6 +66,8 @@ async function main(): Promise<void> {
     return;
   }
 
+  const compareLegacy = process.argv.includes("--compare-legacy");
+
   const idSql = sqlForCanonicalListingIds({
     filters,
     sort,
@@ -76,6 +78,36 @@ async function main(): Promise<void> {
 
   const prisma = new PrismaClient();
 
+  /**
+   * Legacy ORDER BY (pre Phase-5 overhaul), kept here only for EXPLAIN diffing.
+   * Do not use as a runtime path — production reads always go through
+   * `sqlForCanonicalListingIds`.
+   */
+  function legacyLatestSql(): Prisma.Sql {
+    if (sort !== "latest") return idSql;
+    return Prisma.sql`
+      SELECT j.id FROM "Job" j
+      WHERE 1=1
+      ORDER BY j."listingFreshnessAt" DESC, j."createdAt" DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  }
+
+  async function explainOne(label: string, sqlToExplain: Prisma.Sql) {
+    const rows = analyze
+      ? await prisma.$queryRaw<{ "QUERY PLAN": string }[]>(Prisma.sql`
+          EXPLAIN (ANALYZE, BUFFERS)
+          ${sqlToExplain}
+        `)
+      : await prisma.$queryRaw<{ "QUERY PLAN": string }[]>(Prisma.sql`
+          EXPLAIN
+          ${sqlToExplain}
+        `);
+    console.log(`\n=== ${label} ${analyze ? "(ANALYZE, BUFFERS)" : ""} ===`);
+    console.log(rows.map((r) => r["QUERY PLAN"]).join("\n"));
+    return rows.map((r) => r["QUERY PLAN"]).join("\n");
+  }
+
   try {
     console.log("--- parameters ---");
     console.log(JSON.stringify({ scenario, sort, limit, offset, filters: filters ?? null }, null, 2));
@@ -84,18 +116,12 @@ async function main(): Promise<void> {
       "(Parameterized; Prisma sends bound values. Run EXPLAIN in psql with your literal values if needed.)\n",
     );
 
-    const rows = analyze
-      ? await prisma.$queryRaw<{ "QUERY PLAN": string }[]>(Prisma.sql`
-        EXPLAIN (ANALYZE, BUFFERS)
-        ${idSql}
-      `)
-      : await prisma.$queryRaw<{ "QUERY PLAN": string }[]>(Prisma.sql`
-        EXPLAIN
-        ${idSql}
-      `);
+    const planText = await explainOne("CURRENT (postedAt DESC NULLS LAST, listingFreshnessAt DESC, createdAt DESC, id)", idSql);
+    if (compareLegacy) {
+      await explainOne("LEGACY  (listingFreshnessAt DESC, createdAt DESC) — pre-Phase-5 baseline", legacyLatestSql());
+    }
 
-    console.log(analyze ? "EXPLAIN (ANALYZE, BUFFERS)" : "EXPLAIN");
-    console.log(rows.map((r) => r["QUERY PLAN"]).join("\n"));
+    const rows = [{ "QUERY PLAN": planText }];
 
     const text = rows.map((r) => r["QUERY PLAN"]).join("\n").toLowerCase();
     const usesFreshnessIdx = text.includes("idx_jobs_listing_freshness_at");

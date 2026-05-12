@@ -1,5 +1,5 @@
 import type { JobItem } from "../../lib/api";
-import { formatTimeAgo } from "../../lib/format";
+import { FreshnessLine } from "./FreshnessIndicator";
 
 export function JobMeta({ job }: { job: JobItem }) {
   return (
@@ -10,7 +10,7 @@ export function JobMeta({ job }: { job: JobItem }) {
       <span>·</span>
       <span>{job.role.replace(/-/g, " ")}</span>
       <span>·</span>
-      <span>{formatTimeAgo(job.effectivePostedAt ?? job.createdAt)}</span>
+      <FreshnessLine job={job} className="text-sm tracking-normal normal-case text-ink/65" />
     </div>
   );
 }

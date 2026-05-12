@@ -170,7 +170,16 @@ function countPostedInLast2Hours(jobs: JobItem[]): number {
   const now = Date.now();
   const twoH = 2 * 60 * 60 * 1000;
   return jobs.filter((j) => {
-    const iso = j.effectivePostedAt ?? j.createdAt;
+    /**
+     * Only count rows with a real employer-supplied publish date. Mixing in
+     * crawl timestamps would inflate the "posted in the last 2 hours" claim
+     * shown on the upgrade wall and undermine trust.
+     */
+    const isPosted =
+      j.freshness?.source === "POSTED" ||
+      (j.freshness == null && j.postedAt != null && j.postedAt !== "null");
+    if (!isPosted) return false;
+    const iso = j.freshness?.timestamp ?? j.postedAt;
     if (!iso) return false;
     const t = new Date(iso).getTime();
     if (Number.isNaN(t)) return false;

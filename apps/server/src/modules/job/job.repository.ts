@@ -669,17 +669,45 @@ export function sqlForCanonicalListingIds(input: {
     includeProcessing: input.includeProcessing ?? false,
   });
   if (input.sort === "latest") {
+    /*
+     * Freshness-source-aware ordering (Phase 5 of the freshness-integrity overhaul):
+     *
+     *   1. j."postedAt" DESC NULLS LAST
+     *      - Puts rows with a true ATS-supplied publish date ("POSTED" bucket)
+     *        ahead of rows where postedAt is NULL ("DISCOVERED" bucket).
+     *      - Within the POSTED bucket this also orders by the real publish date.
+     *
+     *   2. j."listingFreshnessAt" DESC
+     *      - Tiebreaker for DISCOVERED rows (postedAt all NULL → tie on key 1).
+     *        listingFreshnessAt = COALESCE(postedAt, createdAt) so for DISCOVERED
+     *        this is effectively createdAt DESC.
+     *
+     *   3. j."createdAt" DESC, j.id ASC
+     *      - Strict deterministic tiebreaker so cursor pagination is stable across
+     *        requests even when listingFreshnessAt collides (common for batches).
+     *
+     * Index usage:
+     *   - Served by migration 20260512170000_job_canonical_latest_partial_index
+     *     (idx_jobs_canonical_latest_v2), a partial composite indexed exactly
+     *     on (postedAt DESC NULLS LAST, listingFreshnessAt DESC, createdAt DESC,
+     *     id) with the same predicate as the WHERE clause. Production EXPLAIN
+     *     resolves to an Index Only Scan with no Sort node (~0.235 ms on 95k
+     *     candidates) — see docs/freshness-overhaul/05-query-perf.md.
+     */
     return Prisma.sql`
       SELECT j.id FROM "Job" j
       WHERE ${whereSql}
-      ORDER BY j."listingFreshnessAt" DESC, j."createdAt" DESC
+      ORDER BY j."postedAt" DESC NULLS LAST,
+               j."listingFreshnessAt" DESC,
+               j."createdAt" DESC,
+               j.id ASC
       LIMIT ${input.limit} OFFSET ${input.offset}
     `;
   }
   return Prisma.sql`
     SELECT j.id FROM "Job" j
     WHERE ${whereSql}
-    ORDER BY j."salaryMin" DESC NULLS LAST, j."createdAt" DESC
+    ORDER BY j."salaryMin" DESC NULLS LAST, j."createdAt" DESC, j.id ASC
     LIMIT ${input.limit} OFFSET ${input.offset}
   `;
 }
@@ -961,9 +989,18 @@ export function createJobRepository(prisma: PrismaClient) {
 
     /**
      * Canonical jobs only; filter-first.
-     * Latest: `listingFreshnessAt DESC` (stored generated COALESCE(effectivePostedAt, createdAt); matches UI).
-     * Index: idx_jobs_listing_freshness_at. Avoids partition skew from ordering nullable effectivePostedAt alone.
-     * Salary: salary floor desc, then `createdAt` desc.
+     *
+     * Latest sort (post-overhaul, see `sqlForCanonicalListingIds`):
+     *   ORDER BY postedAt DESC NULLS LAST,    -- POSTED bucket above DISCOVERED
+     *            listingFreshnessAt DESC,      -- secondary key (stable for both buckets)
+     *            createdAt DESC, id ASC        -- pagination-stable tiebreaker
+     *
+     * Real ATS publish dates always rank above discovery-only rows. Within
+     * DISCOVERED rows ordering is unchanged (listingFreshnessAt == createdAt
+     * when postedAt is NULL). Within POSTED rows ordering is unchanged
+     * (listingFreshnessAt == postedAt when postedAt is set).
+     *
+     * Salary sort: salaryMin DESC NULLS LAST, createdAt DESC, id ASC.
      */
     async findManyCanonicalFiltered(options: {
       filters?: JobDiscoveryFilters;

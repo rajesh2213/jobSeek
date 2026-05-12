@@ -28,11 +28,25 @@ function sampleJob(overrides: Partial<JobItem> = {}): JobItem {
   };
 }
 
-test("uncapped path includes description and datePosted fallback", () => {
+test("uncapped path includes description", () => {
   const job = sampleJob({ description: "Readable role details.", postedAt: null });
   const jsonLd = buildJobPostingJsonLd(job, job.description ?? undefined);
   assert.equal(jsonLd.description, "Readable role details.");
-  assert.equal(jsonLd.datePosted, "2026-05-12T06:57:21.746Z");
+});
+
+test("omits datePosted entirely when postedAt is null (Strategy A)", () => {
+  // Discovery-only rows must not surface crawl timestamps as datePosted.
+  const job = sampleJob({ postedAt: null });
+  const jsonLd = buildJobPostingJsonLd(job, undefined);
+  assert.equal("datePosted" in jsonLd, false);
+  assert.equal("validThrough" in jsonLd, false);
+});
+
+test("emits datePosted (and validThrough = +45d) when postedAt is set", () => {
+  const job = sampleJob({ postedAt: "2026-04-15T00:00:00.000Z" });
+  const jsonLd = buildJobPostingJsonLd(job, undefined);
+  assert.equal(jsonLd.datePosted, "2026-04-15T00:00:00.000Z");
+  assert.equal(jsonLd.validThrough, "2026-05-30T00:00:00.000Z");
 });
 
 test("capped path still emits description via structuredDataDescription fallback", () => {

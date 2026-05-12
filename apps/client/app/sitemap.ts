@@ -308,9 +308,28 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
             continue;
           }
         }
+        /**
+         * Strategy A (freshness-overhaul Phase 6): use a deterministic per-row
+         * lastModified that never moves backwards and never bumps to "now" on
+         * every sitemap regen. Order of preference:
+         *
+         *   1. postedAt — real employer publish date
+         *   2. createdAt — first-discovery timestamp (stable per row)
+         *   3. now — only when both are missing (should be zero in production)
+         *
+         * Bumping `lastModified` to `now()` for every discovery-only row caused
+         * Googlebot to re-fetch unchanged URLs on every sitemap pull, wasting
+         * crawl budget. Stable lastModified preserves "freshness" signal while
+         * keeping Googlebot's crawl scheduler honest.
+         */
+        const lastModified = job.postedAt
+          ? new Date(job.postedAt)
+          : job.createdAt
+          ? new Date(job.createdAt)
+          : now;
         jobEntries.push({
           url: `${base}/job/${job.id}`,
-          lastModified: job.postedAt ? new Date(job.postedAt) : now,
+          lastModified,
         });
       }
       sections.jobs.pages = page;
