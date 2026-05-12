@@ -10,7 +10,6 @@ import { batchTransactionOptionsLong } from "../infrastructure/db/prismaTransact
 
 const BATCH_SIZE = 100;
 const PROGRESS_EVERY = 500;
-const CREATED_AT_PROXY_MAX_AGE_MS = 90 * 86400000;
 /** UUID segment date sanity (per spec). */
 const YEAR_MIN = 2020;
 const YEAR_MAX = 2026;
@@ -48,19 +47,27 @@ function extractUuidTimestampFromUrl(sourceUrl: string): Date | null {
   return null;
 }
 
+/**
+ * Resolve a *true* publish timestamp from a high-confidence source signal only.
+ *
+ * Historical note (removed): a `createdAtProxy` branch used to copy `createdAt`
+ * into `postedAt` for rows aged < 90d. That contaminated `postedAt` with crawl
+ * timestamps and made "Posted X ago" semantically meaningless across the product.
+ *
+ * Allowed signals:
+ *   - `uuid`: Lever / Ashby URL segments embed UUIDv1 timestamps from the ATS
+ *     side. This is a real, employer-authored timestamp.
+ *
+ * Anything else → leave `postedAt` NULL. Downstream code must treat NULL as
+ * "discovery-only" (freshnessSource = DISCOVERED), never as if it were posted.
+ */
 type Resolution =
   | { kind: "uuid"; postedAt: Date }
-  | { kind: "createdAtProxy"; postedAt: Date }
   | { kind: "leftNull" };
 
-function resolvePostedAt(sourceUrl: string, createdAt: Date, now: number): Resolution {
+function resolvePostedAt(sourceUrl: string): Resolution {
   const fromUuid = extractUuidTimestampFromUrl(sourceUrl);
   if (fromUuid) return { kind: "uuid", postedAt: fromUuid };
-
-  if (createdAt.getTime() >= now - CREATED_AT_PROXY_MAX_AGE_MS) {
-    return { kind: "createdAtProxy", postedAt: createdAt };
-  }
-
   return { kind: "leftNull" };
 }
 
@@ -80,10 +87,8 @@ function groupByPostedAtTime(
 async function main(): Promise<void> {
   loadRootEnv();
   const { dryRun } = parseArgs(process.argv.slice(2));
-  const now = Date.now();
 
   let uuidExtracted = 0;
-  let createdAtProxy = 0;
   let leftNull = 0;
   let processed = 0;
   /** Cursor so --dry-run still scans all rows without updating. */
@@ -109,12 +114,9 @@ async function main(): Promise<void> {
     const toWrite: Array<{ id: string; postedAt: Date }> = [];
 
     for (const row of batch) {
-      const r = resolvePostedAt(row.sourceUrl, row.createdAt, now);
+      const r = resolvePostedAt(row.sourceUrl);
       if (r.kind === "uuid") {
         uuidExtracted += 1;
-        toWrite.push({ id: row.id, postedAt: r.postedAt });
-      } else if (r.kind === "createdAtProxy") {
-        createdAtProxy += 1;
         toWrite.push({ id: row.id, postedAt: r.postedAt });
       } else {
         leftNull += 1;
@@ -140,16 +142,15 @@ async function main(): Promise<void> {
     processed += batch.length;
     if (processed % PROGRESS_EVERY === 0) {
       console.log(
-        `[progress] processed=${processed} uuidExtracted=${uuidExtracted} createdAtProxy=${createdAtProxy} leftNull=${leftNull}`,
+        `[progress] processed=${processed} uuidExtracted=${uuidExtracted} leftNull=${leftNull}`,
       );
     }
 
   }
 
-  const total = uuidExtracted + createdAtProxy + leftNull;
+  const total = uuidExtracted + leftNull;
   const report = {
     uuidExtracted,
-    createdAtProxy,
     leftNull,
     total,
     dryRun,
