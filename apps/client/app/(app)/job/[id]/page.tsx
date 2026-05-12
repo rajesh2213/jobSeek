@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { fetchJobById } from "../../../../lib/api";
-import { buildJobPostingJsonLd } from "../../../../lib/jobPostingJsonLd";
+import { buildJobPostingJsonLd, type JsonLdDescriptionMode } from "../../../../lib/jobPostingJsonLd";
 import { absoluteUrl } from "../../../../lib/seoSite";
 import {
   refineSectionsForDisplay,
@@ -32,10 +32,19 @@ import { EmailCaptureCard } from "../../../../components/email/EmailCaptureCard"
 
 interface Props {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+function readJsonLdMode(raw: string | string[] | undefined): JsonLdDescriptionMode {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return value === "structured" ? "structured" : "flat";
+}
+
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { id } = await params;
+  const qs = await searchParams;
+  /** TEMPORARY EXPERIMENT: prevent indexing experiment variants. */
+  const hasJsonLdModeQuery = qs.jsonldMode != null;
   const { getToken } = await auth();
   const token = await getToken();
   const h = await headers();
@@ -56,6 +65,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `${job.title} at ${job.company.name} | JobLoom`,
     description: desc,
     alternates: { canonical },
+    robots: hasJsonLdModeQuery ? { index: false, follow: true } : undefined,
     openGraph: {
       title: `${job.title} at ${job.company.name}`,
       description: desc,
@@ -64,8 +74,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function JobDetailPage({ params }: Props) {
+export default async function JobDetailPage({ params, searchParams }: Props) {
   const { id } = await params;
+  const qs = await searchParams;
+  /** TEMPORARY EXPERIMENT: remove after parser validation. */
+  const jsonLdMode = readJsonLdMode(qs.jsonldMode);
   const { getToken } = await auth();
   const token = await getToken();
   const h = await headers();
@@ -93,7 +106,7 @@ export default async function JobDetailPage({ params }: Props) {
   const applyHref = job.applyUrl?.trim() || job.sourceUrl?.trim() || "";
   const jsonLdDescription = structuredText || job.description || undefined;
 
-  const jsonLd = buildJobPostingJsonLd(job, jsonLdDescription);
+  const jsonLd = buildJobPostingJsonLd(job, jsonLdDescription, jsonLdMode);
 
   return (
     <main className="min-h-screen">
