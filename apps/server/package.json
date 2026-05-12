@@ -53,6 +53,8 @@
     "metrics:ats": "tsx src/scripts/ats.metrics.snapshot.ts",
     "monitor:pipeline": "tsx src/scripts/monitorPipeline.ts",
     "smoke:15m": "tsx scripts/runSmokeTest15m.ts",
+    "freshness:audit": "tsx scripts/freshness/audit.ts",
+    "freshness:audit:json": "tsx scripts/freshness/audit.ts --json",
     "backfill:parsed-descriptions": "tsx src/scripts/backfillParsedDescriptions.ts",
     "backfill:job-enrichment": "tsx src/scripts/backfillJobEnrichment.ts",
     "backfill:job-status": "tsx src/scripts/backfillJobStatus.ts",
