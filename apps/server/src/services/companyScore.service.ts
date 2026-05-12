@@ -142,21 +142,55 @@ export async function logCompanyPriorityDistribution(prisma: PrismaClient): Prom
   );
 }
 
-/** Bump ingestion counters, set success timestamp when applicable, then request score recompute. */
+/**
+ * Bump ingestion counters, set success timestamp when applicable, then request score recompute.
+ *
+ * Semantics:
+ * - `lastAttemptAt`: set on every call (success or failure) — last worker **attempt** boundary.
+ * - `lastIngestionSuccessAt`: only on success — feeds company score freshness.
+ * - `lastCrawledAt` (Company): only on success — **completion-oriented** “board / ingest finished OK”
+ *   stamp for ops and selection heuristics. Do **not** set this from scheduler enqueue.
+ */
+export type RecordIngestionFinishedOpts = {
+  /** Bull job `timestamp` / scheduler enqueue time when known (legacy crawl path). */
+  crawlEnqueuedAtMs?: number;
+};
+
 export async function recordIngestionFinished(
   prisma: PrismaClient,
   companyId: string,
   success: boolean,
+  opts?: RecordIngestionFinishedOpts,
 ): Promise<void> {
+  const now = new Date();
   const data: IngestionFinishedUpdate = {
-    lastAttemptAt: new Date(),
+    lastAttemptAt: now,
     ingestionAttempts: { increment: 1 },
-    ...(success ? { lastIngestionSuccessAt: new Date() } : {}),
+    ...(success ? { lastIngestionSuccessAt: now, lastCrawledAt: now } : {}),
   };
   await prisma.company.update({
     where: { id: companyId },
     data,
   });
+  if (
+    success &&
+    opts?.crawlEnqueuedAtMs != null &&
+    Number.isFinite(opts.crawlEnqueuedAtMs)
+  ) {
+    const elapsedMs = now.getTime() - opts.crawlEnqueuedAtMs;
+    const thresholdMs = 30 * 60 * 1000;
+    if (elapsedMs > thresholdMs) {
+      logger.warn(
+        {
+          event: "ingestion_enqueue_to_completion_divergence",
+          companyId,
+          elapsedMs,
+          thresholdMs,
+        },
+        "ingestion_enqueue_to_completion_divergence",
+      );
+    }
+  }
   await requestScoreRecompute(companyId);
 }
 

@@ -108,6 +108,10 @@ function validateCrawlCompanyJobsPayload(
   const greenhouseBoardToken = data.greenhouseBoardToken;
   const atsType = data.atsType;
   const atsBoardToken = data.atsBoardToken;
+  const crawlEnqueuedAtMs =
+    typeof data.crawlEnqueuedAtMs === "number" && Number.isFinite(data.crawlEnqueuedAtMs)
+      ? data.crawlEnqueuedAtMs
+      : undefined;
   if (
     !(companyId === undefined || typeof companyId === "string") ||
     typeof companyName !== "string" ||
@@ -127,6 +131,7 @@ function validateCrawlCompanyJobsPayload(
     greenhouseBoardToken,
     atsType: normalizedAtsType,
     atsBoardToken,
+    crawlEnqueuedAtMs,
   };
 }
 
@@ -363,6 +368,7 @@ async function start(): Promise<void> {
           greenhouseBoardToken,
           atsType: atsTypeFromPayload,
           atsBoardToken: atsBoardTokenFromPayload,
+          crawlEnqueuedAtMs,
         } = payload;
 
         let ingestionCompanyId: string | null = null;
@@ -451,15 +457,32 @@ async function start(): Promise<void> {
 
           ingestionCompanyId = resolvedCompanyId;
 
+          const crawlQueueWaitMs =
+            typeof crawlEnqueuedAtMs === "number" && Number.isFinite(crawlEnqueuedAtMs)
+              ? Date.now() - crawlEnqueuedAtMs
+              : null;
           logger.info(
             {
               event: "crawl_start",
               companyId: resolvedCompanyId,
               companyName,
               atsType: resolvedAtsType,
+              queueWaitMs: crawlQueueWaitMs,
             },
             "crawl started",
           );
+          const THIRTY_MIN_MS = 30 * 60 * 1000;
+          if (crawlQueueWaitMs != null && crawlQueueWaitMs > THIRTY_MIN_MS) {
+            logger.warn(
+              {
+                event: "crawl_queue_wait_high",
+                companyId: resolvedCompanyId,
+                queueWaitMs: crawlQueueWaitMs,
+                thresholdMs: THIRTY_MIN_MS,
+              },
+              "crawl_queue_wait_high",
+            );
+          }
 
           await throttleApiCall();
           const fetchStart = Date.now();
@@ -568,7 +591,12 @@ async function start(): Promise<void> {
               "Company crawl completed",
             );
             try {
-              await recordIngestionFinished(prisma, resolvedCompanyId, true);
+              await recordIngestionFinished(prisma, resolvedCompanyId, true, {
+                crawlEnqueuedAtMs:
+                  typeof crawlEnqueuedAtMs === "number" && Number.isFinite(crawlEnqueuedAtMs)
+                    ? crawlEnqueuedAtMs
+                    : undefined,
+              });
             } catch (recErr) {
               logger.warn(
                 { event: "ingestion_metrics_record_failed", companyId: resolvedCompanyId, err: recErr },
@@ -585,7 +613,12 @@ async function start(): Promise<void> {
             failures: enqueueFailures,
           });
           try {
-            await recordIngestionFinished(prisma, resolvedCompanyId, true);
+            await recordIngestionFinished(prisma, resolvedCompanyId, true, {
+              crawlEnqueuedAtMs:
+                typeof crawlEnqueuedAtMs === "number" && Number.isFinite(crawlEnqueuedAtMs)
+                  ? crawlEnqueuedAtMs
+                  : undefined,
+            });
           } catch (recErr) {
             logger.warn(
               { event: "ingestion_metrics_record_failed", companyId: resolvedCompanyId, err: recErr },

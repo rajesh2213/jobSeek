@@ -242,6 +242,7 @@ export function createCompanyRepository(prisma: PrismaClient) {
       companyId: string,
       lastCrawledAt: Date,
     ): Promise<void> {
+      // Direct `lastCrawledAt` only (no `lastAttemptAt`). Prefer `recordIngestionFinished` from ingest workers.
       await prisma.company.update({
         where: { id: companyId },
         data: { lastCrawledAt },
