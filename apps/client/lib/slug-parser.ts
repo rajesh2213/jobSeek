@@ -519,7 +519,9 @@ export function normalizeRelatedSlugPath(slug: string): string {
 export function isCanonicalListingPath(path: string): boolean {
   const clean = path.trim();
   if (!clean.startsWith("/jobs")) return false;
-  const rest = clean.replace(/^\/jobs\/?/, "");
+  // Accept full listing URLs (including query/hash) but validate canonical path only.
+  const pathname = clean.split("#", 1)[0]?.split("?", 1)[0] ?? clean;
+  const rest = pathname.replace(/^\/jobs\/?/, "");
   if (!rest) return true;
   const segments = rest.split("/").filter(Boolean);
   const parsed = parseSlugWithMeta(segments);

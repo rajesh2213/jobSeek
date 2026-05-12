@@ -7,7 +7,7 @@ import {
   hasUnknownJobQueryParams,
   isSitemapEligibleJobsPath,
 } from "./seoIndexability";
-import { parseSlugWithMeta } from "./slug-parser";
+import { buildJobsListingUrl, isCanonicalListingPath, parseSlugWithMeta } from "./slug-parser";
 
 test("unknown query params default to disallowed/noindex", () => {
   assert.equal(hasUnknownJobQueryParams(["foo"]), true);
@@ -140,5 +140,15 @@ test("refinement classifier treats multi-filters as deep refinement", () => {
   assert.equal(out.hasDeepRefinement, true);
   assert.equal(out.hasPagination, false);
   assert.equal(out.hasDisallowedParam, false);
+});
+
+test("canonical listing path check ignores query strings", () => {
+  const categoryHref = buildJobsListingUrl({ category: "engineering" });
+  assert.equal(categoryHref, "/jobs/category/engineering?category=engineering");
+  assert.equal(isCanonicalListingPath(categoryHref), true);
+
+  const skillHref = buildJobsListingUrl({ skills: ["react"] });
+  assert.equal(skillHref, "/jobs/skill/react?skills=react");
+  assert.equal(isCanonicalListingPath(skillHref), true);
 });
 
