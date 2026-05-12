@@ -44,6 +44,15 @@ export function isClientAnalyticsAllowed(): boolean {
   return true;
 }
 
+/**
+ * Product analytics (PostHog): only the explicit `jobloom_analytics` opt-out applies.
+ * DNT/GPC is still honored for the Meta pixel via {@link isClientAnalyticsAllowed}.
+ */
+export function isPosthogClientCaptureAllowed(): boolean {
+  if (typeof window === "undefined") return false;
+  return getAnalyticsConsentStorage() !== "denied";
+}
+
 export function getPublicMetaPixelId(): string | null {
   const id = process.env.NEXT_PUBLIC_META_PIXEL_ID?.trim();
   return id || null;
