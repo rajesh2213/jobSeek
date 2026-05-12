@@ -69,7 +69,7 @@ const LANDING_MIN_COUNT = parseBoundedIntEnv(
 );
 const LANDING_SECTION_BUDGET_MS = parseBoundedIntEnv(
   process.env.SEO_SITEMAP_LANDING_BUDGET_MS,
-  12000,
+  16000,
   2000,
   60000,
 );
@@ -81,7 +81,7 @@ const JOBS_SECTION_BUDGET_MS = parseBoundedIntEnv(
 );
 const COMPANIES_SECTION_BUDGET_MS = parseBoundedIntEnv(
   process.env.SEO_SITEMAP_COMPANIES_BUDGET_MS,
-  15000,
+  18000,
   5000,
   120000,
 );

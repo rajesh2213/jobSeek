@@ -105,10 +105,11 @@ export function createSeoService(prisma: PrismaClient) {
     const { minCount, maxSlugs } = input;
     const seen = new Set<string>();
     const out: SeoLandingEntry[] = [];
-    const roleLimit = parsePositiveIntEnv(process.env.SEO_LANDING_MAX_ROLE_SLUGS, 20, 5, 100);
+    /** Phase B: modest default bump (env overrides). ~25% more count queries vs 20×8 — reversible via env. */
+    const roleLimit = parsePositiveIntEnv(process.env.SEO_LANDING_MAX_ROLE_SLUGS, 22, 5, 100);
     const locationLimit = parsePositiveIntEnv(
       process.env.SEO_LANDING_MAX_LOCATION_DIMENSIONS,
-      8,
+      9,
       1,
       SEO_DIMENSIONS.locations.length,
     );

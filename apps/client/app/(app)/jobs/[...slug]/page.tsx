@@ -11,11 +11,13 @@ import {
   jobsRouteMetadata,
 } from "../../../../lib/seo";
 import { JobsSearchPage } from "../../../../components/job/JobsSearchPage";
+import { JOB_CATEGORIES } from "../../../../lib/taxonomy";
 import {
   getCanonicalJobListingUrl,
   normalizeRelatedSlugPath,
   parseJobFiltersFromSearch,
   parseSlugWithMeta,
+  type JobFilters,
 } from "../../../../lib/slug-parser";
 import { JsonLdScript } from "../../../../components/seo/JsonLdScript";
 import { JobsListingFaq } from "../../../../components/seo/JobsListingFaq";
@@ -93,13 +95,7 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
   const disableAllNoindex = process.env.SEO_DISABLE_ALL_NOINDEX === "true";
   const indexable = forceNoindexAll ? false : disableAllNoindex ? true : policy.index;
   const minIndex = getSeoMinJobsIndex();
-  const role = typeof filters.role === "string" && filters.role ? filters.role : "frontend-engineer";
-  const relatedSearchLinks = [
-    { href: `/jobs/role/${role}/location/remote`, label: `Explore remote ${toTitle(role)} jobs` },
-    { href: "/jobs/category/engineering/location/remote", label: "Explore remote engineering jobs" },
-    { href: "/jobs/role/backend-developer/location/us", label: "See backend jobs in US" },
-    { href: "/jobs/role/frontend-engineer/location/remote", label: "See remote frontend jobs" },
-  ];
+  const relatedSearchLinks = buildCuratedRelatedSearchLinks(filters, canonicalSlugPath);
 
   const listingTop = (
     <>
@@ -147,10 +143,55 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
   );
 }
 
+const ALLOWED_CATEGORY = new Set<string>(JOB_CATEGORIES);
+
 function toTitle(s: string): string {
   return s
     .split(/[-\s]+/)
     .filter(Boolean)
     .map((p) => p[0]?.toUpperCase() + p.slice(1).toLowerCase())
     .join(" ");
+}
+
+/** Phase B: small fixed set of canonical hubs; skips current path; caps at 6 links. */
+function buildCuratedRelatedSearchLinks(
+  filters: JobFilters,
+  currentCanonicalPath: string,
+): Array<{ href: string; label: string }> {
+  const norm = (p: string) => (p.split("?")[0] ?? "").replace(/\/$/, "") || "/jobs";
+  const current = norm(currentCanonicalPath);
+  const seen = new Set<string>();
+  const out: Array<{ href: string; label: string }> = [];
+
+  const push = (href: string, label: string) => {
+    const path = norm(href);
+    if (path === current || seen.has(path)) return;
+    seen.add(path);
+    out.push({ href, label });
+  };
+
+  const role = filters.role?.trim();
+  const category = filters.category?.trim();
+  if (role) {
+    push(`/jobs/role/${role}/location/remote`, `Remote ${toTitle(role)} jobs`);
+    push(`/jobs/role/${role}/location/us`, `${toTitle(role)} jobs in the US`);
+    push(`/jobs/role/${role}/location/in`, `${toTitle(role)} jobs in India`);
+    push(`/jobs/role/${role}/location/gb`, `${toTitle(role)} jobs in the UK`);
+  }
+  if (category && ALLOWED_CATEGORY.has(category)) {
+    push(`/jobs/category/${category}/location/remote`, `Remote ${toTitle(category)} jobs`);
+    push(`/jobs/category/${category}/location/us`, `${toTitle(category)} jobs in the US`);
+  }
+
+  const fallbacks: Array<{ href: string; label: string }> = [
+    { href: "/jobs/role/data-engineer/location/remote", label: "Remote data engineer jobs" },
+    { href: "/jobs/role/product-manager/location/us", label: "Product manager jobs in the US" },
+    { href: "/jobs/category/engineering/location/remote", label: "Remote engineering jobs" },
+    { href: "/jobs/role/frontend-engineer/location/remote", label: "Remote frontend engineer jobs" },
+  ];
+  for (const f of fallbacks) {
+    if (out.length >= 6) break;
+    push(f.href, f.label);
+  }
+  return out.slice(0, 6);
 }
