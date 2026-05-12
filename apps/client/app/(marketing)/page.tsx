@@ -4,9 +4,9 @@ import { absoluteUrl } from "../../lib/seoSite";
 import { SITE_LOGO_PRIM_SRC } from "../../lib/siteLogo";
 import LandingPageClient from "../../components/landing/LandingPageClient";
 
-const homepageTitle = "JobLoom - Real-Time Jobs From Company Career Sites, Faster";
+const homepageTitle = "JobLoom — Jobs from company career sites, before they hit major boards";
 const homepageDescription =
-  "Find jobs directly from company career sites before they appear on major job boards. Search thousands of real-time remote and tech jobs in one place.";
+  "Jobs from company career sites and boards—personalised alerts, resume-aware matching, Smart Apply (browser extension), and application tracking in one workspace.";
 const homepageCanonical = "/";
 const homepageUrl = absoluteUrl(homepageCanonical);
 
@@ -50,7 +50,7 @@ export default function LandingPage() {
     url: homepageUrl,
     logo: absoluteUrl(SITE_LOGO_PRIM_SRC),
     description:
-      "JobLoom helps people discover real-time jobs directly from company career sites and apply earlier.",
+      "JobLoom aggregates roles from company career sites and boards with personalised alerts, resume-aware matching, Smart Apply including a browser extension, and application tracking.",
   };
 
   const sameAs = buildSameAs();
