@@ -125,70 +125,60 @@ function medianAcrossAllCompanies(sortedNonZeroCounts: number[], totalCompanies:
   return (valueAt(mid - 1) + valueAt(mid)) / 2;
 }
 
+async function runMetricThunksSequential<T>(thunks: Array<() => Promise<T>>): Promise<T[]> {
+  const out: T[] = [];
+  for (const t of thunks) {
+    out.push(await t());
+  }
+  return out;
+}
+
 export async function buildMetricsSnapshot(prisma: PrismaClient): Promise<MetricsSnapshot> {
-  const [
-    totalCompanies,
-    companiesWithDomain,
-    companiesWithATS,
-    companiesReady,
-    companiesEnriching,
-    companiesRaw,
-    companiesExhausted,
-    companiesCreatedFromJobs,
-    totalJobs,
-    totalCanonicalJobs,
-    totalDuplicateJobs,
-    readyJobsCount,
-    processingJobsCount,
-    failedJobsCount,
-    topCountRows,
-    bottomCountRows,
-    allCompanyJobCountRows,
-    guardBySourceRows,
-    guardTopBadWorkdayCompaniesRows,
-    guardTotalsRows,
-    qualityShadowTotalsRows,
-    qualityShadowBySourceRows,
-  ] = await Promise.all([
-    prisma.company.count(),
-    prisma.company.count({ where: { domain: { not: null } } }),
-    prisma.company.count({ where: { atsType: { not: null } } }),
-    prisma.company.count({ where: { status: CompanyStatus.ready } }),
-    prisma.company.count({ where: { status: CompanyStatus.enriching } }),
-    prisma.company.count({ where: { status: CompanyStatus.raw } }),
-    prisma.company.count({ where: { discoverySource: { contains: "enrich_exhausted" } } }),
-    prisma.company.count({ where: { discoverySource: "job_ingestion" } }),
-    prisma.job.count(),
-    prisma.job.count({ where: { canonicalJobId: null } }),
-    prisma.job.count({ where: { canonicalJobId: { not: null } } }),
-    prisma.job.count({ where: { status: "ready" } }),
-    prisma.job.count({ where: { status: "processing" } }),
-    prisma.job.count({ where: { status: "failed" } }),
-    prisma.job.groupBy({
-      by: ["companyId"],
-      _count: { companyId: true },
-      orderBy: { _count: { companyId: "desc" } },
-      take: 10,
-    }),
-    prisma.job.groupBy({
-      by: ["companyId"],
-      _count: { companyId: true },
-      orderBy: { _count: { companyId: "asc" } },
-      take: 10,
-    }),
-    prisma.job.groupBy({
-      by: ["companyId"],
-      _count: { companyId: true },
-      orderBy: { _count: { companyId: "asc" } },
-    }),
-    prisma.$queryRaw<
-      Array<{
-        source: string;
-        bad_workday_url: bigint;
-        empty_description: bigint;
-        empty_parsed: bigint;
-      }>
-    >`
+  const useSequentialMetrics = process.env.METRICS_SNAPSHOT_SEQUENTIAL?.trim() === "true";
+  const taskFactories: Array<() => Promise<unknown>> = [
+    () => prisma.company.count(),
+    () => prisma.company.count({ where: { domain: { not: null } } }),
+    () => prisma.company.count({ where: { atsType: { not: null } } }),
+    () => prisma.company.count({ where: { status: CompanyStatus.ready } }),
+    () => prisma.company.count({ where: { status: CompanyStatus.enriching } }),
+    () => prisma.company.count({ where: { status: CompanyStatus.raw } }),
+    () => prisma.company.count({ where: { discoverySource: { contains: "enrich_exhausted" } } }),
+    () => prisma.company.count({ where: { discoverySource: "job_ingestion" } }),
+    () => prisma.job.count(),
+    () => prisma.job.count({ where: { canonicalJobId: null } }),
+    () => prisma.job.count({ where: { canonicalJobId: { not: null } } }),
+    () => prisma.job.count({ where: { status: "ready" } }),
+    () => prisma.job.count({ where: { status: "processing" } }),
+    () => prisma.job.count({ where: { status: "failed" } }),
+    () =>
+      prisma.job.groupBy({
+        by: ["companyId"],
+        _count: { companyId: true },
+        orderBy: { _count: { companyId: "desc" } },
+        take: 10,
+      }),
+    () =>
+      prisma.job.groupBy({
+        by: ["companyId"],
+        _count: { companyId: true },
+        orderBy: { _count: { companyId: "asc" } },
+        take: 10,
+      }),
+    () =>
+      prisma.job.groupBy({
+        by: ["companyId"],
+        _count: { companyId: true },
+        orderBy: { _count: { companyId: "asc" } },
+      }),
+    () =>
+      prisma.$queryRaw<
+        Array<{
+          source: string;
+          bad_workday_url: bigint;
+          empty_description: bigint;
+          empty_parsed: bigint;
+        }>
+      >`
       SELECT
         j.source,
         COUNT(*) FILTER (
@@ -212,9 +202,10 @@ export async function buildMetricsSnapshot(prisma: PrismaClient): Promise<Metric
       GROUP BY j.source
       ORDER BY j.source ASC
     `,
-    prisma.$queryRaw<
-      Array<{ companyId: string; companyName: string; bad_workday_url: bigint }>
-    >`
+    () =>
+      prisma.$queryRaw<
+        Array<{ companyId: string; companyName: string; bad_workday_url: bigint }>
+      >`
       SELECT
         c.id AS "companyId",
         c.name AS "companyName",
@@ -227,9 +218,10 @@ export async function buildMetricsSnapshot(prisma: PrismaClient): Promise<Metric
       ORDER BY bad_workday_url DESC
       LIMIT 10
     `,
-    prisma.$queryRaw<
-      Array<{ bad_workday_url: bigint; empty_description: bigint; empty_parsed: bigint }>
-    >`
+    () =>
+      prisma.$queryRaw<
+        Array<{ bad_workday_url: bigint; empty_description: bigint; empty_parsed: bigint }>
+      >`
       SELECT
         COUNT(*) FILTER (
           WHERE j.source = 'workday'
@@ -250,16 +242,17 @@ export async function buildMetricsSnapshot(prisma: PrismaClient): Promise<Metric
         )::bigint AS empty_parsed
       FROM "Job" j
     `,
-    prisma.$queryRaw<
-      Array<{
-        compared_rows: bigint;
-        publishable_runtime_true: bigint;
-        publishable_flag_true: bigint;
-        mismatches_total: bigint;
-        false_positive_flag: bigint;
-        false_negative_flag: bigint;
-      }>
-    >`
+    () =>
+      prisma.$queryRaw<
+        Array<{
+          compared_rows: bigint;
+          publishable_runtime_true: bigint;
+          publishable_flag_true: bigint;
+          mismatches_total: bigint;
+          false_positive_flag: bigint;
+          false_negative_flag: bigint;
+        }>
+      >`
       WITH eval AS (
         SELECT
           j.source,
@@ -296,15 +289,16 @@ export async function buildMetricsSnapshot(prisma: PrismaClient): Promise<Metric
         COUNT(*) FILTER (WHERE flag_publishable = false AND runtime_publishable = true)::bigint AS false_negative_flag
       FROM eval
     `,
-    prisma.$queryRaw<
-      Array<{
-        source: string;
-        compared_rows: bigint;
-        mismatches_total: bigint;
-        false_positive_flag: bigint;
-        false_negative_flag: bigint;
-      }>
-    >`
+    () =>
+      prisma.$queryRaw<
+        Array<{
+          source: string;
+          compared_rows: bigint;
+          mismatches_total: bigint;
+          false_positive_flag: bigint;
+          false_negative_flag: bigint;
+        }>
+      >`
       WITH eval AS (
         SELECT
           j.source,
@@ -342,7 +336,77 @@ export async function buildMetricsSnapshot(prisma: PrismaClient): Promise<Metric
       GROUP BY source
       ORDER BY mismatches_total DESC, compared_rows DESC
     `,
-  ]);
+  ];
+
+  const allResults = useSequentialMetrics
+    ? await runMetricThunksSequential(taskFactories)
+    : await Promise.all(taskFactories.map((f) => f()));
+
+  const [
+    totalCompanies,
+    companiesWithDomain,
+    companiesWithATS,
+    companiesReady,
+    companiesEnriching,
+    companiesRaw,
+    companiesExhausted,
+    companiesCreatedFromJobs,
+    totalJobs,
+    totalCanonicalJobs,
+    totalDuplicateJobs,
+    readyJobsCount,
+    processingJobsCount,
+    failedJobsCount,
+    topCountRows,
+    bottomCountRows,
+    allCompanyJobCountRows,
+    guardBySourceRows,
+    guardTopBadWorkdayCompaniesRows,
+    guardTotalsRows,
+    qualityShadowTotalsRows,
+    qualityShadowBySourceRows,
+  ] = allResults as [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    Array<{ companyId: string; _count: { companyId: number } }>,
+    Array<{ companyId: string; _count: { companyId: number } }>,
+    Array<{ companyId: string; _count: { companyId: number } }>,
+    Array<{
+      source: string;
+      bad_workday_url: bigint;
+      empty_description: bigint;
+      empty_parsed: bigint;
+    }>,
+    Array<{ companyId: string; companyName: string; bad_workday_url: bigint }>,
+    Array<{ bad_workday_url: bigint; empty_description: bigint; empty_parsed: bigint }>,
+    Array<{
+      compared_rows: bigint;
+      publishable_runtime_true: bigint;
+      publishable_flag_true: bigint;
+      mismatches_total: bigint;
+      false_positive_flag: bigint;
+      false_negative_flag: bigint;
+    }>,
+    Array<{
+      source: string;
+      compared_rows: bigint;
+      mismatches_total: bigint;
+      false_positive_flag: bigint;
+      false_negative_flag: bigint;
+    }>,
+  ];
 
   const guardTotals = guardTotalsRows[0] ?? {
     bad_workday_url: BigInt(0),
