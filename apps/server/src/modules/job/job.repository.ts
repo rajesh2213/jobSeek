@@ -687,19 +687,12 @@ export function sqlForCanonicalListingIds(input: {
      *        requests even when listingFreshnessAt collides (common for batches).
      *
      * Index usage:
-     *   - The existing idx_jobs_listing_freshness_at remains useful for the
-     *     POSTED leg (Postgres can pull the top of the heap then sort).
-     *   - For the new POSTED-first bucketing we accept a Sort node on the
-     *     candidate set. Validated under EXPLAIN ANALYZE — cost is negligible
-     *     because the WHERE clause already prunes to canonical+active rows.
-     *   - If EXPLAIN shows the Sort becoming expensive on huge listings, add a
-     *     CONCURRENTLY-built composite index:
-     *       CREATE INDEX CONCURRENTLY idx_jobs_posted_freshness
-     *         ON "Job" ("postedAt" DESC NULLS LAST, "listingFreshnessAt" DESC,
-     *                    "createdAt" DESC, id)
-     *         WHERE "canonicalJobId" IS NULL AND "isActive" = true
-     *           AND ("status" = 'ready' OR "status" IS NULL);
-     *     Deferred until measurement proves it's needed.
+     *   - Served by migration 20260512170000_job_canonical_latest_partial_index
+     *     (idx_jobs_canonical_latest_v2), a partial composite indexed exactly
+     *     on (postedAt DESC NULLS LAST, listingFreshnessAt DESC, createdAt DESC,
+     *     id) with the same predicate as the WHERE clause. Production EXPLAIN
+     *     resolves to an Index Only Scan with no Sort node (~0.235 ms on 95k
+     *     candidates) — see docs/freshness-overhaul/05-query-perf.md.
      */
     return Prisma.sql`
       SELECT j.id FROM "Job" j
