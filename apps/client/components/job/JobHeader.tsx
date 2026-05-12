@@ -1,11 +1,11 @@
 import Link from "next/link";
 import type { JobItem } from "../../lib/api";
-import { formatTimeAgo } from "../../lib/format";
 import { jobDetailPinLocationText } from "../../lib/jobDisplay";
 import { ApplyJobButton } from "./ApplyJobButton";
 import { AppliedToggleButton } from "./AppliedToggleButton";
 import { WorkTypeOutlinePill } from "./WorkTypeOutlinePill";
 import { buttonClassName } from "../ui/Button";
+import { FreshnessLine } from "./FreshnessIndicator";
 
 interface Props {
   job: JobItem;
@@ -19,9 +19,11 @@ export function JobHeader({ job, applyHref, applyUrlLocked }: Props) {
     <header className="space-y-3">
       <div className="flex flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <p className="text-xs font-bold uppercase tracking-wider text-ink/45">{job.category.replace(/-/g, " ")}</p>
-        <p className="shrink-0 text-xs font-medium text-ink/45">
-          {formatTimeAgo(job.effectivePostedAt ?? job.createdAt)}
-        </p>
+        {/* Backend-owned Posted/Added prefix — never inferred client-side. */}
+        <FreshnessLine
+          job={job}
+          className="shrink-0 text-xs font-medium tracking-normal normal-case text-ink/45"
+        />
       </div>
       <h1 className="font-display text-3xl font-normal italic text-ink sm:text-4xl">{job.title}</h1>
       <div className="flex flex-row flex-wrap items-start justify-between gap-x-4 gap-y-3">

@@ -2,20 +2,20 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { memo, useMemo } from "react";
+import { memo } from "react";
 import type { JobItem } from "../../lib/api";
 import { accentFromId } from "../../lib/accent";
-import { formatSalaryUsd, formatTimeAgo } from "../../lib/format";
+import { formatSalaryUsd } from "../../lib/format";
 import { filterSkillPillsForDisplay, jobCardPinLocationText } from "../../lib/jobDisplay";
 import { cn } from "../../lib/cn";
 import { companyLogoSrcForDisplay } from "../../lib/logoDisplay";
-import { useNowTicker } from "../../lib/useNowTicker";
 import { Badge } from "../ui/Badge";
 import { buttonClassName } from "../ui/Button";
 import { ApplyJobButton } from "./ApplyJobButton";
 import { AppliedToggleButton } from "./AppliedToggleButton";
 import { Card } from "../ui/Card";
 import { WorkTypeOutlinePill } from "./WorkTypeOutlinePill";
+import { FreshnessLine, JustPostedBadge, NewBadge } from "./FreshnessIndicator";
 
 const ResumeScorePill = dynamic(
   () =>
@@ -31,42 +31,6 @@ const ResumeScorePill = dynamic(
   },
 );
 
-/** Roles first seen or posted within this window show the NEW badge. */
-const NEW_JOB_MAX_MS = 10 * 60 * 60 * 1000;
-/** Stronger “Just posted” pulse for very fresh listings. */
-const JUST_POSTED_MAX_MS = 90 * 60 * 1000;
-
-/** Freshness instant aligned with listing sort (`listingFreshnessAt` ≡ effectivePostedAt ?? createdAt). */
-function listingFreshnessInstant(job: JobItem): string | null | undefined {
-  return job.effectivePostedAt ?? job.createdAt;
-}
-
-function isJustPosted(job: JobItem): boolean {
-  const raw = listingFreshnessInstant(job);
-  if (!raw || raw === "null") return false;
-  const t = new Date(raw).getTime();
-  if (Number.isNaN(t)) return false;
-  return Date.now() - t < JUST_POSTED_MAX_MS;
-}
-
-function isNewJob(job: JobItem): boolean {
-  const iso = listingFreshnessInstant(job);
-  if (!iso) return false;
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return false;
-  return Date.now() - t < NEW_JOB_MAX_MS;
-}
-
-function postedMetaLine(job: JobItem): string {
-  const ts = listingFreshnessInstant(job);
-  const raw = formatTimeAgo(ts);
-  if (raw === "Recently posted") return raw;
-  const hasPosted =
-    job.postedAt != null && String(job.postedAt).trim() !== "" && job.postedAt !== "null";
-  const prefix = hasPosted ? "Posted" : "Added";
-  return `${prefix} ${raw}`;
-}
-
 interface Props {
   job: JobItem;
   /** Dense card for similar-jobs grid (no excerpt, max 3 skill tags). */
@@ -76,15 +40,7 @@ interface Props {
 
 function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
   /** Compact cards skip the global minute ticker to cut re-renders; relative time still correct on mount. */
-  const tick = useNowTicker(!compact);
-
-  const postedLabel = useMemo(
-    () => postedMetaLine(job),
-    [job.postedAt, job.effectivePostedAt, job.createdAt, tick],
-  );
-  const showNew = isNewJob(job);
-  const justPosted = isJustPosted(job);
-  const showNewBadge = showNew && !justPosted;
+  const liveTicker = !compact;
   const accent = accentFromId(job.id);
   const skillPool = filterSkillPillsForDisplay(job.skills);
   const tags = skillPool.slice(0, 4);
@@ -118,18 +74,6 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
     "hover:shadow-[0_14px_44px_-12px_rgba(0,0,0,0.14)]",
   );
   const motionLiteClass = "transition-transform duration-150 ease-out hover:scale-[1.01]";
-
-  const justPostedBadge = justPosted ? (
-    <span className="rounded-full bg-emerald-500/14 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-900 ring-1 ring-emerald-500/25 dark:text-emerald-100">
-      Just posted
-    </span>
-  ) : null;
-
-  const newBadge = showNewBadge ? (
-    <span className="rounded-full bg-brand px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white shadow-md ring-2 ring-brand/90 ring-offset-2 ring-offset-surface">
-      NEW
-    </span>
-  ) : null;
 
   if (compact) {
     return (
@@ -192,11 +136,9 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
               )}
               <div className="min-w-0 flex-1">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-ink/30">
-                    {postedLabel}
-                  </span>
-                  {justPostedBadge}
-                  {showNewBadge ? newBadge : null}
+                  <FreshnessLine job={job} liveTicker={liveTicker} />
+                  <JustPostedBadge job={job} />
+                  <NewBadge job={job} />
                 </div>
                 <Link
                   prefetch={false}
@@ -374,11 +316,9 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
         )}
         <div className="relative min-w-0 flex-1 pr-0 lg:pr-[13.5rem] xl:pr-56">
           <div className="mb-1.5 flex min-w-0 flex-wrap items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-ink/30">
-              {postedLabel}
-            </span>
-            {justPostedBadge}
-            {showNewBadge ? newBadge : null}
+            <FreshnessLine job={job} liveTicker={liveTicker} />
+            <JustPostedBadge job={job} />
+            <NewBadge job={job} />
           </div>
 
           <h3 className="mb-2 text-lg font-extrabold leading-snug tracking-tight text-ink">
