@@ -5,6 +5,7 @@ import { DM_Sans, Instrument_Serif } from "next/font/google";
 import { RouteLoader } from "../components/layout/RouteLoader";
 import { AppProviders } from "../components/providers/AppProviders";
 import { getSiteBaseUrl } from "../lib/seoSite";
+import { PosthogAppProvider } from "./providers";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -63,10 +64,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           signInUrl="/sign-in"
           signUpUrl="/sign-up"
         >
-          <AppProviders>
-            <RouteLoader />
-            <div className="relative min-h-screen">{children}</div>
-          </AppProviders>
+          <PosthogAppProvider>
+            <AppProviders>
+              <RouteLoader />
+              <div className="relative min-h-screen">{children}</div>
+            </AppProviders>
+          </PosthogAppProvider>
         </ClerkProvider>
       </body>
     </html>
