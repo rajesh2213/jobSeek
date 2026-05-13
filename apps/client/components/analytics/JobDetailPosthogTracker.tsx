@@ -9,7 +9,7 @@ import {
 interface Props {
   jobId: string;
   company: string;
-  location: string;
+  location: string | null;
   remote: boolean;
   /** e.g. `job_detail_page` */
   source: string;
@@ -25,7 +25,7 @@ export function JobDetailPosthogTracker({ jobId, company, location, remote, sour
       withPosthogAttribution({
         jobId,
         company,
-        location,
+        location: location ?? "",
         remote,
         source,
       }),

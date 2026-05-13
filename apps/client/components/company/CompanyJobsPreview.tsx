@@ -24,7 +24,9 @@ export function CompanyJobsPreview({ companySlug, jobs }: Props) {
               className="block rounded-lg border border-ink/10 px-3 py-2.5 no-underline transition hover:bg-ink/5"
             >
               <p className="line-clamp-2 text-sm font-semibold text-ink">{job.title}</p>
-              <p className="mt-2 text-[13px] leading-snug text-black/50">📍 {jobCardPinLocationText(job)}</p>
+              {jobCardPinLocationText(job) != null && (
+                <p className="mt-2 text-[13px] leading-snug text-black/50">📍 {jobCardPinLocationText(job)}</p>
+              )}
               <div className="mt-2">
                 <WorkTypeOutlinePill job={job} />
               </div>

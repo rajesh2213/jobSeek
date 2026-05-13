@@ -20,18 +20,18 @@ export function countryLabelForDisplay(code: string): string {
   }
 }
 
-/** Pin line for cards: full country name when possible, else code. */
-export function jobCardPinLocationText(job: JobItem): string {
+/** Pin line for cards: full country name when possible, null when unknown. */
+export function jobCardPinLocationText(job: JobItem): string | null {
   const code = (job.locationCountry ?? job.country)?.trim() || "";
-  if (!code || code === "UNKNOWN") return "Location TBD";
+  if (!code || code === "UNKNOWN") return null;
   const label = countryLabelForDisplay(code);
   return label || code;
 }
 
-/** Detail header: city + country when city exists. */
-export function jobDetailPinLocationText(job: JobItem): string {
+/** Detail header: city + country when city exists, null when unknown. */
+export function jobDetailPinLocationText(job: JobItem): string | null {
   const code = (job.locationCountry ?? job.country)?.trim() || "";
-  if (!code || code === "UNKNOWN") return "Location TBD";
+  if (!code || code === "UNKNOWN") return null;
   const countryName = countryLabelForDisplay(code) || code;
   const city = job.locationCity?.trim();
   if (city) return `${city}, ${countryName}`;

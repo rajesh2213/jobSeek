@@ -24,8 +24,23 @@ function primaryAshbyLocationLine(job: AshbyJob): string | undefined {
   return undefined;
 }
 
+/**
+ * Build a location line from the structured `address.postalAddress` field
+ * that the Ashby posting API provides (locality, region, country).
+ * Used as a fallback when the free-text `location` is missing.
+ */
+function locationFromAddress(job: AshbyJob): string | undefined {
+  const addr = job.address?.postalAddress;
+  if (!addr) return undefined;
+  const parts = [addr.addressLocality, addr.addressRegion, addr.addressCountry]
+    .map((p) => p?.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return undefined;
+  return parts.join(", ");
+}
+
 function getAshbyLocation(job: AshbyJob): string | undefined {
-  const primary = primaryAshbyLocationLine(job);
+  const primary = primaryAshbyLocationLine(job) ?? locationFromAddress(job);
   const secondaries = job.secondaryLocations ?? [];
   const extra: string[] = [];
   const seen = new Set<string>();
@@ -66,7 +81,7 @@ export function parseAshbyJobs(
       isRemote: Boolean(job.isRemote) || inferRemote(location),
       source: "ashby",
       sourceUrl,
-      postedAt: parseDate(job.postedDate ?? job.createdAt),
+      postedAt: parseDate(job.publishedAt ?? job.postedDate ?? job.createdAt),
       companyId,
     });
   }

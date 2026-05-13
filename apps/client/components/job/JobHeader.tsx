@@ -35,12 +35,17 @@ export function JobHeader({ job, applyHref, applyUrlLocked }: Props) {
             </Link>
           </p>
           <div className="flex min-w-0 flex-row flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-snug text-black/50">
-            <span className="inline-flex min-w-0 max-w-full items-center gap-1">
-              <span className="shrink-0" aria-hidden>
-                📍
-              </span>
-              <span className="min-w-0 truncate">{jobDetailPinLocationText(job)}</span>
-            </span>
+            {(() => {
+              const locationText = jobDetailPinLocationText(job);
+              return locationText ? (
+                <span className="inline-flex min-w-0 max-w-full items-center gap-1">
+                  <span className="shrink-0" aria-hidden>
+                    📍
+                  </span>
+                  <span className="min-w-0 truncate">{locationText}</span>
+                </span>
+              ) : null;
+            })()}
             <WorkTypeOutlinePill job={job} className="shrink-0" />
           </div>
         </div>

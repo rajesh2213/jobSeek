@@ -59,7 +59,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
   const logo = job.company.logoUrl?.trim();
   const initial = job.company.name.slice(0, 1).toUpperCase();
   const locationText = jobCardPinLocationText(job);
-  const showLocation = locationText !== "Location TBD";
+  const showLocation = locationText != null;
   const titleHover =
     accent === "teal"
       ? "group-hover:text-teal"

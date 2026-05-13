@@ -189,6 +189,8 @@ export const CITY_TO_COUNTRY: Record<string, string> = Object.fromEntries(
     chandigarh: "IN",
     visakhapatnam: "IN",
     "new york": "US",
+    "new york city": "US",
+    nyc: "US",
     manhattan: "US",
     brooklyn: "US",
     "los angeles": "US",
@@ -219,6 +221,12 @@ export const CITY_TO_COUNTRY: Record<string, string> = Object.fromEntries(
     sacramento: "US",
     kansas: "US",
     "salt lake": "US",
+    "salt lake city": "US",
+    "oklahoma city": "US",
+    "kansas city": "US",
+    "jersey city": "US",
+    "atlantic city": "US",
+    "rapid city": "US",
     nashville: "US",
     raleigh: "US",
     stlouis: "US",
@@ -309,6 +317,7 @@ export const CITY_TO_COUNTRY: Record<string, string> = Object.fromEntries(
     jakarta: "ID",
     bangkok: "TH",
     hochiminh: "VN",
+    "ho chi minh city": "VN",
     hanoi: "VN",
     manila: "PH",
     kualalumpur: "MY",
@@ -329,6 +338,7 @@ export const CITY_TO_COUNTRY: Record<string, string> = Object.fromEntries(
     panama: "PA",
     sanjose: "CR",
     guatemala: "GT",
+    "guatemala city": "GT",
     quito: "EC",
     casablanca: "MA",
     tunis: "TN",
@@ -443,6 +453,7 @@ export const CITY_TO_COUNTRY: Record<string, string> = Object.fromEntries(
     surabaya: "ID",
     bandung: "ID",
     cebu: "PH",
+    "quezon city": "PH",
     davao: "PH",
     brunei: "BN",
     portmoresby: "PG",
@@ -1002,6 +1013,13 @@ export function testLocationResolver(): void {
       fn: () => {
         const r = resolveLocation("New York, NY");
         return r.country === "US" && r.state === "New York";
+      },
+    },
+    {
+      name: "New York City",
+      fn: () => {
+        const r = resolveLocation("New York City");
+        return r.country === "US" && r.city === "New York City";
       },
     },
     {
