@@ -193,6 +193,7 @@ export const CITY_TO_COUNTRY: Record<string, string> = Object.fromEntries(
     nyc: "US",
     manhattan: "US",
     brooklyn: "US",
+    "san francisco": "US",
     "los angeles": "US",
     chicago: "US",
     houston: "US",
