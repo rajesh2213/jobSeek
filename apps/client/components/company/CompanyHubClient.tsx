@@ -429,7 +429,9 @@ export function CompanyHubClient({
                   [
                     ["remote", "Remote"],
                     ["onsite", "On-site"],
-                    ["hybrid", "Hybrid"],
+                    ...(process.env.NEXT_PUBLIC_HYBRID_FILTER === "true"
+                      ? ([["hybrid", "Hybrid"]] as const)
+                      : []),
                   ] as const
                 ).map(([key, label]) => (
                   <button

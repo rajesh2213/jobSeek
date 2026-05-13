@@ -30,6 +30,7 @@ import { Button } from "../ui/Button";
 import { SortSegmented } from "../ui/SortSegmented";
 
 const EXPERIENCE_FILTER_ENABLED = process.env.NEXT_PUBLIC_EXPERIENCE_FILTER === "true";
+const HYBRID_FILTER_ENABLED = process.env.NEXT_PUBLIC_HYBRID_FILTER === "true";
 
 function CitySuggestionShimmerRow() {
   return (
@@ -596,11 +597,11 @@ export function JobsInlineFilters({
         </div>
 
         <div className="col-span-2 flex w-full min-w-0 shrink-0 items-center gap-0.5 rounded-xl border border-ink/15 bg-white p-1 lg:w-auto lg:min-w-[220px] lg:max-w-[260px] lg:gap-1">
-          {[
+          {([
             { label: "Remote", value: "remote" },
             { label: "Onsite", value: "onsite" },
-            { label: "Hybrid", value: "hybrid" },
-          ].map((item) => {
+            ...(HYBRID_FILTER_ENABLED ? [{ label: "Hybrid", value: "hybrid" }] : []),
+          ] as const).map((item) => {
             const value = item.value as "remote" | "onsite" | "hybrid";
             const active = uiFilters.types.includes(value);
             return (

@@ -1,5 +1,5 @@
 import type { DedupJobInput, NormalizedJob } from "../modules/crawler/crawler.types.js";
-import { deriveExperienceLevel, extractSalaryMinUsd, normalizeJobAttributes } from "./taxonomyNormalizer.js";
+import { deriveExperienceLevel, deriveWorkType, extractSalaryMinUsd, normalizeJobAttributes } from "./taxonomyNormalizer.js";
 
 /**
  * Derive taxonomy + ISO country from raw ATS payload.
@@ -15,6 +15,7 @@ export function enrichDedupInput(
   });
   const salaryMin = extractSalaryMinUsd(input.description ?? "");
   const experienceLevel = deriveExperienceLevel(input.title);
+  const workType = deriveWorkType(input.title, input.description, input.location);
 
   return {
     title: input.title,
@@ -37,6 +38,7 @@ export function enrichDedupInput(
     locationRegion: attrs.region,
     salaryMin,
     experienceLevel,
+    ...(workType ? { workType } : {}),
     ...(attrs.hasMultipleLocations ? { hasMultipleLocations: true } : {}),
   };
 }

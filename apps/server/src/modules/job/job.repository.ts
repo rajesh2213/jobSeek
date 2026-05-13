@@ -1783,6 +1783,7 @@ export function createJobRepository(prisma: PrismaClient) {
           source: true,
           sourceUrl: true,
           description: true,
+          workType: true,
         },
       });
       if (!existing) {
@@ -1835,12 +1836,18 @@ export function createJobRepository(prisma: PrismaClient) {
         }
       }
 
+      const enrichedRemoteType =
+        typeof mergedEnriched.remoteType === "string" ? mergedEnriched.remoteType : null;
+      const shouldPromoteHybrid =
+        enrichedRemoteType === "hybrid" && existing.workType !== "hybrid";
+
       await prisma.job.update({
         where: { id },
         data: {
           parsedDescription: finalParsed as Prisma.InputJsonValue,
           enriched: mergedEnriched as Prisma.InputJsonValue,
           skills: mergedSkills,
+          ...(shouldPromoteHybrid ? { workType: "hybrid" } : {}),
           ...jobQualityData({
             source: existing.source,
             sourceUrl: existing.sourceUrl,

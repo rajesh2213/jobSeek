@@ -135,6 +135,22 @@ export function deriveExperienceLevel(title: string): "junior" | "senior" | null
   return null;
 }
 
+const HYBRID_RE = /\bhybrid\b/i;
+
+/**
+ * Detect "hybrid" work type from combined title + description + location text.
+ * Returns "hybrid" only when there is an explicit signal; otherwise null
+ * (caller falls back to isRemote-based remote/onsite).
+ */
+export function deriveWorkType(
+  title: string,
+  description?: string,
+  location?: string,
+): "hybrid" | null {
+  const blob = `${title}\n${description ?? ""}\n${location ?? ""}`;
+  return HYBRID_RE.test(blob) ? "hybrid" : null;
+}
+
 export function extractSalaryMinUsd(description: string): number | null {
   const m = description.match(/\$\s*(\d{1,3})\s*k\b/i);
   if (m) return parseInt(m[1]!, 10) * 1000;

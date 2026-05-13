@@ -1,0 +1,200 @@
+import { Prisma } from "@prisma/client";
+import { loadRootEnv } from "../infrastructure/env/loadEnv.js";
+import { prisma } from "../infrastructure/db/prisma.js";
+
+type Args = {
+  batchSize: number;
+  sleepMs: number;
+  maxBatches: number;
+  dryRun: boolean;
+  checkpoint: string | null;
+};
+
+function parseArgs(argv: string[]): Args {
+  const out: Args = {
+    batchSize: 500,
+    sleepMs: 200,
+    maxBatches: 10,
+    dryRun: true,
+    checkpoint: null,
+  };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === "--batch-size") out.batchSize = Number(argv[i + 1] ?? out.batchSize);
+    if (arg === "--sleep-ms") out.sleepMs = Number(argv[i + 1] ?? out.sleepMs);
+    if (arg === "--max-batches") out.maxBatches = Number(argv[i + 1] ?? out.maxBatches);
+    if (arg === "--apply") out.dryRun = false;
+    if (arg === "--checkpoint") out.checkpoint = String(argv[i + 1] ?? "").trim() || null;
+  }
+  out.batchSize = Math.max(50, Math.min(2000, Math.floor(out.batchSize)));
+  out.sleepMs = Math.max(0, Math.min(10000, Math.floor(out.sleepMs)));
+  out.maxBatches = Math.max(1, Math.min(100000, Math.floor(out.maxBatches)));
+  return out;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function logProgress(payload: Record<string, unknown>): void {
+  console.error(
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      event: "backfill_hybrid_work_type_progress",
+      ...payload,
+    }),
+  );
+}
+
+async function checkpointGet(key: string): Promise<string | null> {
+  const row = await prisma.$queryRaw<Array<{ value: string }>>`
+    SELECT "value" FROM "BackfillCheckpoint" WHERE "key" = ${key} LIMIT 1
+  `;
+  return row[0]?.value ?? null;
+}
+
+async function checkpointSet(key: string, value: string): Promise<void> {
+  await prisma.$executeRaw`
+    INSERT INTO "BackfillCheckpoint" ("key", "value", "updatedAt")
+    VALUES (${key}, ${value}, NOW())
+    ON CONFLICT ("key") DO UPDATE
+    SET "value" = EXCLUDED."value", "updatedAt" = NOW()
+  `;
+}
+
+async function ensureCheckpointTable(): Promise<void> {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "BackfillCheckpoint" (
+      "key" TEXT PRIMARY KEY,
+      "value" TEXT NOT NULL,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
+const HYBRID_RE = /\bhybrid\b/i;
+const CHECKPOINT_KEY = "hybrid_work_type:last_id";
+
+function isHybrid(
+  enriched: unknown,
+  description: string | null,
+  title: string,
+): boolean {
+  if (
+    enriched &&
+    typeof enriched === "object" &&
+    "remoteType" in enriched &&
+    (enriched as Record<string, unknown>).remoteType === "hybrid"
+  ) {
+    return true;
+  }
+  const blob = `${title}\n${description ?? ""}`;
+  return HYBRID_RE.test(blob);
+}
+
+async function run(args: Args): Promise<{ scanned: number; updated: number; skipped: number; batches: number }> {
+  let cursor = args.checkpoint ?? (await checkpointGet(CHECKPOINT_KEY)) ?? "";
+  let scanned = 0;
+  let updated = 0;
+  let skipped = 0;
+  let batches = 0;
+  const runStarted = Date.now();
+
+  while (batches < args.maxBatches) {
+    const batchStarted = Date.now();
+    const rows = await prisma.job.findMany({
+      where: {
+        id: cursor ? { gt: cursor } : undefined,
+        workType: { not: "hybrid" },
+      },
+      orderBy: { id: "asc" },
+      take: args.batchSize,
+      select: { id: true, title: true, description: true, enriched: true },
+    });
+    if (rows.length === 0) break;
+
+    batches += 1;
+    scanned += rows.length;
+    let updatedThisBatch = 0;
+
+    for (const row of rows) {
+      if (!isHybrid(row.enriched, row.description, row.title)) {
+        skipped += 1;
+        cursor = row.id;
+        continue;
+      }
+
+      updated += 1;
+      updatedThisBatch += 1;
+
+      if (!args.dryRun) {
+        await prisma.job.update({
+          where: { id: row.id },
+          data: { workType: "hybrid" } satisfies Prisma.JobUpdateInput,
+        });
+      }
+      cursor = row.id;
+    }
+
+    if (!args.dryRun && cursor) await checkpointSet(CHECKPOINT_KEY, cursor);
+
+    const batchMs = Date.now() - batchStarted;
+    const elapsedSec = (Date.now() - runStarted) / 1000;
+    const rowsPerSec = batchMs > 0 ? rows.length / (batchMs / 1000) : null;
+    const batchesRemaining = Math.max(0, args.maxBatches - batches);
+    const etaSec =
+      batchesRemaining > 0 && batchMs > 0 ? (batchesRemaining * (batchMs + args.sleepMs)) / 1000 : 0;
+
+    logProgress({
+      phase: "batch_done",
+      dryRun: args.dryRun,
+      batch: batches,
+      maxBatches: args.maxBatches,
+      rowsThisBatch: rows.length,
+      updatedThisBatch,
+      cumulativeScanned: scanned,
+      cumulativeUpdated: updated,
+      cumulativeSkipped: skipped,
+      checkpoint: cursor,
+      batchDurationMs: batchMs,
+      rowsPerSec: rowsPerSec != null ? Number(rowsPerSec.toFixed(2)) : null,
+      elapsedSec: Number(elapsedSec.toFixed(2)),
+      etaRemainingSec: batchesRemaining ? Number(etaSec.toFixed(1)) : 0,
+    });
+
+    if (args.sleepMs > 0) await sleep(args.sleepMs);
+  }
+
+  return { scanned, updated, skipped, batches };
+}
+
+async function main(): Promise<void> {
+  loadRootEnv();
+  const args = parseArgs(process.argv.slice(2));
+  await ensureCheckpointTable();
+
+  const result = await run(args);
+
+  console.log(
+    JSON.stringify(
+      {
+        dryRun: args.dryRun,
+        batchSize: args.batchSize,
+        sleepMs: args.sleepMs,
+        maxBatches: args.maxBatches,
+        ...result,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+main()
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
