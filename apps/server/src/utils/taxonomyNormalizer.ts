@@ -111,6 +111,30 @@ export function normalizeLocation(rawLocation: string): ResolvedLocation {
   return resolveLocation(rawLocation || "");
 }
 
+const JUNIOR_RE =
+  /\b(intern(?:ship)?|junior|entry[\s-]?level|new\s*grad(?:uate)?|trainee|apprentice|co[\s-]?op)\b/i;
+
+const SENIOR_RE =
+  /\b(senior|staff|principal|distinguished|fellow|(?:lead|head\s+of|director|vp|vice\s*president|chief)\b)/i;
+
+/**
+ * Infer experience level from job title keywords.
+ * Only returns "junior" or "senior" when there is a clear signal;
+ * ambiguous or mid-level titles return null.
+ */
+export function deriveExperienceLevel(title: string): "junior" | "senior" | null {
+  const t = title.trim();
+  if (!t) return null;
+
+  const isJunior = JUNIOR_RE.test(t);
+  const isSenior = SENIOR_RE.test(t);
+
+  if (isJunior && isSenior) return null;
+  if (isJunior) return "junior";
+  if (isSenior) return "senior";
+  return null;
+}
+
 export function extractSalaryMinUsd(description: string): number | null {
   const m = description.match(/\$\s*(\d{1,3})\s*k\b/i);
   if (m) return parseInt(m[1]!, 10) * 1000;

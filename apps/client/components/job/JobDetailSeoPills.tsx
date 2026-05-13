@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { JobItem } from "../../lib/api";
 import { Badge } from "../ui/Badge";
 
+const EXPERIENCE_FILTER_ENABLED = false;
 const EXP_FILTER = new Set(["junior", "mid", "senior"]);
 
 /**
@@ -9,6 +10,8 @@ const EXP_FILTER = new Set(["junior", "mid", "senior"]);
  * {@link JobHeader}; this row is only experience (and similar) so skills stay separate.
  */
 export function JobDetailSeoPills({ job }: { job: JobItem }) {
+  if (!EXPERIENCE_FILTER_ENABLED) return null;
+
   const exp = job.experienceLevel?.toLowerCase().trim();
   const experienceHref =
     exp && EXP_FILTER.has(exp) ? `/jobs?experience=${encodeURIComponent(exp)}` : null;

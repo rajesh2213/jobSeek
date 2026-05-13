@@ -29,6 +29,8 @@ import { FilterChips } from "../filters/FilterChips";
 import { Button } from "../ui/Button";
 import { SortSegmented } from "../ui/SortSegmented";
 
+const EXPERIENCE_FILTER_ENABLED = false;
+
 function CitySuggestionShimmerRow() {
   return (
     <li className="px-3 py-2.5" aria-hidden>
@@ -705,6 +707,7 @@ export function JobsInlineFilters({
           </AnimatePresence>
         </div>
 
+        {EXPERIENCE_FILTER_ENABLED && (
         <div
           className="relative col-span-1 w-full min-w-0 lg:w-auto lg:min-w-[140px] lg:max-w-[220px]"
           data-dropdown-id="experience"
@@ -739,6 +742,7 @@ export function JobsInlineFilters({
           ) : null}
           </AnimatePresence>
         </div>
+        )}
 
         <div
           className="relative col-span-1 w-full min-w-0 lg:w-auto lg:min-w-[140px] lg:max-w-[220px]"
