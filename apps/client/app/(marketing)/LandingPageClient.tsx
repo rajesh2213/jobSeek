@@ -176,7 +176,7 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
     <section
       className="mx-auto grid w-full max-w-6xl gap-8 px-4 pb-2 pt-4 sm:px-6 lg:grid-cols-2 lg:items-center"
     >
-      <motion.div style={{ scale: heroScale, y: heroY, opacity: heroOpacity }}>
+      <motion.div className="flex flex-col" style={{ scale: heroScale, y: heroY, opacity: heroOpacity }}>
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full border border-brand/20 bg-brand/[0.06] px-3 py-1.5 text-xs font-semibold text-ink/70 shadow-sm sm:whitespace-nowrap sm:px-3.5">
             Many roles start on <span className="font-extrabold text-brand">company career sites</span>
@@ -209,7 +209,7 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
           JobLoom helps you <span className="font-semibold text-ink">move earlier</span>, <span className="font-semibold text-ink">fix what's missing</span>, and{" "}
           <span className="font-semibold text-ink">track everything</span> - so nothing slips through.
         </p>
-        <div className="mt-2 grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="order-1 mt-2 grid max-w-xl grid-cols-1 gap-2 sm:grid-cols-2 lg:order-none">
           {stats.map((s, i) => (
             <motion.div
               key={s.k}
@@ -236,7 +236,7 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
             </motion.div>
           ))}
         </div>
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="mt-4 flex flex-wrap gap-3 lg:order-none">
           <motion.div
             animate={{ boxShadow: ["0 0 0 0 rgba(232,83,58,0.35)", "0 0 0 10px rgba(232,83,58,0)"] }}
             transition={{ repeat: Infinity, duration: 1.8 }}
@@ -247,7 +247,7 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
                 href="/jobs"
                 className="rounded-full bg-brand px-6 py-2.5 text-sm font-bold !text-white shadow-md transition-colors hover:bg-brand-hover hover:!text-white"
               >
-                Start applying smarter →
+                Find Jobs Smarter →
               </Link>
             </motion.div>
           </motion.div>
@@ -255,7 +255,7 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
             See Pro plans
           </Link>
         </div>
-        <div className="mt-4 max-w-xl">
+        <div className="order-2 mt-4 max-w-xl lg:order-none">
           <EmailCaptureCard
             source="homepage"
             title="Get top jobs daily - free"
