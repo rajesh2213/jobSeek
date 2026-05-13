@@ -16,6 +16,11 @@ async function main() {
   try {
     await server.listen({ port, host: "0.0.0.0" });
     server.log.info({ port, event: "server_listen" }, "Server listening");
+
+    const warmupUrl = `http://127.0.0.1:${port}/companies?page=1&limit=20`;
+    fetch(warmupUrl)
+      .then(() => server.log.info({ event: "boot_warmup_done", url: warmupUrl }, "boot_warmup_done"))
+      .catch((err) => server.log.warn({ event: "boot_warmup_failed", err: String(err) }, "boot_warmup_failed"));
   } catch (err) {
     logger.error({ err, event: "server_listen_failed" }, "Server failed to start");
     process.exit(1);

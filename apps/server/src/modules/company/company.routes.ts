@@ -24,7 +24,6 @@ const COMPANY_AGG_CACHE_TTL_SECONDS = Math.max(
   15,
   Number(process.env.COMPANY_AGG_CACHE_TTL_SECONDS ?? "60") || 60,
 );
-const DEBUG_COMPANY_AGG = process.env.DEBUG_COMPANY_AGG === "1";
 const DEBUG_COMPANY_CONCURRENCY = process.env.DEBUG_COMPANY_CONCURRENCY === "1";
 
 type CompaniesAggResponseBody = {
@@ -159,32 +158,14 @@ export function registerCompanyRoutes(
         typeof request.headers["x-ssr-page"] === "string"
           ? request.headers["x-ssr-page"]
           : null;
-      const startedAt = Date.now();
-
       if (!hasAuthHeader && COMPANY_AGG_CACHE_ENABLED) {
         const hit = await redis.get(cacheKey);
         if (hit) {
           const parsed = JSON.parse(hit) as CompaniesAggResponseBody;
-          if (DEBUG_COMPANY_AGG) {
-            request.log.info(
-              {
-                event: "COMPANY_AGG_TRIGGER",
-                route: "/companies",
-                cacheStatus: "HIT",
-                callerType,
-                ssrPage,
-                sitemap: ssrPage === "sitemap",
-                executionMs: Date.now() - startedAt,
-                cacheKey,
-              },
-              "COMPANY_AGG_TRIGGER",
-            );
-          }
           return reply.send(parsed);
         }
 
         let inflight = inflightAnonymousCompanyAgg.get(cacheKey);
-        const isInflightJoiner = Boolean(inflight);
         if (!inflight) {
           inflight = (async (): Promise<CompaniesAggResponseBody> => {
             try {
@@ -229,21 +210,6 @@ export function registerCompanyRoutes(
         }
 
         const responsePayload = await inflight;
-        if (DEBUG_COMPANY_AGG) {
-          request.log.info(
-            {
-              event: "COMPANY_AGG_TRIGGER",
-              route: "/companies",
-              cacheStatus: isInflightJoiner ? "INFLIGHT_JOIN" : "MISS",
-              callerType,
-              ssrPage,
-              sitemap: ssrPage === "sitemap",
-              executionMs: Date.now() - startedAt,
-              cacheKey,
-            },
-            "COMPANY_AGG_TRIGGER",
-          );
-        }
         return reply.send(responsePayload);
       }
 
@@ -266,21 +232,6 @@ export function registerCompanyRoutes(
           stats: result.stats,
         },
       };
-      if (DEBUG_COMPANY_AGG) {
-        request.log.info(
-          {
-            event: "COMPANY_AGG_TRIGGER",
-            route: "/companies",
-            cacheStatus: "MISS",
-            callerType,
-            ssrPage,
-            sitemap: ssrPage === "sitemap",
-            executionMs: Date.now() - startedAt,
-            cacheKey,
-          },
-          "COMPANY_AGG_TRIGGER",
-        );
-      }
       return reply.send(responsePayload);
     },
   );

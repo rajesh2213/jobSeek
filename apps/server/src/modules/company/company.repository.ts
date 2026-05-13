@@ -8,10 +8,7 @@ import type {
 import { slugifyCompanyName } from "../../utils/slugify.js";
 import { getDomainFromUrl, normalizeDomain } from "../../utils/common.js";
 import type { JobWithCompany } from "../job/job.repository.js";
-import { logger } from "../../utils/logger.js";
 import { computeCompanyQualityFlags } from "../../services/qualityFlags.service.js";
-
-const DEBUG_COMPANY_AGG = process.env.DEBUG_COMPANY_AGG === "1";
 const WORKDAY_ROOT_JOB_PATH_SNIPPET = "myworkdayjobs.com/job/";
 
 function publicVisibilityGuardEnabled(): boolean {
@@ -502,69 +499,11 @@ export function createCompanyRepository(prisma: PrismaClient) {
             AND "lastSeenAt" >= ${weekAgo}
         `;
 
-      if (!DEBUG_COMPANY_AGG) {
-        const totalTracked = await prisma.company.count();
-        const aggRows = await countDistinctHiringCompaniesSql();
-        return {
-          totalTracked,
-          hiringThisWeek: Number(aggRows[0]?.c ?? 0),
-        };
-      }
-
-      let executionMsNew = 0;
       const totalTracked = await prisma.company.count();
-      const aggStarted = Date.now();
       const aggRows = await countDistinctHiringCompaniesSql();
-      executionMsNew = Date.now() - aggStarted;
-      const newCount = Number(aggRows[0]?.c ?? 0);
-      let hiringThisWeek = newCount;
-
-      const startedOld = Date.now();
-      const legacyDistinct = await prisma.job.findMany({
-        where: {
-          canonicalJobId: null,
-          status: "ready",
-          lastSeenAt: { gte: weekAgo },
-        },
-        distinct: ["companyId"],
-        select: { companyId: true },
-      });
-      const executionMsOld = Date.now() - startedOld;
-      const oldCount = legacyDistinct.length;
-      const diff = newCount - oldCount;
-
-      if (oldCount !== newCount) {
-        logger.warn(
-          {
-            event: "COMPANY_STATS_SHADOW_MISMATCH",
-            oldCount,
-            newCount,
-            diff,
-            executionMsOld,
-            executionMsNew,
-            weekAgo: weekAgo.toISOString(),
-          },
-          "COMPANY_STATS_SHADOW_MISMATCH",
-        );
-        hiringThisWeek = oldCount;
-      }
-
-      logger.info(
-        {
-          event: "COMPANY_STATS_SHADOW_COMPARE",
-          oldCount,
-          newCount,
-          diff,
-          executionMsOld,
-          executionMsNew,
-          weekAgo: weekAgo.toISOString(),
-        },
-        "COMPANY_STATS_SHADOW_COMPARE",
-      );
-
       return {
         totalTracked,
-        hiringThisWeek,
+        hiringThisWeek: Number(aggRows[0]?.c ?? 0),
       };
     },
   };
