@@ -62,6 +62,20 @@ type PrimaryLifecycleSqlRow = {
   oldest_processing_minutes: number | null;
 };
 
+export type ProviderFreshnessRow = {
+  type: string;
+  active: number;
+  fresh_1h: number;
+  fresh_6h: number;
+  stale_24h_plus: number;
+};
+
+export type ScoreTierRow = {
+  hot: number;
+  warm: number;
+  cold: number;
+};
+
 export type IngestionObservabilitySnapshot = {
   generatedAt: string;
   queues: QueueDepthRow[];
@@ -96,6 +110,14 @@ export type IngestionObservabilitySnapshot = {
     lastBeatIso: string | null;
     ageMs: number | null;
   };
+  /** Provider-level freshness distribution. */
+  providerFreshness: ProviderFreshnessRow[] | null;
+  /** Score tier distribution (Hot/Warm/Cold). */
+  scoreTiers: ScoreTierRow | null;
+  /** Inactive endpoints that had recent success (recovery candidates). */
+  recoverableInactiveCount: number | null;
+  /** Orphan active endpoints (no companyId). */
+  orphanActiveCount: number | null;
   notes: string[];
 };
 
@@ -403,6 +425,49 @@ export async function buildIngestionObservabilitySnapshot(
     notes.push(`DB slice failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
+  let providerFreshness: ProviderFreshnessRow[] | null = null;
+  let scoreTiers: ScoreTierRow | null = null;
+  let recoverableInactiveCount: number | null = null;
+  let orphanActiveCount: number | null = null;
+
+  try {
+    const pfRows = await prisma.$queryRaw<ProviderFreshnessRow[]>`
+      SELECT type,
+        COUNT(*)::int as active,
+        COUNT(*) FILTER (WHERE "lastCrawledAt" > NOW() - INTERVAL '1 hour')::int as fresh_1h,
+        COUNT(*) FILTER (WHERE "lastCrawledAt" > NOW() - INTERVAL '6 hours')::int as fresh_6h,
+        COUNT(*) FILTER (WHERE "lastCrawledAt" < NOW() - INTERVAL '24 hours' OR "lastCrawledAt" IS NULL)::int as stale_24h_plus
+      FROM "AtsEndpoint" WHERE "isActive" = true
+      GROUP BY type ORDER BY active DESC LIMIT 20
+    `;
+    providerFreshness = pfRows;
+
+    const stRows = await prisma.$queryRaw<Array<{ hot: bigint; warm: bigint; cold: bigint }>>`
+      SELECT
+        COUNT(*) FILTER (WHERE score >= 80)::bigint as hot,
+        COUNT(*) FILTER (WHERE score >= 40 AND score < 80)::bigint as warm,
+        COUNT(*) FILTER (WHERE score < 40)::bigint as cold
+      FROM "AtsEndpoint" WHERE "isActive" = true
+    `;
+    if (stRows[0]) {
+      scoreTiers = { hot: Number(stRows[0].hot), warm: Number(stRows[0].warm), cold: Number(stRows[0].cold) };
+    }
+
+    const recRows2 = await prisma.$queryRaw<Array<{ c: bigint }>>`
+      SELECT COUNT(*)::bigint as c FROM "AtsEndpoint"
+      WHERE "isActive" = false AND "lastSuccessAt" > NOW() - INTERVAL '30 days'
+    `;
+    recoverableInactiveCount = recRows2[0] ? Number(recRows2[0].c) : null;
+
+    const orphRows = await prisma.$queryRaw<Array<{ c: bigint }>>`
+      SELECT COUNT(*)::bigint as c FROM "AtsEndpoint"
+      WHERE "companyId" IS NULL AND "isActive" = true
+    `;
+    orphanActiveCount = orphRows[0] ? Number(orphRows[0].c) : null;
+  } catch (err) {
+    notes.push(`Extended metrics failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   const endpointFreshnessDrift =
     endpoints != null
       ? {
@@ -449,6 +514,10 @@ export async function buildIngestionObservabilitySnapshot(
     ingestAtsQueueWaitSampleSize,
     endpointFreshnessDrift,
     serpSchedulerHeartbeat,
+    providerFreshness,
+    scoreTiers,
+    recoverableInactiveCount,
+    orphanActiveCount,
     notes,
   };
 }

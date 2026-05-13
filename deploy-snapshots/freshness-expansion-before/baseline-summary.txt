@@ -1,0 +1,83 @@
+=== FRESHNESS EXPANSION BASELINE ===
+Captured: 2026-05-13T13:36:58.763Z
+
+--- Key Metrics ---
+  total_endpoints: 845
+  active_endpoints: 692
+  inactive_endpoints: 153
+  orphan_active: 141
+  recently_succeeded_inactive: 50
+  companies_with_atstype_no_endpoint: 239
+  total_jobs: 117930
+  jobs_last_7d: 37694
+  freshly_monitored_companies: 422
+
+--- Endpoint Counts ---
+  isActive=false: 153
+  isActive=true: 692
+
+--- Provider Distribution ---
+  ashby active=true: 170
+  ashby active=false: 15
+  bamboohr active=false: 3
+  greenhouse active=true: 274
+  greenhouse active=false: 31
+  jobvite active=false: 3
+  lever active=true: 114
+  lever active=false: 30
+  teamtailor active=true: 2
+  workday active=false: 71
+  workday active=true: 132
+
+--- Score Distribution ---
+  0-7: 697
+  8-39: 148
+
+--- Freshness Histogram (Active Endpoints) ---
+  <30m | ashby: 23
+  <30m | greenhouse: 32
+  <30m | lever: 16
+  <30m | workday: 16
+  >24h | greenhouse: 2
+  >24h | workday: 26
+  1-2h | ashby: 27
+  1-2h | greenhouse: 34
+  1-2h | lever: 15
+  1-2h | teamtailor: 1
+  1-2h | workday: 18
+  2-4h | ashby: 59
+  2-4h | greenhouse: 56
+  2-4h | lever: 29
+  2-4h | workday: 26
+  30m-1h | ashby: 2
+  30m-1h | greenhouse: 48
+  30m-1h | lever: 2
+  30m-1h | workday: 8
+  4-8h | ashby: 54
+  4-8h | greenhouse: 61
+  4-8h | lever: 43
+  4-8h | teamtailor: 1
+  4-8h | workday: 24
+  8-24h | ashby: 5
+  8-24h | greenhouse: 39
+  8-24h | lever: 6
+  8-24h | workday: 13
+  never | greenhouse: 2
+  never | lever: 3
+  never | workday: 1
+
+--- Company Coverage ---
+  careers_unresolved: 7682
+  no_source: 1082
+  active_fresh: 422
+  ats_known_no_endpoint: 239
+  active_stale: 116
+  endpoint_inactive: 116
+
+--- Env Config ---
+  ATS_ENDPOINT_WORKER_CONCURRENCY=1
+  ATS_POOL_INGEST_CONCURRENCY=2
+  ATS_PARSE_CONCURRENCY=2
+  ATS_ENDPOINT_FETCH_TIMEOUT_MS=600000
+  ATS_ENDPOINT_SCHEDULER_MAX_PER_TYPE=10
+  WORKER_CONCURRENCY=4

@@ -34,10 +34,17 @@ const ATS_ENDPOINT_SCHED_SELECT = {
   lastCrawledAt: true,
 } as const;
 
+/**
+ * Tiered crawl cooldowns based on dynamic endpoint score.
+ *   Hot (80+):  15 minutes
+ *   Warm (40-79): 2 hours
+ *   Cold (<40):  8 hours
+ * Env overrides: ATS_COOLDOWN_HOT_MS, ATS_COOLDOWN_WARM_MS, ATS_COOLDOWN_COLD_MS
+ */
 function endpointCooldownMs(score: number): number {
-  if (score >= 80) return 5 * 60 * 1000;
-  if (score >= 40) return 30 * 60 * 1000;
-  return 2 * 60 * 60 * 1000;
+  if (score >= 80) return Math.max(5 * 60_000, Number(process.env.ATS_COOLDOWN_HOT_MS ?? String(15 * 60_000)) || 15 * 60_000);
+  if (score >= 40) return Math.max(30 * 60_000, Number(process.env.ATS_COOLDOWN_WARM_MS ?? String(2 * 3600_000)) || 2 * 3600_000);
+  return Math.max(60 * 60_000, Number(process.env.ATS_COOLDOWN_COLD_MS ?? String(8 * 3600_000)) || 8 * 3600_000);
 }
 
 function randomIntInclusive(min: number, max: number): number {
@@ -161,6 +168,13 @@ async function enqueuePrioritizedIngests(): Promise<void> {
     );
   }
 
+  const tierCounts = { hot: 0, warm: 0, cold: 0 };
+  for (const ep of top) {
+    if (ep.score >= 80) tierCounts.hot++;
+    else if (ep.score >= 40) tierCounts.warm++;
+    else tierCounts.cold++;
+  }
+
   logger.info(
     {
       event: "ats_endpoint_scheduler_run",
@@ -173,6 +187,12 @@ async function enqueuePrioritizedIngests(): Promise<void> {
       poolLimit,
       maxPerTypeFairness: maxPerType,
       estimatedKB: Number(queryMetrics.estimatedKB.toFixed(2)),
+      tierCounts,
+      cooldowns: {
+        hot_ms: endpointCooldownMs(80),
+        warm_ms: endpointCooldownMs(40),
+        cold_ms: endpointCooldownMs(0),
+      },
     },
     "ats_endpoint_scheduler_run",
   );

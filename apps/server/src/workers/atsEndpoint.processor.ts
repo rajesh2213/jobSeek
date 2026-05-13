@@ -73,12 +73,51 @@ let atsLastIdleEventAt = 0;
 
 const DEFAULT_ATS_FETCH_TIMEOUT_MS = 600_000;
 
+const PROVIDER_TIMEOUT_MS: Record<string, number> = {
+  workday: Math.max(30_000, Math.min(300_000, Number(process.env.ATS_WORKDAY_FETCH_TIMEOUT_MS ?? "120000") || 120_000)),
+  greenhouse: 60_000,
+  lever: 60_000,
+  ashby: 60_000,
+  bamboohr: 60_000,
+  teamtailor: 60_000,
+  rippling: 60_000,
+  jobvite: 60_000,
+  smartrecruiters: 60_000,
+  workable: 60_000,
+};
+
+const PROVIDER_MAX_CONCURRENT: Record<string, number> = {
+  workday: Math.max(1, Math.min(2, Number(process.env.ATS_WORKDAY_MAX_CONCURRENT ?? "1") || 1)),
+};
+
+const providerActiveCounts = new Map<string, number>();
+
+function acquireProviderSlot(atsType: string): boolean {
+  const max = PROVIDER_MAX_CONCURRENT[atsType];
+  if (max == null) return true;
+  const current = providerActiveCounts.get(atsType) ?? 0;
+  if (current >= max) return false;
+  providerActiveCounts.set(atsType, current + 1);
+  return true;
+}
+
+function releaseProviderSlot(atsType: string): void {
+  const max = PROVIDER_MAX_CONCURRENT[atsType];
+  if (max == null) return;
+  const current = providerActiveCounts.get(atsType) ?? 0;
+  providerActiveCounts.set(atsType, Math.max(0, current - 1));
+}
+
 /**
  * Hard cap on `createAtsCrawlerStandard(...).fetchJobs` (fetch + normalize in adapter).
  * Uses `UnrecoverableError` on expiry so BullMQ does not retry the same hung fetch (avoids retry storms).
  * Set `ATS_ENDPOINT_FETCH_TIMEOUT_MS=0` to disable (not recommended in production).
+ * Provider-specific timeouts via PROVIDER_TIMEOUT_MS (Workday default: 120s).
  */
-function atsEndpointFetchTimeoutMs(): number {
+function atsEndpointFetchTimeoutMs(atsType?: string): number {
+  if (atsType && PROVIDER_TIMEOUT_MS[atsType] != null) {
+    return PROVIDER_TIMEOUT_MS[atsType];
+  }
   const raw = process.env.ATS_ENDPOINT_FETCH_TIMEOUT_MS?.trim();
   if (raw === "0") return 0;
   const n = Number(raw ?? String(DEFAULT_ATS_FETCH_TIMEOUT_MS));
@@ -227,7 +266,8 @@ async function start(): Promise<void> {
       atsPoolParseConcurrency: parsePoolConcurrency,
       atsParseChunkSize: parseChunkSize,
       atsEndpointBullConcurrency: bullConcurrency,
-      atsFetchTimeoutMs: atsEndpointFetchTimeoutMs(),
+      atsFetchTimeoutMs: atsEndpointFetchTimeoutMs(undefined),
+      atsWorkdayTimeoutMs: PROVIDER_TIMEOUT_MS["workday"],
       jobWorkerConc: Number(process.env.WORKER_CONCURRENCY ?? "5"),
     },
     "worker_concurrency_config",
@@ -354,8 +394,16 @@ async function start(): Promise<void> {
       companyName: company.name,
     };
 
+    if (!acquireProviderSlot(atsType)) {
+      logger.info(
+        { event: "ats_ingestion_skipped_provider_concurrency", ...logBase, atsType },
+        "ats_ingestion_skipped_provider_concurrency",
+      );
+      return;
+    }
+
     let normalizedJobs;
-    const fetchTimeoutMs = atsEndpointFetchTimeoutMs();
+    const fetchTimeoutMs = atsEndpointFetchTimeoutMs(atsType);
     const fetchStartedAt = Date.now();
     try {
       const standard = createAtsCrawlerStandard(atsType);
@@ -384,7 +432,9 @@ async function start(): Promise<void> {
         }
       }
     } catch (err) {
-      if (err instanceof UnrecoverableError && err.message.startsWith("ats_endpoint_fetch_timeout")) {
+      releaseProviderSlot(atsType);
+      const isTimeout = err instanceof UnrecoverableError && err.message.startsWith("ats_endpoint_fetch_timeout");
+      if (isTimeout) {
         logger.error(
           {
             event: "ats_endpoint_fetch_timeout",
@@ -392,7 +442,7 @@ async function start(): Promise<void> {
             atsType,
             timeoutMs: fetchTimeoutMs,
             durationMs: Date.now() - fetchStartedAt,
-            err: err.message,
+            err: (err as Error).message,
           },
           "ats_endpoint_fetch_timeout",
         );
@@ -404,6 +454,7 @@ async function start(): Promise<void> {
           ...logBase,
           errorKind,
           err,
+          isTimeout,
         },
         "ats_ingestion_failed",
       );
@@ -422,6 +473,8 @@ async function start(): Promise<void> {
       }
       throw err;
     }
+
+    releaseProviderSlot(atsType);
 
     const companyDomain = extractCompanyDomain(
       company.careersUrl,
@@ -665,9 +718,35 @@ async function start(): Promise<void> {
       data: { lastCrawledAt: crawlCompletedAt },
     });
 
-    if (failures === 0) {
+    const totalFetched = normalizedJobs.length;
+    const failureRatio = totalFetched > 0 ? failures / totalFetched : 0;
+    if (failures === 0 || (totalFetched > 0 && failureRatio < 0.5)) {
       await endpointService.markSuccess(endpointId);
+      if (failures > 0) {
+        logger.warn(
+          {
+            event: "endpoint_job_partial_failures",
+            endpointId,
+            atsType,
+            totalFetched,
+            failures,
+            failureRatio: Math.round(failureRatio * 100) / 100,
+          },
+          "endpoint_job_partial_failures",
+        );
+      }
     } else {
+      logger.error(
+        {
+          event: "endpoint_fetch_failures",
+          endpointId,
+          atsType,
+          totalFetched,
+          failures,
+          failureRatio: Math.round(failureRatio * 100) / 100,
+        },
+        "endpoint_fetch_failures",
+      );
       await endpointService.markFailure(endpointId);
     }
 

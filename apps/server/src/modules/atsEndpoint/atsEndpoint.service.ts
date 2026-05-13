@@ -5,6 +5,7 @@ import {
   disableAtsEndpointIngestion,
   isAtsEndpointIngestionEnabled,
 } from "./atsEndpointReadiness.js";
+import { recomputeEndpointScore } from "./atsEndpointScoring.js";
 
 export type RegisterAtsEndpointInput = {
   type: string;
@@ -141,12 +142,33 @@ export function createAtsEndpointService(prisma: PrismaClient) {
     },
 
     async markSuccess(endpointId: string): Promise<void> {
-      await prisma.atsEndpoint.update({
+      const now = new Date();
+      const row = await prisma.atsEndpoint.update({
         where: { id: endpointId },
         data: {
-          lastSuccessAt: new Date(),
-          lastCheckedAt: new Date(),
+          lastSuccessAt: now,
+          lastCheckedAt: now,
+          failureCount: 0,
+          successCount: { increment: 1 },
         },
+        select: { id: true, failureCount: true, successCount: true, type: true, slug: true },
+      });
+      if (row.successCount === 1 || row.failureCount !== 0) {
+        logger.info(
+          {
+            event: "endpoint_success_lifecycle",
+            endpointId,
+            type: row.type,
+            slug: row.slug,
+            successCount: row.successCount,
+            failureCountReset: true,
+          },
+          "endpoint_success_lifecycle",
+        );
+      }
+      // Opportunistic score recompute (non-blocking, non-fatal)
+      recomputeEndpointScore(prisma, endpointId).catch((err) => {
+        logger.warn({ event: "score_recompute_failed", endpointId, err }, "score_recompute_failed");
       });
     },
 
