@@ -12,6 +12,7 @@ import {
   extractJobTitleFromHtml,
   extractJsonLdJobPostingFlags,
   extractJsonLdJobPostingStrict,
+  extractPostedAtFromJobPostingJsonLd,
   extractSalaryFromJobPostingJsonLd,
 } from "../utils/jobDetailHtml.js";
 import {
@@ -40,6 +41,10 @@ const MAX_CANDIDATES = 50;
 const MIN_DESCRIPTION_CHARS = 120;
 const JOB_DETAIL_CONCURRENCY = 4;
 const JOB_DETAIL_TIMEOUT_MS = 12_000;
+
+function isCareersPageJsonLdPostedAtEnabled(): boolean {
+  return process.env.POSTEDAT_CAREERS_PAGE_JSONLD === "1";
+}
 
 function isJobHub(link: string): boolean {
   return /job|career|position|opening|opportunit|hiring|join|work/i.test(link);
@@ -191,6 +196,9 @@ export async function processIngestJobsFromSourceUrl(
     "job_source_debug",
   );
 
+  let jsonLdPostedAtExtracted = 0;
+  let jsonLdPostedAtRejected = 0;
+
   const rowResults = await asyncPool(
     finalCandidates,
     JOB_DETAIL_CONCURRENCY,
@@ -223,6 +231,28 @@ export async function processIngestJobsFromSourceUrl(
 
         const jsonLd = extractJsonLdJobPostingFlags(meta.html);
         const structuredSalary = extractSalaryFromJobPostingJsonLd(meta.html);
+
+        let extractedPostedAt: Date | undefined;
+        if (isCareersPageJsonLdPostedAtEnabled()) {
+          const { postedAt: pa, rejected, rejectReason } =
+            extractPostedAtFromJobPostingJsonLd(meta.html);
+          if (pa) {
+            extractedPostedAt = pa;
+            jsonLdPostedAtExtracted++;
+          } else if (rejected) {
+            jsonLdPostedAtRejected++;
+            logger.info(
+              {
+                event: "careers_jsonld_postedat_rejected",
+                companyId,
+                sourceUrl: link,
+                reason: rejectReason,
+              },
+              "careers_jsonld_postedat_rejected",
+            );
+          }
+        }
+
         const strictDesc = process.env.CAREERS_PAGE_STRICT_DESCRIPTION === "1";
         const { text: description, source: extractionSource } = extractJobDescriptionFromHtml(meta.html, {
           careersPageStrict: strictDesc,
@@ -432,6 +462,7 @@ export async function processIngestJobsFromSourceUrl(
           source: "careers_page",
           sourceUrl: link,
           applyUrl: link,
+          postedAt: extractedPostedAt,
           companyId,
           companyName: companyName || company.name,
           companyDomain,
@@ -488,4 +519,21 @@ export async function processIngestJobsFromSourceUrl(
     },
     "job_source_result",
   );
+
+  if (isCareersPageJsonLdPostedAtEnabled() && attempted > 0) {
+    logger.info(
+      {
+        event: "careers_postedat_batch_metrics",
+        companyId,
+        attempted,
+        inserted: jobsInserted,
+        jsonLdPostedAtExtracted,
+        jsonLdPostedAtRejected,
+        postedAtPct: attempted > 0
+          ? Math.round((100 * jsonLdPostedAtExtracted) / attempted)
+          : 0,
+      },
+      "careers_postedat_batch_metrics",
+    );
+  }
 }

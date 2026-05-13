@@ -659,6 +659,58 @@ export function extractLocationFallbackFromHtml(html: string): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// JSON-LD datePosted Extraction
+// ---------------------------------------------------------------------------
+
+const MAX_POSTEDAT_AGE_MS = 10 * 365.25 * 24 * 60 * 60 * 1000;
+const MAX_POSTEDAT_FUTURE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Extract `datePosted` from the first schema.org `JobPosting` JSON-LD block.
+ * Returns a validated `Date` or `null`. Rejects:
+ *  - Missing / non-string / empty `datePosted`
+ *  - Unparseable date strings
+ *  - Future dates (>24 h from now)
+ *  - Ancient dates (>10 years ago)
+ * Uses the shared `walkJsonLdRoots` infrastructure — no extra HTML parsing pass.
+ */
+export function extractPostedAtFromJobPostingJsonLd(html: string): {
+  postedAt: Date | null;
+  rejected: boolean;
+  rejectReason?: string;
+} {
+  let raw: string | undefined;
+
+  walkJsonLdRoots(html, (node) => {
+    if (raw !== undefined) return;
+    if (!isJobPostingNode(node)) return;
+    const dp = node["datePosted"] ?? node["validFrom"];
+    if (typeof dp === "string" && dp.trim()) {
+      raw = dp.trim();
+    }
+  });
+
+  if (raw === undefined) {
+    return { postedAt: null, rejected: false };
+  }
+
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) {
+    return { postedAt: null, rejected: true, rejectReason: "unparseable" };
+  }
+
+  const now = Date.now();
+  if (d.getTime() > now + MAX_POSTEDAT_FUTURE_MS) {
+    return { postedAt: null, rejected: true, rejectReason: "future_date" };
+  }
+  if (d.getTime() < now - MAX_POSTEDAT_AGE_MS) {
+    return { postedAt: null, rejected: true, rejectReason: "ancient_date" };
+  }
+
+  return { postedAt: d, rejected: false };
+}
+
+// ---------------------------------------------------------------------------
 // JSON-LD Salary Extraction
 // ---------------------------------------------------------------------------
 
