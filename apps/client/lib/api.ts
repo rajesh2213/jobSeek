@@ -940,6 +940,12 @@ export async function fetchSeoLandingPages(options?: {
   minCount?: number;
   maxSlugs?: number;
   internalSeoSecret?: string | null;
+  /**
+   * Skip the Next.js data cache entirely.  Callers that already live behind
+   * their own cache layer (e.g. sitemap's `unstable_cache`) should set this
+   * to avoid double-caching / stale-while-revalidate serving old failures.
+   */
+  noCache?: boolean;
 }): Promise<{
   data: SeoLandingEntry[];
   meta?: {
@@ -967,10 +973,13 @@ export async function fetchSeoLandingPages(options?: {
     headers.set("x-internal-seo", "true");
     headers.set("x-internal-seo-secret", secret);
   }
-  const res = await fetch(url, {
-    headers,
-    next: { revalidate: 300 },
-  });
+  const fetchOptions: RequestInit & { next?: { revalidate: number } } = { headers };
+  if (options?.noCache) {
+    fetchOptions.cache = "no-store";
+  } else {
+    fetchOptions.next = { revalidate: 300 };
+  }
+  const res = await fetch(url, fetchOptions);
   if (res.status === 401) {
     console.warn("[seo] landing-pages unauthorized", {
       apiBaseUrl: API_BASE_URL,

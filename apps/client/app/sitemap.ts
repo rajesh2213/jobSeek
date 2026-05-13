@@ -191,6 +191,7 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
         minCount: LANDING_MIN_COUNT,
         maxSlugs: MAX_LANDING_SITEMAP_SLUGS,
         internalSeoSecret,
+        noCache: true,
       }),
       LANDING_SECTION_BUDGET_MS,
       "landing_fetch",

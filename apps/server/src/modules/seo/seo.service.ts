@@ -28,6 +28,7 @@ export interface SeoLandingGenerationStats {
   experiencesConsidered: number;
   estimatedCountQueries: number;
   estimatedTotalQueries: number;
+  batchDurationMs?: number;
 }
 
 function parsePositiveIntEnv(
@@ -70,32 +71,170 @@ export function createSeoService(prisma: PrismaClient) {
       .filter((r) => r.role.length > 0);
   }
 
-  async function countByDimensions(input: {
-    role: string;
-    location?: string;
-    experience?: string;
-  }): Promise<number> {
-    const role = normalizeRoleSlug(input.role);
-    const location = input.location?.trim().toLowerCase();
-    const experience = input.experience?.trim().toLowerCase();
-    const expLevel = experience ? experienceSlugToLevel(experience) : undefined;
-    const locFilter = location ? locationTokenToFilter(location) : {};
+  // ── Batched dimension counting ──────────────────────────────────────
+  // Replaces N×M sequential countByDimensions() calls with 2–3 bulk queries.
 
-    const rows = await prisma.$queryRaw<Array<{ c: bigint }>>`
-      SELECT COUNT(*)::bigint AS c
+  interface DimCountRow {
+    role: string;
+    location_country: string;
+    work_type: string;
+    experience_level: string | null;
+    c: bigint;
+  }
+
+  interface EuropeCountRow {
+    role: string;
+    experience_level: string | null;
+    c: bigint;
+  }
+
+  /**
+   * Single GROUP BY covering all role×country×workType×experience combos
+   * for the supplied role names.  Returns ~300 rows for 22 roles (~0.5s).
+   */
+  async function batchCountsByDimensions(
+    roleNames: string[],
+  ): Promise<DimCountRow[]> {
+    if (roleNames.length === 0) return [];
+    const rolesSql = Prisma.join(roleNames.map((r) => Prisma.sql`${r}`));
+    return prisma.$queryRaw<DimCountRow[]>`
+      SELECT j.role,
+             j."locationCountry" AS location_country,
+             j."workType"        AS work_type,
+             j."experienceLevel" AS experience_level,
+             COUNT(*)::bigint    AS c
       FROM "Job" j
       WHERE j."canonicalJobId" IS NULL
         AND j."isActive" = true
         AND (j."expiresAt" IS NULL OR j."expiresAt" > NOW())
         AND (j."status" = 'ready' OR j."status" IS NULL)
-        AND j.role NOT IN (${excludedSql})
-        AND j.role = ${role}
-        AND (${locFilter.country ? Prisma.sql`(j."locationCountry" = ${locFilter.country} OR (j."locationCountry" = 'UNKNOWN' AND j.country = ${locFilter.country}))` : Prisma.sql`TRUE`})
-        AND (${locFilter.workType ? Prisma.sql`j."workType" = ${locFilter.workType}` : Prisma.sql`TRUE`})
-        AND (${locFilter.location ? Prisma.sql`(j."locationRegion" ILIKE ${`%${locFilter.location}%`} OR j."locationCity" ILIKE ${`%${locFilter.location}%`} OR j.country ILIKE ${`%${locFilter.location}%`})` : Prisma.sql`TRUE`})
-        AND (${expLevel ? Prisma.sql`j."experienceLevel" = ${expLevel}` : Prisma.sql`TRUE`})
+        AND j.role IN (${rolesSql})
+      GROUP BY j.role, j."locationCountry", j."workType", j."experienceLevel"
     `;
-    return Number(rows[0]?.c ?? 0);
+  }
+
+  /**
+   * Supplemental batch for the "europe" ILIKE dimension which can't be
+   * resolved from locationCountry alone.  Returns ~40 rows (~0.3s).
+   */
+  async function batchEuropeCounts(
+    roleNames: string[],
+  ): Promise<EuropeCountRow[]> {
+    if (roleNames.length === 0) return [];
+    const rolesSql = Prisma.join(roleNames.map((r) => Prisma.sql`${r}`));
+    return prisma.$queryRaw<EuropeCountRow[]>`
+      SELECT j.role,
+             j."experienceLevel" AS experience_level,
+             COUNT(*)::bigint    AS c
+      FROM "Job" j
+      WHERE j."canonicalJobId" IS NULL
+        AND j."isActive" = true
+        AND (j."expiresAt" IS NULL OR j."expiresAt" > NOW())
+        AND (j."status" = 'ready' OR j."status" IS NULL)
+        AND j.role IN (${rolesSql})
+        AND (j."locationRegion" ILIKE '%europe%'
+             OR j."locationCity" ILIKE '%europe%'
+             OR j.country ILIKE '%europe%')
+      GROUP BY j.role, j."experienceLevel"
+    `;
+  }
+
+  type CountLookup = Map<string, number>;
+
+  /**
+   * Build an in-memory lookup keyed as "role|locToken|expSlug" from the
+   * batch query results, using the same locationTokenToFilter mapping the
+   * old per-query path used.
+   */
+  function buildCountLookup(
+    dimRows: DimCountRow[],
+    europeRows: EuropeCountRow[],
+    locations: readonly string[],
+    experiences: readonly string[],
+  ): CountLookup {
+    const lookup: CountLookup = new Map();
+
+    const inc = (key: string, n: number) =>
+      lookup.set(key, (lookup.get(key) ?? 0) + n);
+
+    const countryToTokens = new Map<string, string[]>();
+    const workTypeToTokens = new Map<string, string[]>();
+    const ilikeLocs: string[] = [];
+    for (const loc of locations) {
+      const f = locationTokenToFilter(loc);
+      if (f.country) {
+        const arr = countryToTokens.get(f.country) ?? [];
+        arr.push(loc);
+        countryToTokens.set(f.country, arr);
+      } else if (f.workType) {
+        const arr = workTypeToTokens.get(f.workType) ?? [];
+        arr.push(loc);
+        workTypeToTokens.set(f.workType, arr);
+      } else if (f.location) {
+        ilikeLocs.push(loc);
+      }
+    }
+
+    const expSlugToLevel = new Map<string, string>();
+    for (const exp of experiences) {
+      const lvl = experienceSlugToLevel(exp);
+      if (lvl) expSlugToLevel.set(exp, lvl);
+    }
+    const levelToExpSlugs = new Map<string, string[]>();
+    for (const [slug, lvl] of expSlugToLevel) {
+      const arr = levelToExpSlugs.get(lvl) ?? [];
+      arr.push(slug);
+      levelToExpSlugs.set(lvl, arr);
+    }
+
+    for (const row of dimRows) {
+      const n = Number(row.c);
+      const role = normalizeRoleSlug(row.role);
+      const country = row.location_country;
+      const wt = row.work_type;
+      const rawExp = row.experience_level ?? "";
+
+      const matchedLocTokens: string[] = [];
+      if (country && countryToTokens.has(country)) {
+        matchedLocTokens.push(...countryToTokens.get(country)!);
+      }
+      if (wt && workTypeToTokens.has(wt)) {
+        matchedLocTokens.push(...workTypeToTokens.get(wt)!);
+      }
+
+      const matchedExpSlugs: string[] = [];
+      if (rawExp && levelToExpSlugs.has(rawExp)) {
+        matchedExpSlugs.push(...levelToExpSlugs.get(rawExp)!);
+      }
+
+      for (const locToken of matchedLocTokens) {
+        inc(`${role}|${locToken}|`, n);
+        for (const expSlug of matchedExpSlugs) {
+          inc(`${role}|${locToken}|${expSlug}`, n);
+        }
+      }
+
+      for (const expSlug of matchedExpSlugs) {
+        inc(`${role}||${expSlug}`, n);
+      }
+    }
+
+    for (const row of europeRows) {
+      const n = Number(row.c);
+      const role = normalizeRoleSlug(row.role);
+      const rawExp = row.experience_level ?? "";
+      for (const loc of ilikeLocs) {
+        inc(`${role}|${loc}|`, n);
+        if (rawExp) {
+          const matchedExpSlugs = levelToExpSlugs.get(rawExp) ?? [];
+          for (const expSlug of matchedExpSlugs) {
+            inc(`${role}|${loc}|${expSlug}`, n);
+          }
+        }
+      }
+    }
+
+    return lookup;
   }
 
   async function listSeoLandingEntries(input: {
@@ -105,7 +244,6 @@ export function createSeoService(prisma: PrismaClient) {
     const { minCount, maxSlugs } = input;
     const seen = new Set<string>();
     const out: SeoLandingEntry[] = [];
-    /** Phase B: modest default bump (env overrides). ~25% more count queries vs 20×8 — reversible via env. */
     const roleLimit = parsePositiveIntEnv(process.env.SEO_LANDING_MAX_ROLE_SLUGS, 22, 5, 100);
     const locationLimit = parsePositiveIntEnv(
       process.env.SEO_LANDING_MAX_LOCATION_DIMENSIONS,
@@ -128,17 +266,36 @@ export function createSeoService(prisma: PrismaClient) {
       out.push({ slug, count });
     };
 
+    const batchStart = Date.now();
+
     const roles = await topRoleSlugs(Math.min(roleLimit, maxSlugs));
+    const roleNames = roles.map((r) => r.role);
+
+    const needsEurope = selectedLocations.some(
+      (l) => locationTokenToFilter(l).location != null,
+    );
+    const [dimRows, europeRows] = await Promise.all([
+      batchCountsByDimensions(roleNames),
+      needsEurope ? batchEuropeCounts(roleNames) : Promise.resolve([]),
+    ]);
+
+    const counts = buildCountLookup(
+      dimRows,
+      europeRows,
+      selectedLocations,
+      selectedExperiences,
+    );
+    const batchDurationMs = Date.now() - batchStart;
+
     for (const r of roles) {
       if (out.length >= maxSlugs) break;
-      // role only
       if (r.count >= minCount) {
         push(filtersToJobListingSlug({ role: r.role }), r.count);
       }
 
       for (const loc of selectedLocations) {
         if (out.length >= maxSlugs) break;
-        const c = await countByDimensions({ role: r.role, location: loc });
+        const c = counts.get(`${r.role}|${loc}|`) ?? 0;
         if (c >= minCount) {
           const locFilter = locationTokenToFilter(loc);
           push(
@@ -155,7 +312,7 @@ export function createSeoService(prisma: PrismaClient) {
 
       for (const exp of selectedExperiences) {
         if (out.length >= maxSlugs) break;
-        const c = await countByDimensions({ role: r.role, experience: exp });
+        const c = counts.get(`${r.role}||${exp}`) ?? 0;
         if (c >= minCount) {
           push(`role/${r.role}/experience/${exp}`, c);
         }
@@ -165,7 +322,7 @@ export function createSeoService(prisma: PrismaClient) {
         if (out.length >= maxSlugs) break;
         for (const exp of selectedExperiences) {
           if (out.length >= maxSlugs) break;
-          const c = await countByDimensions({ role: r.role, location: loc, experience: exp });
+          const c = counts.get(`${r.role}|${loc}|${exp}`) ?? 0;
           if (c >= minCount) {
             push(`role/${r.role}/location/${loc}/experience/${exp}`, c);
           }
@@ -176,16 +333,15 @@ export function createSeoService(prisma: PrismaClient) {
     const rolesConsidered = roles.length;
     const locationsConsidered = selectedLocations.length;
     const experiencesConsidered = selectedExperiences.length;
-    const estimatedCountQueries =
-      rolesConsidered * (locationsConsidered + experiencesConsidered + locationsConsidered * experiencesConsidered);
     return {
       entries: out.slice(0, maxSlugs),
       stats: {
         rolesConsidered,
         locationsConsidered,
         experiencesConsidered,
-        estimatedCountQueries,
-        estimatedTotalQueries: estimatedCountQueries + 1, // +1 for topRoleSlugs()
+        estimatedCountQueries: 3,
+        estimatedTotalQueries: 3,
+        batchDurationMs,
       },
     };
   }

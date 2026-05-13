@@ -77,6 +77,7 @@ export function registerSeoRoutes(server: FastifyInstance, seo: SeoService): voi
           experiencesConsidered: stats.experiencesConsidered,
           estimatedCountQueries: stats.estimatedCountQueries,
           estimatedTotalQueries: stats.estimatedTotalQueries,
+          batchDurationMs: stats.batchDurationMs,
         },
       });
     },
