@@ -1,0 +1,17 @@
+[Unit]
+Description=JobSeek Job Purge Worker (daily expiry marking + stale job deletion)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/jobSeek
+EnvironmentFile=/home/ubuntu/jobSeek/.env
+Environment=NODE_ENV=production
+Environment=WORKER_NAME=jobseek-job-purge-worker
+ExecStart=/usr/bin/npm run worker:job-purge -w @jobseek/server
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

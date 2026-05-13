@@ -1,0 +1,16 @@
+[Unit]
+Description=JobSeek Job Purge Scheduler (registers BullMQ repeat tick at 03:00 UTC)
+After=network.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/jobSeek
+EnvironmentFile=/home/ubuntu/jobSeek/.env
+Environment=NODE_ENV=production
+Environment=WORKER_NAME=jobseek-job-purge-scheduler
+ExecStart=/usr/bin/npm run scheduler:job-purge -w @jobseek/server
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
