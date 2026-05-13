@@ -20,9 +20,9 @@ export default function PricingPage() {
           Less than one coffee a month for your entire job search.
         </p>
 
-        <div className="mx-auto mt-16 max-w-5xl overflow-x-auto">
+        <div className="mx-auto mt-16 max-w-5xl">
           <h3 className="text-center font-sans text-xl font-bold text-ink">Compare plans</h3>
-          <div className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+          <div className="mt-6 overflow-x-auto rounded-2xl border border-line bg-surface shadow-card">
             <table className="w-full min-w-[480px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-line bg-canvas/80">
