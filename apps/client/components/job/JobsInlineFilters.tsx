@@ -29,7 +29,7 @@ import { FilterChips } from "../filters/FilterChips";
 import { Button } from "../ui/Button";
 import { SortSegmented } from "../ui/SortSegmented";
 
-const EXPERIENCE_FILTER_ENABLED = false;
+const EXPERIENCE_FILTER_ENABLED = process.env.NEXT_PUBLIC_EXPERIENCE_FILTER === "true";
 
 function CitySuggestionShimmerRow() {
   return (

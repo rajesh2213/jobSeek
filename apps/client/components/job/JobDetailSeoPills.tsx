@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { JobItem } from "../../lib/api";
 import { Badge } from "../ui/Badge";
 
-const EXPERIENCE_FILTER_ENABLED = false;
+const EXPERIENCE_FILTER_ENABLED = process.env.NEXT_PUBLIC_EXPERIENCE_FILTER === "true";
 const EXP_FILTER = new Set(["junior", "mid", "senior"]);
 
 /**
