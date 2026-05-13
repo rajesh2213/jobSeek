@@ -7,7 +7,7 @@ import {
 import { parseTeamtailorJobs } from "./teamtailor.parser.js";
 import type { TeamtailorApiResponse, TeamtailorJob } from "./teamtailor.types.js";
 import { asyncPool } from "../../../utils/asyncPool.js";
-import { extractJobDescriptionFromHtml } from "../../../utils/jobDetailHtml.js";
+import { extractJobDescriptionFromHtml, extractSalaryFromJobPostingJsonLd } from "../../../utils/jobDetailHtml.js";
 
 function extractPostedAtFromJsonLd(html: string): string | undefined {
   const scriptRe = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
@@ -97,6 +97,7 @@ class TeamtailorCrawlerImpl implements AtsCrawler<TeamtailorJob> {
           const detailHtml = await r.text();
           const extracted = extractJobDescriptionFromHtml(detailHtml);
           const postedAt = extractPostedAtFromJsonLd(detailHtml);
+          const salary = extractSalaryFromJobPostingJsonLd(detailHtml);
 
           return {
             ...job,
@@ -104,6 +105,7 @@ class TeamtailorCrawlerImpl implements AtsCrawler<TeamtailorJob> {
               ...job.attributes,
               body: extracted.text || job.attributes?.body,
               created_at: postedAt || job.attributes?.created_at,
+              salary: salary ?? job.attributes?.salary,
             },
           };
         } catch {

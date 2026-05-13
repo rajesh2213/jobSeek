@@ -249,6 +249,50 @@ function mergeExperienceLevelFromSources(jobs: Job[]): string | null {
   return null;
 }
 
+/**
+ * Pick the best coherent salary tuple from a single source row.
+ * Never mixes min from one row with max from another — that would
+ * create synthetic ranges never published by any employer.
+ *
+ * Priority:
+ * 1. Complete range (min+max) from jsonld source
+ * 2. Complete range from any source
+ * 3. Min-only from jsonld source
+ * 4. Min-only from any source (highest min wins)
+ */
+export function pickBestSalary(
+  rows: Array<{
+    salaryMin: number | null;
+    salaryMax: number | null;
+    salarySource: string | null;
+  }>,
+): { salaryMin: number | null; salaryMax: number | null; salarySource: string | null } {
+  const withSalary = rows.filter(
+    (r) => typeof r.salaryMin === "number" && r.salaryMin > 0,
+  );
+  if (withSalary.length === 0) {
+    return { salaryMin: null, salaryMax: null, salarySource: null };
+  }
+
+  const ranged = withSalary.filter(
+    (r) => typeof r.salaryMax === "number" && r.salaryMax > 0,
+  );
+  const pool = ranged.length > 0 ? ranged : withSalary;
+
+  const jsonld = pool.filter((r) => r.salarySource === "jsonld");
+  const best = jsonld.length > 0 ? jsonld : pool;
+
+  const winner = best.reduce((a, b) =>
+    (b.salaryMin ?? 0) > (a.salaryMin ?? 0) ? b : a,
+  );
+
+  return {
+    salaryMin: winner.salaryMin,
+    salaryMax: winner.salaryMax,
+    salarySource: winner.salarySource,
+  };
+}
+
 export function aggregateCanonicalFromSources(jobs: Job[]): {
   title: string;
   description: string | null;
@@ -269,6 +313,8 @@ export function aggregateCanonicalFromSources(jobs: Job[]): {
   role: string;
   skills: string[];
   salaryMin: number | null;
+  salaryMax: number | null;
+  salarySource: string | null;
 } {
   if (jobs.length === 0) {
     throw new Error("aggregateCanonicalFromSources: empty job set");
@@ -318,10 +364,7 @@ export function aggregateCanonicalFromSources(jobs: Job[]): {
     if (!postedAt || t.getTime() < postedAt.getTime()) postedAt = t;
   }
 
-  const salaryMins = ordered
-    .map((j) => j.salaryMin)
-    .filter((x): x is number => typeof x === "number" && x > 0);
-  const salaryMin = salaryMins.length > 0 ? Math.max(...salaryMins) : null;
+  const salaryTuple = pickBestSalary(ordered);
 
   const applyUrl = mergeApplyUrl(ordered);
 
@@ -366,7 +409,9 @@ export function aggregateCanonicalFromSources(jobs: Job[]): {
     source,
     role,
     skills,
-    salaryMin,
+    salaryMin: salaryTuple.salaryMin,
+    salaryMax: salaryTuple.salaryMax,
+    salarySource: salaryTuple.salarySource,
   };
 }
 

@@ -7,6 +7,7 @@ export interface TeamtailorJobAttributes {
   /** When present, closer to public publish than `created_at`. */
   published_at?: string;
   start_date?: string;
+  salary?: import("../../../utils/jobDetailHtml.js").JsonLdSalary | null;
 }
 
 export interface TeamtailorJob {

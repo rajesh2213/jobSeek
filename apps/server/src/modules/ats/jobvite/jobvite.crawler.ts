@@ -6,6 +6,7 @@ import {
 import { parseJobviteJobs } from "./jobvite.parser.js";
 import type { JobviteJsonLdJobPosting, JobviteRawJob } from "./jobvite.types.js";
 import { asyncPool } from "../../../utils/asyncPool.js";
+import { extractSalaryFromJobPostingJsonLd } from "../../../utils/jobDetailHtml.js";
 
 function extractJsonLdJobPostings(html: string): JobviteRawJob[] {
   const jobs: JobviteRawJob[] = [];
@@ -80,8 +81,9 @@ async function enrichJobviteJobDetail(raw: JobviteRawJob): Promise<JobviteRawJob
     const html = await res.text();
     const jsonLd = extractJsonLdJobPostings(html);
     const found = jsonLd.find((j) => j.sourceUrl === raw.sourceUrl);
-    if (!found) return raw;
-    return { ...raw, description: found.description, postedAt: found.postedAt, location: found.location };
+    const salary = extractSalaryFromJobPostingJsonLd(html);
+    if (!found) return { ...raw, salary: salary ?? raw.salary };
+    return { ...raw, description: found.description, postedAt: found.postedAt, location: found.location, salary: salary ?? raw.salary };
   } catch {
     return raw;
   }

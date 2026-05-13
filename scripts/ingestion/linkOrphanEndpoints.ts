@@ -16,6 +16,10 @@
  *   --min-confidence <n> Minimum confidence 1-3 (default: 2)
  */
 
+import dotenv from "dotenv";
+import { resolve } from "path";
+dotenv.config({ path: resolve(process.cwd(), ".env") });
+
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();

@@ -865,6 +865,8 @@ export function createJobRepository(prisma: PrismaClient) {
       role: input.role,
       skills: input.skills,
       salaryMin: input.salaryMin,
+      salaryMax: input.salaryMax,
+      salarySource: input.salarySource,
       ...(input.hasMultipleLocations
         ? {
             enriched: { hasMultipleLocations: true } as Prisma.InputJsonValue,
@@ -1458,6 +1460,8 @@ export function createJobRepository(prisma: PrismaClient) {
         role: string;
         skills: string[];
         salaryMin: number | null;
+        salaryMax: number | null;
+        salarySource: string | null;
       },
     ): Promise<void> {
       const row = await prisma.job.findUnique({ where: { id } });
@@ -1484,6 +1488,8 @@ export function createJobRepository(prisma: PrismaClient) {
           role: data.role,
           skills: data.skills,
           salaryMin: data.salaryMin,
+          salaryMax: data.salaryMax,
+          salarySource: data.salarySource,
           effectivePostedAt: deriveEffectivePostedAt(data.postedAt, row.createdAt),
           ...jobQualityData({
             source: data.source,

@@ -59,6 +59,8 @@ export interface NormalizedJob {
    * When `JOB_DEDUP_TOUCH_SKIP=1`, dedup may skip a redundant `updateLastSeenById`. Not persisted to DB.
    */
   batchTouchAtMs?: number;
+  /** Structured salary from JSON-LD baseSalary, when available from the ATS HTML page. */
+  structuredSalary?: { minValue: number; maxValue: number | null; currency: string };
 }
 
 /**
@@ -75,6 +77,8 @@ export interface DedupJobInput extends Omit<NormalizedJob, "location"> {
   locationCountry: string;
   locationRegion: string | null;
   salaryMin: number | null;
+  salaryMax: number | null;
+  salarySource: "jsonld" | "regex" | null;
   /** When set, overrides remote/onsite derivation from `isRemote`. */
   workType?: "remote" | "onsite" | "hybrid";
   experienceLevel?: string | null;

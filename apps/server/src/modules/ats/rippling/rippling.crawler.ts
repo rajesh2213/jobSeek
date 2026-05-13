@@ -3,6 +3,7 @@ import { throttleByAts, trimWhitespace } from "../ats.interface.js";
 import { parseRipplingJobs } from "./rippling.parser.js";
 import type { RipplingRawJob } from "./rippling.types.js";
 import { asyncPool } from "../../../utils/asyncPool.js";
+import { extractSalaryFromJobPostingJsonLd } from "../../../utils/jobDetailHtml.js";
 
 function parseJsonEmbeddedJobs(html: string): RipplingRawJob[] {
   const jobs: RipplingRawJob[] = [];
@@ -60,12 +61,14 @@ async function enrichRipplingJobDetail(raw: RipplingRawJob): Promise<RipplingRaw
     const html = await res.text();
     const jsonJobs = parseJsonEmbeddedJobs(html);
     const found = jsonJobs.find((j) => j.sourceUrl === raw.sourceUrl) ?? jsonJobs[0];
-    if (!found) return raw;
+    const salary = extractSalaryFromJobPostingJsonLd(html);
+    if (!found) return { ...raw, salary: salary ?? raw.salary };
     return {
       ...raw,
       description: found.description ?? raw.description,
       postedAt: found.postedAt ?? raw.postedAt,
       location: found.location ?? raw.location,
+      salary: salary ?? raw.salary,
     };
   } catch {
     return raw;
@@ -83,8 +86,14 @@ class RipplingCrawlerImpl implements AtsCrawler<RipplingRawJob> {
       throw new Error(`Rippling request failed (${res.status} ${res.statusText})`);
     }
     const html = await res.text();
+    const salary = extractSalaryFromJobPostingJsonLd(html);
     const jsonJobs = parseJsonEmbeddedJobs(html).filter((job) => job.title && job.sourceUrl);
-    if (jsonJobs.length > 0) return jsonJobs;
+    if (jsonJobs.length > 0) {
+      if (salary) {
+        return jsonJobs.map((j) => ({ ...j, salary: j.salary ?? salary }));
+      }
+      return jsonJobs;
+    }
     const linkJobs = parseLinkBasedJobs(token, html);
     const needsDetail = linkJobs.filter((j) => !j.description || !j.postedAt).slice(0, 10);
     if (needsDetail.length === 0) return linkJobs;

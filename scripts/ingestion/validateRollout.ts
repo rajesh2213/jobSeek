@@ -8,6 +8,10 @@
  * and POST_ROLLOUT_EXPANSION_REPORT.md
  */
 
+import dotenv from "dotenv";
+import { resolve } from "path";
+dotenv.config({ path: resolve(process.cwd(), ".env") });
+
 import { PrismaClient } from "@prisma/client";
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";

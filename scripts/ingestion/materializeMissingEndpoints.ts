@@ -14,6 +14,10 @@
  *   --delay-ms <n>     Delay between inserts (default: 200)
  */
 
+import dotenv from "dotenv";
+import { resolve } from "path";
+dotenv.config({ path: resolve(process.cwd(), ".env") });
+
 import { PrismaClient, Prisma } from "@prisma/client";
 import {
   parseCrawlableBoard,

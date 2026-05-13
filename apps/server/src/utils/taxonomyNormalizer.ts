@@ -151,9 +151,68 @@ export function deriveWorkType(
   return HYBRID_RE.test(blob) ? "hybrid" : null;
 }
 
+/**
+ * Business-metric terms that appear right after a `$NNNk` token.
+ * Matches are non-salary: ACV, ARR, quota, budget, deal size, etc.
+ * Allows optional `+`, `–`, or whitespace between the amount and the keyword.
+ */
+const NON_SALARY_AFTER_RE = new RegExp(
+  [
+    String.raw`^\s*\+?\s*[-–—]?\s*(?:`,
+    // Metric acronyms
+    String.raw`acv|arr|mrr|gmv|tcv|aov|aum|ltv|cltv|nrr`,
+    // Direct business terms
+    String.raw`|revenue|quotas?|targets?|budgets?|deals?(?:\s+sizes?)?`,
+    String.raw`|spend(?:ing)?|gifts?|donations?|pipelines?|bookings?`,
+    String.raw`|capital|endowments?|expenses?|portfolios?|loans?|mortgages?`,
+    String.raw`|financ(?:ing|ed?)`,
+    // Multi-word business phrases
+    String.raw`|(?:assets?\s+)?under\s+management`,
+    String.raw`|contracts?\s*(?:values?|sizes?)`,
+    String.raw`|projects?\s*(?:costs?|values?|sizes?)`,
+    String.raw`|major\s+gifts?|planned\s+giv`,
+    String.raw`|(?:sales|annual|yearly|monthly)\s+(?:quotas?|targets?|pipelines?|bookings?|revenue)`,
+    String.raw`|(?:total|gross|net)\s+(?:revenue|spend)`,
+    String.raw`|per\s+(?:deals?|contracts?|projects?|transactions?)`,
+    String.raw`|worth\s+of`,
+    String.raw`)\b`,
+  ].join(""),
+  "i",
+);
+
+/**
+ * "$NNNk to $NNNM/B" — a range spanning orders of magnitude is always
+ * a deal / project / fund size, never a salary.
+ */
+const LARGE_RANGE_AFTER_RE = /^\s*\+?\s*(?:to|-|–|—)\s*\$\s*[\d,.]+\s*[mb]\b/i;
+
+/**
+ * Sales / fundraising verbs immediately before a dollar amount signal
+ * that the number is a deal size or raise amount, not compensation.
+ */
+const NON_SALARY_BEFORE_RE =
+  /(?:clos(?:e[sd]?|ing)|sold|sell(?:ing)?|rais(?:e[sd]?|ing))\s*$/i;
+
 export function extractSalaryMinUsd(description: string): number | null {
-  const m = description.match(/\$\s*(\d{1,3})\s*k\b/i);
-  if (m) return parseInt(m[1]!, 10) * 1000;
+  const pattern = /\$\s*(\d{1,3})\s*k\b/gi;
+  let match;
+  while ((match = pattern.exec(description)) !== null) {
+    const value = parseInt(match[1]!, 10) * 1000;
+    if (value < 10_000) continue;
+
+    const end = match.index + match[0].length;
+    const afterSlice = description.slice(end, end + 80);
+    if (NON_SALARY_AFTER_RE.test(afterSlice)) continue;
+    if (LARGE_RANGE_AFTER_RE.test(afterSlice)) continue;
+
+    const beforeSlice = description.slice(
+      Math.max(0, match.index - 100),
+      match.index,
+    );
+    if (NON_SALARY_BEFORE_RE.test(beforeSlice)) continue;
+
+    return value;
+  }
   return null;
 }
 

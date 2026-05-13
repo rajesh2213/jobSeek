@@ -29,6 +29,7 @@ export function parseRipplingJobs(
       applyUrl: sourceUrl,
       postedAt: parseDate(job.postedAt),
       companyId,
+      ...(job.salary ? { structuredSalary: job.salary } : {}),
     });
   }
   return normalized;

@@ -1,4 +1,5 @@
 import type { DedupJobInput, NormalizedJob } from "../modules/crawler/crawler.types.js";
+import { logger } from "./logger.js";
 import { deriveExperienceLevel, deriveWorkType, extractSalaryMinUsd, normalizeJobAttributes } from "./taxonomyNormalizer.js";
 
 /**
@@ -13,7 +14,31 @@ export function enrichDedupInput(
     location: input.location,
     isRemote: input.isRemote,
   });
-  const salaryMin = extractSalaryMinUsd(input.description ?? "");
+
+  let salaryMin: number | null = null;
+  let salaryMax: number | null = null;
+  let salarySource: "jsonld" | "regex" | null = null;
+
+  const ss = input.structuredSalary;
+  if (ss && ss.currency.toUpperCase() === "USD") {
+    salaryMin = ss.minValue;
+    salaryMax = ss.maxValue ?? null;
+    salarySource = "jsonld";
+  }
+
+  if (salaryMin == null) {
+    salaryMin = extractSalaryMinUsd(input.description ?? "");
+    salaryMax = null;
+    salarySource = salaryMin != null ? "regex" : null;
+  }
+
+  if (salarySource) {
+    logger.info(
+      { event: "salary_extraction", source: salarySource, hasMax: salaryMax != null, atsType: input.source },
+      "salary_extraction",
+    );
+  }
+
   const experienceLevel = deriveExperienceLevel(input.title);
   const workType = deriveWorkType(input.title, input.description, input.location);
 
@@ -37,6 +62,8 @@ export function enrichDedupInput(
     locationCountry: attrs.country,
     locationRegion: attrs.region,
     salaryMin,
+    salaryMax,
+    salarySource,
     experienceLevel,
     ...(workType ? { workType } : {}),
     ...(attrs.hasMultipleLocations ? { hasMultipleLocations: true } : {}),

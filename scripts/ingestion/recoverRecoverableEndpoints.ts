@@ -21,6 +21,10 @@
  *   --delay-ms <n>        Delay between updates (default: 300)
  */
 
+import dotenv from "dotenv";
+import { resolve } from "path";
+dotenv.config({ path: resolve(process.cwd(), ".env") });
+
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();

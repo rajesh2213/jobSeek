@@ -12,6 +12,7 @@ import {
   extractJobTitleFromHtml,
   extractJsonLdJobPostingFlags,
   extractJsonLdJobPostingStrict,
+  extractSalaryFromJobPostingJsonLd,
 } from "../utils/jobDetailHtml.js";
 import {
   isGarbageCareersHostPath,
@@ -221,6 +222,7 @@ export async function processIngestJobsFromSourceUrl(
         );
 
         const jsonLd = extractJsonLdJobPostingFlags(meta.html);
+        const structuredSalary = extractSalaryFromJobPostingJsonLd(meta.html);
         const strictDesc = process.env.CAREERS_PAGE_STRICT_DESCRIPTION === "1";
         const { text: description, source: extractionSource } = extractJobDescriptionFromHtml(meta.html, {
           careersPageStrict: strictDesc,
@@ -433,6 +435,7 @@ export async function processIngestJobsFromSourceUrl(
           companyId,
           companyName: companyName || company.name,
           companyDomain,
+          ...(structuredSalary ? { structuredSalary } : {}),
         });
         const newContentHash = computeJobContentHash({
           title,

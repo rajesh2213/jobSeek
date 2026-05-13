@@ -7,7 +7,7 @@ import type {
   BambooHrRawJob,
 } from "./bamboohr.types.js";
 import { asyncPool } from "../../../utils/asyncPool.js";
-import { extractJobDescriptionFromHtml } from "../../../utils/jobDetailHtml.js";
+import { extractJobDescriptionFromHtml, extractSalaryFromJobPostingJsonLd } from "../../../utils/jobDetailHtml.js";
 
 function extractPostedAtFromJsonLd(html: string): string | undefined {
   const scriptRe = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
@@ -127,10 +127,12 @@ class BambooHrCrawlerImpl implements AtsCrawler<BambooHrRawJob> {
         const html = await r.text();
         const extracted = extractJobDescriptionFromHtml(html);
         const postedAt = extractPostedAtFromJsonLd(html);
+        const salary = extractSalaryFromJobPostingJsonLd(html);
         return {
           ...job,
           description: extracted.text && extracted.text.trim().length > 0 ? extracted.text : job.description,
           postedAt: postedAt ?? job.postedAt,
+          salary: salary ?? job.salary,
         };
       } catch {
         return job;

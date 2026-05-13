@@ -657,3 +657,163 @@ export function extractDescriptionFromMainContent(html: string): string {
 export function extractLocationFallbackFromHtml(html: string): string | null {
   return legacyVisibleLocationFromHtml(html);
 }
+
+// ---------------------------------------------------------------------------
+// JSON-LD Salary Extraction
+// ---------------------------------------------------------------------------
+
+export interface JsonLdSalary {
+  minValue: number;
+  maxValue: number | null;
+  currency: string;
+}
+
+const ANNUAL_MIN = 10_000;
+const ANNUAL_MAX = 2_000_000;
+const HOURLY_MIN = 7;
+const HOURLY_MAX = 500;
+const MONTHLY_MIN = 1_000;
+const MONTHLY_MAX = 90_000;
+const HOURS_PER_YEAR = 2080;
+const MONTHS_PER_YEAR = 12;
+
+function coerceNumber(v: unknown): number | undefined {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = parseFloat(v.replace(/[,$\s]/g, ""));
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
+function coerceString(v: unknown): string | undefined {
+  return typeof v === "string" && v.trim() ? v.trim() : undefined;
+}
+
+/**
+ * Resolve min/max/currency/unit from the wildly inconsistent shapes ATS
+ * platforms use for `baseSalary` / `estimatedSalary` in JSON-LD.
+ */
+function resolveSalaryNode(
+  salary: unknown,
+): { min?: number; max?: number; currency?: string; unit?: string } | null {
+  if (!salary || typeof salary !== "object") return null;
+  const s = salary as Record<string, unknown>;
+
+  let currency = coerceString(s.currency);
+  let unit: string | undefined;
+  let min: number | undefined;
+  let max: number | undefined;
+
+  const value = s.value;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const v = value as Record<string, unknown>;
+    min = coerceNumber(v.minValue);
+    max = coerceNumber(v.maxValue);
+    unit = coerceString(v.unitText);
+    if (min == null && max == null) {
+      const single = coerceNumber(v.value);
+      if (single != null) {
+        min = single;
+      }
+    }
+  } else if (Array.isArray(value) && value.length > 0) {
+    const first = value[0];
+    if (first && typeof first === "object") {
+      return resolveSalaryNode({ ...s, value: first });
+    }
+    const n = coerceNumber(first);
+    if (n != null) min = n;
+  } else if (typeof value === "number" || typeof value === "string") {
+    min = coerceNumber(value);
+  }
+
+  if (min == null && max == null) {
+    min = coerceNumber(s.minValue);
+    max = coerceNumber(s.maxValue);
+  }
+
+  if (!unit) unit = coerceString(s.unitText);
+  if (!currency) currency = coerceString((s.value as Record<string, unknown>)?.currency);
+
+  if (min == null && max == null) return null;
+
+  return { min, max, currency, unit };
+}
+
+function normalizeToAnnual(
+  raw: number,
+  unit: string | undefined,
+): number | null {
+  const u = (unit ?? "YEAR").toUpperCase();
+  let annual: number;
+  if (u === "YEAR" || u === "ANNUALLY") {
+    annual = raw;
+  } else if (u === "HOUR" || u === "HOURLY") {
+    if (raw < HOURLY_MIN || raw >= HOURLY_MAX) return null;
+    annual = raw * HOURS_PER_YEAR;
+  } else if (u === "MONTH" || u === "MONTHLY") {
+    if (raw < MONTHLY_MIN || raw >= MONTHLY_MAX) return null;
+    annual = raw * MONTHS_PER_YEAR;
+  } else if (u === "WEEK" || u === "WEEKLY") {
+    annual = raw * 52;
+  } else {
+    return null;
+  }
+  return annual >= ANNUAL_MIN && annual <= ANNUAL_MAX ? Math.round(annual) : null;
+}
+
+/**
+ * Extract structured salary from JSON-LD `baseSalary` (or `estimatedSalary`)
+ * on a Schema.org `JobPosting` node. Returns `null` aggressively on any
+ * uncertainty — this is best-effort enrichment, not authoritative.
+ *
+ * Only returns USD salaries. Normalizes hourly/monthly/weekly to annual.
+ */
+export function extractSalaryFromJobPostingJsonLd(html: string): JsonLdSalary | null {
+  let result: JsonLdSalary | null = null;
+
+  walkJsonLdRoots(html, (node) => {
+    if (result) return;
+    if (!isJobPostingNode(node)) return;
+
+    const salaryRaw = node.baseSalary ?? node.estimatedSalary;
+    if (!salaryRaw) return;
+
+    const items = Array.isArray(salaryRaw) ? salaryRaw : [salaryRaw];
+    for (const item of items) {
+      const resolved = resolveSalaryNode(item);
+      if (!resolved) continue;
+
+      const currency = (resolved.currency ?? "").toUpperCase();
+      if (currency !== "USD") continue;
+
+      const unit = resolved.unit;
+      let minAnnual = resolved.min != null ? normalizeToAnnual(resolved.min, unit) : null;
+      let maxAnnual = resolved.max != null ? normalizeToAnnual(resolved.max, unit) : null;
+
+      if (minAnnual == null && maxAnnual == null) continue;
+
+      if (minAnnual != null && maxAnnual != null) {
+        if (minAnnual > maxAnnual) {
+          [minAnnual, maxAnnual] = [maxAnnual, minAnnual];
+        }
+        if (minAnnual === maxAnnual) {
+          maxAnnual = null;
+        }
+      }
+
+      if (minAnnual == null && maxAnnual != null) {
+        minAnnual = maxAnnual;
+        maxAnnual = null;
+      }
+
+      if (minAnnual == null) continue;
+
+      result = { minValue: minAnnual, maxValue: maxAnnual, currency: "USD" };
+      return;
+    }
+  });
+
+  return result;
+}

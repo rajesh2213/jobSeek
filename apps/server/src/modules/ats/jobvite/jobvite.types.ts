@@ -21,5 +21,6 @@ export interface JobviteRawJob {
   description?: string;
   postedAt?: string;
   location?: string;
+  salary?: import("../../../utils/jobDetailHtml.js").JsonLdSalary | null;
 }
 

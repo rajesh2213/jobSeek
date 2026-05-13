@@ -37,6 +37,7 @@ export function parseTeamtailorJobs(
         attrs?.published_at ?? attrs?.start_date ?? attrs?.created_at,
       ),
       companyId,
+      ...(attrs?.salary ? { structuredSalary: attrs.salary } : {}),
     });
   }
   return normalized;

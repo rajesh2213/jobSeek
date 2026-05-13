@@ -16,5 +16,6 @@ export interface BambooHrRawJob {
   location?: string;
   description?: string;
   postedAt?: string;
+  salary?: import("../../../utils/jobDetailHtml.js").JsonLdSalary | null;
 }
 

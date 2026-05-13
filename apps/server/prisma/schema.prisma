@@ -172,6 +172,9 @@ model Job {
   /// Discovery salary sort uses sqlForCanonicalListingIds ORDER BY salaryMin DESC NULLS LAST.
   /// Partial index idx_jobs_listing_salary_desc_fast is created via SQL migration (CONCURRENTLY), not Prisma @@index.
   salaryMin          Int?
+  salaryMax          Int?
+  /// Provenance of salary data: "jsonld" (structured JSON-LD) or "regex" (description pattern match).
+  salarySource       String?   @db.VarChar(10)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
