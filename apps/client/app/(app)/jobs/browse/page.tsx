@@ -13,18 +13,17 @@ export const metadata: Metadata = {
 
 const BROWSE_LOCATIONS: ReadonlyArray<{ token: string; label: string }> = [
   { token: "remote", label: "Remote" },
-  { token: "usa", label: "United States" },
-  { token: "india", label: "India" },
-  { token: "uk", label: "United Kingdom" },
-  { token: "canada", label: "Canada" },
-  { token: "germany", label: "Germany" },
-  { token: "australia", label: "Australia" },
-  { token: "france", label: "France" },
-  { token: "netherlands", label: "Netherlands" },
-  { token: "europe", label: "Europe" },
-  { token: "singapore", label: "Singapore" },
-  { token: "japan", label: "Japan" },
-  { token: "brazil", label: "Brazil" },
+  { token: "US", label: "United States" },
+  { token: "IN", label: "India" },
+  { token: "GB", label: "United Kingdom" },
+  { token: "CA", label: "Canada" },
+  { token: "DE", label: "Germany" },
+  { token: "AU", label: "Australia" },
+  { token: "FR", label: "France" },
+  { token: "NL", label: "Netherlands" },
+  { token: "SG", label: "Singapore" },
+  { token: "JP", label: "Japan" },
+  { token: "BR", label: "Brazil" },
 ];
 
 export default async function JobsBrowsePage() {
@@ -80,9 +79,7 @@ export default async function JobsBrowsePage() {
               const href =
                 token === "remote"
                   ? buildJobsListingUrl({ workType: "remote", isRemote: true })
-                  : token === "europe"
-                    ? "/jobs/location/europe"
-                    : buildJobsListingUrl({ country: token });
+                  : buildJobsListingUrl({ country: token });
               if (!isCanonicalListingPath(href)) return null;
               return (
                 <Link

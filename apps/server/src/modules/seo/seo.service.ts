@@ -309,20 +309,26 @@ export function createSeoService(prisma: PrismaClient) {
     // ── Location hub pages ─────────────────────────────────────────────
     // Derived from SEO_DIMENSIONS.locations. Sums batch dimension rows across
     // all roles for each location token to approximate per-location totals.
+    // Only emit locations that resolve to a 2-letter ISO country code or
+    // "remote" — these are the only canonical slug paths the client parser
+    // supports. ILIKE-based locations (e.g. "europe") are skipped because
+    // `/jobs/location/europe` is not a canonical path.
     let locationHubsEmitted = 0;
     for (const loc of selectedLocations) {
       if (out.length >= maxSlugs) break;
+      const locFilter = locationTokenToFilter(loc);
+      if (!locFilter.country && !locFilter.isRemote && !locFilter.workType) continue;
       let locTotal = 0;
       for (const r of roles) {
         locTotal += counts.get(`${r.role}|${loc}|`) ?? 0;
       }
       if (locTotal >= minCount) {
-        const locFilter = locationTokenToFilter(loc);
         const slug = filtersToJobListingSlug({
           country: locFilter.country,
           isRemote: locFilter.isRemote,
           workType: locFilter.workType,
-        }) || `location/${loc}`;
+        });
+        if (!slug) continue;
         push(slug, locTotal);
         locationHubsEmitted++;
       }
