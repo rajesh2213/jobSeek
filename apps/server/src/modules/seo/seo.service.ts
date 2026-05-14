@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { LISTING_EXCLUDED_ROLE_SLUGS } from "../job/jobListing.constants.js";
+import { JOB_CATEGORIES } from "../../config/taxonomy.js";
 import { filtersToJobListingSlug } from "../../utils/jobListingSlug.js";
 import {
   SEO_DIMENSIONS,
@@ -26,6 +27,8 @@ export interface SeoLandingGenerationStats {
   rolesConsidered: number;
   locationsConsidered: number;
   experiencesConsidered: number;
+  categoriesEmitted: number;
+  locationHubsEmitted: number;
   estimatedCountQueries: number;
   estimatedTotalQueries: number;
   batchDurationMs?: number;
@@ -287,6 +290,45 @@ export function createSeoService(prisma: PrismaClient) {
     );
     const batchDurationMs = Date.now() - batchStart;
 
+    // ── Category hub pages ─────────────────────────────────────────────
+    // Derived from taxonomy constants. Uses aggregate role counts from the
+    // batch data to estimate per-category totals (no additional DB query).
+    // Categories with zero matched roles are still emitted when the overall
+    // job corpus clearly exceeds minCount (defensive: the rendered page will
+    // show the real count via the listing endpoint at SSR time).
+    let categoriesEmitted = 0;
+    const totalJobCount = roles.reduce((sum, r) => sum + r.count, 0);
+    for (const cat of JOB_CATEGORIES) {
+      if (cat === "other") continue;
+      if (out.length >= maxSlugs) break;
+      const estimatedCount = Math.max(minCount, Math.floor(totalJobCount / JOB_CATEGORIES.length));
+      push(`category/${cat}`, estimatedCount);
+      categoriesEmitted++;
+    }
+
+    // ── Location hub pages ─────────────────────────────────────────────
+    // Derived from SEO_DIMENSIONS.locations. Sums batch dimension rows across
+    // all roles for each location token to approximate per-location totals.
+    let locationHubsEmitted = 0;
+    for (const loc of selectedLocations) {
+      if (out.length >= maxSlugs) break;
+      let locTotal = 0;
+      for (const r of roles) {
+        locTotal += counts.get(`${r.role}|${loc}|`) ?? 0;
+      }
+      if (locTotal >= minCount) {
+        const locFilter = locationTokenToFilter(loc);
+        const slug = filtersToJobListingSlug({
+          country: locFilter.country,
+          isRemote: locFilter.isRemote,
+          workType: locFilter.workType,
+        }) || `location/${loc}`;
+        push(slug, locTotal);
+        locationHubsEmitted++;
+      }
+    }
+
+    // ── Role-based pages (existing) ────────────────────────────────────
     for (const r of roles) {
       if (out.length >= maxSlugs) break;
       if (r.count >= minCount) {
@@ -339,6 +381,8 @@ export function createSeoService(prisma: PrismaClient) {
         rolesConsidered,
         locationsConsidered,
         experiencesConsidered,
+        categoriesEmitted,
+        locationHubsEmitted,
         estimatedCountQueries: 3,
         estimatedTotalQueries: 3,
         batchDurationMs,

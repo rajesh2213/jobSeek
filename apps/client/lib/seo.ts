@@ -189,6 +189,84 @@ function recordSeoDecisionCounter(surface: "jobs", reason: SeoPolicyReason): voi
   console.info("[seo-policy] decision-counters", compact);
 }
 
+// ---------------------------------------------------------------------------
+// Dynamic intro for SEO landing pages
+// ---------------------------------------------------------------------------
+
+const LOCATION_DISPLAY: Record<string, string> = {
+  US: "the United States", IN: "India", GB: "the United Kingdom", CA: "Canada",
+  DE: "Germany", AU: "Australia", FR: "France", NL: "the Netherlands",
+  ES: "Spain", IT: "Italy", SE: "Sweden", PL: "Poland", SG: "Singapore",
+  AE: "the UAE", JP: "Japan", BR: "Brazil", MX: "Mexico", ZA: "South Africa",
+};
+
+/**
+ * Deterministic page intro derived only from filters + the existing SSR listing
+ * response (total count, first-page job items). No additional fetches or DB queries.
+ * Falls back to a generic intro when insufficient context is available.
+ */
+export function buildDynamicIntro(
+  filters: JobFilters,
+  meta: { total?: number | null; jobs?: JobItem[] },
+): string {
+  const total = typeof meta.total === "number" && meta.total > 0 ? meta.total : null;
+  const isRemote =
+    filters.workType === "remote" || filters.isRemote === true;
+  const role = filters.role?.trim();
+  const category = filters.category?.trim();
+  const country = filters.country?.trim()?.toUpperCase();
+
+  const topCompanies = extractTopCompanies(meta.jobs ?? [], 3);
+  const companySuffix =
+    topCompanies.length >= 2
+      ? ` Top employers include ${topCompanies.join(", ")}.`
+      : "";
+
+  const countStr = total ? `${total.toLocaleString()} ` : "";
+
+  if (role && isRemote) {
+    return `Browse ${countStr}remote ${toTitleCase(role)} jobs updated daily on JobLoom.${companySuffix}`;
+  }
+  if (role && country) {
+    const loc = LOCATION_DISPLAY[country] ?? country;
+    return `Browse ${countStr}${toTitleCase(role)} jobs in ${loc} updated daily on JobLoom.${companySuffix}`;
+  }
+  if (role) {
+    return `Browse ${countStr}${toTitleCase(role)} jobs updated daily on JobLoom.${companySuffix}`;
+  }
+  if (category && isRemote) {
+    return `Explore ${countStr}remote ${toTitleCase(category)} jobs refreshed daily across top companies.${companySuffix}`;
+  }
+  if (category && country) {
+    const loc = LOCATION_DISPLAY[country] ?? country;
+    return `Explore ${countStr}${toTitleCase(category)} jobs in ${loc} refreshed daily.${companySuffix}`;
+  }
+  if (category) {
+    return `Explore ${countStr}${toTitleCase(category)} jobs refreshed daily from company career pages.${companySuffix}`;
+  }
+  if (isRemote) {
+    return `Browse ${countStr}remote jobs from verified company career pages, updated daily.${companySuffix}`;
+  }
+  if (country) {
+    const loc = LOCATION_DISPLAY[country] ?? country;
+    return `Browse ${countStr}jobs in ${loc} from verified company career pages, updated daily.${companySuffix}`;
+  }
+  return "JobLoom helps you discover real-time jobs from company career sites in one place, then drill into focused listings like this page.";
+}
+
+function extractTopCompanies(jobs: JobItem[], max: number): string[] {
+  const counts = new Map<string, number>();
+  for (const job of jobs) {
+    const name = (job as { company?: { name?: string } }).company?.name?.trim();
+    if (!name) continue;
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, max)
+    .map(([name]) => name);
+}
+
 export function buildJobListingItemListJsonLd(
   jobs: JobItem[],
   listTotal?: number,

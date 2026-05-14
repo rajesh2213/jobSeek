@@ -6,10 +6,26 @@ import { buildJobsListingUrl, isCanonicalListingPath } from "../../../../lib/slu
 import { Container } from "../../../../components/ui/Container";
 
 export const metadata: Metadata = {
-  title: "Browse jobs by category and skill | JobLoom",
+  title: "Browse jobs by category, skill, and location | JobLoom",
   description:
     "Explore indexed job discovery pages by category, tech stack, and location. Jump to high-signal searches with one click.",
 };
+
+const BROWSE_LOCATIONS: ReadonlyArray<{ token: string; label: string }> = [
+  { token: "remote", label: "Remote" },
+  { token: "usa", label: "United States" },
+  { token: "india", label: "India" },
+  { token: "uk", label: "United Kingdom" },
+  { token: "canada", label: "Canada" },
+  { token: "germany", label: "Germany" },
+  { token: "australia", label: "Australia" },
+  { token: "france", label: "France" },
+  { token: "netherlands", label: "Netherlands" },
+  { token: "europe", label: "Europe" },
+  { token: "singapore", label: "Singapore" },
+  { token: "japan", label: "Japan" },
+  { token: "brazil", label: "Brazil" },
+];
 
 export default async function JobsBrowsePage() {
   const [catResult, skillResult] = await Promise.allSettled([
@@ -51,6 +67,30 @@ export default async function JobsBrowsePage() {
                   {typeof n === "number" ? (
                     <span className="ml-1.5 text-ink/40">({n.toLocaleString()})</span>
                   ) : null}
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-ink/45">Locations</h2>
+          <div className="flex flex-wrap gap-2">
+            {BROWSE_LOCATIONS.map(({ token, label }) => {
+              const href =
+                token === "remote"
+                  ? buildJobsListingUrl({ workType: "remote", isRemote: true })
+                  : token === "europe"
+                    ? "/jobs/location/europe"
+                    : buildJobsListingUrl({ country: token });
+              if (!isCanonicalListingPath(href)) return null;
+              return (
+                <Link
+                  key={token}
+                  href={href}
+                  className="rounded-full bg-surface px-3 py-1.5 text-sm text-ink/80 no-underline ring-1 ring-ink/10 hover:text-brand"
+                >
+                  {label}
                 </Link>
               );
             })}

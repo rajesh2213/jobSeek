@@ -104,6 +104,78 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: str
   }
 }
 
+// ---------------------------------------------------------------------------
+// Quality scoring — telemetry only, no behavior changes
+// ---------------------------------------------------------------------------
+
+interface SitemapQualityInput {
+  landing: MetadataRoute.Sitemap;
+  jobEntries: MetadataRoute.Sitemap;
+  companyEntries: MetadataRoute.Sitemap;
+  now: Date;
+}
+
+interface SitemapQualityMetrics {
+  landingCount: number;
+  jobCount: number;
+  companyCount: number;
+  landingWithLastmod: number;
+  jobsWithLastmod: number;
+  jobsFreshPct: number;
+  jobsStalePct: number;
+  landingCategoryHubs: number;
+  landingLocationHubs: number;
+  landingRoleHubs: number;
+  landingCombined: number;
+}
+
+function computeSitemapQualityMetrics(input: SitemapQualityInput): SitemapQualityMetrics {
+  const { landing, jobEntries, companyEntries, now } = input;
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  let landingWithLastmod = 0;
+  let landingCategoryHubs = 0;
+  let landingLocationHubs = 0;
+  let landingRoleHubs = 0;
+  let landingCombined = 0;
+  for (const entry of landing) {
+    if (entry.lastModified) landingWithLastmod++;
+    const path = typeof entry.url === "string" ? entry.url : "";
+    if (/\/jobs\/category\/[^/]+$/.test(path)) landingCategoryHubs++;
+    else if (/\/jobs\/location\/[^/]+$/.test(path)) landingLocationHubs++;
+    else if (/\/jobs\/role\/[^/]+$/.test(path)) landingRoleHubs++;
+    else if (path.includes("/jobs/")) landingCombined++;
+  }
+
+  let jobsWithLastmod = 0;
+  let jobsFresh = 0;
+  let jobsStale = 0;
+  for (const entry of jobEntries) {
+    const lm = entry.lastModified;
+    if (!lm) continue;
+    jobsWithLastmod++;
+    const d = lm instanceof Date ? lm : new Date(lm);
+    if (d >= sevenDaysAgo) jobsFresh++;
+    else if (d < thirtyDaysAgo) jobsStale++;
+  }
+  const jobCount = jobEntries.length;
+
+  return {
+    landingCount: landing.length,
+    jobCount,
+    companyCount: companyEntries.length,
+    landingWithLastmod,
+    jobsWithLastmod,
+    jobsFreshPct: jobCount > 0 ? Math.round((jobsFresh / jobCount) * 100) : 0,
+    jobsStalePct: jobCount > 0 ? Math.round((jobsStale / jobCount) * 100) : 0,
+    landingCategoryHubs,
+    landingLocationHubs,
+    landingRoleHubs,
+    landingCombined,
+  };
+}
+
 let sitemapGenerationRuns = 0;
 let lastGenerationCompletedAtMs: number | null = null;
 
@@ -468,6 +540,17 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
   const output = [...staticEntries, ...landing, ...companyEntries, ...jobEntries];
   const excludedCounts: Record<string, number> = {};
   for (const [k, v] of excludedByReason.entries()) excludedCounts[k] = v;
+
+  // ── Quality scoring (telemetry-only) ─────────────────────────────────
+  // Observability metric: does not alter sitemap inclusion or indexing.
+  const qualityMetrics = computeSitemapQualityMetrics({
+    landing,
+    jobEntries,
+    companyEntries,
+    now,
+  });
+  console.info("[sitemap] quality_metrics", { generationRun, ...qualityMetrics });
+
   const serializeStartedAt = Date.now();
   const payloadJson = JSON.stringify(output);
   const payloadSerializeDurationMs = Date.now() - serializeStartedAt;

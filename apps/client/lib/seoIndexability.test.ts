@@ -152,3 +152,89 @@ test("canonical listing path check ignores query strings", () => {
   assert.equal(isCanonicalListingPath(skillHref), true);
 });
 
+test("category-only slug gets allow_jobs_category_leaf reason", () => {
+  const decision = decideJobsListingSeoPolicy({
+    routeKind: "jobs-slug",
+    filters: { category: "engineering" },
+    searchParamKeys: [],
+    canonicalPath: "/jobs/category/engineering",
+    validCanonicalSlugPath: true,
+  });
+  assert.equal(decision.index, true);
+  assert.equal(decision.reason, "allow_jobs_category_leaf");
+});
+
+test("location-only slug gets allow_jobs_location_leaf reason", () => {
+  const decision = decideJobsListingSeoPolicy({
+    routeKind: "jobs-slug",
+    filters: { country: "US" },
+    searchParamKeys: [],
+    canonicalPath: "/jobs/location/us",
+    validCanonicalSlugPath: true,
+  });
+  assert.equal(decision.index, true);
+  assert.equal(decision.reason, "allow_jobs_location_leaf");
+
+  const remote = decideJobsListingSeoPolicy({
+    routeKind: "jobs-slug",
+    filters: { workType: "remote", isRemote: true },
+    searchParamKeys: [],
+    canonicalPath: "/jobs/location/remote",
+    validCanonicalSlugPath: true,
+  });
+  assert.equal(remote.index, true);
+  assert.equal(remote.reason, "allow_jobs_location_leaf");
+});
+
+test("experience-only refinement gets noindex_experience_refinement reason", () => {
+  const decision = decideJobsListingSeoPolicy({
+    routeKind: "jobs-slug",
+    filters: { role: "backend-developer", experience: "senior" },
+    searchParamKeys: [],
+    canonicalPath: "/jobs/role/backend-developer/experience/6-plus-years",
+    validCanonicalSlugPath: true,
+  });
+  assert.equal(decision.index, false);
+  assert.equal(decision.reason, "noindex_experience_refinement");
+});
+
+test("experience + posted refinement stays noindex_deep_refinement", () => {
+  const decision = decideJobsListingSeoPolicy({
+    routeKind: "jobs-slug",
+    filters: { role: "backend-developer", experience: "senior", posted: "1w" },
+    searchParamKeys: ["posted"],
+    canonicalPath: "/jobs/role/backend-developer/experience/6-plus-years?posted=1w",
+    validCanonicalSlugPath: true,
+  });
+  assert.equal(decision.index, false);
+  assert.equal(decision.reason, "noindex_deep_refinement");
+});
+
+test("role+location slug keeps allow_jobs_canonical_leaf reason", () => {
+  const decision = decideJobsListingSeoPolicy({
+    routeKind: "jobs-slug",
+    filters: { role: "data-engineer", country: "US" },
+    searchParamKeys: [],
+    canonicalPath: "/jobs/role/data-engineer/location/us",
+    validCanonicalSlugPath: true,
+  });
+  assert.equal(decision.index, true);
+  assert.equal(decision.reason, "allow_jobs_canonical_leaf");
+});
+
+test("sitemap eligibility uses specific leaf reasons", () => {
+  const catEligible = isSitemapEligibleJobsPath({
+    validCanonicalSlugPath: true,
+    filters: { category: "data" },
+  });
+  assert.equal(catEligible.sitemapEligible, true);
+  assert.equal(catEligible.reason, "allow_jobs_category_leaf");
+
+  const locEligible = isSitemapEligibleJobsPath({
+    validCanonicalSlugPath: true,
+    filters: { country: "IN" },
+  });
+  assert.equal(locEligible.sitemapEligible, true);
+  assert.equal(locEligible.reason, "allow_jobs_location_leaf");
+});
+

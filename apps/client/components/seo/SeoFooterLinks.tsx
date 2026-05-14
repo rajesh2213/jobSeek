@@ -4,41 +4,38 @@ import { mergeBrowseSkillQueries } from "../../lib/seoSkillTokens";
 
 const defaultSkillQueries = ["react", "typescript", "nodejs", "python"];
 const roleQueries = ["backend-developer", "frontend-engineer", "data-engineer", "product-manager"];
-const locationQueries = ["US", "IN", "remote", "DE"];
+const locationQueries = ["US", "IN", "remote", "DE", "GB", "CA"];
+const categoryQueries = ["engineering", "data", "product", "design", "security", "infrastructure"];
+
+const LOCATION_LABEL: Record<string, string> = {
+  US: "United States",
+  IN: "India",
+  DE: "Germany",
+  GB: "United Kingdom",
+  CA: "Canada",
+};
 
 function BrowseGroup({
   title,
-  hrefBuilder,
-  values,
+  items,
 }: {
   title: string;
-  hrefBuilder: (v: string) => string;
-  values: string[];
+  items: Array<{ href: string; label: string }>;
 }) {
+  const filtered = items.filter((item) => isCanonicalListingPath(item.href));
+  if (filtered.length === 0) return null;
   return (
     <div>
       <h3 className="text-xs font-bold uppercase tracking-wider text-ink/50">{title}</h3>
       <div className="mt-3 flex flex-wrap gap-2">
-        {values.map((v) => (
-          (() => {
-            const href = hrefBuilder(v);
-            if (!isCanonicalListingPath(href)) return null;
-            return (
-              <Link
-                key={`${title}-${v}`}
-                href={href}
-                className="rounded-full bg-surface px-3 py-1.5 text-sm text-ink/70 no-underline ring-1 ring-ink/10 hover:text-brand"
-              >
-                {v === "US"
-                  ? "United States"
-                  : v === "IN"
-                    ? "India"
-                    : v === "DE"
-                      ? "Germany"
-                      : v.replace(/-/g, " ")}
-              </Link>
-            );
-          })()
+        {filtered.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="rounded-full bg-surface px-3 py-1.5 text-sm text-ink/70 no-underline ring-1 ring-ink/10 hover:text-brand"
+          >
+            {item.label}
+          </Link>
         ))}
       </div>
     </div>
@@ -61,31 +58,35 @@ export function SeoFooterLinks(props?: { browseSkills?: string[] }) {
         .
       </p>
       <BrowseGroup
+        title="Browse by category"
+        items={categoryQueries.map((c) => ({
+          href: buildJobsListingUrl({ category: c }),
+          label: c.replace(/-/g, " "),
+        }))}
+      />
+      <BrowseGroup
         title="Browse by skills"
-        values={skillQueries}
-        hrefBuilder={(s) => buildJobsListingUrl({ skills: [s.toLowerCase()] })}
+        items={skillQueries.map((s) => ({
+          href: buildJobsListingUrl({ skills: [s.toLowerCase()] }),
+          label: s,
+        }))}
       />
       <BrowseGroup
         title="Browse by role"
-        values={roleQueries}
-        hrefBuilder={(r) =>
-          buildJobsListingUrl({ role: r, roles: [r] })
-        }
+        items={roleQueries.map((r) => ({
+          href: buildJobsListingUrl({ role: r, roles: [r] }),
+          label: r.replace(/-/g, " "),
+        }))}
       />
       <BrowseGroup
         title="Browse by location"
-        values={locationQueries}
-        hrefBuilder={(loc) =>
-          loc === "remote"
-            ? buildJobsListingUrl({
-                workTypes: ["remote"],
-                workType: "remote",
-                isRemote: true,
-              })
-            : loc === "US" || loc === "IN" || loc === "DE"
-              ? buildJobsListingUrl({ country: loc })
-              : buildJobsListingUrl({ locations: [loc] })
-        }
+        items={locationQueries.map((loc) => ({
+          href:
+            loc === "remote"
+              ? buildJobsListingUrl({ workType: "remote", isRemote: true })
+              : buildJobsListingUrl({ country: loc }),
+          label: LOCATION_LABEL[loc] ?? loc.replace(/-/g, " "),
+        }))}
       />
     </section>
   );

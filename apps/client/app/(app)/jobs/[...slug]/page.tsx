@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { loadJobsDiscoveryPage, stableJobFiltersKey } from "../../../../lib/jobsPageData";
 import {
+  buildDynamicIntro,
   buildJobDiscoveryCrumbItems,
   buildBreadcrumbListJsonLd,
   buildJobListingItemListJsonLd,
@@ -20,7 +21,7 @@ import {
   type JobFilters,
 } from "../../../../lib/slug-parser";
 import { JsonLdScript } from "../../../../components/seo/JsonLdScript";
-import { JobsListingFaq } from "../../../../components/seo/JobsListingFaq";
+import { JobsListingFaq, buildFaqJsonLd } from "../../../../components/seo/JobsListingFaq";
 import { SeoBreadcrumbs } from "../../../../components/seo/SeoBreadcrumbs";
 import { decideJobsListingSeoPolicy } from "../../../../lib/seoIndexability";
 
@@ -95,7 +96,8 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
   const disableAllNoindex = process.env.SEO_DISABLE_ALL_NOINDEX === "true";
   const indexable = forceNoindexAll ? false : disableAllNoindex ? true : policy.index;
   const minIndex = getSeoMinJobsIndex();
-  const relatedSearchLinks = buildCuratedRelatedSearchLinks(filters, canonicalSlugPath);
+  const dominantCategory = response.data[0]?.category ?? undefined;
+  const relatedSearchLinks = buildCuratedRelatedSearchLinks(filters, canonicalSlugPath, { dominantCategory });
 
   const listingTop = (
     <>
@@ -105,12 +107,7 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
         <JsonLdScript data={buildJobListingItemListJsonLd(response.data.slice(0, 10), total)} />
       ) : null}
       <section className="mt-3 rounded-xl border border-ink/10 bg-surface px-3 py-2 text-xs leading-snug text-ink/75 sm:mt-4 sm:px-4 sm:py-3 sm:text-sm sm:leading-normal">
-        <p>
-          <Link href="/" className="font-semibold text-brand hover:underline">
-            JobLoom
-          </Link>{" "}
-          helps you discover real-time jobs from company career sites in one place, then drill into focused listings like this page.
-        </p>
+        <p>{buildDynamicIntro(filters, { total, jobs: response.data })}</p>
       </section>
       <section className="mt-3 rounded-xl border border-ink/10 bg-surface px-3 py-3 sm:mt-4 sm:px-4 sm:py-4">
         <h3 className="text-xs font-semibold text-ink sm:text-sm">Explore related searches</h3>
@@ -129,8 +126,14 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
     </>
   );
 
+  const faqJsonLd = indexable ? buildFaqJsonLd(filters, total) : null;
   const listingFaq =
-    total >= minIndex && total >= 8 ? <JobsListingFaq /> : null;
+    total >= minIndex && total >= 8 ? (
+      <>
+        {faqJsonLd ? <JsonLdScript data={faqJsonLd} /> : null}
+        <JobsListingFaq filters={filters} total={total} />
+      </>
+    ) : null;
 
   return (
     <JobsSearchPage
@@ -153,17 +156,46 @@ function toTitle(s: string): string {
     .join(" ");
 }
 
-/** Phase B: small fixed set of canonical hubs; skips current path; caps at 6 links. */
+const CATEGORY_REPRESENTATIVE_ROLES: Partial<Record<string, string[]>> = {
+  engineering: ["backend-developer", "frontend-engineer", "full-stack-engineer", "devops-engineer"],
+  product: ["product-manager", "product-designer", "product-analyst"],
+  data: ["data-engineer", "data-scientist", "data-analyst", "machine-learning-engineer"],
+  management: ["engineering-manager", "project-manager", "program-manager"],
+  security: ["security-engineer", "security-analyst"],
+  infrastructure: ["site-reliability-engineer", "cloud-engineer", "devops-engineer"],
+  design: ["product-designer", "ux-designer", "ui-designer"],
+  marketing: ["marketing-manager", "growth-marketer", "content-marketer"],
+  sales: ["account-executive", "sales-engineer", "business-development-representative"],
+  finance: ["financial-analyst", "accountant", "controller"],
+};
+
+const LOCATION_HUB_LINKS: ReadonlyArray<{ token: string; label: string }> = [
+  { token: "remote", label: "Remote" },
+  { token: "us", label: "US" },
+  { token: "in", label: "India" },
+  { token: "gb", label: "UK" },
+  { token: "de", label: "Germany" },
+  { token: "ca", label: "Canada" },
+];
+
+/**
+ * Hierarchy-aware related search links. Adapts link targets based on the
+ * page's position in the category > role > location taxonomy. Uses only
+ * client-side taxonomy data — no additional fetches.
+ */
 function buildCuratedRelatedSearchLinks(
   filters: JobFilters,
   currentCanonicalPath: string,
+  context?: { dominantCategory?: string },
 ): Array<{ href: string; label: string }> {
   const norm = (p: string) => (p.split("?")[0] ?? "").replace(/\/$/, "") || "/jobs";
   const current = norm(currentCanonicalPath);
   const seen = new Set<string>();
   const out: Array<{ href: string; label: string }> = [];
+  const MAX_LINKS = 10;
 
   const push = (href: string, label: string) => {
+    if (out.length >= MAX_LINKS) return;
     const path = norm(href);
     if (path === current || seen.has(path)) return;
     seen.add(path);
@@ -172,26 +204,60 @@ function buildCuratedRelatedSearchLinks(
 
   const role = filters.role?.trim();
   const category = filters.category?.trim();
+  const isRemote =
+    filters.workType === "remote" || filters.isRemote === true;
+  const hasLocation = Boolean(filters.country?.trim()) || isRemote;
+  const inferredCategory = category || context?.dominantCategory;
+
   if (role) {
-    push(`/jobs/role/${role}/location/remote`, `Remote ${toTitle(role)} jobs`);
-    push(`/jobs/role/${role}/location/us`, `${toTitle(role)} jobs in the US`);
-    push(`/jobs/role/${role}/location/in`, `${toTitle(role)} jobs in India`);
-    push(`/jobs/role/${role}/location/gb`, `${toTitle(role)} jobs in the UK`);
-  }
-  if (category && ALLOWED_CATEGORY.has(category)) {
-    push(`/jobs/category/${category}/location/remote`, `Remote ${toTitle(category)} jobs`);
+    // Role page: link to parent category hub, then role+location variants, then sibling roles
+    if (inferredCategory && ALLOWED_CATEGORY.has(inferredCategory)) {
+      push(`/jobs/category/${inferredCategory}`, `All ${toTitle(inferredCategory)} jobs`);
+    }
+    if (!isRemote) push(`/jobs/role/${role}/location/remote`, `Remote ${toTitle(role)} jobs`);
+    for (const loc of LOCATION_HUB_LINKS) {
+      if (out.length >= MAX_LINKS) break;
+      push(`/jobs/role/${role}/location/${loc.token}`, `${toTitle(role)} jobs in ${loc.label}`);
+    }
+  } else if (category && ALLOWED_CATEGORY.has(category)) {
+    // Category page: link to representative roles within category, then category+location
+    const reps = CATEGORY_REPRESENTATIVE_ROLES[category] ?? [];
+    for (const r of reps) {
+      if (out.length >= MAX_LINKS - 3) break;
+      push(`/jobs/role/${r}`, `${toTitle(r)} jobs`);
+    }
+    if (!isRemote) push(`/jobs/category/${category}/location/remote`, `Remote ${toTitle(category)} jobs`);
     push(`/jobs/category/${category}/location/us`, `${toTitle(category)} jobs in the US`);
+    push(`/jobs/category/${category}/location/in`, `${toTitle(category)} jobs in India`);
+  } else if (hasLocation) {
+    // Location page: link to top categories and roles in this location
+    const locToken = isRemote ? "remote" : (filters.country?.trim()?.toLowerCase() ?? "");
+    const locLabel = isRemote ? "remote" : (filters.country?.trim()?.toUpperCase() ?? "");
+    for (const cat of ["engineering", "data", "product", "design"]) {
+      if (out.length >= MAX_LINKS - 2) break;
+      push(`/jobs/category/${cat}`, `${toTitle(cat)} jobs`);
+    }
+    for (const r of ["backend-developer", "frontend-engineer", "data-engineer"]) {
+      if (out.length >= MAX_LINKS) break;
+      if (locToken) {
+        push(`/jobs/role/${r}/location/${locToken}`, `${toTitle(r)} jobs${locLabel ? ` in ${locLabel}` : ""}`);
+      } else {
+        push(`/jobs/role/${r}`, `${toTitle(r)} jobs`);
+      }
+    }
   }
 
+  // Fallbacks for any remaining slots
   const fallbacks: Array<{ href: string; label: string }> = [
+    { href: "/jobs/category/engineering", label: "Engineering jobs" },
+    { href: "/jobs/category/data", label: "Data jobs" },
     { href: "/jobs/role/data-engineer/location/remote", label: "Remote data engineer jobs" },
     { href: "/jobs/role/product-manager/location/us", label: "Product manager jobs in the US" },
-    { href: "/jobs/category/engineering/location/remote", label: "Remote engineering jobs" },
-    { href: "/jobs/role/frontend-engineer/location/remote", label: "Remote frontend engineer jobs" },
+    { href: "/jobs/location/remote", label: "Remote jobs" },
   ];
   for (const f of fallbacks) {
-    if (out.length >= 6) break;
+    if (out.length >= MAX_LINKS) break;
     push(f.href, f.label);
   }
-  return out.slice(0, 6);
+  return out.slice(0, MAX_LINKS);
 }

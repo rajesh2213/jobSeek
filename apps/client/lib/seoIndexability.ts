@@ -3,12 +3,16 @@ import type { JobFilters } from "./slug-parser";
 export type SeoPolicyReason =
   | "allow_jobs_root"
   | "allow_jobs_canonical_leaf"
+  | "allow_jobs_category_leaf"
+  | "allow_jobs_location_leaf"
+  | "allow_jobs_experience_leaf"
   | "allow_job_detail"
   | "allow_company_default"
   | "canonicalize_jobs_query_to_slug"
   | "canonicalize_noncanonical_slug"
   | "noindex_pagination"
   | "noindex_deep_refinement"
+  | "noindex_experience_refinement"
   | "noindex_disallowed_param"
   | "noindex_company_broken"
   | "exclude_sitemap_noncanonical"
@@ -142,8 +146,59 @@ export function decideJobsListingSeoPolicy(input: {
   }
   if (hasPagination) return noindex("noindex_pagination");
   if (hasDisallowedParam) return noindex("noindex_disallowed_param");
-  if (hasDeepRefinement) return noindex("noindex_deep_refinement");
-  return allow("allow_jobs_canonical_leaf");
+  if (hasDeepRefinement) {
+    if (isExperienceOnlyRefinement(filters)) {
+      return noindex("noindex_experience_refinement");
+    }
+    return noindex("noindex_deep_refinement");
+  }
+  return allow(classifyCanonicalLeaf(filters));
+}
+
+/**
+ * True when the only "deep refinement" trigger is the experience filter.
+ * Used for monitoring: distinguishes experience-slug noindex from other refinement noindex.
+ */
+function isExperienceOnlyRefinement(filters: JobFilters): boolean {
+  if (!filters.experience) return false;
+  const multiToken = Boolean(
+    (filters.roles?.length ?? 0) > 1 ||
+      (filters.skills?.length ?? 0) > 1 ||
+      (filters.locations?.length ?? 0) > 1 ||
+      (filters.categories?.length ?? 0) > 1,
+  );
+  if (multiToken) return false;
+  if (filters.posted) return false;
+  if (typeof filters.limit === "number" && filters.limit !== 20) return false;
+  return true;
+}
+
+/**
+ * Finer-grained monitoring reason for canonical leaf pages.
+ * Does NOT change index/follow/sitemap behavior — only the `reason` field
+ * so telemetry can distinguish category hubs from role hubs from location hubs.
+ */
+function classifyCanonicalLeaf(filters: JobFilters): SeoPolicyReason {
+  const hasRole = Boolean(filters.role?.trim());
+  const hasCategory = Boolean(filters.category?.trim());
+  const hasSkill = (filters.skills?.length ?? 0) > 0;
+  const hasLocation =
+    Boolean(filters.country?.trim()) ||
+    Boolean(filters.location?.trim()) ||
+    filters.isRemote === true ||
+    filters.workType === "remote";
+  const hasExperience = Boolean(filters.experience);
+
+  if (hasCategory && !hasRole && !hasSkill && !hasLocation && !hasExperience) {
+    return "allow_jobs_category_leaf";
+  }
+  if (hasLocation && !hasRole && !hasCategory && !hasSkill && !hasExperience) {
+    return "allow_jobs_location_leaf";
+  }
+  if (hasExperience && !hasLocation && !hasRole && !hasCategory && !hasSkill) {
+    return "allow_jobs_experience_leaf";
+  }
+  return "allow_jobs_canonical_leaf";
 }
 
 export function decideCompanySeoPolicy(input: {
@@ -174,6 +229,6 @@ export function isSitemapEligibleJobsPath(input: {
   const { hasPagination, hasDeepRefinement, hasDisallowedParam } = classifyJobRefinement(input.filters);
   if (hasPagination) return noindex("exclude_sitemap_pagination");
   if (hasDisallowedParam || hasDeepRefinement) return noindex("exclude_sitemap_refinement");
-  return allow("allow_jobs_canonical_leaf");
+  return allow(classifyCanonicalLeaf(input.filters));
 }
 
