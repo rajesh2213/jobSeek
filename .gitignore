@@ -73,3 +73,8 @@ apps/server/data/company-datasets/Wellfound_Final.csv
 apps/server/data/company-datasets/companies-*.csv
 # Generated chunks (optional; re-run split:company-csv locally)
 apps/server/data/company-datasets/split/
+
+deploy-snapshots/
+docs/
+backups/
+apps/server/data/company-datasets/

@@ -7,6 +7,7 @@ import type { Redis } from "ioredis";
 import { logger } from "../../../../utils/logger.js";
 import { openClawQuotaRedisKey } from "./openclaw.quota.js";
 import type { OpenClawShadowEvalResult } from "./openclaw.parseShadow.js";
+import type { OpenClawAtsDiscoveryEvalResult } from "./openclaw.atsDiscovery.js";
 
 function metricsKey(date = new Date()): string {
   return `openclaw:metrics:${openClawQuotaRedisKey(date).replace("openclaw:quota:", "")}`;
@@ -28,6 +29,22 @@ export type OpenClawShadowMetricField =
   | "parse_ineligible_recent_seen"
   | "parse_ineligible_canonical_row_missing";
 
+/** OpenClaw ATS endpoint discovery shadow counters. */
+export type OpenClawAtsDiscoveryMetricField =
+  | "ats_discovery_evaluated"
+  | "ats_discovery_supported"
+  | "ats_discovery_rejected"
+  | "ats_discovery_existing_endpoint"
+  | "ats_discovery_candidate_would_create"
+  | "ats_discovery_reject_unknown_host"
+  | "ats_discovery_reject_existing_endpoint"
+  | "ats_discovery_reject_invalid_url"
+  | "ats_discovery_reject_unsupported_ats"
+  | "ats_discovery_reject_missing_company"
+  | "ats_discovery_reject_ambiguous_endpoint"
+  | "ats_discovery_reject_slug_extraction_failed"
+  | "ats_discovery_reject_empty_base_url";
+
 export type OpenClawMetricField =
   | "requests"
   | "jobs_normalized"
@@ -43,7 +60,8 @@ export type OpenClawMetricField =
   | "schema_rejects"
   /** Mapper validation failures (invalid URL, bad apply link, oversize fields, etc.). */
   | "malformed_job_rows"
-  | OpenClawShadowMetricField;
+  | OpenClawShadowMetricField
+  | OpenClawAtsDiscoveryMetricField;
 
 export async function incrOpenClawMetric(
   redis: Redis | null,
@@ -111,6 +129,58 @@ export async function recordOpenClawShadowParseEval(
   await incrOpenClawMetric(redis, "parse_ineligible", 1);
   const sub = shadowIneligibleMetric(result.reason);
   if (sub) await incrOpenClawMetric(redis, sub, 1);
+}
+
+function atsDiscoveryRejectMetric(
+  reason: string,
+): OpenClawAtsDiscoveryMetricField | null {
+  switch (reason) {
+    case "unknown_host":
+      return "ats_discovery_reject_unknown_host";
+    case "invalid_url":
+      return "ats_discovery_reject_invalid_url";
+    case "unsupported_ats":
+      return "ats_discovery_reject_unsupported_ats";
+    case "missing_company":
+      return "ats_discovery_reject_missing_company";
+    case "existing_endpoint":
+      return "ats_discovery_reject_existing_endpoint";
+    case "ambiguous_endpoint":
+      return "ats_discovery_reject_ambiguous_endpoint";
+    case "slug_extraction_failed":
+      return "ats_discovery_reject_slug_extraction_failed";
+    case "empty_base_url":
+      return "ats_discovery_reject_empty_base_url";
+    default:
+      return null;
+  }
+}
+
+/**
+ * Record ATS endpoint discovery shadow outcome (Redis counters only).
+ * Does not create endpoints or enqueue crawls.
+ */
+export async function recordOpenClawAtsDiscoveryEval(
+  redis: Redis | null,
+  result: OpenClawAtsDiscoveryEvalResult,
+): Promise<void> {
+  await incrOpenClawMetric(redis, "ats_discovery_evaluated", 1);
+
+  const o = result.outcome;
+  if (o.status === "rejected") {
+    await incrOpenClawMetric(redis, "ats_discovery_rejected", 1);
+    const sub = atsDiscoveryRejectMetric(o.reason);
+    if (sub) await incrOpenClawMetric(redis, sub, 1);
+    return;
+  }
+
+  await incrOpenClawMetric(redis, "ats_discovery_supported", 1);
+
+  if (o.status === "would_create") {
+    await incrOpenClawMetric(redis, "ats_discovery_candidate_would_create", 1);
+  } else if (o.status === "existing_endpoint") {
+    await incrOpenClawMetric(redis, "ats_discovery_existing_endpoint", 1);
+  }
 }
 
 export async function readOpenClawMetricsHash(redis: Redis | null): Promise<OpenClawMetricsHash> {

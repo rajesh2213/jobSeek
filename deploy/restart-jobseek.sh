@@ -22,6 +22,8 @@ services=(
   jobseek-growth-email-worker
   jobseek-growth-email-scheduler
   jobseek-score
+  jobseek-openclaw-worker
+  jobseek-openclaw-scheduler
 )
 
 for svc in "${services[@]}"; do

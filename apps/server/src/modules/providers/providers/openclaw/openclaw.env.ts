@@ -17,6 +17,8 @@ export interface OpenClawEnvConfig {
   circuitFailureThreshold: number;
   circuitCooldownMs: number;
   maxHttpRetries: number;
+  /** When true (default), ATS endpoint discovery runs in shadow mode: metrics + logs only. */
+  atsDiscoveryShadow: boolean;
 }
 
 function parseBool(raw: string | undefined, defaultFalse: boolean): boolean {
@@ -91,6 +93,7 @@ export function loadOpenClawEnv(): OpenClawEnvConfig {
       24 * 60 * 60 * 1000,
     ),
     maxHttpRetries: clamp(Number(process.env.OPENCLAW_HTTP_RETRIES ?? "2") || 2, 0, 5),
+    atsDiscoveryShadow: parseBool(process.env.OPENCLAW_ATS_DISCOVERY_SHADOW, true),
   };
 }
 

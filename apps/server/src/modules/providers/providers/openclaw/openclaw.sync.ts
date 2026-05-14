@@ -21,7 +21,7 @@ import { normalizeJobUrl } from "../../../../utils/normalizeJobUrl.js";
 import type { JobRepository } from "../../../job/job.repository.js";
 import { CRAWLABLE_ATS_TYPES, type AtsType } from "../../../ats/ats.interface.js";
 import { normalizeDomain } from "../../../../utils/common.js";
-import { incrOpenClawMetric, recordOpenClawShadowParseEval } from "./openclaw.analytics.js";
+import { incrOpenClawMetric, recordOpenClawShadowParseEval, recordOpenClawAtsDiscoveryEval } from "./openclaw.analytics.js";
 import {
   createEmptyOpenClawShadowSummary,
   evaluateOpenClawShadowParseEligibility,
@@ -30,6 +30,12 @@ import {
 } from "./openclaw.parseShadow.js";
 import { peekRecentSeenBlocksEnqueue } from "../../../../services/recentJobSeen.service.js";
 import { computeCompanyQualityFlags } from "../../../../services/qualityFlags.service.js";
+import {
+  inferAtsCandidate,
+  createEmptyAtsDiscoverySummary,
+  mergeAtsDiscoveryIntoSummary,
+  type OpenClawAtsDiscoveryEvalResult,
+} from "./openclaw.atsDiscovery.js";
 
 const PAGING_KEY = "openclaw:paging:next_page";
 
@@ -266,6 +272,30 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
 
   let emittedDryRunSkipLogs = false;
   const shadowSummary = createEmptyOpenClawShadowSummary();
+  const atsDiscoverySummary = createEmptyAtsDiscoverySummary();
+
+  // Pre-load existing ATS endpoint (type, slug) pairs for the discovery allowlist.
+  // Single lightweight query, avoids N+1 per job row.
+  const existingEndpointKeys = new Set<string>();
+  if (cfg.atsDiscoveryShadow) {
+    try {
+      const discoveryTypes = ["workday", "ashby", "workable", "bamboohr", "greenhouse", "lever"];
+      const rows = await ctx.prisma.atsEndpoint.findMany({
+        where: { type: { in: discoveryTypes } },
+        select: { type: true, slug: true },
+      });
+      for (const r of rows) existingEndpointKeys.add(`${r.type}\0${r.slug}`);
+      logger.info(
+        { event: "openclaw_ats_discovery_cache_loaded", count: existingEndpointKeys.size },
+        "openclaw_ats_discovery_cache_loaded",
+      );
+    } catch (err) {
+      logger.warn(
+        { event: "openclaw_ats_discovery_cache_failed", err },
+        "openclaw_ats_discovery_cache_failed",
+      );
+    }
+  }
 
   for (let i = 0; i < cfg.maxPagesPerRun; i++) {
     const fetched = await client.fetchJobsSearch({
@@ -471,6 +501,72 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
             },
             "openclaw_parse_shadow_eval",
           );
+
+          // --- ATS endpoint discovery shadow eval ---
+          if (cfg.atsDiscoveryShadow) {
+            try {
+              const sourceUrlForDiscovery = jobRow?.sourceUrl ?? dedupInput.sourceUrl;
+              const inference = inferAtsCandidate(sourceUrlForDiscovery);
+              let discoveryResult: OpenClawAtsDiscoveryEvalResult;
+
+              if (inference.status === "rejected") {
+                discoveryResult = {
+                  sourceUrl: sourceUrlForDiscovery,
+                  detectedType: null,
+                  outcome: inference,
+                };
+              } else {
+                const cand = inference.candidate;
+                if (!jobRow?.companyId) {
+                  discoveryResult = {
+                    sourceUrl: sourceUrlForDiscovery,
+                    detectedType: cand.type,
+                    outcome: { status: "rejected", reason: "missing_company" },
+                  };
+                } else {
+                  const endpointKey = `${cand.type}\0${cand.slug}`;
+                  const alreadyExists = existingEndpointKeys.has(endpointKey);
+                  discoveryResult = {
+                    sourceUrl: sourceUrlForDiscovery,
+                    detectedType: cand.type,
+                    outcome: alreadyExists
+                      ? { status: "existing_endpoint", candidate: cand }
+                      : { status: "would_create", candidate: cand },
+                  };
+                }
+              }
+
+              await recordOpenClawAtsDiscoveryEval(redis, discoveryResult);
+              mergeAtsDiscoveryIntoSummary(atsDiscoverySummary, discoveryResult);
+
+              const o = discoveryResult.outcome;
+              logger.info(
+                {
+                  event: "openclaw_ats_discovery_eval",
+                  provider: "openclaw",
+                  canonical_id: canonical.id,
+                  source_url: sourceUrlForDiscovery,
+                  detected_type: discoveryResult.detectedType,
+                  outcome_status: o.status,
+                  outcome_reason: o.status === "rejected" ? o.reason : null,
+                  candidate_slug: o.status !== "rejected" ? o.candidate.slug : null,
+                  candidate_base_url: o.status !== "rejected" ? o.candidate.baseUrl : null,
+                  company_id: jobRow?.companyId ?? null,
+                },
+                "openclaw_ats_discovery_eval",
+              );
+            } catch (discoveryErr) {
+              logger.warn(
+                {
+                  event: "openclaw_ats_discovery_eval_failed",
+                  provider: "openclaw",
+                  canonical_id: canonical.id,
+                  err: discoveryErr,
+                },
+                "openclaw_ats_discovery_eval_failed",
+              );
+            }
+          }
         } catch (shadowErr) {
           logger.warn(
             {
@@ -520,6 +616,23 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
         ats_breakdown: shadowSummary.ats_breakdown,
       },
       "openclaw_parse_shadow_summary",
+    );
+  }
+
+  if (cfg.atsDiscoveryShadow && atsDiscoverySummary.evaluated > 0) {
+    logger.info(
+      {
+        event: "openclaw_ats_discovery_summary",
+        provider: "openclaw",
+        evaluated: atsDiscoverySummary.evaluated,
+        supported: atsDiscoverySummary.supported,
+        rejected: atsDiscoverySummary.rejected,
+        would_create: atsDiscoverySummary.would_create,
+        existing_endpoint: atsDiscoverySummary.existing_endpoint,
+        ats_breakdown: atsDiscoverySummary.ats_breakdown,
+        reject_breakdown: atsDiscoverySummary.reject_breakdown,
+      },
+      "openclaw_ats_discovery_summary",
     );
   }
 

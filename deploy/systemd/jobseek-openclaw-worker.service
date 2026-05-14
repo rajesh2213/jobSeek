@@ -1,0 +1,15 @@
+[Unit]
+Description=JobSeek OpenClaw Worker (BullMQ)
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/jobSeek
+EnvironmentFile=/home/ubuntu/jobSeek/.env
+Environment=WORKER_NAME=jobseek-openclaw-worker
+ExecStart=/usr/bin/npm run worker:openclaw -w @jobseek/server
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
