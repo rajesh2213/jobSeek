@@ -1,8 +1,14 @@
-import { SKILL_ALIAS_MAP, type JobCategory } from "../config/taxonomy.js";
+import {
+  SKILL_ALIAS_MAP,
+  DOMAIN_CONTRADICTION_TITLE_RE,
+  SOFTWARE_ONLY_SKILL_SLUGS,
+  type JobCategory,
+} from "../config/taxonomy.js";
 import {
   resolveLocation,
   type ResolvedLocation,
 } from "./locationResolver.js";
+import { logger } from "./logger.js";
 
 export type { ResolvedLocation };
 
@@ -92,16 +98,85 @@ export function normalizeRole(title: string): string {
 }
 
 /**
- * Generic skill extraction via SKILL_ALIAS_MAP (substring match, longest aliases first).
+ * Pre-compiled word-boundary patterns for each SKILL_ALIAS_MAP entry.
+ * Built once at module load; O(1) per-call overhead, O(n) per text scan.
+ *
+ * Uses `(?<![a-z0-9])…(?![a-z0-9])` instead of `\b` because `\b` misbehaves
+ * around non-word chars in aliases like "c#" and ".net".
+ */
+const SKILL_ALIAS_PATTERNS: ReadonlyArray<{ pattern: RegExp; canonical: string }> = (() => {
+  const entries = Object.entries(SKILL_ALIAS_MAP).sort(
+    (a, b) => b[0].length - a[0].length,
+  );
+  return entries.map(([alias, canonical]) => {
+    const k = alias.toLowerCase();
+    if (k === "c#") {
+      return { pattern: /c#/i, canonical };
+    }
+    if (k === ".net") {
+      return { pattern: /(^|[^a-z0-9])\.net(?![a-z0-9])/i, canonical };
+    }
+    const escaped = k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return {
+      pattern: new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`, "i"),
+      canonical,
+    };
+  });
+})();
+
+/**
+ * Word-boundary–aware skill extraction via SKILL_ALIAS_MAP.
+ * Only matches aliases at word boundaries to prevent substring contamination
+ * (e.g. "patients" no longer matches "ts" → "typescript").
  */
 export function normalizeSkills(text: string): string[] {
-  const lower = text.toLowerCase();
   const found = new Set<string>();
-  const entries = Object.entries(SKILL_ALIAS_MAP).sort((a, b) => b[0].length - a[0].length);
-  for (const [alias, canonical] of entries) {
-    if (lower.includes(alias.toLowerCase())) found.add(canonical);
+  for (const { pattern, canonical } of SKILL_ALIAS_PATTERNS) {
+    if (pattern.test(text)) found.add(canonical);
   }
   return Array.from(found).sort();
+}
+
+let domainFilterLogCount = 0;
+
+/**
+ * Suppress skills that contradict the job's occupation domain.
+ * E.g. a phlebotomist job should never show AWS/TypeScript/Golang.
+ *
+ * Deterministic, O(n) where n = |skills|, uses pre-built Sets for O(1) lookups.
+ * Returns skills unchanged for tech-compatible titles.
+ */
+export function filterSkillsByDomainContradiction(
+  skills: string[],
+  title: string,
+): string[] {
+  if (!DOMAIN_CONTRADICTION_TITLE_RE.test(title)) return skills;
+
+  const kept: string[] = [];
+  const rejected: string[] = [];
+  for (const s of skills) {
+    if (SOFTWARE_ONLY_SKILL_SLUGS.has(s)) {
+      rejected.push(s);
+    } else {
+      kept.push(s);
+    }
+  }
+
+  if (rejected.length > 0) {
+    domainFilterLogCount += 1;
+    if (domainFilterLogCount <= 500 || domainFilterLogCount % 100 === 0) {
+      logger.info(
+        {
+          event: "skill_domain_contradiction_filtered",
+          title: title.slice(0, 120),
+          rejected,
+          kept: kept.length,
+        },
+        "skill_domain_contradiction_filtered",
+      );
+    }
+  }
+  return kept;
 }
 
 /**
@@ -294,10 +369,12 @@ export function normalizeJobAttributes(job: {
     );
     const country = orderedDistinct[0] ?? "UNKNOWN";
     const hasMultipleLocations = orderedDistinct.length > 1;
+    const rawSkills = normalizeSkills(blob);
+    const skills = filterSkillsByDomainContradiction(rawSkills, job.title);
     return {
       category: normalizeCategory(job.title),
       role: normalizeRole(job.title),
-      skills: normalizeSkills(blob),
+      skills,
       country,
       isRemote: mergedRemote,
       city: primary.city,
@@ -325,10 +402,12 @@ export function normalizeJobAttributes(job: {
     country = "GLOBAL";
   }
 
+  const rawSkills = normalizeSkills(blob);
+  const skills = filterSkillsByDomainContradiction(rawSkills, job.title);
   return {
     category: normalizeCategory(job.title),
     role: normalizeRole(job.title),
-    skills: normalizeSkills(blob),
+    skills,
     country,
     isRemote: mergedRemote,
     city: loc.city,
