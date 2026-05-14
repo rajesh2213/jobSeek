@@ -1260,12 +1260,36 @@ export async function fetchJobById(
   const headers = new Headers();
   const t = opts?.token?.trim();
   if (t) headers.set("Authorization", `Bearer ${t}`);
-  const forwardedFor = opts?.forwardedFor?.trim();
-  if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
-  const res = await fetch(`${API_BASE_URL}/jobs/${id}`, {
-    headers,
-    cache: "no-store",
-  });
+
+  /**
+   * PRODUCTION-INTENT: Two-tier fetch strategy for job detail pages.
+   *
+   * Authenticated (has token): `no-store` — per-user metering stays accurate,
+   *   `x-forwarded-for` is forwarded for IP chain attribution.
+   *
+   * Anonymous (no token): ISR-cached for 5 min — the internal SEO bypass tells
+   *   Fastify to skip IP-based metering and return the full payload.  The
+   *   `x-forwarded-for` header is intentionally omitted so all anonymous requests
+   *   share one Next.js data-cache entry per job ID instead of one per visitor IP.
+   *
+   * This eliminates redundant upstream fetches for crawler/anonymous traffic while
+   * keeping authenticated behaviour unchanged.
+   */
+  let fetchOptions: RequestInit & { next?: { revalidate?: number } };
+  if (t) {
+    const forwardedFor = opts?.forwardedFor?.trim();
+    if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
+    fetchOptions = { headers, cache: "no-store" };
+  } else {
+    const internalSeoSecret = process.env.INTERNAL_SEO_SECRET?.trim();
+    if (internalSeoSecret) {
+      headers.set("x-internal-seo", "true");
+      headers.set("x-internal-seo-secret", internalSeoSecret);
+    }
+    fetchOptions = { headers, next: { revalidate: 300 } };
+  }
+
+  const res = await fetch(`${API_BASE_URL}/jobs/${id}`, fetchOptions);
   if (res.status === 404) return null;
   if (!res.ok) {
     throw new Error(`Failed to fetch job ${id}: ${res.status} ${res.statusText}`);

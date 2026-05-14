@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { headers } from "next/headers";
 import Link from "next/link";
-import { auth } from "@clerk/nextjs/server";
-import { fetchJobById } from "../../../../lib/api";
+import { loadJobDetailPage } from "../../../../lib/jobsPageData";
 import { buildJobPostingJsonLd } from "../../../../lib/jobPostingJsonLd";
 import { absoluteUrl } from "../../../../lib/seoSite";
 import {
@@ -38,11 +36,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const { getToken } = await auth();
-  const token = await getToken();
-  const h = await headers();
-  const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
-  const fetched = await fetchJobById(id, { token, forwardedFor });
+  const fetched = await loadJobDetailPage(id);
   if (!fetched) {
     return { title: "Job not found | JobLoom" };
   }
@@ -68,11 +62,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function JobDetailPage({ params }: Props) {
   const { id } = await params;
-  const { getToken } = await auth();
-  const token = await getToken();
-  const h = await headers();
-  const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
-  const fetched = await fetchJobById(id, { token, forwardedFor });
+  const fetched = await loadJobDetailPage(id);
   if (!fetched?.data?.company) notFound();
 
   const job = fetched.data;

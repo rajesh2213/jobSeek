@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { auth } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
-import { fetchJobs, type JobsApiResponse } from "./api";
+import { fetchJobById, fetchJobs, type JobDetailFetchResult, type JobsApiResponse } from "./api";
 import {
   type JobFilters,
   MAX_JOB_FILTER_QUERY_TOKENS,
@@ -100,3 +100,25 @@ export function loadJobsListingDeferred(input: {
   const jobsDataPromise = loadJobsDiscoveryPage(input.filtersKey);
   return { jobsDataPromise };
 }
+
+/**
+ * One fetch per request for a given job ID (shared by `generateMetadata` and page RSC).
+ *
+ * Mirrors the `loadJobsDiscoveryPage` deduplication pattern.  Without this wrapper both
+ * `generateMetadata` and the page component independently call `auth()` + `fetchJobById`,
+ * doubling the Clerk session resolution AND the upstream Fastify round-trip on every SSR.
+ * React `cache()` deduplicates by argument identity within a single server render so the
+ * second call is a no-op lookup.
+ *
+ * `fetchJobById` itself applies two-tier caching internally: ISR (5 min) for anonymous
+ * traffic, `no-store` for authenticated requests — so metering is preserved.
+ */
+export const loadJobDetailPage = cache(
+  async (id: string): Promise<JobDetailFetchResult | null> => {
+    const { getToken } = await auth();
+    const token = await getToken();
+    const h = await headers();
+    const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
+    return fetchJobById(id, { token, forwardedFor });
+  },
+);
