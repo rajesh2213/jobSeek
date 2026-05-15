@@ -6,12 +6,37 @@ import {
   getCanonicalsFromRequirementLine,
   normalizeLineForSkillScan,
   getSkillDisplayLabel,
+  extractEnrichmentTechStack,
+  keywordMatches,
 } from "./index";
 
 test("getCanonicalFromToken maps common aliases", () => {
   assert.equal(getCanonicalFromToken("Postgres"), "postgresql");
-  assert.equal(getCanonicalFromToken("node"), "nodejs");
+  assert.equal(getCanonicalFromToken("nodejs"), "nodejs");
+  assert.equal(getCanonicalFromToken("node"), null);
+  assert.equal(getCanonicalFromToken("next"), null);
   assert.equal(getCanonicalFromToken("notatechnologyword"), null);
+});
+
+test("extractEnrichmentTechStack: does not match common English next/node/react", () => {
+  assert.deepEqual(
+    extractEnrichmentTechStack("The next step in the hiring process"),
+    [],
+  );
+  assert.deepEqual(
+    extractEnrichmentTechStack("Sentinel lymph node biopsy"),
+    [],
+  );
+  assert.ok(
+    extractEnrichmentTechStack("Built with Next.js and React.js").includes("Next.js"),
+  );
+});
+
+test("keywordMatches: explicit tech forms only", () => {
+  assert.equal(keywordMatches("use Next.js daily", "next.js"), true);
+  assert.equal(keywordMatches("nextjs app", "nextjs"), true);
+  /** Bare "next" is not an enrichment key — even though word-boundary match would fire. */
+  assert.equal(keywordMatches("take the next step", "next.js"), false);
 });
 
 test("getCanonicalsFromRequirementLine: phrase then token", () => {
