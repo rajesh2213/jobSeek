@@ -27,7 +27,8 @@ export default clerkMiddleware(async (auth, req) => {
  *
  * Excluded (no server-side auth): /, /about, /privacy, /terms, /support, /billing,
  *   /companies, /company/*, /jobs/browse, /pricing, /sitemap.xml, /robots.txt,
- *   /sign-in, /sign-up, /applications, /saved-searches, /smart-apply, static assets.
+ *   /sign-in, /sign-up, /applications, /saved-searches, /smart-apply,
+ *   /features/* (public SEO landing pages), static assets.
  */
 export const config = {
   matcher: [

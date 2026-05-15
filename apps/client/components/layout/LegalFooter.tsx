@@ -39,6 +39,12 @@ export function LegalFooter() {
             <Link href="/pricing" className="hover:text-brand" prefetch={false}>
               Pricing
             </Link>
+            <Link href="/features/smart-apply" className="hover:text-brand" prefetch={false}>
+              Smart Apply
+            </Link>
+            <Link href="/features/application-tracker" className="hover:text-brand" prefetch={false}>
+              Applications
+            </Link>
             <Link href="/account" className="hover:text-brand" prefetch={false}>
               Account
             </Link>

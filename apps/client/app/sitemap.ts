@@ -208,6 +208,8 @@ async function generateSitemapData(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/jobs`, lastModified: now },
     { url: `${base}/jobs/browse`, lastModified: now },
     { url: `${base}/companies`, lastModified: now },
+    { url: `${base}/features/smart-apply`, lastModified: now },
+    { url: `${base}/features/application-tracker`, lastModified: now },
   ];
   const staticPhaseDurationMs = Date.now() - startedAt;
 

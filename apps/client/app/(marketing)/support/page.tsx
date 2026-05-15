@@ -30,6 +30,7 @@ const TOPICS = [
     title: "Smart Apply & Autofill",
     description:
       "Smart Apply runs through the Chrome extension. It detects fields on application pages and fills them using your saved JobLoom profile—you stay in control of what gets submitted.",
+    learnMoreHref: "/features/smart-apply",
     faqs: [
       {
         q: "Does Smart Apply submit applications for me?",
@@ -123,7 +124,21 @@ export default function SupportPage() {
             {TOPICS.map((topic) => (
               <Card key={topic.title} accent="brand" className="p-6 sm:p-7">
                 <h3 className="font-sans text-lg font-bold text-ink">{topic.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink-muted">{topic.description}</p>
+                <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+                  {topic.description}
+                  {"learnMoreHref" in topic && topic.learnMoreHref ? (
+                    <>
+                      {" "}
+                      <Link
+                        href={topic.learnMoreHref}
+                        className="font-medium text-brand hover:underline"
+                        prefetch={false}
+                      >
+                        Feature overview →
+                      </Link>
+                    </>
+                  ) : null}
+                </p>
                 <div className="mt-5 space-y-2 border-t border-line pt-5">
                   {topic.faqs.map(({ q, a }) => (
                     <details

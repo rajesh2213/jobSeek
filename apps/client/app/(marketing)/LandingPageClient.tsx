@@ -446,6 +446,48 @@ function SolutionSection() {
   );
 }
 
+function HighlightCarouselCard({
+  title,
+  body,
+  href,
+  motionKey,
+  motionProps,
+}: {
+  title: string;
+  body: string;
+  href?: string;
+  motionKey: string;
+  motionProps: {
+    initial: { opacity: number; y: number; rotate: number };
+    whileInView: { opacity: number; y: number; rotate: number };
+    viewport: { once: boolean; amount: number };
+    transition: { duration: number; delay: number };
+  };
+}) {
+  const inner = (
+    <>
+      <p className="font-semibold text-ink">{title}</p>
+      <p className="mt-2 leading-snug">{body}</p>
+      {href ? (
+        <p className="mt-2 text-xs font-semibold text-brand">Learn more →</p>
+      ) : null}
+    </>
+  );
+  const className =
+    "w-[320px] rounded-2xl border border-ink/10 bg-canvas p-4 text-sm text-ink/75 transition-shadow hover:shadow-[0_8px_24px_rgba(20,20,20,0.06)]";
+  return (
+    <motion.div key={motionKey} {...motionProps} className={className}>
+      {href ? (
+        <Link href={href} prefetch={false} className="block no-underline text-inherit">
+          {inner}
+        </Link>
+      ) : (
+        inner
+      )}
+    </motion.div>
+  );
+}
+
 /** Product-capability carousel — no named testimonials or outcome guarantees. */
 function SocialProofSection() {
   const ref = useRef<HTMLElement | null>(null);
@@ -469,6 +511,7 @@ function SocialProofSection() {
     {
       title: "Smart Apply (Pro)",
       body: "Optional browser extension assists with form fields from your saved profile—you review everything before submitting.",
+      href: "/features/smart-apply",
     },
     {
       title: "Saved searches & alerts",
@@ -477,6 +520,7 @@ function SocialProofSection() {
     {
       title: "Application tracking",
       body: "Keep stages and notes in one workspace so follow-ups don’t get lost in your inbox.",
+      href: "/features/application-tracker",
     },
   ];
   const sectionY = mapRange(scrollYProgress, 0, 0.16, 56, 0);
@@ -506,17 +550,19 @@ function SocialProofSection() {
               transition={{ duration: 34, repeat: Infinity, ease: "linear" }}
             >
               {[...rowA, ...rowA].map((t, i) => (
-                <motion.div
+                <HighlightCarouselCard
                   key={`a-${t.title}-${i}`}
-                  initial={{ opacity: 0, y: 14, rotate: i % 2 === 0 ? -1.8 : 1.8 }}
-                  whileInView={{ opacity: 1, y: 0, rotate: 0 }}
-                  viewport={{ once: true, amount: 0.35 }}
-                  transition={{ duration: 0.55, delay: Math.min(i, 2) * 0.08 }}
-                  className="w-[320px] rounded-2xl border border-ink/10 bg-canvas p-4 text-sm text-ink/75"
-                >
-                  <p className="font-semibold text-ink">{t.title}</p>
-                  <p className="mt-2 leading-snug">{t.body}</p>
-                </motion.div>
+                  title={t.title}
+                  body={t.body}
+                  href={"href" in t ? t.href : undefined}
+                  motionKey={`a-${t.title}-${i}`}
+                  motionProps={{
+                    initial: { opacity: 0, y: 14, rotate: i % 2 === 0 ? -1.8 : 1.8 },
+                    whileInView: { opacity: 1, y: 0, rotate: 0 },
+                    viewport: { once: true, amount: 0.35 },
+                    transition: { duration: 0.55, delay: Math.min(i, 2) * 0.08 },
+                  }}
+                />
               ))}
             </motion.div>
           </motion.div>
@@ -528,17 +574,19 @@ function SocialProofSection() {
               transition={{ duration: 37, repeat: Infinity, ease: "linear" }}
             >
               {[...rowB, ...rowB].map((t, i) => (
-                <motion.div
+                <HighlightCarouselCard
                   key={`b-${t.title}-${i}`}
-                  initial={{ opacity: 0, y: 14, rotate: i % 2 === 0 ? 1.8 : -1.8 }}
-                  whileInView={{ opacity: 1, y: 0, rotate: 0 }}
-                  viewport={{ once: true, amount: 0.35 }}
-                  transition={{ duration: 0.55, delay: Math.min(i, 2) * 0.08 }}
-                  className="w-[320px] rounded-2xl border border-ink/10 bg-canvas p-4 text-sm text-ink/75"
-                >
-                  <p className="font-semibold text-ink">{t.title}</p>
-                  <p className="mt-2 leading-snug">{t.body}</p>
-                </motion.div>
+                  title={t.title}
+                  body={t.body}
+                  href={"href" in t ? t.href : undefined}
+                  motionKey={`b-${t.title}-${i}`}
+                  motionProps={{
+                    initial: { opacity: 0, y: 14, rotate: i % 2 === 0 ? 1.8 : -1.8 },
+                    whileInView: { opacity: 1, y: 0, rotate: 0 },
+                    viewport: { once: true, amount: 0.35 },
+                    transition: { duration: 0.55, delay: Math.min(i, 2) * 0.08 },
+                  }}
+                />
               ))}
             </motion.div>
           </motion.div>
