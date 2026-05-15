@@ -10,11 +10,7 @@ import {
   SOFTWARE_ONLY_SKILL_SLUGS,
 } from "../config/taxonomy.js";
 import { enrichJob } from "../modules/enrichment/enrichment.service.js";
-import {
-  normalizeJobAttributes,
-  normalizeSkills,
-  filterSkillsByDomainContradiction,
-} from "../utils/taxonomyNormalizer.js";
+import { normalizeJobAttributes } from "../utils/taxonomyNormalizer.js";
 import { extractEnrichmentTechStack } from "@jobseek/skill-constants";
 
 const SOFTWARE_ARR = [...SOFTWARE_ONLY_SKILL_SLUGS];
