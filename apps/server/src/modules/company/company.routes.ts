@@ -308,7 +308,7 @@ export function registerCompanyRoutes(
           ...out.meta,
           company: {
             id: exists.id,
-            name: exists.name,
+            name: companyDisplayName(exists.name, exists.domain),
             slug: exists.slug,
             domain: exists.domain,
           },
@@ -330,7 +330,12 @@ export function registerCompanyRoutes(
           code: "COMPANY_NOT_FOUND",
         } satisfies ApiError);
       }
-      return reply.send({ data: company });
+      return reply.send({
+        data: {
+          ...company,
+          name: companyDisplayName(company.name, company.domain),
+        },
+      });
     },
   );
 

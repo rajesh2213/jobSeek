@@ -184,6 +184,16 @@ export function createCompanyRepository(prisma: PrismaClient) {
       return prisma.company.findFirst({ where: { atsBoardToken } });
     },
 
+    async findManyByAtsBoard(atsType: string, atsBoardToken: string): Promise<Company[]> {
+      const token = atsBoardToken.trim();
+      const type = atsType.trim();
+      if (!token || !type) return [];
+      return prisma.company.findMany({
+        where: { atsType: type, atsBoardToken: token },
+        orderBy: { createdAt: "asc" },
+      });
+    },
+
     async listCrawlableByAtsType(atsType: string): Promise<Company[]> {
       return prisma.company.findMany({
         where: {

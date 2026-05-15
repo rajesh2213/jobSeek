@@ -15,6 +15,7 @@ import {
   ENRICH_PRIORITY_JOB_DISCOVERED,
 } from "../../queues/enrich-company.queue.js";
 import { recordCompanyCreatedFromJob } from "../../services/companyDiscoveryMetrics.service.js";
+import { pickCanonicalCompany } from "../../utils/companyCanonical.js";
 
 export class CompanyService {
   constructor(
@@ -111,6 +112,50 @@ export class CompanyService {
       "company_created_from_job",
     );
     return { companyId: company.id, created: true };
+  }
+
+  /**
+   * ATS ingest: when multiple companies share the same board token, prefer the canonical row
+   * (e.g. api_manual "Reddit" over csv_seed "REDDI").
+   */
+  async resolveCompanyForAtsIngest(params: {
+    preferredCompanyId?: string;
+    companyName?: string;
+    atsType: string;
+    atsBoardToken: string;
+  }): Promise<{ companyId: string; created: boolean; switchedCanonical: boolean }> {
+    const token = params.atsBoardToken.trim();
+    const type = params.atsType.trim();
+    const boardMatches =
+      token && type ? await this.companyRepository.findManyByAtsBoard(type, token) : [];
+
+    if (boardMatches.length > 0) {
+      const canonical = pickCanonicalCompany(boardMatches);
+      if (canonical) {
+        const preferredId = params.preferredCompanyId?.trim();
+        const switched =
+          Boolean(preferredId && preferredId !== canonical.id && boardMatches.length > 1);
+        if (switched) {
+          logger.info(
+            {
+              event: "ats_company_canonical_switch",
+              fromCompanyId: preferredId,
+              toCompanyId: canonical.id,
+              atsType: type,
+              atsBoardToken: token,
+            },
+            "ats_company_canonical_switch",
+          );
+        }
+        return { companyId: canonical.id, created: false, switchedCanonical: switched };
+      }
+    }
+
+    const ensured = await this.ensureCompanyFromJob({
+      preferredCompanyId: params.preferredCompanyId,
+      companyName: params.companyName,
+    });
+    return { ...ensured, switchedCanonical: false };
   }
 
   async getAllCompanies(input: {

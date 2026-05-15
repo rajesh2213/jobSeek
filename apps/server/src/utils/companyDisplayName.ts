@@ -46,11 +46,30 @@ export function isAtsPlaceholderCompanyName(name: string | null | undefined): bo
 }
 
 /**
+ * Recover truncated seed/ingest names when the domain label extends the stored name
+ * (e.g. REDDI + reddit.com → Reddit).
+ */
+function displayNameFromTruncatedDomain(name: string, domain: string): string | null {
+  const label = domain.split(".")[0]?.trim().toLowerCase() ?? "";
+  const n = name.trim().toLowerCase();
+  if (!label || !n || label.length <= n.length || n.length < 4) return null;
+  if (!label.startsWith(n)) return null;
+  return titleCaseWords(label);
+}
+
+/**
  * Presentation-only fallback for ugly ATS placeholder names.
  * Keeps persisted DB value unchanged while making public output cleaner.
  */
 export function companyDisplayName(name: string, domain?: string | null): string {
   const trimmed = name.trim();
+  if (!trimmed) return trimmed;
+
+  if (domain?.trim()) {
+    const fromTrunc = displayNameFromTruncatedDomain(trimmed, domain.trim());
+    if (fromTrunc) return fromTrunc;
+  }
+
   if (!isAtsPlaceholderCompanyName(trimmed)) return trimmed;
 
   const wdTenant = extractTenantFromWorkdayPlaceholder(trimmed);

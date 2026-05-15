@@ -19,6 +19,7 @@ import { createJobRepository } from "../modules/job/job.repository.js";
 import { JobService } from "../modules/job/job.service.js";
 import { CompanyService } from "../modules/company/company.service.js";
 import { extractCompanyDomain } from "../utils/jobFingerprint.js";
+import { companyDisplayName } from "../utils/companyDisplayName.js";
 import { createAtsEndpointService } from "../modules/atsEndpoint/atsEndpoint.service.js";
 import { createAtsCrawlerStandard } from "../modules/ats/AtsCrawlerStandard.js";
 import type { AtsType } from "../modules/ats/ats.interface.js";
@@ -360,12 +361,15 @@ async function start(): Promise<void> {
     );
     atsActiveJobMeta = { endpointId, atsType: endpointRow.type, startedAt: Date.now() };
 
-    const { companyId: resolvedCompanyId } = await companyService.ensureCompanyFromJob({
+    const ingestCompany = await companyService.resolveCompanyForAtsIngest({
       preferredCompanyId: endpointRow.companyId ?? undefined,
       companyName:
         endpointRow.companyName?.trim() ||
         fallbackCompanyNameFromEndpoint(endpointRow.type, endpointRow.slug),
+      atsType: endpointRow.type,
+      atsBoardToken: endpointRow.slug,
     });
+    const resolvedCompanyId = ingestCompany.companyId;
 
     const company = await companyService.findById(resolvedCompanyId);
     if (!company) {
@@ -383,6 +387,18 @@ async function start(): Promise<void> {
       throw err;
     }
 
+    const displayName = companyDisplayName(company.name, company.domain);
+    if (
+      ingestCompany.switchedCanonical ||
+      endpointRow.companyId !== resolvedCompanyId ||
+      endpointRow.companyName?.trim() !== displayName
+    ) {
+      await prisma.atsEndpoint.update({
+        where: { id: endpointId },
+        data: { companyId: resolvedCompanyId, companyName: displayName },
+      });
+    }
+
     const atsType = endpointRow.type as AtsType;
     const endpointForAdapter = {
       id: endpointRow.id,
@@ -391,7 +407,7 @@ async function start(): Promise<void> {
       baseUrl: endpointRow.baseUrl,
       metadata: endpointRow.metadata,
       companyId: resolvedCompanyId,
-      companyName: company.name,
+      companyName: displayName,
     };
 
     if (!acquireProviderSlot(atsType)) {
