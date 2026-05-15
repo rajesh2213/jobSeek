@@ -91,21 +91,21 @@ export default function SmartApplyFeaturePage() {
           transition={{ delay: 0.18 }}
           className="flex flex-wrap gap-3"
         >
+          <Link
+            href={workspaceHref}
+            prefetch={false}
+            className="inline-flex rounded-full bg-brand px-5 py-2.5 text-sm font-bold !text-white transition-colors hover:bg-brand-hover"
+          >
+            Open Smart Apply Workspace
+          </Link>
           <a
             href={jobloomChromeWebStoreUrl()}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex rounded-full bg-brand px-5 py-2.5 text-sm font-bold !text-white transition-colors hover:bg-brand-hover"
+            className="inline-flex rounded-full border border-ink/15 bg-white px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-brand/30 hover:text-brand"
           >
             Get the extension →
           </a>
-          <Link
-            href={workspaceHref}
-            prefetch={false}
-            className="inline-flex rounded-full border border-ink/15 bg-white px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-brand/30 hover:text-brand"
-          >
-            Open workspace
-          </Link>
         </motion.div>
         <div className="mt-10 lg:grid lg:grid-cols-2 lg:items-center lg:gap-10">
           <MockFormPreview />

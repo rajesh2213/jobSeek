@@ -45,7 +45,7 @@ import {
   usePosthogStableMicrotask,
   withPosthogAttribution,
 } from "../../lib/posthog";
-import { signInWithNext } from "../../lib/signInUrl";
+import { protectedFeatureNavDest, signInWithNext, SMART_APPLY_APP_PATH } from "../../lib/signInUrl";
 import { signalProgrammaticNavigation } from "../layout/RouteLoader";
 import { Container } from "../ui/Container";
 import { Button } from "../ui/Button";
@@ -769,7 +769,12 @@ export function JobsSearchClient({
   const navigateProtected = useCallback(
     (path: string) => {
       if (!authLoaded) return;
-      const dest = isSignedIn ? path : signInWithNext(path);
+      const dest =
+        path === SMART_APPLY_APP_PATH
+          ? protectedFeatureNavDest(SMART_APPLY_APP_PATH, isSignedIn)
+          : isSignedIn
+            ? path
+            : signInWithNext(path);
       signalProgrammaticNavigation(dest);
       router.push(dest);
     },

@@ -1,3 +1,28 @@
+export const SMART_APPLY_APP_PATH = "/smart-apply";
+export const APPLICATIONS_APP_PATH = "/applications";
+export const SMART_APPLY_FEATURE_PATH = "/features/smart-apply";
+export const APPLICATION_TRACKER_FEATURE_PATH = "/features/application-tracker";
+
+/** Signed-out nav: feature landing; signed-in: app workspace. */
+export function smartApplyNavHref(isSignedIn: boolean): string {
+  return isSignedIn ? SMART_APPLY_APP_PATH : SMART_APPLY_FEATURE_PATH;
+}
+
+export function applicationsNavHref(isSignedIn: boolean): string {
+  return isSignedIn ? APPLICATIONS_APP_PATH : APPLICATION_TRACKER_FEATURE_PATH;
+}
+
+/** Rail / menu click for Smart Apply or Applications. */
+export function protectedFeatureNavDest(
+  appPath: typeof SMART_APPLY_APP_PATH | typeof APPLICATIONS_APP_PATH,
+  isSignedIn: boolean,
+): string {
+  if (isSignedIn) return appPath;
+  return appPath === SMART_APPLY_APP_PATH
+    ? SMART_APPLY_FEATURE_PATH
+    : APPLICATION_TRACKER_FEATURE_PATH;
+}
+
 /**
  * Build `/sign-in` URL with a post-auth return path.
  * Uses the `next` query key (not `redirect_url`) so it does not collide with

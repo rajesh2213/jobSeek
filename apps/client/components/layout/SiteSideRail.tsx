@@ -14,7 +14,13 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "../../lib/cn";
 import { useApplications } from "../../lib/applicationsContext";
-import { signInWithNext } from "../../lib/signInUrl";
+import {
+  APPLICATIONS_APP_PATH,
+  APPLICATION_TRACKER_FEATURE_PATH,
+  protectedFeatureNavDest,
+  SMART_APPLY_APP_PATH,
+  SMART_APPLY_FEATURE_PATH,
+} from "../../lib/signInUrl";
 import { signalProgrammaticNavigation } from "./RouteLoader";
 
 /** Collapsed width (desktop rail); expands on hover/focus/active. */
@@ -516,8 +522,11 @@ export function SiteSideRailProvider({ children }: { children: ReactNode }) {
 
   const jobs = pathname.startsWith("/jobs");
   const companies = pathname.startsWith("/companies") || pathname.startsWith("/company");
-  const smartApply = pathname.startsWith("/smart-apply");
-  const applications = pathname.startsWith("/applications");
+  const smartApply =
+    pathname.startsWith(SMART_APPLY_APP_PATH) || pathname.startsWith(SMART_APPLY_FEATURE_PATH);
+  const applications =
+    pathname.startsWith(APPLICATIONS_APP_PATH) ||
+    pathname.startsWith(APPLICATION_TRACKER_FEATURE_PATH);
 
   const activeKey = useMemo<string | null>(() => {
     if (jobs) return "jobs";
@@ -534,7 +543,10 @@ export function SiteSideRailProvider({ children }: { children: ReactNode }) {
   const goProtected = useCallback(
     (path: string) => {
       if (!authLoaded) return;
-      const dest = isSignedIn ? path : signInWithNext(path);
+      const dest =
+        path === SMART_APPLY_APP_PATH || path === APPLICATIONS_APP_PATH
+          ? protectedFeatureNavDest(path, isSignedIn)
+          : path;
       signalProgrammaticNavigation(dest);
       router.push(dest);
     },

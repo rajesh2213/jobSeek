@@ -301,8 +301,8 @@ const PAIN_POINTS = [
   {
     pain: "Your inbox is chaos.",
     sub: "You miss assessments and follow-ups.",
-    fix: "Email job alerts on saved searches (Pro) + Applications view",
-    outcome: "Know when new matches land-follow up while the role is still fresh.",
+    fix: "Email job alerts on saved searches (Pro)",
+    outcome: "Know when new matches land while the role is still fresh.",
   },
 ];
 
@@ -506,7 +506,7 @@ function SocialProofSection() {
     },
     {
       title: "Apply on the employer’s site",
-      body: "JobLoom helps you find and prepare; you still submit applications through the company’s own flows.",
+      body: "JobLoom helps you discover and evaluate fit; you still submit applications through the company’s own flows.",
     },
     {
       title: "Smart Apply (Pro)",
@@ -734,7 +734,7 @@ function FinalUrgencySection() {
           Job search rewards clarity—not chaos.
         </h3>
         <p className="mt-2 text-xl font-medium text-white/80 sm:text-2xl">
-          When you discover roles earlier and stay organized, you can be more deliberate about where you invest effort.
+          When you discover roles earlier, you can be more deliberate about where you invest effort.
         </p>
         <p className="mx-auto mt-4 max-w-xl text-sm text-white/50">
           Illustrative comparison—not a guarantee about applicant counts or outcomes. Your results depend on your profile, market, and how employers hire.
@@ -749,7 +749,7 @@ function FinalUrgencySection() {
               Late to new posts
             </p>
             <p className="mt-1 text-xs leading-relaxed text-white/45">
-              Easy to miss listings when you’re refreshing five sites—or to apply without a system for follow-ups.
+              Easy to miss listings when you’re refreshing five sites and job boards every day.
             </p>
           </div>
           <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-5 py-4 text-left shadow-[0_0_20px_rgba(16,185,129,0.08)]">
@@ -760,7 +760,7 @@ function FinalUrgencySection() {
               Earlier triage
             </p>
             <p className="mt-1 text-xs leading-relaxed text-white/45">
-              One place to search, prep, and track—so you can respond to fresh posts with intention instead of panic.
+              One searchable feed with fit signals—so you can respond to fresh posts with intention instead of panic.
             </p>
           </div>
         </div>
