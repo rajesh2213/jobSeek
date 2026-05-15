@@ -29,6 +29,15 @@ export function getSeoMinJobsIndex(): number {
   return Number.isFinite(n) && n >= 0 ? n : 5;
 }
 
+/** Prefer API total; fall back to first-page job count when total is omitted (SEO listing cap). */
+export function resolveListingJobCount(
+  metaTotal: number | null | undefined,
+  jobsOnPage: number,
+): number {
+  if (typeof metaTotal === "number" && metaTotal > 0) return metaTotal;
+  return jobsOnPage > 0 ? jobsOnPage : 0;
+}
+
 export function buildJobsSeo(filters: JobFilters, total?: number): {
   title: string;
   description: string;

@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { buildDiscoveryWhereSql, type JobDiscoveryFilters } from "../job/job.repository.js";
+import { readCachedAggregations, writeCachedAggregations } from "./seoAggregationCache.js";
 
 export interface SeoAggregations {
   topSkills: Array<{ skill: string; count: number }>;
@@ -86,8 +87,13 @@ export function createSeoAggregationsService(prisma: PrismaClient) {
   }
 
   async function safeFetchAggregations(filters: JobDiscoveryFilters): Promise<SeoAggregations> {
+    const cached = await readCachedAggregations(filters);
+    if (cached) return cached;
+
     try {
-      return await fetchAggregations(filters);
+      const data = await fetchAggregations(filters);
+      await writeCachedAggregations(filters, data);
+      return data;
     } catch (_err) {
       return {
         topSkills: [],

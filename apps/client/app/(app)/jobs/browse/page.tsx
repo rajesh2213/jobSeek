@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { fetchJobCategories, fetchJobSkills } from "../../../../lib/api";
+import { fetchJobCategories, fetchJobSkills, fetchRoles } from "../../../../lib/api";
 import { JOB_CATEGORIES } from "../../../../lib/taxonomy";
 import { buildJobsListingUrl, isCanonicalListingPath } from "../../../../lib/slug-parser";
 import { Container } from "../../../../components/ui/Container";
@@ -27,14 +27,17 @@ const BROWSE_LOCATIONS: ReadonlyArray<{ token: string; label: string }> = [
 ];
 
 export default async function JobsBrowsePage() {
-  const [catResult, skillResult] = await Promise.allSettled([
+  const [catResult, skillResult, roleResult] = await Promise.allSettled([
     fetchJobCategories(),
     fetchJobSkills(),
+    fetchRoles(),
   ]);
   const catAgg = catResult.status === "fulfilled" ? catResult.value : [];
   const skillAgg = skillResult.status === "fulfilled" ? skillResult.value : [];
+  const roleAgg = roleResult.status === "fulfilled" ? roleResult.value : [];
   const catBySlug = new Map(catAgg.map((c) => [c.slug, c.count]));
   const topSkills = skillAgg.slice(0, 48);
+  const topRoles = roleAgg.slice(0, 32);
 
   return (
     <main className="min-h-screen pb-20 pt-8">
@@ -66,6 +69,26 @@ export default async function JobsBrowsePage() {
                   {typeof n === "number" ? (
                     <span className="ml-1.5 text-ink/40">({n.toLocaleString()})</span>
                   ) : null}
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-ink/45">Top roles</h2>
+          <div className="flex flex-wrap gap-2">
+            {topRoles.map((r) => {
+              const href = buildJobsListingUrl({ role: r.slug });
+              if (!isCanonicalListingPath(href)) return null;
+              return (
+                <Link
+                  key={r.slug}
+                  href={href}
+                  className="rounded-full bg-surface px-3 py-1.5 text-sm text-ink/80 no-underline ring-1 ring-ink/10 hover:text-brand"
+                >
+                  {r.label || r.slug.replace(/-/g, " ")}
+                  <span className="ml-1.5 text-ink/40">({r.count.toLocaleString()})</span>
                 </Link>
               );
             })}

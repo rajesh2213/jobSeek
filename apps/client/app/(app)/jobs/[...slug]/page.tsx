@@ -10,6 +10,7 @@ import {
   getSeoMinJobsIndex,
   jobDiscoveryBreadcrumbJsonLdPaths,
   jobsRouteMetadata,
+  resolveListingJobCount,
 } from "../../../../lib/seo";
 import { JobsSearchPage } from "../../../../components/job/JobsSearchPage";
 import { JOB_CATEGORIES } from "../../../../lib/taxonomy";
@@ -54,7 +55,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     searchParamKeys,
     validCanonicalSlugPath: parsed.validCanonical,
     canonicalPath: getCanonicalJobListingUrl(filters),
-    total: response.meta?.total ?? undefined,
+    total: resolveListingJobCount(response.meta?.total, response.data.length) || undefined,
   });
 }
 
@@ -84,7 +85,7 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
     normalizeRelatedSlugPath(s).replace(/^\/jobs\/?/, ""),
   ).filter(Boolean);
 
-  const total = response.meta?.total ?? 0;
+  const total = resolveListingJobCount(response.meta?.total, response.data.length);
   const policy = decideJobsListingSeoPolicy({
     routeKind: "jobs-slug",
     filters,
