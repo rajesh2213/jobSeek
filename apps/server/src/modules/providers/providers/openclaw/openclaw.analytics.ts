@@ -43,7 +43,8 @@ export type OpenClawAtsDiscoveryMetricField =
   | "ats_discovery_reject_missing_company"
   | "ats_discovery_reject_ambiguous_endpoint"
   | "ats_discovery_reject_slug_extraction_failed"
-  | "ats_discovery_reject_empty_base_url";
+  | "ats_discovery_reject_empty_base_url"
+  | "ats_discovery_canonical_collision";
 
 export type OpenClawMetricField =
   | "requests"
@@ -180,6 +181,10 @@ export async function recordOpenClawAtsDiscoveryEval(
     await incrOpenClawMetric(redis, "ats_discovery_candidate_would_create", 1);
   } else if (o.status === "existing_endpoint") {
     await incrOpenClawMetric(redis, "ats_discovery_existing_endpoint", 1);
+  }
+
+  if (result.canonicalCollision) {
+    await incrOpenClawMetric(redis, "ats_discovery_canonical_collision", 1);
   }
 }
 

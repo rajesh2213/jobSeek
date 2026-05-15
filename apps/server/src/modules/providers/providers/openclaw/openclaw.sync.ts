@@ -33,6 +33,9 @@ import { computeCompanyQualityFlags } from "../../../../services/qualityFlags.se
 import {
   inferAtsCandidate,
   createEmptyAtsDiscoverySummary,
+  createCanonicalTracker,
+  trackCanonicalCandidate,
+  finalizeAtsDiscoverySummary,
   mergeAtsDiscoveryIntoSummary,
   type OpenClawAtsDiscoveryEvalResult,
 } from "./openclaw.atsDiscovery.js";
@@ -273,6 +276,7 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
   let emittedDryRunSkipLogs = false;
   const shadowSummary = createEmptyOpenClawShadowSummary();
   const atsDiscoverySummary = createEmptyAtsDiscoverySummary();
+  const atsCanonicalTracker = createCanonicalTracker();
 
   // Pre-load existing ATS endpoint (type, slug) pairs for the discovery allowlist.
   // Single lightweight query, avoids N+1 per job row.
@@ -529,12 +533,19 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
                   discoveryResult = {
                     sourceUrl: sourceUrlForDiscovery,
                     detectedType: cand.type,
+                    canonicalBoardUrl: inference.canonicalBoardUrl ?? null,
                     outcome: alreadyExists
                       ? { status: "existing_endpoint", candidate: cand }
                       : { status: "would_create", candidate: cand },
                   };
                 }
               }
+
+              const canonicalCollision = trackCanonicalCandidate(
+                atsCanonicalTracker,
+                discoveryResult,
+              );
+              discoveryResult.canonicalCollision = canonicalCollision;
 
               await recordOpenClawAtsDiscoveryEval(redis, discoveryResult);
               mergeAtsDiscoveryIntoSummary(atsDiscoverySummary, discoveryResult);
@@ -551,6 +562,8 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
                   outcome_reason: o.status === "rejected" ? o.reason : null,
                   candidate_slug: o.status !== "rejected" ? o.candidate.slug : null,
                   candidate_base_url: o.status !== "rejected" ? o.candidate.baseUrl : null,
+                  canonical_board_url: discoveryResult.canonicalBoardUrl ?? null,
+                  canonical_collision: canonicalCollision,
                   company_id: jobRow?.companyId ?? null,
                 },
                 "openclaw_ats_discovery_eval",
@@ -620,6 +633,7 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
   }
 
   if (cfg.atsDiscoveryShadow && atsDiscoverySummary.evaluated > 0) {
+    finalizeAtsDiscoverySummary(atsDiscoverySummary, atsCanonicalTracker);
     logger.info(
       {
         event: "openclaw_ats_discovery_summary",
@@ -629,6 +643,8 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
         rejected: atsDiscoverySummary.rejected,
         would_create: atsDiscoverySummary.would_create,
         existing_endpoint: atsDiscoverySummary.existing_endpoint,
+        unique_canonical_candidates: atsDiscoverySummary.unique_canonical_candidates,
+        canonicalization_collisions: atsDiscoverySummary.canonicalization_collisions,
         ats_breakdown: atsDiscoverySummary.ats_breakdown,
         reject_breakdown: atsDiscoverySummary.reject_breakdown,
       },
