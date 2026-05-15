@@ -301,8 +301,8 @@ const PAIN_POINTS = [
   {
     pain: "Your inbox is chaos.",
     sub: "You miss assessments and follow-ups.",
-    fix: "Email job alerts on saved searches (Pro)",
-    outcome: "Know when new matches land while the role is still fresh.",
+    fix: "Email job alerts on saved searches (Pro) + Applications view",
+    outcome: "Know when new matches land-follow up while the role is still fresh.",
   },
 ];
 
@@ -734,7 +734,7 @@ function FinalUrgencySection() {
           Job search rewards clarity—not chaos.
         </h3>
         <p className="mt-2 text-xl font-medium text-white/80 sm:text-2xl">
-          When you discover roles earlier, you can be more deliberate about where you invest effort.
+          When you discover roles earlier and stay organized, you can be more deliberate about where you invest effort.
         </p>
         <p className="mx-auto mt-4 max-w-xl text-sm text-white/50">
           Illustrative comparison—not a guarantee about applicant counts or outcomes. Your results depend on your profile, market, and how employers hire.
