@@ -39,6 +39,13 @@ import {
   mergeAtsDiscoveryIntoSummary,
   type OpenClawAtsDiscoveryEvalResult,
 } from "./openclaw.atsDiscovery.js";
+import {
+  buildEndpointDedupeCache,
+  persistInactiveOpenClawEndpoint,
+  shouldSkipOpenClawPersist,
+  type OpenClawEndpointDedupeCache,
+} from "./openclaw.atsPersist.js";
+import { runOpenClawInventoryIntelligenceSweep } from "./openclaw.inventorySweep.js";
 
 const PAGING_KEY = "openclaw:paging:next_page";
 
@@ -278,19 +285,25 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
   const atsDiscoverySummary = createEmptyAtsDiscoverySummary();
   const atsCanonicalTracker = createCanonicalTracker();
 
-  // Pre-load existing ATS endpoint (type, slug) pairs for the discovery allowlist.
-  // Single lightweight query, avoids N+1 per job row.
-  const existingEndpointKeys = new Set<string>();
-  if (cfg.atsDiscoveryShadow) {
+  // Pre-load existing ATS endpoint keys (type+slug and Workday board triples). Single query per sync.
+  let endpointDedupeCache: OpenClawEndpointDedupeCache = {
+    typeSlugKeys: new Set(),
+    workdayBoardKeys: new Set(),
+  };
+  if (cfg.atsDiscoveryShadow || cfg.atsDiscoveryPersist) {
     try {
       const discoveryTypes = ["workday", "ashby", "workable", "bamboohr", "greenhouse", "lever"];
       const rows = await ctx.prisma.atsEndpoint.findMany({
         where: { type: { in: discoveryTypes } },
         select: { type: true, slug: true },
       });
-      for (const r of rows) existingEndpointKeys.add(`${r.type}\0${r.slug}`);
+      endpointDedupeCache = buildEndpointDedupeCache(rows);
       logger.info(
-        { event: "openclaw_ats_discovery_cache_loaded", count: existingEndpointKeys.size },
+        {
+          event: "openclaw_ats_discovery_cache_loaded",
+          type_slug_count: endpointDedupeCache.typeSlugKeys.size,
+          workday_board_count: endpointDedupeCache.workdayBoardKeys.size,
+        },
         "openclaw_ats_discovery_cache_loaded",
       );
     } catch (err) {
@@ -529,7 +542,7 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
                   };
                 } else {
                   const endpointKey = `${cand.type}\0${cand.slug}`;
-                  const alreadyExists = existingEndpointKeys.has(endpointKey);
+                  const alreadyExists = endpointDedupeCache.typeSlugKeys.has(endpointKey);
                   discoveryResult = {
                     sourceUrl: sourceUrlForDiscovery,
                     detectedType: cand.type,
@@ -549,6 +562,68 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
 
               await recordOpenClawAtsDiscoveryEval(redis, discoveryResult);
               mergeAtsDiscoveryIntoSummary(atsDiscoverySummary, discoveryResult);
+
+              if (
+                cfg.atsDiscoveryPersist &&
+                discoveryResult.outcome.status === "would_create" &&
+                jobRow?.companyId
+              ) {
+                const cand = discoveryResult.outcome.candidate;
+                const skipReason = shouldSkipOpenClawPersist({
+                  candidate: cand,
+                  cache: endpointDedupeCache,
+                  canonicalCollision,
+                  dryRun: cfg.dryRun,
+                  sourceUrl: sourceUrlForDiscovery,
+                });
+                if (skipReason) {
+                  atsDiscoverySummary.persist_skipped += 1;
+                  if (skipReason === "collision_in_sync") {
+                    await incrOpenClawMetric(redis, "ats_discovery_persist_skipped_collision", 1);
+                  } else if (skipReason === "low_confidence") {
+                    await incrOpenClawMetric(redis, "ats_discovery_persist_skipped_low_confidence", 1);
+                  } else if (skipReason === "suspicious_slug") {
+                    await incrOpenClawMetric(redis, "ats_discovery_persist_skipped_suspicious_slug", 1);
+                  } else if (
+                    skipReason === "existing_endpoint" ||
+                    skipReason === "existing_workday_board"
+                  ) {
+                    await incrOpenClawMetric(redis, "ats_discovery_persist_skipped_existing", 1);
+                  }
+                } else {
+                  try {
+                    const persistResult = await persistInactiveOpenClawEndpoint(ctx.prisma, {
+                      candidate: cand,
+                      companyId: jobRow.companyId,
+                      cache: endpointDedupeCache,
+                      sourceUrl: sourceUrlForDiscovery,
+                      canonicalCollision,
+                    });
+                    if (persistResult.status === "created") {
+                      atsDiscoverySummary.persist_created += 1;
+                      await incrOpenClawMetric(redis, "ats_discovery_persist_created", 1);
+                    } else if (persistResult.status === "updated_seen") {
+                      atsDiscoverySummary.persist_updated_seen += 1;
+                      await incrOpenClawMetric(redis, "ats_discovery_persist_updated_seen", 1);
+                    } else {
+                      atsDiscoverySummary.persist_skipped += 1;
+                      await incrOpenClawMetric(redis, "ats_discovery_persist_skipped_existing", 1);
+                    }
+                  } catch (persistErr) {
+                    logger.warn(
+                      {
+                        event: "openclaw_ats_persist_failed",
+                        provider: "openclaw",
+                        canonical_id: canonical.id,
+                        type: cand.type,
+                        slug: cand.slug,
+                        err: persistErr,
+                      },
+                      "openclaw_ats_persist_failed",
+                    );
+                  }
+                }
+              }
 
               const o = discoveryResult.outcome;
               logger.info(
@@ -634,6 +709,59 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
 
   if (cfg.atsDiscoveryShadow && atsDiscoverySummary.evaluated > 0) {
     finalizeAtsDiscoverySummary(atsDiscoverySummary, atsCanonicalTracker);
+    if (cfg.atsDiscoveryPersist) {
+      try {
+        const staleCutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+        const [inventoryTotal, inventoryStale] = await Promise.all([
+          ctx.prisma.atsEndpoint.count({ where: { source: "openclaw", isActive: false } }),
+          ctx.prisma.atsEndpoint.count({
+            where: {
+              source: "openclaw",
+              isActive: false,
+              OR: [{ lastSeenAt: null }, { lastSeenAt: { lt: staleCutoff } }],
+            },
+          }),
+        ]);
+        atsDiscoverySummary.inventory_total = inventoryTotal;
+        atsDiscoverySummary.inventory_stale_not_seen_days = inventoryStale;
+      } catch (invErr) {
+        logger.warn(
+          { event: "openclaw_inventory_telemetry_failed", err: invErr },
+          "openclaw_inventory_telemetry_failed",
+        );
+      }
+    }
+    if (cfg.atsDiscoveryPersist) {
+      try {
+        const sweep = await runOpenClawInventoryIntelligenceSweep(ctx.prisma);
+        if (redis) {
+          await incrOpenClawMetric(redis, "openclaw_inventory_sweep_total", sweep.total);
+          await incrOpenClawMetric(redis, "openclaw_inventory_stale", sweep.stale);
+          for (const [tier, count] of Object.entries(sweep.tiers)) {
+            if (count > 0) {
+              const field =
+                tier === "HIGH_CONFIDENCE"
+                  ? "openclaw_inventory_tier_high"
+                  : tier === "OBSERVE_LONGER"
+                    ? "openclaw_inventory_tier_observe"
+                    : tier === "LOW_CONFIDENCE"
+                      ? "openclaw_inventory_tier_low"
+                      : "openclaw_inventory_tier_never";
+              await incrOpenClawMetric(redis, field, count);
+            }
+          }
+        }
+        Object.assign(atsDiscoverySummary, {
+          inventory_sweep_stale: sweep.stale,
+          inventory_activation_tiers: sweep.tiers,
+        });
+      } catch (sweepErr) {
+        logger.warn(
+          { event: "openclaw_inventory_sweep_failed", err: sweepErr },
+          "openclaw_inventory_sweep_failed",
+        );
+      }
+    }
     logger.info(
       {
         event: "openclaw_ats_discovery_summary",
@@ -645,6 +773,13 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
         existing_endpoint: atsDiscoverySummary.existing_endpoint,
         unique_canonical_candidates: atsDiscoverySummary.unique_canonical_candidates,
         canonicalization_collisions: atsDiscoverySummary.canonicalization_collisions,
+        persist_created: atsDiscoverySummary.persist_created,
+        persist_updated_seen: atsDiscoverySummary.persist_updated_seen,
+        persist_skipped: atsDiscoverySummary.persist_skipped,
+        inventory_total: atsDiscoverySummary.inventory_total,
+        inventory_stale_14d: atsDiscoverySummary.inventory_stale_not_seen_days,
+        inventory_sweep_stale: atsDiscoverySummary.inventory_sweep_stale,
+        inventory_activation_tiers: atsDiscoverySummary.inventory_activation_tiers,
         ats_breakdown: atsDiscoverySummary.ats_breakdown,
         reject_breakdown: atsDiscoverySummary.reject_breakdown,
       },

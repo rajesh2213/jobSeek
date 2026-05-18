@@ -317,6 +317,13 @@ export type OpenClawAtsDiscoverySummary = {
   ats_breakdown: Record<string, { would_create: number; existing: number }>;
   unique_canonical_candidates: number;
   canonicalization_collisions: number;
+  persist_created: number;
+  persist_updated_seen: number;
+  persist_skipped: number;
+  inventory_total: number;
+  inventory_stale_not_seen_days: number;
+  inventory_sweep_stale?: number;
+  inventory_activation_tiers?: Record<string, number>;
 };
 
 export function createEmptyAtsDiscoverySummary(): OpenClawAtsDiscoverySummary {
@@ -330,6 +337,11 @@ export function createEmptyAtsDiscoverySummary(): OpenClawAtsDiscoverySummary {
     ats_breakdown: {},
     unique_canonical_candidates: 0,
     canonicalization_collisions: 0,
+    persist_created: 0,
+    persist_updated_seen: 0,
+    persist_skipped: 0,
+    inventory_total: 0,
+    inventory_stale_not_seen_days: 0,
   };
 }
 

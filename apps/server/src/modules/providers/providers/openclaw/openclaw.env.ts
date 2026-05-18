@@ -19,6 +19,8 @@ export interface OpenClawEnvConfig {
   maxHttpRetries: number;
   /** When true (default), ATS endpoint discovery runs in shadow mode: metrics + logs only. */
   atsDiscoveryShadow: boolean;
+  /** When true, persist high-confidence candidates as inactive AtsEndpoint rows (source=openclaw). */
+  atsDiscoveryPersist: boolean;
 }
 
 function parseBool(raw: string | undefined, defaultFalse: boolean): boolean {
@@ -94,6 +96,7 @@ export function loadOpenClawEnv(): OpenClawEnvConfig {
     ),
     maxHttpRetries: clamp(Number(process.env.OPENCLAW_HTTP_RETRIES ?? "2") || 2, 0, 5),
     atsDiscoveryShadow: parseBool(process.env.OPENCLAW_ATS_DISCOVERY_SHADOW, true),
+    atsDiscoveryPersist: parseBool(process.env.OPENCLAW_ATS_DISCOVERY_PERSIST, false),
   };
 }
 

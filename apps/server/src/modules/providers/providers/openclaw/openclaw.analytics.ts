@@ -44,7 +44,19 @@ export type OpenClawAtsDiscoveryMetricField =
   | "ats_discovery_reject_ambiguous_endpoint"
   | "ats_discovery_reject_slug_extraction_failed"
   | "ats_discovery_reject_empty_base_url"
-  | "ats_discovery_canonical_collision";
+  | "ats_discovery_canonical_collision"
+  | "ats_discovery_persist_created"
+  | "ats_discovery_persist_updated_seen"
+  | "ats_discovery_persist_skipped_collision"
+  | "ats_discovery_persist_skipped_existing"
+  | "ats_discovery_persist_skipped_low_confidence"
+  | "ats_discovery_persist_skipped_suspicious_slug"
+  | "openclaw_inventory_sweep_total"
+  | "openclaw_inventory_stale"
+  | "openclaw_inventory_tier_high"
+  | "openclaw_inventory_tier_observe"
+  | "openclaw_inventory_tier_low"
+  | "openclaw_inventory_tier_never";
 
 export type OpenClawMetricField =
   | "requests"
