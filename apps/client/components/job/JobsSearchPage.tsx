@@ -16,6 +16,8 @@ interface Props {
   weeklyJobsPosted?: number;
   relatedSlugs?: string[];
   listingTop?: ReactNode;
+  /** Market insights sidebar (SEO landing pages, desktop beside results). */
+  listingSidebar?: ReactNode;
   /** FAQ block rendered below job results (above related searches). */
   listingFaq?: ReactNode;
 }
@@ -26,6 +28,7 @@ export function JobsSearchPage({
   weeklyJobsPosted,
   relatedSlugs = FALLBACK_RELATED_SLUGS,
   listingTop,
+  listingSidebar,
   listingFaq,
 }: Props) {
   /* B1: Suspense wraps client subtree for progressive hydration; listing rows remain in SSR props. */
@@ -37,6 +40,7 @@ export function JobsSearchPage({
         weeklyJobsPosted={weeklyJobsPosted}
         relatedSlugs={relatedSlugs}
         listingTop={listingTop}
+        listingSidebar={listingSidebar}
         listingFaq={listingFaq}
       />
     </Suspense>

@@ -97,6 +97,7 @@ interface Props {
   weeklyJobsPosted?: number;
   relatedSlugs: string[];
   listingTop?: ReactNode;
+  listingSidebar?: ReactNode;
   listingFaq?: ReactNode;
 }
 
@@ -419,6 +420,7 @@ export function JobsSearchClient({
   weeklyJobsPosted,
   relatedSlugs,
   listingTop,
+  listingSidebar,
   listingFaq,
 }: Props) {
   const { getToken, isSignedIn, isLoaded: authLoaded } = useAuth();
@@ -1776,7 +1778,7 @@ export function JobsSearchClient({
               ? listJobs.slice(0, FREE_DISCOVERY_PREVIEW_JOB_ROWS)
               : listJobs;
           const wallPhase = discoveryPhase === "preview" ? "preview" : "search";
-          return (
+          const resultsMain = (
             <>
               {listJobs.length > 0 ? (
                 <JobList jobs={jobsForList} flashAppliedJobId={flashAppliedJobId} />
@@ -1805,6 +1807,17 @@ export function JobsSearchClient({
                 </div>
               ) : null}
             </>
+          );
+
+          if (!listingSidebar) {
+            return resultsMain;
+          }
+
+          return (
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_min(16rem,22rem)] lg:items-start">
+              <div className="min-w-0">{resultsMain}</div>
+              <div className="min-w-0 lg:sticky lg:top-24">{listingSidebar}</div>
+            </div>
           );
         })()}
       </Container>

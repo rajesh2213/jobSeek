@@ -1028,6 +1028,7 @@ export interface SeoAggregationsResponse {
 export async function fetchSeoAggregations(options: {
   filtersSlug: string;
   internalSeoSecret?: string | null;
+  signal?: AbortSignal;
 }): Promise<SeoAggregationsResponse["data"]> {
   const secret = (options.internalSeoSecret ?? process.env.INTERNAL_SEO_SECRET)?.trim();
   const headers = new Headers();
@@ -1036,7 +1037,11 @@ export async function fetchSeoAggregations(options: {
     headers.set("x-internal-seo-secret", secret);
   }
   const url = `${API_BASE_URL}/seo/aggregations?filters=${encodeURIComponent(options.filtersSlug)}`;
-  const res = await fetch(url, { headers, next: { revalidate: 300 } });
+  const res = await fetch(url, {
+    headers,
+    signal: options.signal,
+    next: { revalidate: 300 },
+  });
   if (!res.ok) {
     return {
       topSkills: [],

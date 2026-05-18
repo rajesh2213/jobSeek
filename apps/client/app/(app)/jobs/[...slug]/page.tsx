@@ -25,6 +25,12 @@ import { JsonLdScript } from "../../../../components/seo/JsonLdScript";
 import { JobsListingFaq, buildFaqJsonLd } from "../../../../components/seo/JobsListingFaq";
 import { SeoBreadcrumbs } from "../../../../components/seo/SeoBreadcrumbs";
 import { decideJobsListingSeoPolicy } from "../../../../lib/seoIndexability";
+import { SeoAggregationSidebar } from "../../../../components/seo/SeoAggregationSidebar";
+import {
+  hasAggregationSidebarContent,
+  isSeoAggregationEnrichmentEnabled,
+  safeFetchSeoAggregations,
+} from "../../../../lib/seoAggregations";
 
 const FALLBACK_RELATED_SLUGS = [
   "role/data-engineer/location/remote",
@@ -80,13 +86,8 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
    * same expensive `/seo/landing-pages` work as the sitemap and can dominate TTFB (~30s+), while
    * `JobsSearchClient` already hydrates related links from the same API after paint.
    */
-  const response = await loadJobsDiscoveryPage(filtersKey);
-  const relatedSlugs = FALLBACK_RELATED_SLUGS.map((s) =>
-    normalizeRelatedSlugPath(s).replace(/^\/jobs\/?/, ""),
-  ).filter(Boolean);
-
-  const total = resolveListingJobCount(response.meta?.total, response.data.length);
-  const policy = decideJobsListingSeoPolicy({
+  const filtersSlug = slug.join("/");
+  const policyPre = decideJobsListingSeoPolicy({
     routeKind: "jobs-slug",
     filters,
     searchParamKeys: Object.keys(sp).filter(Boolean).sort(),
@@ -95,7 +96,23 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
   });
   const forceNoindexAll = process.env.SEO_FORCE_NOINDEX_ALL === "true";
   const disableAllNoindex = process.env.SEO_DISABLE_ALL_NOINDEX === "true";
-  const indexable = forceNoindexAll ? false : disableAllNoindex ? true : policy.index;
+  const indexablePre =
+    forceNoindexAll ? false : disableAllNoindex ? true : policyPre.index;
+  const fetchAggregations =
+    isSeoAggregationEnrichmentEnabled() && indexablePre && filtersSlug.length > 0;
+
+  const response = await loadJobsDiscoveryPage(filtersKey);
+  const aggregations = fetchAggregations
+    ? await safeFetchSeoAggregations(filtersSlug)
+    : null;
+
+  const relatedSlugs = FALLBACK_RELATED_SLUGS.map((s) =>
+    normalizeRelatedSlugPath(s).replace(/^\/jobs\/?/, ""),
+  ).filter(Boolean);
+
+  const total = resolveListingJobCount(response.meta?.total, response.data.length);
+  const policy = policyPre;
+  const indexable = indexablePre;
   const minIndex = getSeoMinJobsIndex();
   const dominantCategory = response.data[0]?.category ?? undefined;
   const relatedSearchLinks = buildCuratedRelatedSearchLinks(filters, canonicalSlugPath, { dominantCategory });
@@ -136,12 +153,21 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
       </>
     ) : null;
 
+  const listingSidebar =
+    aggregations &&
+    hasAggregationSidebarContent(aggregations) &&
+    total >= minIndex &&
+    total >= 8 ? (
+      <SeoAggregationSidebar data={aggregations} />
+    ) : null;
+
   return (
     <JobsSearchPage
       jobs={response.data}
       meta={response.meta}
       relatedSlugs={relatedSlugs}
       listingTop={listingTop}
+      listingSidebar={listingSidebar}
       listingFaq={listingFaq}
     />
   );
