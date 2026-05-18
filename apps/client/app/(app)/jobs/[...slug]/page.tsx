@@ -25,7 +25,7 @@ import { JsonLdScript } from "../../../../components/seo/JsonLdScript";
 import { JobsListingFaq, buildFaqJsonLd } from "../../../../components/seo/JobsListingFaq";
 import { SeoBreadcrumbs } from "../../../../components/seo/SeoBreadcrumbs";
 import { decideJobsListingSeoPolicy } from "../../../../lib/seoIndexability";
-import { SeoAggregationSidebar } from "../../../../components/seo/SeoAggregationSidebar";
+import { SeoAggregationSidebarHydrator } from "../../../../components/seo/SeoAggregationSidebarHydrator";
 import {
   hasAggregationSidebarContent,
   isSeoAggregationEnrichmentEnabled,
@@ -154,11 +154,15 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
     ) : null;
 
   const listingSidebar =
-    aggregations &&
-    hasAggregationSidebarContent(aggregations) &&
-    total >= minIndex &&
-    total >= 8 ? (
-      <SeoAggregationSidebar data={aggregations} />
+    fetchAggregations && total >= minIndex && total >= 8 ? (
+      <SeoAggregationSidebarHydrator
+        filtersSlug={filtersSlug}
+        initial={
+          aggregations && hasAggregationSidebarContent(aggregations)
+            ? aggregations
+            : null
+        }
+      />
     ) : null;
 
   return (
