@@ -1040,7 +1040,7 @@ export async function fetchSeoAggregations(options: {
   const res = await fetch(url, {
     headers,
     signal: options.signal,
-    next: { revalidate: 300 },
+    cache: "no-store",
   });
   if (!res.ok) {
     return {

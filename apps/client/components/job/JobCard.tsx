@@ -321,7 +321,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
             <NewBadge job={job} />
           </div>
 
-          <h3 className="mb-2 text-lg font-extrabold leading-snug tracking-tight text-ink">
+          <h3 className="mb-2 min-w-0 text-lg font-extrabold leading-snug tracking-tight text-ink">
             <Link
               prefetch={false}
               href={`/job/${job.id}`}
@@ -329,7 +329,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
               rel="noopener noreferrer"
               className={cn(
                 `no-underline transition-colors ${titleHover} text-ink`,
-                "line-clamp-3 lg:line-clamp-none",
+                "line-clamp-2 break-words",
               )}
             >
               {job.title}

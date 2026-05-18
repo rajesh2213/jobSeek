@@ -1,9 +1,9 @@
 export function aggregationQueryTimeoutMs(): number {
   const raw = process.env.SEO_AGGREGATION_QUERY_TIMEOUT_MS?.trim();
-  if (!raw) return 3000;
+  if (!raw) return 10000;
   const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed)) return 3000;
-  return Math.max(1000, Math.min(parsed, 8000));
+  if (!Number.isFinite(parsed)) return 10000;
+  return Math.max(3000, Math.min(parsed, 15000));
 }
 
 export async function withAggregationTimeout<T>(
