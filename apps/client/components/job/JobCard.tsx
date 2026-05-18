@@ -235,6 +235,38 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
       className={cn("h-full transition-shadow", cardHoverClass, isAppliedFlash && "ring-2 ring-teal/45 bg-teal-soft/35")}
     >
       <div className="relative z-0 flex gap-3 lg:gap-5">
+        <div className="absolute right-6 top-6 z-10 hidden min-w-0 flex-col gap-2 lg:flex">
+          <div className="flex flex-nowrap justify-end gap-2">
+            <ApplyJobButton
+              jobId={job.id}
+              company={job.company.name}
+              source="job_card"
+              applyUrl={applyHref}
+              outlineTone={accent}
+              size="sm"
+              variant="outline"
+              className="shrink-0"
+            />
+            <AppliedToggleButton
+              jobId={job.id}
+              outlineTone={accent}
+              size="sm"
+              className="shrink-0"
+            />
+            <Link
+              prefetch={false}
+              href={`/job/${job.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(buttonClassName({ variant: "primary", size: "sm" }), "shrink-0")}
+            >
+              View role →
+            </Link>
+          </div>
+          <div className="w-full min-w-0">
+            <ResumeScorePill job={job} />
+          </div>
+        </div>
         {logo ? (
           <div className="relative h-12 w-12 shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element -- external company logos */}
@@ -282,8 +314,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
             {initial}
           </div>
         )}
-        <div className="min-w-0 flex-1 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-x-4">
-          <div className="min-w-0">
+        <div className="min-w-0 flex-1 lg:pr-52 xl:pr-56">
           <div className="mb-1.5 flex min-w-0 flex-wrap items-center gap-2">
             <FreshnessLine job={job} liveTicker={liveTicker} />
             <JustPostedBadge job={job} />
@@ -400,41 +431,6 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
             >
               View
             </Link>
-          </div>
-
-          </div>
-          <div className="hidden shrink-0 flex-col gap-2 lg:flex lg:max-w-[13.5rem]">
-            <div className="flex flex-wrap justify-end gap-2">
-              <ApplyJobButton
-                jobId={job.id}
-                company={job.company.name}
-                source="job_card"
-                applyUrl={applyHref}
-                outlineTone={accent}
-                size="sm"
-                variant="outline"
-                className="shrink-0"
-              />
-              <AppliedToggleButton
-                jobId={job.id}
-                outlineTone={accent}
-                size="sm"
-                className="shrink-0"
-              />
-              <Link
-                prefetch={false}
-                href={`/job/${job.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(buttonClassName({ variant: "primary", size: "sm" }), "shrink-0")}
-              >
-                View role →
-              </Link>
-            </div>
-            <div className="w-full min-w-0">
-              <ResumeScorePill job={job} />
-            </div>
-
           </div>
         </div>
       </div>
