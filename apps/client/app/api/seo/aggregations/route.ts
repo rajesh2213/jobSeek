@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { fetchSeoAggregations } from "../../../../lib/api";
 
 export const dynamic = "force-dynamic";
-export const fetchCache = "force-no-store";
 
 /**
  * Server-side proxy for market insights. Keeps INTERNAL_SEO_SECRET off the browser

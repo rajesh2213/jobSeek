@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   loadJobsDiscoveryPage,
@@ -50,6 +51,7 @@ interface Props {
 }
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+  noStore();
   const { slug } = await params;
   const sp = await searchParams;
   const parsed = parseSlugWithMeta(slug);
@@ -58,7 +60,12 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     ...parseJobFiltersFromSearch(sp),
     surface: "seo" as const,
   };
-  const response = await loadJobsDiscoveryPage(stableJobFiltersKey(filters));
+  let response: Awaited<ReturnType<typeof loadJobsDiscoveryPage>>;
+  try {
+    response = await loadJobsDiscoveryPage(stableJobFiltersKey(filters));
+  } catch {
+    response = { data: [] };
+  }
   const searchParamKeys = Object.keys(sp).filter(Boolean).sort();
   return jobsRouteMetadata(filters, {
     routeKind: "jobs-slug",
@@ -70,6 +77,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 }
 
 export default async function JobsSeoPage({ params, searchParams }: Props) {
+  noStore();
   const { slug } = await params;
   const sp = await searchParams;
   const parsed = parseSlugWithMeta(slug);
@@ -105,7 +113,12 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
   const fetchAggregations =
     isSeoAggregationEnrichmentEnabled() && indexablePre && filtersSlug.length > 0;
 
-  const response = await loadJobsDiscoveryPage(filtersKey);
+  let response: Awaited<ReturnType<typeof loadJobsDiscoveryPage>>;
+  try {
+    response = await loadJobsDiscoveryPage(filtersKey);
+  } catch {
+    response = { data: [] };
+  }
   const aggregations = fetchAggregations
     ? await safeFetchSeoAggregations(filtersSlug)
     : null;
@@ -157,17 +170,16 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
       </>
     ) : null;
 
-  const listingSidebar =
-    fetchAggregations && total >= minIndex && total >= 8 ? (
-      <SeoAggregationSidebarHydrator
-        filtersSlug={filtersSlug}
-        initial={
-          aggregations && hasAggregationSidebarContent(aggregations)
-            ? aggregations
-            : null
-        }
-      />
-    ) : null;
+  const listingSidebar = fetchAggregations ? (
+    <SeoAggregationSidebarHydrator
+      filtersSlug={filtersSlug}
+      initial={
+        aggregations && hasAggregationSidebarContent(aggregations)
+          ? aggregations
+          : null
+      }
+    />
+  ) : null;
 
   const weeklyFromEnv = weeklyJobsPostedEnvOverride();
 
@@ -179,6 +191,7 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
       relatedSlugs={relatedSlugs}
       listingTop={listingTop}
       listingSidebar={listingSidebar}
+      seoAggregationFiltersSlug={fetchAggregations ? filtersSlug : undefined}
       listingFaq={listingFaq}
     />
   );

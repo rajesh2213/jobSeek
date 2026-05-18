@@ -13,6 +13,7 @@ import {
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { SeoAggregationSidebarHydrator } from "../seo/SeoAggregationSidebarHydrator";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import {
@@ -98,7 +99,15 @@ interface Props {
   relatedSlugs: string[];
   listingTop?: ReactNode;
   listingSidebar?: ReactNode;
+  seoAggregationFiltersSlug?: string;
   listingFaq?: ReactNode;
+}
+
+function seoAggregationFiltersSlugFromPathname(pathname: string): string | null {
+  if (!pathname.startsWith("/jobs/")) return null;
+  const rest = pathname.slice("/jobs/".length).split("?")[0]?.trim();
+  if (!rest || rest === "browse") return null;
+  return rest;
 }
 
 function discoverySurfaceFromPathname(pathname: string): "browse" | "seo" {
@@ -421,6 +430,7 @@ export function JobsSearchClient({
   relatedSlugs,
   listingTop,
   listingSidebar,
+  seoAggregationFiltersSlug,
   listingFaq,
 }: Props) {
   const { getToken, isSignedIn, isLoaded: authLoaded } = useAuth();
@@ -1788,14 +1798,24 @@ export function JobsSearchClient({
             </>
           );
 
-          if (!listingSidebar) {
+          const aggregationSlug =
+            seoAggregationFiltersSlug?.trim() ||
+            seoAggregationFiltersSlugFromPathname(pathname) ||
+            "";
+          const sidebarNode =
+            listingSidebar ??
+            (aggregationSlug ? (
+              <SeoAggregationSidebarHydrator filtersSlug={aggregationSlug} initial={null} />
+            ) : null);
+
+          if (!sidebarNode) {
             return resultsMain;
           }
 
           return (
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_min(16rem,22rem)] lg:items-start">
               <div className="min-w-0">{resultsMain}</div>
-              <div className="min-w-0 lg:sticky lg:top-24">{listingSidebar}</div>
+              <div className="min-w-0 lg:sticky lg:top-24">{sidebarNode}</div>
             </div>
           );
         })()}

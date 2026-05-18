@@ -18,6 +18,8 @@ interface Props {
   listingTop?: ReactNode;
   /** Market insights sidebar (SEO landing pages, desktop beside results). */
   listingSidebar?: ReactNode;
+  /** Slug path for client-side sidebar hydration when SSR omitted the sidebar. */
+  seoAggregationFiltersSlug?: string;
   /** FAQ block rendered below job results (above related searches). */
   listingFaq?: ReactNode;
 }
@@ -29,6 +31,7 @@ export function JobsSearchPage({
   relatedSlugs = FALLBACK_RELATED_SLUGS,
   listingTop,
   listingSidebar,
+  seoAggregationFiltersSlug,
   listingFaq,
 }: Props) {
   /* B1: Suspense wraps client subtree for progressive hydration; listing rows remain in SSR props. */
@@ -41,6 +44,7 @@ export function JobsSearchPage({
         relatedSlugs={relatedSlugs}
         listingTop={listingTop}
         listingSidebar={listingSidebar}
+        seoAggregationFiltersSlug={seoAggregationFiltersSlug}
         listingFaq={listingFaq}
       />
     </Suspense>
