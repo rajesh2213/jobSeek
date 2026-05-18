@@ -57,27 +57,50 @@ function toCompanyPublic(company: JobCompanyPublic): Record<string, unknown> {
   };
 }
 
+/** Listing cards: omit domain/careersUrl/openRoles — not used on JobCard. */
+function toCompanyListPublic(company: JobCompanyPublic): Record<string, unknown> {
+  return {
+    id: company.id,
+    name: companyDisplayName(company.name, company.domain),
+    slug: company.slug,
+    logoUrl: company.logoUrl ?? null,
+  };
+}
+
 /**
- * List serializer (phase 1): keep `description` for compatibility, omit heavy parsed/enriched fields.
+ * List serializer: explicit field allowlist; omit parsed/enriched; drop `description` when previews exist.
  */
 export function toJobListJson(job: JobWithCompanyRow): Record<string, unknown> {
-  const { company, parsedDescription: _parsedDescription, enriched: _enriched, ...rest } = job;
-  const cleanedFull = cleanJobDescription(job.description);
+  const { company } = job;
   const preview = buildJobPreviewLines({
     parsedDescription: job.parsedDescription,
     description: job.description,
     company: job.company,
   });
-  const description = truncateJobDescriptionForList(cleanedFull);
+  const hasPreview = preview.previewLines.length > 0;
+  const cleanedFull = cleanJobDescription(job.description);
+  const description = hasPreview
+    ? null
+    : truncateJobDescriptionForList(cleanedFull);
   return {
-    ...rest,
+    id: job.id,
+    title: job.title,
+    status: job.status,
+    country: job.country,
+    locationCountry: job.locationCountry,
+    isRemote: job.isRemote,
+    workType: job.workType,
+    skills: job.skills,
+    salaryMin: job.salaryMin,
+    sourceUrl: job.sourceUrl,
+    applyUrl: job.applyUrl,
+    postedAt: job.postedAt,
+    effectivePostedAt: job.effectivePostedAt ?? null,
+    createdAt: job.createdAt,
     description,
     previewLines: preview.previewLines,
     previewLinesSource: preview.previewLinesSource,
-    company: toCompanyPublic(company),
-    /** Listing sort key; aligns with DB `listingFreshnessAt` (= COALESCE(effectivePostedAt, createdAt)). */
-    effectivePostedAt: job.effectivePostedAt ?? null,
-    /** Backend-owned freshness semantics — see apps/server/src/utils/freshness.ts */
+    company: toCompanyListPublic(company),
     freshness: buildFreshness(job),
   };
 }

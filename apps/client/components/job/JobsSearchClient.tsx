@@ -452,27 +452,6 @@ export function JobsSearchClient({
   }, [relatedSlugs]);
 
   useEffect(() => {
-    let cancelled = false;
-    if (resolvedWeeklyJobsPosted !== undefined) {
-      return () => {
-        cancelled = true;
-      };
-    }
-    void fetchJobs({ posted: "1w", page: 1, limit: 1, sort: "latest" })
-      .then((res) => {
-        if (cancelled) return;
-        const total = Number(res.meta?.total ?? 0);
-        setResolvedWeeklyJobsPosted(Number.isFinite(total) && total >= 0 ? Math.round(total) : 0);
-      })
-      .catch(() => {
-        /* non-critical */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [resolvedWeeklyJobsPosted]);
-
-  useEffect(() => {
     const tick = () => {
       if (typeof window === "undefined") return;
       setExtensionPresent(window.__JOBSEEK_EXTENSION__ === true);

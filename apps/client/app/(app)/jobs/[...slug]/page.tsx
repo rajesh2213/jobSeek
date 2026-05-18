@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { loadJobsDiscoveryPage, stableJobFiltersKey } from "../../../../lib/jobsPageData";
+import {
+  loadJobsDiscoveryPage,
+  stableJobFiltersKey,
+  weeklyJobsPostedEnvOverride,
+} from "../../../../lib/jobsPageData";
 import {
   buildDynamicIntro,
   buildJobDiscoveryCrumbItems,
@@ -165,10 +169,13 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
       />
     ) : null;
 
+  const weeklyFromEnv = weeklyJobsPostedEnvOverride();
+
   return (
     <JobsSearchPage
       jobs={response.data}
       meta={response.meta}
+      weeklyJobsPosted={weeklyFromEnv ?? undefined}
       relatedSlugs={relatedSlugs}
       listingTop={listingTop}
       listingSidebar={listingSidebar}

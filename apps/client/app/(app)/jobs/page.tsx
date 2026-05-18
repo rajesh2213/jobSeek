@@ -89,8 +89,7 @@ export default async function JobsPage({ searchParams }: Props) {
 
   const weeklyFromEnv = weeklyJobsPostedEnvOverride();
 
-  // B1: Skip awaiting weekly API on SSR unless ops pins `JOBS_WEEKLY_POSTED_OVERRIDE`; otherwise
-  // JobsSearchClient fills the hero stat via fetchJobs (posted=1w) on mount.
+  // Hero weekly stat: `JOBS_WEEKLY_POSTED_OVERRIDE` when set; otherwise StatsStrip shows 0 (list API has no total).
   return (
     <JobsSearchPage
       jobs={response.data}

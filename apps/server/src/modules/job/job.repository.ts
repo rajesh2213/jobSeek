@@ -21,6 +21,7 @@ import { recordStatusTransition } from "../../services/jobStatusMetrics.service.
 import { jobParsedNoopSkipEnabled } from "../../utils/jobWriteOptimization.js";
 import {
   LISTING_EXCLUDED_ROLE_SLUGS,
+  LIST_JOB_HYDRATE_DESCRIPTION_MAX_CHARS,
   ROLE_SUGGEST_EXTRA_EXCLUDED,
 } from "./jobListing.constants.js";
 import { computeJobQualityFlags } from "../../services/qualityFlags.service.js";
@@ -747,12 +748,11 @@ function getCompanyListingSelect(includeCompanyJobCount: boolean) {
     slug: true,
     logoUrl: true,
     domain: true,
-    careersUrl: true,
   } as const;
 }
 
 /**
- * Prisma select for canonical listing hydrate (`findManyCanonicalFiltered` and shadow experiments).
+ * Prisma select for shadow/full listing experiments (not used on hot GET /jobs path).
  */
 export function buildCanonicalListingJobSelect(includeCompanyJobCount: boolean) {
   const companyInner = getCompanyListingSelect(includeCompanyJobCount);
@@ -770,6 +770,7 @@ export function buildCanonicalListingJobSelect(includeCompanyJobCount: boolean) 
     workType: true,
     experienceLevel: true,
     description: true,
+    parsedDescription: true,
     source: true,
     sourceUrl: true,
     applyUrl: true,
@@ -786,6 +787,82 @@ export function buildCanonicalListingJobSelect(includeCompanyJobCount: boolean) 
     status: true,
     company: { select: companyInner },
   } as const;
+}
+
+/** Slim row shape for production listing hydrate (SQL + company join). */
+type ListingJobSlimRow = {
+  id: string;
+  title: string;
+  companyId: string;
+  country: string;
+  locationCountry: string;
+  isRemote: boolean;
+  workType: string;
+  description: string | null;
+  parsedDescription: unknown;
+  sourceUrl: string;
+  applyUrl: string | null;
+  postedAt: Date | null;
+  effectivePostedAt: Date | null;
+  createdAt: Date;
+  salaryMin: number | null;
+  skills: string[];
+  status: string | null;
+};
+
+/**
+ * Production listing hydrate: bounded description I/O, `parsedDescription` for preview quality,
+ * slim columns, no company `_count`.
+ */
+async function hydrateCanonicalListingByIds(
+  prisma: PrismaClient,
+  ids: string[],
+  options?: { includeCompanyJobCount?: boolean; truncChars?: number },
+): Promise<JobWithCompany[]> {
+  if (ids.length === 0) return [];
+  const truncChars = options?.truncChars ?? LIST_JOB_HYDRATE_DESCRIPTION_MAX_CHARS;
+  const safeLen = Math.max(256, Math.min(500_000, Math.floor(truncChars)));
+  const includeCompanyJobCount = options?.includeCompanyJobCount ?? false;
+
+  const rows = await prisma.$queryRaw<ListingJobSlimRow[]>`
+    SELECT
+      j.id,
+      j.title,
+      j."companyId",
+      j.country,
+      j."locationCountry",
+      j."isRemote",
+      j."workType",
+      SUBSTRING(j.description FROM 1 FOR (${safeLen})::integer) AS description,
+      j."parsedDescription",
+      j."sourceUrl",
+      j."applyUrl",
+      j."postedAt",
+      j."effectivePostedAt",
+      j."createdAt",
+      j."salaryMin",
+      j.skills,
+      j.status
+    FROM "Job" j
+    WHERE j.id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}`))})
+  `;
+
+  const companyIds = [...new Set(rows.map((r) => r.companyId))];
+  const companySelect = getCompanyListingSelect(includeCompanyJobCount);
+  const companies = await prisma.company.findMany({
+    where: { id: { in: companyIds } },
+    select: companySelect,
+  });
+  const cmap = new Map(companies.map((c) => [c.id, c]));
+  const jobs = rows.map((r) => {
+    const co = cmap.get(r.companyId);
+    if (!co) {
+      throw new Error(`hydrateCanonicalListingByIds: missing company ${r.companyId}`);
+    }
+    return { ...r, company: co };
+  });
+  reorderJobsByCanonicalIds(jobs, ids);
+  return jobs as unknown as JobWithCompany[];
 }
 
 /** Row shape returned by {@link createJobRepository}'s trunc-description shadow hydrate SQL. */
@@ -1017,8 +1094,6 @@ export function createJobRepository(prisma: PrismaClient) {
       const trackPerf = perfDebug || slowThreshold > 0;
       const tFunc0 = trackPerf ? nowPerfMs() : 0;
 
-      const listSelect = buildCanonicalListingJobSelect(true);
-
       const idQuery = sqlForCanonicalListingIds({
         filters: options.filters,
         sort,
@@ -1077,9 +1152,8 @@ export function createJobRepository(prisma: PrismaClient) {
       }
 
       const tBeforeHydrate = trackPerf ? nowPerfMs() : 0;
-      const jobs = await prisma.job.findMany({
-        where: { id: { in: ids } },
-        select: listSelect,
+      const jobs = await hydrateCanonicalListingByIds(prisma, ids, {
+        includeCompanyJobCount: false,
       });
       const tAfterHydrate = trackPerf ? nowPerfMs() : 0;
 
