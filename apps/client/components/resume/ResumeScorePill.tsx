@@ -9,15 +9,18 @@ import { ApiRequestError, fetchResumeSemanticMatch, type ResumeSemanticMatchMeta
 import {
   trackResumeFirstMatchViewedOnce,
   trackResumeMatchQuotaHit,
+  trackResumeMatchUnscorable,
   trackResumeMatchUpgradeClick,
 } from "../../lib/analytics/resumeMatchFunnel";
 import {
   extractJobKeywords,
   isResumeLegacyKeywordMode,
+  isResumeMatchScored,
+  jobHasMatchSignals,
+  jobMatchSignalsForSemantic,
   scoreResume,
   type ScoringResult,
 } from "../../lib/resumeScorer";
-import { extractJobSkills, jobSkillCanonicalsForSemantic } from "../../lib/skillExtractor";
 import { useResume } from "../../lib/resumeContext";
 import { useAccountPlan } from "../../lib/useAccountPlan";
 import { formatUserLocalResetForMessage } from "../../lib/userLocalResetTime";
@@ -35,6 +38,10 @@ function pillColors(score: number): { bg: string; fg: string; border: string } {
     return { bg: "#fffbeb", fg: "#b45309", border: "#fde68a" };
   }
   return { bg: "#fff7ed", fg: "#c2410c", border: "#fed7aa" };
+}
+
+function unscorablePillColors(): { bg: string; fg: string; border: string } {
+  return { bg: "#f8fafc", fg: "#475569", border: "#e2e8f0" };
 }
 
 export function ResumeScorePill({ job }: { job: JobItem }) {
@@ -69,9 +76,17 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
     const bullets = resumeBullets;
     const keywordStrings = isResumeLegacyKeywordMode()
       ? extractJobKeywords(job).map((k) => k.keyword)
-      : jobSkillCanonicalsForSemantic(extractJobSkills(job));
+      : jobMatchSignalsForSemantic(job);
     const token = await getToken();
     if (!token) return;
+
+    if (!jobHasMatchSignals(job)) {
+      const scored = scoreResume(text, bullets, job, {});
+      setResult(scored);
+      setMatchMeta(null);
+      trackResumeMatchUnscorable({ jobId: job.id });
+      return;
+    }
 
     if (!isPro && resumeMatchAi && resumeMatchAi.remaining <= 0) {
       setQuotaBlocked(true);
@@ -104,7 +119,7 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
 
     const scored = scoreResume(text, bullets, job, semantic);
     setResult(scored);
-    if (meta && scored.score > 0) {
+    if (meta && isResumeMatchScored(scored) && scored.score !== null && scored.score > 0) {
       void trackResumeFirstMatchViewedOnce({
         getToken,
         jobId: job.id,
@@ -136,9 +151,16 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
   }, [hasResume, isLoading, isSignedIn, planLoaded, router, runScore, signInHref]);
 
   const breakdownAllowed = matchMeta?.breakdownAllowed ?? isPro;
-  const showScoredPill = Boolean(result) && !scoring && isSignedIn && planLoaded && !isLoading;
+  const showResultPill = Boolean(result) && !scoring && isSignedIn && planLoaded && !isLoading;
   const scored = result;
-  const c = scored ? pillColors(scored.score) : null;
+  const isScored = scored ? isResumeMatchScored(scored) : false;
+  const isUnscorable = scored ? !isResumeMatchScored(scored) : false;
+  const c =
+    scored && isScored && scored.score !== null
+      ? pillColors(scored.score)
+      : isUnscorable
+        ? unscorablePillColors()
+        : null;
   const loadingState = isSignedIn && (!planLoaded || isLoading);
   const actionDisabled = scoring || loadingState;
 
@@ -169,7 +191,7 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
             Upgrade for unlimited →
           </Link>
         </div>
-      ) : showScoredPill && c && scored ? (
+      ) : showResultPill && c && scored && isScored && scored.score !== null ? (
         <button
           type="button"
           onClick={() => onPillOpen()}
@@ -190,6 +212,26 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
           <span className="shrink-0 text-[11px] font-medium opacity-75">
             {breakdownAllowed ? "See full breakdown →" : "Details (Pro) →"}
           </span>
+        </button>
+      ) : showResultPill && c && scored && isUnscorable ? (
+        <button
+          type="button"
+          onClick={() => setPanelOpen(true)}
+          className="flex h-9 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg border px-3 text-left text-[13px] font-semibold leading-none shadow-sm transition-shadow duration-200 ease-out hover:shadow-md hover:shadow-black/[0.07] active:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/25 focus-visible:ring-offset-2 dark:hover:shadow-black/35"
+          style={{
+            background: c.bg,
+            color: c.fg,
+            borderColor: c.border,
+          }}
+        >
+          <span className="flex min-w-0 flex-1 items-center gap-1.5">
+            <span aria-hidden className="shrink-0">
+              ○
+            </span>
+            <span className="min-w-0 truncate">Can&apos;t score yet</span>
+          </span>
+          <span className="h-4 w-px shrink-0 bg-current opacity-25" aria-hidden />
+          <span className="shrink-0 text-[11px] font-medium opacity-75">Why? →</span>
         </button>
       ) : (
         <div className="w-full">

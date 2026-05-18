@@ -6,9 +6,28 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { JobItem } from "../../lib/api";
 import { trackResumeMatchUpgradeClick } from "../../lib/analytics/resumeMatchFunnel";
-import { resumeGradeLabel } from "../../lib/resumeGradeLabel";
+import {
+  isResumeMatchInsufficient,
+  resumeGradeLabel,
+  resumeMatchInsufficientBody,
+  resumeMatchInsufficientTitle,
+} from "../../lib/resumeGradeLabel";
 import type { ScoringResult, KeywordResult } from "../../lib/resumeScorer";
 import { ResumeBodyPortal } from "./ResumeBodyPortal";
+
+function UnscorableHeader() {
+  return (
+    <motion.div
+      initial={{ scale: 0.92, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      className="mx-auto flex h-[120px] w-[120px] shrink-0 items-center justify-center rounded-full border-[10px] border-ink/10 bg-ink/[0.03]"
+      aria-hidden
+    >
+      <span className="text-3xl leading-none">?</span>
+    </motion.div>
+  );
+}
 
 function ScoreCircle({ score }: { score: number }) {
   const r = 52;
@@ -123,6 +142,7 @@ export function ResumeScorePanel({
     };
   }, [result]);
 
+  const insufficient = result ? isResumeMatchInsufficient(result) : false;
   const missingCount = result?.missing.length ?? 0;
   const workingCount =
     (result?.matched.length ?? 0) + (result?.partial.length ?? 0);
@@ -188,9 +208,19 @@ export function ResumeScorePanel({
                     ✕
                   </button>
                   <div className="absolute left-1/2 top-3 flex w-[min(100%,280px)] -translate-x-1/2 flex-col items-center text-center">
-                    {result ? <ScoreCircle score={result.score} /> : null}
+                    {result ? (
+                      insufficient ? (
+                        <UnscorableHeader />
+                      ) : result.score !== null ? (
+                        <ScoreCircle score={result.score} />
+                      ) : null
+                    ) : null}
                     <p className="mt-2 text-base font-semibold text-ink">
-                      {result ? resumeGradeLabel(result.grade) : "—"}
+                      {result
+                        ? insufficient
+                          ? resumeMatchInsufficientTitle()
+                          : resumeGradeLabel(result.grade)
+                        : "—"}
                     </p>
                     <p className="mt-0.5 line-clamp-2 px-2 text-xs text-ink-muted">
                       {job.title} · {job.company.name}
@@ -199,7 +229,20 @@ export function ResumeScorePanel({
                 </div>
 
                 <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-5 py-4">
-                  {result ? (
+                  {result && insufficient ? (
+                    <section className="flex flex-col gap-3 rounded-xl border border-ink/10 bg-ink/[0.03] p-4">
+                      <p className="text-sm leading-relaxed text-ink-muted">{resumeMatchInsufficientBody()}</p>
+                      <p className="text-sm text-ink-muted">
+                        Re-uploading your resume won&apos;t change this outcome until the job listing includes
+                        recognizable skills in its description.
+                      </p>
+                      <p className="text-xs font-medium text-ink/70">
+                        Tip: try a role with a detailed requirements section, or check back as we enrich listings over
+                        time.
+                      </p>
+                    </section>
+                  ) : null}
+                  {result && !insufficient ? (
                     <>
                       <section className="relative flex flex-col gap-3">
                         <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold leading-snug text-ink">
@@ -317,7 +360,7 @@ export function ResumeScorePanel({
 
                 <div className="shrink-0 border-t border-ink/10 px-5 py-4">
                   <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:gap-3">
-                    {breakdownAllowed && result && result.missing.length > 0 ? (
+                    {breakdownAllowed && result && !insufficient && result.missing.length > 0 ? (
                       <button
                         type="button"
                         onClick={() => void copyMissing()}

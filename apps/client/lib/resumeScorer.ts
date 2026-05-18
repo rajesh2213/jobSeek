@@ -15,7 +15,18 @@ import {
   computeSofterMissingMass,
   computeSofterScorePercent,
 } from "./resumeScoreSoftening";
-import { extractJobSkills, jobSkillCanonicalsForSemantic, type JobSkill } from "./skillExtractor";
+import {
+  jobHasResolvableMatchSignals,
+  resolveJobMatchSkills,
+} from "./jobMatchSignals";
+import { jobSkillCanonicalsForSemantic, type JobSkill } from "./skillExtractor";
+
+export {
+  jobHasResolvableMatchSignals as jobHasMatchSignals,
+  jobMatchSignalsForSemantic,
+  resolveJobMatchSkills,
+  MIN_JOB_MATCH_SIGNALS,
+} from "./jobMatchSignals";
 
 const RESUME_FUZZY_ENABLED = false;
 const LEGACY_ENV = "NEXT_PUBLIC_RESUME_LEGACY_KEYWORDS";
@@ -46,9 +57,15 @@ export interface KeywordResult {
   semanticSimilarity?: number; // 0-1, how confident the suggestion is
 }
 
+export type MatchAvailability = "scored" | "insufficient_job_signals";
+
+export type ResumeMatchGrade = "excellent" | "good" | "fair" | "poor"; // ≥75, ≥55, ≥35, <35
+
 export interface ScoringResult {
-  score: number;
-  grade: "excellent" | "good" | "fair" | "poor"; // ≥75, ≥55, ≥35, <35
+  matchAvailability: MatchAvailability;
+  /** Percent match when {@link MatchAvailability} is `scored`; otherwise `null`. */
+  score: number | null;
+  grade: ResumeMatchGrade | null;
   matched: KeywordResult[];
   missing: KeywordResult[];
   partial: KeywordResult[]; // semantic matches
@@ -73,6 +90,46 @@ export interface ScoringResult {
 // Session-level cache: key includes job id + scoring mode + dict version + semantic match signature
 const scoreCache = new Map<string, ScoringResult>();
 
+const INSUFFICIENT_CACHE_PREFIX = "insufficient|";
+
+function insufficientCacheKey(jobId: string, legacy: boolean): string {
+  return `${INSUFFICIENT_CACHE_PREFIX}legacy=${legacy ? "1" : "0"}|d=${DICTIONARY_VERSION}|${jobId}`;
+}
+
+export function isResumeMatchScored(result: ScoringResult): boolean {
+  return result.matchAvailability === "scored";
+}
+
+/** True when the job exposes at least one scorable signal (dictionary + fallbacks). */
+function jobHasMatchSignalsInternal(job: JobItem): boolean {
+  if (isResumeLegacyKeywordMode()) {
+    return collectLegacyKeywords(job).length > 0;
+  }
+  return jobHasResolvableMatchSignals(job);
+}
+
+function buildInsufficientJobSignalsResult(jobId: string): ScoringResult {
+  const ck = insufficientCacheKey(jobId, isLegacyResumeScoring());
+  const cached = scoreCache.get(ck);
+  if (cached) return cached;
+
+  const result: ScoringResult = {
+    matchAvailability: "insufficient_job_signals",
+    score: null,
+    grade: null,
+    matched: [],
+    missing: [],
+    partial: [],
+    breakdown: {
+      required: { matched: 0, total: 0 },
+      preferred: { matched: 0, total: 0 },
+    },
+    topMissingKeywords: [],
+  };
+  scoreCache.set(ck, result);
+  return result;
+}
+
 function semanticSig(semanticMatches: Record<string, { bullet: string; similarity: number }>): string {
   const entries = Object.entries(semanticMatches).sort(([a], [b]) => a.localeCompare(b));
   return entries.map(([k, v]) => `${k}:${v.similarity.toFixed(4)}`).join("|");
@@ -83,7 +140,7 @@ function cacheKey(
   legacy: boolean,
   semanticMatches: Record<string, { bullet: string; similarity: number }>,
 ): string {
-  return `v2-skills|soft-v1|legacy=${legacy ? "1" : "0"}|d=${DICTIONARY_VERSION}|${jobId}|${semanticSig(semanticMatches)}`;
+  return `v3-signals|soft-v1|legacy=${legacy ? "1" : "0"}|d=${DICTIONARY_VERSION}|${jobId}|${semanticSig(semanticMatches)}`;
 }
 
 export function clearScoreCache(): void {
@@ -100,10 +157,12 @@ export function getCachedScore(
 }
 
 function jobSkillToKeywordResultBase(s: JobSkill): Omit<KeywordResult, "foundIn" | "suggestion"> {
+  const isPreferred =
+    s.source === "parsed_requirement" || s.source === "sparse_responsibility";
   return {
     keyword: s.canonical,
-    category: s.source === "parsed_requirement" ? "preferred" : "required",
-    priority: s.weight === 1.0 ? 3 : s.weight === 0.9 ? 2 : 1,
+    category: isPreferred ? "preferred" : "required",
+    priority: s.weight >= 0.9 ? 3 : s.weight >= 0.65 ? 2 : 1,
     weight: s.weight,
   };
 }
@@ -182,7 +241,7 @@ function scoreResumeSkills(
   job: JobItem,
   semanticMatches: Record<string, { bullet: string; similarity: number }>,
 ): ScoringResult {
-  const skills = extractJobSkills(job);
+  const skills = resolveJobMatchSkills(job);
   const ck = cacheKey(job.id, false, semanticMatches);
   const cached = scoreCache.get(ck);
   if (cached) return cached;
@@ -264,6 +323,7 @@ function scoreResumeSkills(
   ];
 
   const result: ScoringResult = {
+    matchAvailability: "scored",
     score,
     grade: score >= 75 ? "excellent" : score >= 55 ? "good" : score >= 35 ? "fair" : "poor",
     matched,
@@ -272,11 +332,15 @@ function scoreResumeSkills(
     breakdown: {
       required: {
         matched: matched.filter((k) => k.category === "required").length,
-        total: skills.filter((s) => s.source !== "parsed_requirement").length,
+        total: skills.filter(
+          (s) => s.source !== "parsed_requirement" && s.source !== "sparse_responsibility",
+        ).length,
       },
       preferred: {
         matched: matched.filter((k) => k.category === "preferred").length,
-        total: skills.filter((s) => s.source === "parsed_requirement").length,
+        total: skills.filter(
+          (s) => s.source === "parsed_requirement" || s.source === "sparse_responsibility",
+        ).length,
       },
     },
     topMissingKeywords: missing
@@ -366,6 +430,7 @@ function scoreResumeLegacy(
   const score = totalPts === 0 ? 0 : Math.round(((matchedPts + partialPts) / totalPts) * 100);
 
   const result: ScoringResult = {
+    matchAvailability: "scored",
     score,
     grade: score >= 75 ? "excellent" : score >= 55 ? "good" : score >= 35 ? "fair" : "poor",
     matched,
@@ -412,6 +477,9 @@ export function scoreResume(
   job: JobItem,
   semanticMatches: Record<string, { bullet: string; similarity: number }> = {},
 ): ScoringResult {
+  if (!jobHasMatchSignalsInternal(job)) {
+    return buildInsufficientJobSignalsResult(job.id);
+  }
   if (isLegacyResumeScoring()) {
     return scoreResumeLegacy(resumeText, resumeBullets, job, semanticMatches);
   }

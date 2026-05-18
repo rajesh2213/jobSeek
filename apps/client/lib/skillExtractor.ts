@@ -5,7 +5,13 @@ import {
 } from "@jobseek/skill-constants";
 import { MAX_RESUME_MATCH_KEYWORDS } from "./resumeKeywordFilter";
 
-export type JobSkillSource = "taxonomy" | "enriched" | "parsed_requirement";
+export type JobSkillSource =
+  | "taxonomy"
+  | "enriched"
+  | "parsed_requirement"
+  | "sparse_requirement"
+  | "sparse_responsibility"
+  | "role_hint";
 
 export interface JobSkill {
   canonical: string;

@@ -8,16 +8,24 @@ import { ApiRequestError, fetchResumeSemanticMatch } from "../../lib/api";
 import {
   trackResumeFirstMatchViewedOnce,
   trackResumeMatchQuotaHit,
+  trackResumeMatchUnscorable,
   trackResumeMatchUpgradeClick,
 } from "../../lib/analytics/resumeMatchFunnel";
-import { resumeMatchSubtitle } from "../../lib/resumeGradeLabel";
+import {
+  isResumeMatchInsufficient,
+  resumeMatchInsufficientBody,
+  resumeMatchInsufficientTitle,
+  resumeMatchSubtitle,
+} from "../../lib/resumeGradeLabel";
 import {
   extractJobKeywords,
   isResumeLegacyKeywordMode,
+  isResumeMatchScored,
+  jobHasMatchSignals,
+  jobMatchSignalsForSemantic,
   scoreResume,
   type ScoringResult,
 } from "../../lib/resumeScorer";
-import { extractJobSkills, jobSkillCanonicalsForSemantic } from "../../lib/skillExtractor";
 import { useResume } from "../../lib/resumeContext";
 import { useAccountPlan } from "../../lib/useAccountPlan";
 import { formatUserLocalResetForMessage } from "../../lib/userLocalResetTime";
@@ -93,9 +101,17 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
     const bullets = resumeBullets;
     const keywordStrings = isResumeLegacyKeywordMode()
       ? extractJobKeywords(job).map((k) => k.keyword)
-      : jobSkillCanonicalsForSemantic(extractJobSkills(job));
+      : jobMatchSignalsForSemantic(job);
     const token = await getToken();
     if (!token) return;
+
+    if (!jobHasMatchSignals(job)) {
+      const scored = scoreResume(text, bullets, job, {});
+      setResult(scored);
+      setMatchMeta(null);
+      trackResumeMatchUnscorable({ jobId: job.id });
+      return;
+    }
 
     if (!isPro && resumeMatchAi && resumeMatchAi.remaining <= 0) {
       setQuotaWall({ resetAt: resumeMatchAi.resetAt });
@@ -128,7 +144,7 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
 
     const scored = scoreResume(text, bullets, job, semantic);
     setResult(scored);
-    if (meta && scored.score > 0) {
+    if (meta && isResumeMatchScored(scored) && scored.score !== null && scored.score > 0) {
       void trackResumeFirstMatchViewedOnce({
         getToken,
         jobId: job.id,
@@ -233,10 +249,27 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
             {busy ? "Scoring…" : "Check match →"}
           </button>
         </div>
+      ) : isResumeMatchInsufficient(result) ? (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-lg font-bold text-ink">{resumeMatchInsufficientTitle()}</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">{resumeMatchInsufficientBody()}</p>
+            <p className="mt-3 text-xs font-medium text-ink/70">
+              Try another listing with a detailed requirements section, or check back later as we enrich this job.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => openBreakdown()}
+            className="shrink-0 rounded-lg border border-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-ink/5 dark:bg-surface sm:self-center"
+          >
+            Learn more →
+          </button>
+        </div>
       ) : (
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <MiniRing score={result.score} />
+            {result.score !== null ? <MiniRing score={result.score} /> : null}
             <div className="min-w-0 flex-1">
               <p className="text-lg font-bold text-ink">You match {result.score}%</p>
               <p className="mt-1 text-sm font-medium text-ink/90">

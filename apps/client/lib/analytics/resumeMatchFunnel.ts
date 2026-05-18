@@ -85,3 +85,11 @@ export function trackResumeMatchUpgradeClick(params: { surface: string; jobId?: 
     ...attributionCustomData(),
   });
 }
+
+/** Job listing had no extractable skills/keywords — match not scored (no quota consumed). */
+export function trackResumeMatchUnscorable(params: { jobId: string }): void {
+  trackMetaCustom("ResumeMatchUnscorable", {
+    job_id: params.jobId,
+    ...attributionCustomData(),
+  });
+}
