@@ -283,32 +283,9 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
           </div>
         )}
         <div className="flex min-w-0 w-0 flex-1 flex-col gap-2">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="min-w-0 flex-1 overflow-hidden">
-              <div className="mb-1.5 flex min-w-0 flex-wrap items-center gap-2">
-                <FreshnessLine job={job} liveTicker={liveTicker} />
-                <JustPostedBadge job={job} />
-                <NewBadge job={job} />
-              </div>
-
-              <h3 className="min-w-0 overflow-hidden text-lg font-extrabold leading-snug tracking-tight text-ink">
-                <Link
-                  prefetch={false}
-                  href={`/job/${job.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn(
-                    `no-underline transition-colors ${titleHover} text-ink`,
-                    "block line-clamp-2 break-words [overflow-wrap:anywhere]",
-                  )}
-                >
-                  {job.title}
-                </Link>
-              </h3>
-            </div>
-
-            <div className="hidden shrink-0 flex-col items-end gap-2 lg:flex">
-              <div className="flex flex-nowrap justify-end gap-2">
+          <div className="relative min-w-0 lg:pr-52 xl:pr-56">
+            <div className="absolute right-0 top-0 z-10 hidden w-max max-w-full flex-col items-stretch gap-2 lg:flex">
+              <div className="inline-flex flex-nowrap justify-end gap-2">
                 <ApplyJobButton
                   jobId={job.id}
                   company={job.company.name}
@@ -335,10 +312,31 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
                   View role →
                 </Link>
               </div>
-              <div className="w-[min(100%,13.5rem)] min-w-0">
+              <div className="w-full min-w-0">
                 <ResumeScorePill job={job} />
               </div>
             </div>
+
+            <div className="mb-1.5 flex min-w-0 flex-wrap items-center gap-2">
+              <FreshnessLine job={job} liveTicker={liveTicker} />
+              <JustPostedBadge job={job} />
+              <NewBadge job={job} />
+            </div>
+
+            <h3 className="m-0 min-w-0 overflow-hidden text-lg font-extrabold leading-snug tracking-tight text-ink">
+              <Link
+                prefetch={false}
+                href={`/job/${job.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  `no-underline transition-colors ${titleHover} text-ink`,
+                  "block line-clamp-2 break-words [overflow-wrap:anywhere]",
+                )}
+              >
+                {job.title}
+              </Link>
+            </h3>
           </div>
 
           <p className="mb-2 min-w-0 text-base font-medium text-ink/55 sm:text-sm">
