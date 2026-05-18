@@ -228,10 +228,10 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
             <span aria-hidden className="shrink-0">
               ○
             </span>
-            <span className="min-w-0 truncate">Can&apos;t score yet</span>
+            <span className="min-w-0 truncate">Match unavailable</span>
           </span>
           <span className="h-4 w-px shrink-0 bg-current opacity-25" aria-hidden />
-          <span className="shrink-0 text-[11px] font-medium opacity-75">Why? →</span>
+          <span className="shrink-0 text-[11px] font-medium opacity-75">Details →</span>
         </button>
       ) : (
         <div className="w-full">

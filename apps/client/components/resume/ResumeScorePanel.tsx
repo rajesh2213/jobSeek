@@ -10,6 +10,8 @@ import {
   isResumeMatchInsufficient,
   resumeGradeLabel,
   resumeMatchInsufficientBody,
+  resumeMatchInsufficientHint,
+  resumeMatchInsufficientPanelNote,
   resumeMatchInsufficientTitle,
 } from "../../lib/resumeGradeLabel";
 import type { ScoringResult, KeywordResult } from "../../lib/resumeScorer";
@@ -232,14 +234,8 @@ export function ResumeScorePanel({
                   {result && insufficient ? (
                     <section className="flex flex-col gap-3 rounded-xl border border-ink/10 bg-ink/[0.03] p-4">
                       <p className="text-sm leading-relaxed text-ink-muted">{resumeMatchInsufficientBody()}</p>
-                      <p className="text-sm text-ink-muted">
-                        Re-uploading your resume won&apos;t change this outcome until the job listing includes
-                        recognizable skills in its description.
-                      </p>
-                      <p className="text-xs font-medium text-ink/70">
-                        Tip: try a role with a detailed requirements section, or check back as we enrich listings over
-                        time.
-                      </p>
+                      <p className="text-sm text-ink-muted">{resumeMatchInsufficientPanelNote()}</p>
+                      <p className="text-xs font-medium text-ink/70">{resumeMatchInsufficientHint()}</p>
                     </section>
                   ) : null}
                   {result && !insufficient ? (

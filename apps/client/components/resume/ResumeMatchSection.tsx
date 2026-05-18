@@ -14,6 +14,7 @@ import {
 import {
   isResumeMatchInsufficient,
   resumeMatchInsufficientBody,
+  resumeMatchInsufficientHint,
   resumeMatchInsufficientTitle,
   resumeMatchSubtitle,
 } from "../../lib/resumeGradeLabel";
@@ -254,9 +255,7 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
           <div className="min-w-0">
             <p className="text-lg font-bold text-ink">{resumeMatchInsufficientTitle()}</p>
             <p className="mt-2 text-sm leading-relaxed text-ink-muted">{resumeMatchInsufficientBody()}</p>
-            <p className="mt-3 text-xs font-medium text-ink/70">
-              Try another listing with a detailed requirements section, or check back later as we enrich this job.
-            </p>
+            <p className="mt-3 text-xs font-medium text-ink/70">{resumeMatchInsufficientHint()}</p>
           </div>
           <button
             type="button"
