@@ -1,11 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  loadJobsDiscoveryPage,
-  loadJobsListingDeferred,
-  stableJobFiltersKey,
-  weeklyJobsPostedEnvOverride,
-} from "../../../lib/jobsPageData";
+import { EMPTY_JOBS_RESPONSE, weeklyJobsPostedEnvOverride } from "../../../lib/jobsPageData";
 import {
   buildJobDiscoveryCrumbItems,
   buildBreadcrumbListJsonLd,
@@ -36,23 +31,20 @@ interface Props {
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const sp = await searchParams;
   const filters = parseJobFiltersFromSearch(sp);
-  const response = await loadJobsDiscoveryPage(stableJobFiltersKey(filters));
   const searchParamKeys = Object.keys(sp).filter(Boolean).sort();
   return jobsRouteMetadata(filters, {
     routeKind: "jobs-root",
     searchParamKeys,
     canonicalPath: getCanonicalJobListingUrl(filters),
-    total: response.meta?.total ?? undefined,
   });
 }
 
 export default async function JobsPage({ searchParams }: Props) {
   const sp = await searchParams;
   const filters = parseJobFiltersFromSearch(sp);
-  const filtersKey = stableJobFiltersKey(filters);
 
-  const { jobsDataPromise } = loadJobsListingDeferred({ filtersKey });
-  const response = await jobsDataPromise;
+  /** Client hydrates listings — avoids Vercel SSR timeout when API pool is busy. */
+  const response = EMPTY_JOBS_RESPONSE;
 
   const total = response.meta?.total ?? 0;
   const policy = decideJobsListingSeoPolicy({

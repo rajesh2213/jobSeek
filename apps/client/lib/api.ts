@@ -870,6 +870,39 @@ function buildJobDiscoverySearchParams(
   return params;
 }
 
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function parseJobsListResponse(res: Response): Promise<JobsApiResponse> {
+  if (res.status === 503) {
+    const body = (await res.json().catch(() => ({}))) as JobsApiResponse;
+    return {
+      ...body,
+      data: (body.data ?? []).filter(isJobReady),
+      meta: normalizeJobsListMeta(body.meta),
+    };
+  }
+  const bodyText = await res.text();
+  let body: JobsApiResponse & { code?: string };
+  try {
+    body = JSON.parse(bodyText) as JobsApiResponse & { code?: string };
+  } catch {
+    throw new Error(`Failed to fetch jobs: ${res.status} ${res.statusText}`);
+  }
+  if (!res.ok) {
+    if (res.status === 500 && body.code === "P2024") {
+      return { data: [], meta: normalizeJobsListMeta(body.meta) };
+    }
+    throw new Error(`Failed to fetch jobs: ${res.status} ${res.statusText}`);
+  }
+  return {
+    ...body,
+    data: (body.data ?? []).filter(isJobReady),
+    meta: normalizeJobsListMeta(body.meta),
+  };
+}
+
 export async function fetchJobs(
   filters: JobFilters = {},
   opts?: {
@@ -881,6 +914,8 @@ export async function fetchJobs(
     forwardedFor?: string | null;
     /** Server-side callsite label for SSR attribution. */
     ssrPage?: string;
+    /** Abort slow upstream reads (SSR budget). */
+    signal?: AbortSignal | null;
   },
 ): Promise<JobsApiResponse> {
   const params = buildJobDiscoverySearchParams(filters, { includeCompanyId: true });
@@ -917,17 +952,51 @@ export async function fetchJobs(
   const fetchOptions: RequestInit & { next?: { revalidate?: number } } = internalBypass
     ? { headers, next: { revalidate: 120 } }
     : { headers, cache: "no-store" };
+  const browserRetries = typeof window !== "undefined" ? 3 : 1;
+  let lastError: unknown;
 
-  const res = await fetch(url, fetchOptions);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch jobs: ${res.status} ${res.statusText}`);
+  for (let attempt = 0; attempt < browserRetries; attempt++) {
+    const controller = new AbortController();
+    const timeoutMs = typeof window === "undefined" ? 12_000 : 28_000;
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const mergedSignal = opts?.signal ?? controller.signal;
+    try {
+      const res = await fetch(url, { ...fetchOptions, signal: mergedSignal });
+      clearTimeout(timeout);
+      const text = await res.text();
+      let code: string | undefined;
+      try {
+        code = (JSON.parse(text) as { code?: string }).code;
+      } catch {
+        code = undefined;
+      }
+      const retryable =
+        res.status === 503 ||
+        code === "P2024" ||
+        code === "DB_POOL_EXHAUSTED";
+      if (retryable && attempt < browserRetries - 1) {
+        await sleepMs(700 * (attempt + 1));
+        continue;
+      }
+      return await parseJobsListResponse(
+        new Response(text, {
+          status: res.status,
+          statusText: res.statusText,
+          headers: res.headers,
+        }),
+      );
+    } catch (err) {
+      clearTimeout(timeout);
+      lastError = err;
+      if (attempt < browserRetries - 1) {
+        await sleepMs(700 * (attempt + 1));
+        continue;
+      }
+    }
   }
-  const body = (await res.json()) as JobsApiResponse;
-  return {
-    ...body,
-    data: (body.data ?? []).filter(isJobReady),
-    meta: normalizeJobsListMeta(body.meta),
-  };
+
+  if (lastError instanceof Error) throw lastError;
+  throw new Error("Failed to fetch jobs");
 }
 
 export interface SeoLandingEntry {
@@ -1188,21 +1257,33 @@ export async function fetchCompanies(options: {
     : { headers, cache: "no-store" };
   const res = await fetch(url, reqInit);
   if (!res.ok) {
-    throw new Error(`Failed to fetch companies: ${res.status}`);
+    const limit = options.limit ?? 24;
+    return {
+      data: [],
+      meta: {
+        page: options.page ?? 1,
+        limit,
+        total: 0,
+        totalPages: 1,
+        hasMore: false,
+      },
+    };
   }
   return (await res.json()) as CompaniesApiResponse;
 }
 
-export async function fetchCompanyBySlug(slug: string): Promise<CompanyDetail | null> {
+export async function fetchCompanyBySlug(
+  slug: string,
+  opts?: { signal?: AbortSignal | null },
+): Promise<CompanyDetail | null> {
   const res = await fetch(`${API_BASE_URL}/company/${encodeURIComponent(slug)}`, {
     next: { revalidate: 120 },
+    ...(opts?.signal ? { signal: opts.signal } : {}),
   });
   if (res.status === 404) return null;
-  if (!res.ok) {
-    throw new Error(`Failed to fetch company: ${res.status}`);
-  }
+  if (!res.ok) return null;
   const payload = (await res.json()) as CompanyApiResponse;
-  return payload.data;
+  return payload.data ?? null;
 }
 
 export async function fetchCompanyJobs(
@@ -1260,7 +1341,11 @@ export async function fetchCompanyJobs(
 
 export async function fetchJobById(
   id: string,
-  opts?: { token?: string | null; forwardedFor?: string | null },
+  opts?: {
+    token?: string | null;
+    forwardedFor?: string | null;
+    signal?: AbortSignal | null;
+  },
 ): Promise<JobDetailFetchResult | null> {
   const headers = new Headers();
   const t = opts?.token?.trim();
@@ -1293,6 +1378,7 @@ export async function fetchJobById(
     }
     fetchOptions = { headers, next: { revalidate: 300 } };
   }
+  if (opts?.signal) fetchOptions.signal = opts.signal;
 
   const res = await fetch(`${API_BASE_URL}/jobs/${id}`, fetchOptions);
   if (res.status === 404) return null;

@@ -18,7 +18,9 @@ export function JobHeader({ job, applyHref, applyUrlLocked }: Props) {
   return (
     <header className="space-y-3">
       <div className="flex flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <p className="text-xs font-bold uppercase tracking-wider text-ink/45">{job.category.replace(/-/g, " ")}</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-ink/45">
+          {(job.category ?? "other").replace(/-/g, " ")}
+        </p>
         {/* Backend-owned Posted/Added prefix — never inferred client-side. */}
         <FreshnessLine
           job={job}

@@ -1,4 +1,5 @@
 import { PrismaClient, type Prisma } from "../../prisma/generatedClient.js";
+import { resolvePrismaDatasourceUrl } from "./resolvePrismaDatasourceUrl.js";
 import { loadRootEnv } from "../env/loadEnv.js";
 import { logger } from "../../utils/logger.js";
 import { registerPrismaReadInstrumentation } from "../../utils/prismaInstrumentation.js";
@@ -25,10 +26,15 @@ function buildPrismaLog(): Prisma.LogLevel[] | Prisma.LogDefinition[] {
   return ["error"];
 }
 
+const datasourceUrl = resolvePrismaDatasourceUrl();
+
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: buildPrismaLog(),
+    ...(datasourceUrl
+      ? { datasources: { db: { url: datasourceUrl } } }
+      : {}),
   });
 
 if (isPrismaQueryDiagEnabled()) {

@@ -25,7 +25,8 @@ export const LIST_JOB_DESCRIPTION_MAX_CHARS = 1200;
  * Max `description` bytes read from Postgres for listing preview generation.
  * Not serialized on the wire when `previewLines` are present; keeps Supabase I/O bounded.
  */
-export const LIST_JOB_HYDRATE_DESCRIPTION_MAX_CHARS = 8192;
+/** Bounded read for listing preview fallback only (when `parsedDescription` is absent). */
+export const LIST_JOB_HYDRATE_DESCRIPTION_MAX_CHARS = 2048;
 
 /** Extra slugs excluded only from GET /jobs/roles suggestions (broader junk). */
 export const ROLE_SUGGEST_EXTRA_EXCLUDED: readonly string[] = [

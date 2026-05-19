@@ -9,6 +9,11 @@ import cors from "@fastify/cors";
 import fastifyRawBody from "fastify-raw-body";
 import { getIoredis } from "../queues/job.queue.js";
 import { registerApiRequestMetrics } from "../utils/apiRequestMetrics.js";
+import {
+  isListingDegradedDbError,
+  sendCompaniesListingDegraded,
+  sendJobsListingDegraded,
+} from "../infrastructure/db/listingDegradedResponse.js";
 
 export async function buildServer() {
   const server = Fastify({
@@ -92,7 +97,43 @@ export async function buildServer() {
 
   registerApiRequestMetrics(server);
 
-  server.setErrorHandler((error: FastifyError, _request, reply) => {
+  server.setErrorHandler((error: FastifyError, request, reply) => {
+    if (isListingDegradedDbError(error)) {
+      const path = request.url.split("?")[0] ?? "";
+      if (path === "/jobs") {
+        const q = request.query as Record<string, unknown>;
+        const pageRaw = q.page;
+        const limitRaw = q.limit;
+        const page =
+          typeof pageRaw === "string" || typeof pageRaw === "number"
+            ? Math.max(1, parseInt(String(pageRaw), 10) || 1)
+            : 1;
+        const limit =
+          typeof limitRaw === "string" || typeof limitRaw === "number"
+            ? Math.min(100, Math.max(1, parseInt(String(limitRaw), 10) || 20))
+            : 20;
+        request.log.warn({ event: "db_pool_exhausted", route: path }, "db_pool_exhausted");
+        void sendJobsListingDegraded(reply, { page, pageSize: limit });
+        return;
+      }
+      if (path === "/companies") {
+        const q = request.query as Record<string, unknown>;
+        const pageRaw = q.page;
+        const limitRaw = q.limit;
+        const page =
+          typeof pageRaw === "string" || typeof pageRaw === "number"
+            ? Math.max(1, parseInt(String(pageRaw), 10) || 1)
+            : 1;
+        const limit =
+          typeof limitRaw === "string" || typeof limitRaw === "number"
+            ? Math.min(100, Math.max(1, parseInt(String(limitRaw), 10) || 20))
+            : 20;
+        request.log.warn({ event: "db_pool_exhausted", route: path }, "db_pool_exhausted");
+        void sendCompaniesListingDegraded(reply, { page, limit });
+        return;
+      }
+    }
+
     const statusCode = error.statusCode ?? 500;
     const message = statusCode >= 500 ? "Internal server error" : error.message;
     if (statusCode >= 500) {

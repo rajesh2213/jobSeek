@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { fetchJobCategories, fetchJobSkills, fetchRoles } from "../../../../lib/api";
+
+/** Avoid build-time aggregate fetches that can exceed Vercel's static page budget when the API is slow. */
+export const dynamic = "force-dynamic";
 import { JOB_CATEGORIES } from "../../../../lib/taxonomy";
 import { buildJobsListingUrl, isCanonicalListingPath } from "../../../../lib/slug-parser";
 import { Container } from "../../../../components/ui/Container";

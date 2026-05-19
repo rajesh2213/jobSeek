@@ -4,7 +4,7 @@ import { CompanyHubClient } from "./CompanyHubClient";
 import { CompanyHubSkeleton } from "./CompanyHubSkeleton";
 
 interface Props {
-  company: CompanyDetail;
+  company: CompanyDetail | null;
   slug: string;
   initialJobs: JobItem[];
   initialMeta: NonNullable<JobsApiResponse["meta"]>;

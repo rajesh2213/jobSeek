@@ -54,6 +54,7 @@ import { SortSegmented } from "../ui/SortSegmented";
 import { FilterChips } from "../filters/FilterChips";
 import type { JobsInlineUiFiltersState } from "./JobsInlineFilters";
 import { JobList } from "./JobList";
+import { JobListSkeleton } from "./JobCardSkeleton";
 import { ScrollCollapseChrome, useScrollRevealPromos } from "./ScrollCollapseChrome";
 import { EmptyState } from "../ui/EmptyState";
 import { cn } from "../../lib/cn";
@@ -544,6 +545,9 @@ export function JobsSearchClient({
   }));
   const [listJobs, setListJobs] = useState<JobItem[]>(() => jobs.filter(isJobReady));
   const [listMeta, setListMeta] = useState(() => normalizeJobsListMeta(initialMeta));
+  const [listHydrating, setListHydrating] = useState(
+    () => jobs.filter(isJobReady).length === 0,
+  );
   const [loadingMore, setLoadingMore] = useState(false);
   const [savedSearches, setSavedSearches] = useState<SavedSearchItem[]>([]);
   const [savedSearchLimit, setSavedSearchLimit] = useState(3);
@@ -664,6 +668,45 @@ export function JobsSearchClient({
       cancelled = true;
     };
   }, [getToken, isSignedIn, urlKey]);
+
+  /** When SSR returned no rows (timeout/degraded), fetch listings in the browser. */
+  useEffect(() => {
+    if (!authLoaded) return;
+    const ssrReady = jobs.filter(isJobReady);
+    if (ssrReady.length > 0) {
+      setListHydrating(false);
+      return;
+    }
+    let cancelled = false;
+    const page = Math.max(1, urlFilters.page ?? 1);
+    const limit = Math.max(1, Math.min(100, urlFilters.limit ?? 20));
+    setListHydrating(true);
+    void (async () => {
+      try {
+        const token = await getToken();
+        const res = await fetchJobs(
+          {
+            ...listQueryBase(urlFilters),
+            page,
+            limit,
+            surface: discoverySurface === "seo" ? "seo" : undefined,
+          },
+          { token },
+        );
+        if (cancelled) return;
+        setListJobs(res.data.filter(isJobReady));
+        setListMeta(normalizeJobsListMeta(res.meta));
+        listServerSyncKeyRef.current = jobListFiltersKey;
+      } catch {
+        // Keep empty state; user can retry via filters.
+      } finally {
+        if (!cancelled) setListHydrating(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoaded, jobListFiltersKey, jobs, urlFilters, discoverySurface, getToken]);
 
   useEffect(() => {
     // Clear transient notices whenever URL filters change.
@@ -1727,6 +1770,9 @@ export function JobsSearchClient({
             discoveryPhase === "preview"
               ? Math.max(0, listMeta?.totalHidden ?? 0)
               : Math.max(0, totalMatches - listJobs.length);
+          if (listHydrating) {
+            return <JobListSkeleton count={6} />;
+          }
           if (noMatches) {
             return (
               <EmptyState

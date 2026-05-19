@@ -34,11 +34,24 @@ export async function GET(req: NextRequest) {
   if (origin) upstreamHeaders.set("origin", origin);
 
   try {
+    const upstream = new AbortController();
+    const upstreamTimeout = setTimeout(() => upstream.abort(), 25_000);
     const res = await fetch(`${API_BASE}/jobs${search}`, {
       headers: upstreamHeaders,
       cache: "no-store",
+      signal: upstream.signal,
     });
+    clearTimeout(upstreamTimeout);
     const body = await res.text();
+    if (res.status === 503) {
+      return new NextResponse(body, {
+        status: 503,
+        headers: {
+          "content-type": res.headers.get("content-type") ?? "application/json",
+          "cache-control": "private, no-store",
+        },
+      });
+    }
     return new NextResponse(body, {
       status: res.status,
       headers: {

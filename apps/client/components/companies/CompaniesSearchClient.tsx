@@ -44,6 +44,7 @@ export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) 
   const searchParams = useSearchParams();
   const [list, setList] = useState<CompanyListItem[]>(initialCompanies);
   const [meta, setMeta] = useState(initialMeta);
+  const [listHydrating, setListHydrating] = useState(initialCompanies.length === 0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [draftQ, setDraftQ] = useState(() => searchParams.get("q") ?? "");
 
@@ -56,6 +57,36 @@ export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) 
 
   const proOnlyCompaniesParams =
     sort !== "jobs" || hiring || remote;
+
+  useEffect(() => {
+    let cancelled = false;
+    setListHydrating(true);
+    void (async () => {
+      try {
+        const res = await fetchCompanies({
+          page: Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1),
+          limit: LIMIT,
+          q: q.trim() || undefined,
+          sort,
+          hiring: hiring || undefined,
+          remote: remote || undefined,
+        });
+        if (cancelled) return;
+        setList(res.data);
+        setMeta(res.meta);
+      } catch {
+        if (!cancelled) {
+          setList([]);
+          setMeta((m) => ({ ...m, total: 0, hasMore: false }));
+        }
+      } finally {
+        if (!cancelled) setListHydrating(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [q, sort, hiring, remote, searchParams]);
 
   /** Free tier: sort / hiring / remote filters are Pro-only; normalize URL and list. */
   useEffect(() => {
@@ -359,7 +390,16 @@ export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) 
           </div>
         </div>
 
-        {list.length === 0 ? (
+        {listHydrating ? (
+          <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-36 animate-pulse rounded-2xl border border-ink/10 bg-ink/[0.06]"
+              />
+            ))}
+          </div>
+        ) : list.length === 0 ? (
           <div
             className="mt-10 rounded-2xl border border-dashed border-ink/15 bg-surface px-6 py-14 text-center"
             role="status"

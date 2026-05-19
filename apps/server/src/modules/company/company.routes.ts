@@ -18,6 +18,10 @@ import {
   getCompanyJobsQuerySchema,
 } from "./company.schema.js";
 import type { CompaniesListingSort, CompanyListingRow } from "./companyListing.types.js";
+import {
+  isListingDegradedDbError,
+  sendCompaniesListingDegraded,
+} from "../../infrastructure/db/listingDegradedResponse.js";
 
 const COMPANY_AGG_CACHE_ENABLED = process.env.COMPANY_AGG_CACHE_ENABLED !== "0";
 const COMPANY_AGG_CACHE_TTL_SECONDS = Math.max(
@@ -137,6 +141,7 @@ export function registerCompanyRoutes(
       });
       const q = request.query as Record<string, unknown>;
       const { page, limit } = parsePageLimit(q, { defaultLimit: 20, maxLimit: 100 });
+      try {
       const search = typeof q.q === "string" ? q.q : "";
       const sort = parseCompaniesSort(q.sort);
       const hiring = parseQueryBool(q.hiring);
@@ -233,6 +238,13 @@ export function registerCompanyRoutes(
         },
       };
       return reply.send(responsePayload);
+      } catch (err) {
+        if (isListingDegradedDbError(err)) {
+          request.log.warn({ event: "db_pool_exhausted", route: "/companies" }, "db_pool_exhausted");
+          return sendCompaniesListingDegraded(reply, { page, limit });
+        }
+        throw err;
+      }
     },
   );
 

@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import {
-  fetchCompanyBySlug,
-} from "../../../../lib/api";
+import { loadCompanyBySlug } from "../../../../lib/jobsPageData";
 import { buildBreadcrumbListJsonLd } from "../../../../lib/seo";
 import { absoluteUrl } from "../../../../lib/seoSite";
 import { decideCompanySeoPolicy } from "../../../../lib/seoIndexability";
@@ -21,7 +18,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const company = await fetchCompanyBySlug(slug);
+  const company = await loadCompanyBySlug(slug);
   if (!company) {
     return { title: "Company not found | JobLoom" };
   }
@@ -65,8 +62,7 @@ function searchRecord(
 export default async function CompanyDetailPage({ params, searchParams }: Props) {
   const { slug } = await params;
   const sp = await searchParams;
-  const company = await fetchCompanyBySlug(slug);
-  if (!company) notFound();
+  const company = await loadCompanyBySlug(slug);
 
   const parsed = parseJobFiltersFromSearch(searchRecord(sp));
   const { companyId: _cid, ...hubFilters } = parsed;
@@ -89,7 +85,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
         data={buildBreadcrumbListJsonLd([
           { name: "Home", path: "/" },
           { name: "Companies", path: "/companies" },
-          { name: company.name, path: `/company/${slug}` },
+          { name: company?.name ?? slug, path: `/company/${slug}` },
         ])}
       />
       <div className="mx-auto w-[92%] max-w-6xl px-2 pt-6 sm:px-4">
@@ -97,7 +93,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
           items={[
             { name: "Home", href: "/" },
             { name: "Companies", href: "/companies" },
-            { name: company.name },
+            { name: company?.name ?? slug },
           ]}
         />
         <section className="mb-4 rounded-xl border border-ink/10 bg-surface px-4 py-3 text-sm text-ink/75">

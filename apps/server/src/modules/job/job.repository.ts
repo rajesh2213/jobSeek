@@ -789,8 +789,8 @@ export function buildCanonicalListingJobSelect(includeCompanyJobCount: boolean) 
   } as const;
 }
 
-/** Slim row shape for production listing hydrate (SQL + company join). */
-type ListingJobSlimRow = {
+/** Slim row shape for production listing hydrate (single JOIN query). */
+type ListingJobJoinRow = {
   id: string;
   title: string;
   companyId: string;
@@ -808,11 +808,15 @@ type ListingJobSlimRow = {
   salaryMin: number | null;
   skills: string[];
   status: string | null;
+  co_id: string;
+  co_name: string;
+  co_slug: string;
+  co_logoUrl: string | null;
+  co_domain: string | null;
 };
 
 /**
- * Production listing hydrate: bounded description I/O, `parsedDescription` for preview quality,
- * slim columns, no company `_count`.
+ * Production listing hydrate: one round-trip (job + company JOIN), bounded description I/O.
  */
 async function hydrateCanonicalListingByIds(
   prisma: PrismaClient,
@@ -822,9 +826,9 @@ async function hydrateCanonicalListingByIds(
   if (ids.length === 0) return [];
   const truncChars = options?.truncChars ?? LIST_JOB_HYDRATE_DESCRIPTION_MAX_CHARS;
   const safeLen = Math.max(256, Math.min(500_000, Math.floor(truncChars)));
-  const includeCompanyJobCount = options?.includeCompanyJobCount ?? false;
+  void options?.includeCompanyJobCount;
 
-  const rows = await prisma.$queryRaw<ListingJobSlimRow[]>`
+  const rows = await prisma.$queryRaw<ListingJobJoinRow[]>`
     SELECT
       j.id,
       j.title,
@@ -833,7 +837,10 @@ async function hydrateCanonicalListingByIds(
       j."locationCountry",
       j."isRemote",
       j."workType",
-      SUBSTRING(j.description FROM 1 FOR (${safeLen})::integer) AS description,
+      CASE
+        WHEN j."parsedDescription" IS NOT NULL THEN NULL::text
+        ELSE SUBSTRING(j.description FROM 1 FOR (${safeLen})::integer)
+      END AS description,
       j."parsedDescription",
       j."sourceUrl",
       j."applyUrl",
@@ -842,27 +849,45 @@ async function hydrateCanonicalListingByIds(
       j."createdAt",
       j."salaryMin",
       j.skills,
-      j.status
+      j.status,
+      c.id AS "co_id",
+      c.name AS "co_name",
+      c.slug AS "co_slug",
+      c."logoUrl" AS "co_logoUrl",
+      c.domain AS "co_domain"
     FROM "Job" j
+    INNER JOIN "Company" c ON c.id = j."companyId"
     WHERE j.id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}`))})
   `;
 
-  const companyIds = [...new Set(rows.map((r) => r.companyId))];
-  const companySelect = getCompanyListingSelect(includeCompanyJobCount);
-  const companies = await prisma.company.findMany({
-    where: { id: { in: companyIds } },
-    select: companySelect,
-  });
-  const cmap = new Map(companies.map((c) => [c.id, c]));
-  const jobs = rows.map((r) => {
-    const co = cmap.get(r.companyId);
-    if (!co) {
-      throw new Error(`hydrateCanonicalListingByIds: missing company ${r.companyId}`);
-    }
-    return { ...r, company: co };
-  });
+  const jobs: JobWithCompany[] = rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    companyId: r.companyId,
+    country: r.country,
+    locationCountry: r.locationCountry,
+    isRemote: r.isRemote,
+    workType: r.workType,
+    description: r.description,
+    parsedDescription: r.parsedDescription,
+    sourceUrl: r.sourceUrl,
+    applyUrl: r.applyUrl,
+    postedAt: r.postedAt,
+    effectivePostedAt: r.effectivePostedAt,
+    createdAt: r.createdAt,
+    salaryMin: r.salaryMin,
+    skills: r.skills,
+    status: r.status,
+    company: {
+      id: r.co_id,
+      name: r.co_name,
+      slug: r.co_slug,
+      logoUrl: r.co_logoUrl,
+      domain: r.co_domain,
+    },
+  })) as unknown as JobWithCompany[];
   reorderJobsByCanonicalIds(jobs, ids);
-  return jobs as unknown as JobWithCompany[];
+  return jobs;
 }
 
 /** Row shape returned by {@link createJobRepository}'s trunc-description shadow hydrate SQL. */

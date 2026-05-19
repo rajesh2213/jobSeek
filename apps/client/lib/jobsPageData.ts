@@ -1,11 +1,39 @@
 import { cache } from "react";
 import { auth } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
-import { fetchJobById, fetchJobs, type JobDetailFetchResult, type JobsApiResponse } from "./api";
+import {
+  fetchCompanyBySlug,
+  fetchJobById,
+  fetchJobs,
+  type CompanyDetail,
+  type JobDetailFetchResult,
+  type JobsApiResponse,
+} from "./api";
 import {
   type JobFilters,
   MAX_JOB_FILTER_QUERY_TOKENS,
 } from "./slug-parser";
+
+export const EMPTY_JOBS_RESPONSE: JobsApiResponse = { data: [] };
+
+/** Stay under Vercel/nginx ~10s SSR budget so we degrade instead of throwing. */
+function ssrUpstreamTimeoutMs(): number {
+  const raw = process.env.SSR_UPSTREAM_TIMEOUT_MS?.trim();
+  if (!raw) return 8500;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) return 8500;
+  return Math.max(3000, Math.min(parsed, 9000));
+}
+
+async function withSsrUpstreamTimeout<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ssrUpstreamTimeoutMs());
+  try {
+    return await run(controller.signal);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /** Sync read for SSR hero strip — avoids API when ops pins `JOBS_WEEKLY_POSTED_OVERRIDE`. */
 export function weeklyJobsPostedEnvOverride(): number | null {
@@ -42,26 +70,34 @@ export function stableJobFiltersKey(filters: JobFilters): string {
  */
 export const loadJobsDiscoveryPage = cache(
   async (filtersKey: string): Promise<JobsApiResponse> => {
-    const filters = JSON.parse(filtersKey) as JobFilters;
-    const { getToken } = await auth();
-    const token = await getToken();
-    const h = await headers();
-    const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
-    return fetchJobs(
-      {
-        ...filters,
-        page: filters.page ?? 1,
-        limit: filters.limit ?? 20,
-      },
-      {
-        token,
-        forwardedFor,
-        // Do not send internal SEO bypass: user-facing discovery must mirror browser `fetchJobs`
-        // (metering + `viewCapUnlimited`). Bypass here hid the quota strip on first paint and let
-        // cached “unlimited” meta diverge from the first real client request (e.g. load more → 0/75
-        // when the IP bucket was already exhausted). Keep bypass for non-listing SSR (e.g. weekly count).
-      },
-    );
+    try {
+      const filters = JSON.parse(filtersKey) as JobFilters;
+      const { getToken } = await auth();
+      const token = await getToken();
+      const h = await headers();
+      const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
+      return await withSsrUpstreamTimeout((signal) =>
+        fetchJobs(
+          {
+            ...filters,
+            page: filters.page ?? 1,
+            limit: filters.limit ?? 20,
+          },
+          {
+            token,
+            forwardedFor,
+            signal,
+            ssrPage: "jobs",
+            // Do not send internal SEO bypass: user-facing discovery must mirror browser `fetchJobs`
+            // (metering + `viewCapUnlimited`). Bypass here hid the quota strip on first paint and let
+            // cached “unlimited” meta diverge from the first real client request (e.g. load more → 0/75
+            // when the IP bucket was already exhausted). Keep bypass for non-listing SSR (e.g. weekly count).
+          },
+        ),
+      );
+    } catch {
+      return EMPTY_JOBS_RESPONSE;
+    }
   },
 );
 
@@ -115,10 +151,25 @@ export function loadJobsListingDeferred(input: {
  */
 export const loadJobDetailPage = cache(
   async (id: string): Promise<JobDetailFetchResult | null> => {
-    const { getToken } = await auth();
-    const token = await getToken();
-    const h = await headers();
-    const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
-    return fetchJobById(id, { token, forwardedFor });
+    try {
+      const { getToken } = await auth();
+      const token = await getToken();
+      const h = await headers();
+      const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
+      return await withSsrUpstreamTimeout((signal) =>
+        fetchJobById(id, { token, forwardedFor, signal }),
+      );
+    } catch {
+      return null;
+    }
   },
 );
+
+/** Company hub SSR: never throw on upstream timeout/500. */
+export const loadCompanyBySlug = cache(async (slug: string): Promise<CompanyDetail | null> => {
+  try {
+    return await withSsrUpstreamTimeout((signal) => fetchCompanyBySlug(slug, { signal }));
+  } catch {
+    return null;
+  }
+});

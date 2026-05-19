@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import {
   fetchCompanies,
+  fetchCompanyBySlug,
   fetchCompanyJobs,
   isJobReady,
   type CompanyDetail,
@@ -31,6 +32,7 @@ import { FREE_DISCOVERY_PREVIEW_JOB_ROWS } from "../../lib/planLimits";
 import { Badge } from "../ui/Badge";
 import { Button, buttonClassName } from "../ui/Button";
 import { JobCard } from "../job/JobCard";
+import { CompanyHubSkeleton } from "./CompanyHubSkeleton";
 
 const LimitWallEnhanced = dynamic(
   () => import("../job/LimitWallEnhanced").then((m) => m.LimitWallEnhanced),
@@ -101,7 +103,7 @@ function stripProOnlyHubFilters(
 }
 
 interface Props {
-  company: CompanyDetail;
+  company: CompanyDetail | null;
   slug: string;
   initialJobs: JobItem[];
   initialMeta: NonNullable<JobsApiResponse["meta"]>;
@@ -109,7 +111,7 @@ interface Props {
 }
 
 export function CompanyHubClient({
-  company,
+  company: initialCompany,
   slug,
   initialJobs,
   initialMeta,
@@ -119,6 +121,9 @@ export function CompanyHubClient({
   const { isPro, isLoaded: planLoaded } = useAccountPlan();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [resolvedCompany, setResolvedCompany] = useState<CompanyDetail | null>(initialCompany);
+  const [companyHydrating, setCompanyHydrating] = useState(!initialCompany);
+  const [companyMissing, setCompanyMissing] = useState(false);
   const urlKey = searchParams.toString();
   const urlFilters = useMemo(
     () => hubFiltersFromSearchParams(new URLSearchParams(urlKey)),
@@ -134,6 +139,39 @@ export function CompanyHubClient({
     initialJobs.length === 0 && initialMeta.total === 0,
   );
   const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    setResolvedCompany(initialCompany);
+    setCompanyMissing(false);
+    setCompanyHydrating(!initialCompany);
+  }, [initialCompany]);
+
+  useEffect(() => {
+    if (resolvedCompany) {
+      setCompanyHydrating(false);
+      return;
+    }
+    let cancelled = false;
+    setCompanyHydrating(true);
+    void (async () => {
+      try {
+        const next = await fetchCompanyBySlug(slug);
+        if (cancelled) return;
+        if (!next) {
+          setCompanyMissing(true);
+        } else {
+          setResolvedCompany(next);
+        }
+      } catch {
+        if (!cancelled) setCompanyMissing(true);
+      } finally {
+        if (!cancelled) setCompanyHydrating(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, resolvedCompany]);
 
   useEffect(() => {
     setListJobs(initialJobs.filter(isJobReady));
@@ -312,19 +350,49 @@ export function CompanyHubClient({
     listJobs.length === 0 && totalRoles === 0 && !filtersActive;
 
   const jobsLinkAll = useMemo(() => {
-    const p = filtersToSearchParams({ companyId: company.id });
+    if (!resolvedCompany) return "/jobs";
+    const p = filtersToSearchParams({ companyId: resolvedCompany.id });
     const qs = p.toString();
     return qs ? `/jobs?${qs}` : "/jobs";
-  }, [company.id]);
+  }, [resolvedCompany]);
 
-  const jobsLinkEngineering = `/jobs?${filtersToSearchParams({
-    companyId: company.id,
-    role: "engineering",
-  }).toString()}`;
-  const jobsLinkReact = `/jobs?${filtersToSearchParams({
-    companyId: company.id,
-    skills: ["react"],
-  }).toString()}`;
+  const jobsLinkEngineering = resolvedCompany
+    ? `/jobs?${filtersToSearchParams({
+        companyId: resolvedCompany.id,
+        role: "engineering",
+      }).toString()}`
+    : "/jobs";
+  const jobsLinkReact = resolvedCompany
+    ? `/jobs?${filtersToSearchParams({
+        companyId: resolvedCompany.id,
+        skills: ["react"],
+      }).toString()}`
+    : "/jobs";
+
+  if (companyHydrating) {
+    return <CompanyHubSkeleton />;
+  }
+
+  if (!resolvedCompany || companyMissing) {
+    return (
+      <main className="min-h-screen px-6 py-16">
+        <div className="mx-auto max-w-lg text-center">
+          <h1 className="text-2xl font-extrabold text-ink">Company not found</h1>
+          <p className="mt-2 text-sm text-ink/70">
+            This employer page is unavailable or the link may be outdated.
+          </p>
+          <Link
+            href="/companies"
+            className="mt-6 inline-flex text-sm font-semibold text-brand hover:underline"
+          >
+            Browse companies
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  const company = resolvedCompany;
 
   return (
     <main className="min-h-screen">
