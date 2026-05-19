@@ -17,15 +17,9 @@ export function resolvePrismaDatasourceUrl(): string | undefined {
 
   try {
     const u = new URL(raw);
-    if (!u.searchParams.has("connection_limit")) {
-      u.searchParams.set("connection_limit", String(limit));
-    }
-    if (!u.searchParams.has("pool_timeout")) {
-      u.searchParams.set("pool_timeout", isApi ? "20" : "10");
-    }
-    if (!u.searchParams.has("connect_timeout")) {
-      u.searchParams.set("connect_timeout", "10");
-    }
+    u.searchParams.set("connection_limit", String(limit));
+    u.searchParams.set("pool_timeout", isApi ? "20" : "10");
+    u.searchParams.set("connect_timeout", "10");
     return u.toString();
   } catch {
     return raw;
