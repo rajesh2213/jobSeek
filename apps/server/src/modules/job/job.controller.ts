@@ -118,12 +118,6 @@ export function registerJobRoutes(
       const hasAuthHeader = typeof request.headers.authorization === "string";
       const isAnonymous = capCtx.internalUserId == null && !hasAuthHeader;
 
-      const isCommonFilterQuery = Boolean(
-        filters.category ||
-          (filters.skills && filters.skills.length > 0) ||
-          filters.role,
-      );
-
       const isHeavyQuery = Boolean(
         filters.companyId ||
           filters.minSalary !== undefined ||
@@ -134,11 +128,9 @@ export function registerJobRoutes(
 
       const isDeepPagination = page > 5;
 
+      /** Default browse + light taxonomy filters — not company/salary/deep pages. */
       const isSafeToCache =
-        isAnonymous &&
-        isCommonFilterQuery &&
-        !isHeavyQuery &&
-        !isDeepPagination;
+        isAnonymous && !isHeavyQuery && !isDeepPagination && page <= 5;
 
       const meteredLimit = isSafeToCache ? Math.min(limit, 50) : limit;
 
