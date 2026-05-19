@@ -18,15 +18,13 @@ import {
   getCompanyJobsQuerySchema,
 } from "./company.schema.js";
 import type { CompaniesListingSort, CompanyListingRow } from "./companyListing.types.js";
-import {
-  isListingDegradedDbError,
-  sendCompaniesListingDegraded,
-} from "../../infrastructure/db/listingDegradedResponse.js";
+import { isListingDegradedDbError } from "../../infrastructure/db/listingDegradedResponse.js";
+import { readListingStale } from "../../infrastructure/cache/listingRedisCache.js";
 
 const COMPANY_AGG_CACHE_ENABLED = process.env.COMPANY_AGG_CACHE_ENABLED !== "0";
 const COMPANY_AGG_CACHE_TTL_SECONDS = Math.max(
-  15,
-  Number(process.env.COMPANY_AGG_CACHE_TTL_SECONDS ?? "60") || 60,
+  60,
+  Number(process.env.COMPANY_AGG_CACHE_TTL_SECONDS ?? "120") || 120,
 );
 const DEBUG_COMPANY_CONCURRENCY = process.env.DEBUG_COMPANY_CONCURRENCY === "1";
 
@@ -141,7 +139,6 @@ export function registerCompanyRoutes(
       });
       const q = request.query as Record<string, unknown>;
       const { page, limit } = parsePageLimit(q, { defaultLimit: 20, maxLimit: 100 });
-      try {
       const search = typeof q.q === "string" ? q.q : "";
       const sort = parseCompaniesSort(q.sort);
       const hiring = parseQueryBool(q.hiring);
@@ -155,6 +152,7 @@ export function registerCompanyRoutes(
         hiring ? "1" : "0",
         remote ? "1" : "0",
       ].join(":");
+      try {
       const callerType =
         typeof request.headers["x-ssr-origin"] === "string"
           ? "internal_ssr"
@@ -174,14 +172,18 @@ export function registerCompanyRoutes(
         if (!inflight) {
           inflight = (async (): Promise<CompaniesAggResponseBody> => {
             try {
-              const result = await companyService.listCompaniesDiscovery({
-                q: search,
-                sort,
-                hiring,
-                remote,
-                page,
-                limit,
-              });
+              const stats = await companyService.getListingStatsCached(redis);
+              const result = await companyService.listCompaniesDiscovery(
+                {
+                  q: search,
+                  sort,
+                  hiring,
+                  remote,
+                  page,
+                  limit,
+                },
+                { stats },
+              );
               const body: CompaniesAggResponseBody = {
                 data: result.items.map(toCompanyListingPublicJson),
                 meta: {
@@ -193,7 +195,11 @@ export function registerCompanyRoutes(
                   stats: result.stats,
                 },
               };
-              await redis.set(cacheKey, JSON.stringify(body), "EX", COMPANY_AGG_CACHE_TTL_SECONDS);
+              await redis
+                .multi()
+                .set(cacheKey, JSON.stringify(body), "EX", COMPANY_AGG_CACHE_TTL_SECONDS)
+                .set(`${cacheKey}:stale`, JSON.stringify(body), "EX", 3600)
+                .exec();
               return body;
             } finally {
               inflightAnonymousCompanyAgg.delete(cacheKey);
@@ -218,14 +224,18 @@ export function registerCompanyRoutes(
         return reply.send(responsePayload);
       }
 
-      const result = await companyService.listCompaniesDiscovery({
-        q: search,
-        sort,
-        hiring,
-        remote,
-        page,
-        limit,
-      });
+      const stats = await companyService.getListingStatsCached(redis);
+      const result = await companyService.listCompaniesDiscovery(
+        {
+          q: search,
+          sort,
+          hiring,
+          remote,
+          page,
+          limit,
+        },
+        { stats },
+      );
       const responsePayload: CompaniesAggResponseBody = {
         data: result.items.map(toCompanyListingPublicJson),
         meta: {
@@ -240,8 +250,14 @@ export function registerCompanyRoutes(
       return reply.send(responsePayload);
       } catch (err) {
         if (isListingDegradedDbError(err)) {
-          request.log.warn({ event: "db_pool_exhausted", route: "/companies" }, "db_pool_exhausted");
-          return sendCompaniesListingDegraded(reply, { page, limit });
+          const stale = await readListingStale<CompaniesAggResponseBody>(redis, cacheKey);
+          if (stale?.data?.length) {
+            request.log.warn(
+              { event: "listing_stale_fallback", route: "/companies" },
+              "listing_stale_fallback",
+            );
+            return reply.header("X-Listing-Cache", "stale").send(stale);
+          }
         }
         throw err;
       }

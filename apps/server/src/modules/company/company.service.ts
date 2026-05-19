@@ -3,6 +3,11 @@ import { CompanyStatus } from "@prisma/client";
 import type { CompanyRepository } from "./company.repository.js";
 import type { CreateCompanyInput } from "./company.repository.js";
 import type { CompaniesListingSort, CompanyListingRow } from "./companyListing.types.js";
+import type { Redis } from "ioredis";
+import {
+  getCompanyListingStatsCached,
+  type CompanyListingStats,
+} from "./companyStatsCache.js";
 import type { JobRepository, JobDiscoveryFilters, JobWithCompany } from "../job/job.repository.js";
 import type { PaginatedResult } from "../../types/api.js";
 import { logger } from "../../utils/logger.js";
@@ -204,21 +209,28 @@ export class CompanyService {
   /**
    * Public /companies listing: aggregates canonical job counts, sort, light filters, stats.
    */
-  async listCompaniesDiscovery(input: {
-    q: string;
-    sort: CompaniesListingSort;
-    hiring: boolean;
-    remote: boolean;
-    page: number;
-    limit: number;
-  }): Promise<{
+  getListingStatsCached(redis: Redis): Promise<CompanyListingStats> {
+    return getCompanyListingStatsCached(redis, this.companyRepository);
+  }
+
+  async listCompaniesDiscovery(
+    input: {
+      q: string;
+      sort: CompaniesListingSort;
+      hiring: boolean;
+      remote: boolean;
+      page: number;
+      limit: number;
+    },
+    options?: { stats?: CompanyListingStats },
+  ): Promise<{
     items: CompanyListingRow[];
     total: number;
     page: number;
     limit: number;
     totalPages: number;
     hasMore: boolean;
-    stats: { totalTracked: number; hiringThisWeek: number };
+    stats: CompanyListingStats;
   }> {
     const offset = (input.page - 1) * input.limit;
     const filter = {
@@ -229,31 +241,19 @@ export class CompanyService {
       limit: input.limit,
       offset,
     };
-    /** Sequential DB work avoids Prisma pool starvation (pgBouncer connection_limit is small). */
     const t0 = Date.now();
-    const items = await this.companyRepository.listCompaniesDiscovery(filter);
+    const rows = await this.companyRepository.listCompaniesDiscoveryWithTotal(filter);
     if (DEBUG_COMPANY_CONCURRENCY) {
       logger.info(
-        { event: "COMPANY_LIST_PHASE_MS", phase: "items", ms: Date.now() - t0 },
+        { event: "COMPANY_LIST_PHASE_MS", phase: "list_with_total", ms: Date.now() - t0 },
         "COMPANY_LIST_PHASE_MS",
       );
     }
-    const t1 = Date.now();
-    const total = await this.companyRepository.countCompaniesListing(filter);
-    if (DEBUG_COMPANY_CONCURRENCY) {
-      logger.info(
-        { event: "COMPANY_LIST_PHASE_MS", phase: "count", ms: Date.now() - t1 },
-        "COMPANY_LIST_PHASE_MS",
-      );
-    }
-    const t2 = Date.now();
-    const stats = await this.companyRepository.getCompaniesListingStats();
-    if (DEBUG_COMPANY_CONCURRENCY) {
-      logger.info(
-        { event: "COMPANY_LIST_PHASE_MS", phase: "stats", ms: Date.now() - t2 },
-        "COMPANY_LIST_PHASE_MS",
-      );
-    }
+    const total = rows[0]?._listingTotal ?? 0;
+    const items: CompanyListingRow[] = rows.map(({ _listingTotal: _t, ...row }) => row);
+    const stats =
+      options?.stats ??
+      (await this.companyRepository.getCompaniesListingStats());
     const totalPages = Math.ceil(total / input.limit) || 1;
     const hasMore = offset + items.length < total;
     return {

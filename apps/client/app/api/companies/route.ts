@@ -48,39 +48,41 @@ export async function GET(req: NextRequest) {
   if (referer) upstreamHeaders.set("referer", referer);
   if (origin) upstreamHeaders.set("origin", origin);
 
-  try {
-    const upstream = new AbortController();
-    const upstreamTimeout = setTimeout(() => upstream.abort(), 22_000);
-    const res = await fetch(`${API_BASE}/companies${search}`, {
-      headers: upstreamHeaders,
-      cache: "no-store",
-      signal: upstream.signal,
-    });
-    clearTimeout(upstreamTimeout);
-    const body = await res.text();
-    if (isPoolDegraded(res.status, body)) {
-      return new NextResponse(DEGRADED_BODY, {
-        status: 503,
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const upstream = new AbortController();
+      const upstreamTimeout = setTimeout(() => upstream.abort(), 22_000);
+      const res = await fetch(`${API_BASE}/companies${search}`, {
+        headers: upstreamHeaders,
+        cache: "no-store",
+        signal: upstream.signal,
+      });
+      clearTimeout(upstreamTimeout);
+      const body = await res.text();
+      if (isPoolDegraded(res.status, body) && attempt < 2) {
+        await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+        continue;
+      }
+      return new NextResponse(body, {
+        status: res.status,
         headers: {
-          "content-type": "application/json",
-          "cache-control": "private, no-store",
+          "content-type": res.headers.get("content-type") ?? "application/json",
+          "cache-control": res.headers.get("cache-control") ?? "private, no-store",
         },
       });
+    } catch {
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+        continue;
+      }
     }
-    return new NextResponse(body, {
-      status: res.status,
-      headers: {
-        "content-type": res.headers.get("content-type") ?? "application/json",
-        "cache-control": res.headers.get("cache-control") ?? "private, no-store",
-      },
-    });
-  } catch {
-    return new NextResponse(DEGRADED_BODY, {
-      status: 503,
-      headers: {
-        "content-type": "application/json",
-        "cache-control": "private, no-store",
-      },
-    });
   }
+
+  return new NextResponse(DEGRADED_BODY, {
+    status: 503,
+    headers: {
+      "content-type": "application/json",
+      "cache-control": "private, no-store",
+    },
+  });
 }

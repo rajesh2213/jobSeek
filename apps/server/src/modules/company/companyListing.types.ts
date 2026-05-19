@@ -10,6 +10,11 @@ export interface CompaniesListingInput {
 }
 
 /** Row returned by listCompaniesDiscovery (public listing). */
+export type CompanyListingRowWithTotal = CompanyListingRow & {
+  _listingTotal: number;
+};
+
+/** Row returned by listCompaniesDiscovery (public listing). */
 export interface CompanyListingRow {
   id: string;
   name: string;

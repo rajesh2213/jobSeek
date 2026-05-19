@@ -36,11 +36,12 @@ import {
   logJobListMeteredSlow,
   summarizeJobDiscoveryFilters,
 } from "./jobListMeteredDiag.js";
-import { withListingDbSlot } from "../../infrastructure/db/listingDbConcurrency.js";
+import { stableServerJobFiltersKey } from "../../infrastructure/cache/listingFiltersKey.js";
 import {
-  isListingDegradedDbError,
-  sendJobsListingDegraded,
-} from "../../infrastructure/db/listingDegradedResponse.js";
+  fetchJobsListingWithCache,
+  isJobsListingCacheEligible,
+} from "./jobsListingFetch.js";
+import { getCachedJobDetailJson, setCachedJobDetailJson } from "./jobDetailCache.js";
 
 interface GetJobParams {
   id: string;
@@ -139,8 +140,7 @@ export function registerJobRoutes(
       const durMs = (a: number, b: number) => Math.max(0, Math.round((b - a) * 100) / 100);
       const eluOrigin = createEventLoopUtilizationOrigin();
 
-      try {
-        return await jobListRequestDiag.run(
+      return await jobListRequestDiag.run(
         {
           sort,
           page,
@@ -150,48 +150,48 @@ export function registerJobRoutes(
         },
         async () => {
           let out: Awaited<ReturnType<typeof runMeteredJobsList<JobWithCompany>>>;
-          try {
-            out = await withListingDbSlot(() =>
-              runMeteredJobsList<JobWithCompany>(
-                server.prisma,
-                redis,
-                capCtx,
-                bypassCap,
-                {
+          const filtersKey = stableServerJobFiltersKey(filters);
+          const listingCacheEligible = isJobsListingCacheEligible({
+            isAnonymous,
+            isSafeToCache,
+            page,
+          });
+
+          out = await runMeteredJobsList<JobWithCompany>(
+            server.prisma,
+            redis,
+            capCtx,
+            bypassCap,
+            {
+              page,
+              limit: meteredLimit,
+              offset,
+              fetchList: (effectiveLimit) => {
+                const listInput = {
                   page,
-                  limit: meteredLimit,
+                  limit: effectiveLimit,
+                  paginationStride: meteredLimit,
                   offset,
-                  fetchList: (effectiveLimit) =>
-                    jobService.list({
-                      page,
-                      limit: effectiveLimit,
-                      paginationStride: meteredLimit,
-                      offset,
-                      filters,
-                      sort,
-                      includeProcessing,
-                    }),
-                },
-              ),
-            );
-          } catch (err) {
-            if (isListingDegradedDbError(err)) {
-              request.log.warn(
-                { event: "db_pool_exhausted", route: "/jobs" },
-                "db_pool_exhausted",
-              );
-              setApiCacheHeader(reply, request, {
-                route: "/jobs",
-                cacheable: false,
-                reason: "db_pool_exhausted",
-              });
-              return sendJobsListingDegraded(reply, {
-                page,
-                pageSize: meteredLimit,
-              });
-            }
-            throw err;
-          }
+                  filters,
+                  sort,
+                  includeProcessing,
+                };
+                if (!listingCacheEligible) {
+                  return jobService.list(listInput);
+                }
+                return fetchJobsListingWithCache(
+                  redis,
+                  {
+                    page,
+                    limit: effectiveLimit,
+                    sort,
+                    filtersKey,
+                  },
+                  () => jobService.list(listInput),
+                );
+              },
+            },
+          );
           const tAfterList = performance.now();
 
           const meteredListMs = durMs(tAfterCapCtx, tAfterList);
@@ -248,24 +248,6 @@ export function registerJobRoutes(
           });
         },
       );
-      } catch (err) {
-        if (isListingDegradedDbError(err)) {
-          request.log.warn(
-            { event: "db_pool_exhausted", route: "/jobs", phase: "handler" },
-            "db_pool_exhausted",
-          );
-          setApiCacheHeader(reply, request, {
-            route: "/jobs",
-            cacheable: false,
-            reason: "db_pool_exhausted",
-          });
-          return sendJobsListingDegraded(reply, {
-            page,
-            pageSize: meteredLimit,
-          });
-        }
-        throw err;
-      }
     },
   );
 
@@ -303,7 +285,18 @@ export function registerJobRoutes(
 
       const q = request.query as Record<string, unknown>;
       const includeProcessing = parseQueryBool(q.includeProcessing);
-      const job = await jobService.getById(request.params.id, { includeProcessing });
+      const jobId = request.params.id;
+      const hasAuthHeader = typeof request.headers.authorization === "string";
+      if (!includeProcessing && !hasAuthHeader) {
+        const cachedDetail = await getCachedJobDetailJson<ReturnType<typeof toJobDetailJson>>(
+          redis,
+          jobId,
+        );
+        if (cachedDetail) {
+          return reply.header("X-Job-Detail-Cache", "hit").send({ data: cachedDetail });
+        }
+      }
+      const job = await jobService.getById(jobId, { includeProcessing });
       if (!job) {
         if (!includeProcessing) {
           const hidden = await jobService.getById(request.params.id, {
@@ -324,8 +317,12 @@ export function registerJobRoutes(
 
       if (capState.unlimited) {
         const resetAt = capState.resetAt.toISOString();
+        const detailJson = toJobDetailJson(job as unknown as JobWithCompanyRow);
+        if (!includeProcessing && !hasAuthHeader) {
+          void setCachedJobDetailJson(redis, jobId, detailJson);
+        }
         return reply.send({
-          data: toJobDetailJson(job as unknown as JobWithCompanyRow),
+          data: detailJson,
           meta: {
             capReached: false,
             remaining: null,

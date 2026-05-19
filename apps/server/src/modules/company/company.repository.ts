@@ -4,6 +4,7 @@ import type {
   CompaniesListingInput,
   CompaniesListingSort,
   CompanyListingRow,
+  CompanyListingRowWithTotal,
 } from "./companyListing.types.js";
 import { slugifyCompanyName } from "../../utils/slugify.js";
 import { getDomainFromUrl, normalizeDomain } from "../../utils/common.js";
@@ -456,13 +457,21 @@ export function createCompanyRepository(prisma: PrismaClient) {
     },
 
     async listCompaniesDiscovery(input: CompaniesListingInput): Promise<CompanyListingRow[]> {
+      const rows = await this.listCompaniesDiscoveryWithTotal(input);
+      return rows.map(({ _listingTotal: _t, ...row }) => row);
+    },
+
+    /** Single round-trip: page rows + total count via window function (avoids second heavy COUNT query). */
+    async listCompaniesDiscoveryWithTotal(
+      input: CompaniesListingInput,
+    ): Promise<import("./companyListing.types.js").CompanyListingRowWithTotal[]> {
       const nameCond = nameSearchCondition(input.q);
       const havingSql = listingHavingClause(input.hiring, input.remote);
       const orderSql = listingOrderBy(input.sort);
       const visibilityGuard = publicVisibilityJobJoinGuardSql();
       const limit = input.limit;
       const offset = input.offset;
-      return prisma.$queryRaw<CompanyListingRow[]>`
+      return prisma.$queryRaw<CompanyListingRowWithTotal[]>`
         SELECT * FROM (
           SELECT
             c.id,
@@ -475,7 +484,8 @@ export function createCompanyRepository(prisma: PrismaClient) {
             c."lastCrawledAt",
             c."updatedAt",
             COUNT(j.id)::int AS "jobCount",
-            COALESCE(BOOL_OR(j."isRemote" OR j."workType" = 'remote'), false) AS "hasRemoteJobs"
+            COALESCE(BOOL_OR(j."isRemote" OR j."workType" = 'remote'), false) AS "hasRemoteJobs",
+            COUNT(*) OVER()::int AS "_listingTotal"
           FROM "Company" c
           LEFT JOIN "Job" j ON j."companyId" = c.id
             AND j."canonicalJobId" IS NULL

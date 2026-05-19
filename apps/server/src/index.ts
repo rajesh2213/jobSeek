@@ -26,6 +26,17 @@ async function main() {
           server.log.warn({ event: "boot_warmup_failed", err: String(err) }, "boot_warmup_failed"),
         );
     }
+
+    if (process.env.LISTING_CACHE_WARMUP_ENABLED !== "0") {
+      const base = `http://127.0.0.1:${port}`;
+      const warmListingCaches = () => {
+        fetch(`${base}/jobs?page=1&limit=20`)
+          .catch(() => undefined);
+        fetch(`${base}/companies?page=1&limit=20`)
+          .catch(() => undefined);
+      };
+      setTimeout(warmListingCaches, 2500);
+    }
   } catch (err) {
     logger.error({ err, event: "server_listen_failed" }, "Server failed to start");
     process.exit(1);

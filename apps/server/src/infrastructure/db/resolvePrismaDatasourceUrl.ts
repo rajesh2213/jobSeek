@@ -9,7 +9,7 @@ export function resolvePrismaDatasourceUrl(): string | undefined {
   const workerName = process.env.WORKER_NAME?.trim() ?? "";
   const isApi = workerName === "jobseek-api";
   const envLimit = Number.parseInt(process.env.PRISMA_CONNECTION_LIMIT ?? "", 10);
-  const defaultLimit = isApi ? 2 : 1;
+  const defaultLimit = isApi ? 3 : 1;
   const limit =
     Number.isFinite(envLimit) && envLimit >= 1
       ? Math.min(envLimit, isApi ? 10 : 2)
