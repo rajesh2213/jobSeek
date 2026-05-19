@@ -1,4 +1,5 @@
 import type { Redis } from "ioredis";
+import { isDbPoolExhaustedError } from "../../infrastructure/db/isDbPoolExhausted.js";
 import type { CompanyRepository } from "./company.repository.js";
 
 const STATS_KEY = "companies:stats:v1";
@@ -24,7 +25,21 @@ export async function getCompanyListingStatsCached(
       /* refresh */
     }
   }
-  const stats = await repo.getCompaniesListingStats();
-  await redis.set(STATS_KEY, JSON.stringify(stats), "EX", STATS_TTL_SEC);
-  return stats;
+  try {
+    const stats = await repo.getCompaniesListingStats();
+    await redis.set(STATS_KEY, JSON.stringify(stats), "EX", STATS_TTL_SEC);
+    return stats;
+  } catch (err) {
+    if (hit && isDbPoolExhaustedError(err)) {
+      try {
+        return JSON.parse(hit) as CompanyListingStats;
+      } catch {
+        /* fall through */
+      }
+    }
+    if (isDbPoolExhaustedError(err)) {
+      return { totalTracked: 0, hiringThisWeek: 0 };
+    }
+    throw err;
+  }
 }

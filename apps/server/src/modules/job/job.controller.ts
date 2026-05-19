@@ -41,6 +41,11 @@ import {
   fetchJobsListingWithCache,
   isJobsListingCacheEligible,
 } from "./jobsListingFetch.js";
+import {
+  getStaleJobsListingRaw,
+  jobsListingRawCacheKey,
+} from "./jobsListingCache.js";
+import { isListingDegradedDbError } from "../../infrastructure/db/listingDegradedResponse.js";
 import { getCachedJobDetailJson, setCachedJobDetailJson } from "./jobDetailCache.js";
 
 interface GetJobParams {
@@ -140,6 +145,14 @@ export function registerJobRoutes(
       const durMs = (a: number, b: number) => Math.max(0, Math.round((b - a) * 100) / 100);
       const eluOrigin = createEventLoopUtilizationOrigin();
 
+      const filtersKey = stableServerJobFiltersKey(filters);
+      const listingCacheEligible = isJobsListingCacheEligible({
+        isAnonymous,
+        isSafeToCache,
+        page,
+      });
+
+      try {
       return await jobListRequestDiag.run(
         {
           sort,
@@ -149,15 +162,7 @@ export function registerJobRoutes(
           filterSummary: summarizeJobDiscoveryFilters(filters),
         },
         async () => {
-          let out: Awaited<ReturnType<typeof runMeteredJobsList<JobWithCompany>>>;
-          const filtersKey = stableServerJobFiltersKey(filters);
-          const listingCacheEligible = isJobsListingCacheEligible({
-            isAnonymous,
-            isSafeToCache,
-            page,
-          });
-
-          out = await runMeteredJobsList<JobWithCompany>(
+          const out = await runMeteredJobsList<JobWithCompany>(
             server.prisma,
             redis,
             capCtx,
@@ -248,6 +253,49 @@ export function registerJobRoutes(
           });
         },
       );
+      } catch (err) {
+        if (listingCacheEligible && isListingDegradedDbError(err)) {
+          const stale = await getStaleJobsListingRaw(
+            redis,
+            jobsListingRawCacheKey({
+              page,
+              limit: meteredLimit,
+              sort,
+              filtersKey,
+            }),
+          );
+          if (stale?.items?.length) {
+            request.log.warn(
+              { event: "listing_stale_fallback", route: "/jobs" },
+              "listing_stale_fallback",
+            );
+            return reply.header("X-Listing-Cache", "stale").send({
+              data: stale.items.map((j) =>
+                toJobListJson(j as unknown as JobWithCompanyRow),
+              ),
+              meta: {
+                page,
+                pageSize: meteredLimit,
+                total: stale.total,
+                totalCount: stale.total,
+                hasMore: stale.hasMore ?? stale.items.length === meteredLimit,
+                capReached: false,
+                remaining: null,
+                resetAt: new Date().toISOString(),
+                viewCapUnlimited: true,
+                limit: {
+                  mode: LIMITS.MODE,
+                  remaining: null,
+                  resetAt: new Date().toISOString(),
+                  warning: false,
+                  isCapped: false,
+                },
+              },
+            });
+          }
+        }
+        throw err;
+      }
     },
   );
 

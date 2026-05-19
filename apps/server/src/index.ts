@@ -35,7 +35,8 @@ async function main() {
         fetch(`${base}/companies?page=1&limit=20`)
           .catch(() => undefined);
       };
-      setTimeout(warmListingCaches, 2500);
+      setTimeout(warmListingCaches, 45_000);
+      setInterval(warmListingCaches, 90_000);
     }
   } catch (err) {
     logger.error({ err, event: "server_listen_failed" }, "Server failed to start");
