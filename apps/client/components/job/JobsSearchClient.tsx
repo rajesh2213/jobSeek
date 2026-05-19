@@ -548,6 +548,7 @@ export function JobsSearchClient({
   const [listHydrating, setListHydrating] = useState(
     () => jobs.filter(isJobReady).length === 0,
   );
+  const [listDegraded, setListDegraded] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [savedSearches, setSavedSearches] = useState<SavedSearchItem[]>([]);
   const [savedSearchLimit, setSavedSearchLimit] = useState(3);
@@ -681,6 +682,7 @@ export function JobsSearchClient({
     const page = Math.max(1, urlFilters.page ?? 1);
     const limit = Math.max(1, Math.min(100, urlFilters.limit ?? 20));
     setListHydrating(true);
+    setListDegraded(false);
     void (async () => {
       try {
         const token = await getToken();
@@ -697,8 +699,11 @@ export function JobsSearchClient({
         setListJobs(res.data.filter(isJobReady));
         setListMeta(normalizeJobsListMeta(res.meta));
         listServerSyncKeyRef.current = jobListFiltersKey;
+        if (res.data.filter(isJobReady).length === 0) {
+          setListDegraded(false);
+        }
       } catch {
-        // Keep empty state; user can retry via filters.
+        setListDegraded(true);
       } finally {
         if (!cancelled) setListHydrating(false);
       }
@@ -1772,6 +1777,46 @@ export function JobsSearchClient({
               : Math.max(0, totalMatches - listJobs.length);
           if (listHydrating) {
             return <JobListSkeleton count={6} />;
+          }
+          if (listDegraded) {
+            return (
+              <div className="rounded-2xl border border-dashed border-brand/25 bg-surface px-6 py-14 text-center">
+                <p className="text-base font-medium text-ink">Jobs are loading slowly</p>
+                <p className="mt-2 text-sm text-ink/70">
+                  The database is busy. Wait a moment, then retry.
+                </p>
+                <Button
+                  type="button"
+                  className="mt-4"
+                  onClick={() => {
+                    setListDegraded(false);
+                    setListHydrating(true);
+                    void (async () => {
+                      try {
+                        const token = await getToken();
+                        const res = await fetchJobs(
+                          {
+                            ...listQueryBase(urlFilters),
+                            page: Math.max(1, urlFilters.page ?? 1),
+                            limit: Math.max(1, Math.min(100, urlFilters.limit ?? 20)),
+                            surface: discoverySurface === "seo" ? "seo" : undefined,
+                          },
+                          { token },
+                        );
+                        setListJobs(res.data.filter(isJobReady));
+                        setListMeta(normalizeJobsListMeta(res.meta));
+                      } catch {
+                        setListDegraded(true);
+                      } finally {
+                        setListHydrating(false);
+                      }
+                    })();
+                  }}
+                >
+                  Retry
+                </Button>
+              </div>
+            );
           }
           if (noMatches) {
             return (

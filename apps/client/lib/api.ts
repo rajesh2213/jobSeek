@@ -952,7 +952,7 @@ export async function fetchJobs(
   const fetchOptions: RequestInit & { next?: { revalidate?: number } } = internalBypass
     ? { headers, next: { revalidate: 120 } }
     : { headers, cache: "no-store" };
-  const browserRetries = typeof window !== "undefined" ? 3 : 1;
+  const browserRetries = typeof window !== "undefined" ? 4 : 1;
   let lastError: unknown;
 
   for (let attempt = 0; attempt < browserRetries; attempt++) {
@@ -978,13 +978,22 @@ export async function fetchJobs(
         await sleepMs(700 * (attempt + 1));
         continue;
       }
-      return await parseJobsListResponse(
+      const parsed = await parseJobsListResponse(
         new Response(text, {
           status: res.status,
           statusText: res.statusText,
           headers: res.headers,
         }),
       );
+      if (
+        retryable &&
+        parsed.data.length === 0 &&
+        attempt < browserRetries - 1
+      ) {
+        await sleepMs(700 * (attempt + 1));
+        continue;
+      }
+      return parsed;
     } catch (err) {
       clearTimeout(timeout);
       lastError = err;
@@ -995,8 +1004,9 @@ export async function fetchJobs(
     }
   }
 
+  if (lastError instanceof ApiRequestError) throw lastError;
   if (lastError instanceof Error) throw lastError;
-  throw new Error("Failed to fetch jobs");
+  throw new ApiRequestError("Failed to fetch jobs", 503, "DB_POOL_EXHAUSTED");
 }
 
 export interface SeoLandingEntry {
@@ -1245,7 +1255,12 @@ export async function fetchCompanies(options: {
   if (options.hiring) params.set("hiring", "true");
   if (options.remote) params.set("remote", "true");
   const qs = params.toString();
-  const url = `${API_BASE_URL}/companies${qs ? `?${qs}` : ""}`;
+  const useBrowserCompaniesProxy =
+    typeof window !== "undefined" &&
+    (process.env.NEXT_PUBLIC_JOBS_BROWSER_PROXY ?? "1").trim() !== "0";
+  const url = useBrowserCompaniesProxy
+    ? `/api/companies${qs ? `?${qs}` : ""}`
+    : `${API_BASE_URL}/companies${qs ? `?${qs}` : ""}`;
   const isServer = typeof window === "undefined";
   const headers = new Headers();
   if (isServer) {
@@ -1255,21 +1270,70 @@ export async function fetchCompanies(options: {
   const reqInit: RequestInit & { next?: { revalidate?: number } } = isServer
     ? { headers, next: { revalidate: 60 } }
     : { headers, cache: "no-store" };
-  const res = await fetch(url, reqInit);
-  if (!res.ok) {
-    const limit = options.limit ?? 24;
-    return {
-      data: [],
-      meta: {
-        page: options.page ?? 1,
-        limit,
-        total: 0,
-        totalPages: 1,
-        hasMore: false,
-      },
-    };
+
+  const browserRetries = typeof window !== "undefined" ? 4 : 1;
+  const limit = options.limit ?? 24;
+
+  for (let attempt = 0; attempt < browserRetries; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 22_000);
+    try {
+      const res = await fetch(url, { ...reqInit, signal: controller.signal });
+      clearTimeout(timeout);
+      const text = await res.text();
+      let code: string | undefined;
+      try {
+        code = (JSON.parse(text) as { code?: string }).code;
+      } catch {
+        code = undefined;
+      }
+      const retryable =
+        res.status === 503 ||
+        code === "P2024" ||
+        code === "DB_POOL_EXHAUSTED";
+      if (retryable && attempt < browserRetries - 1) {
+        await sleepMs(800 * (attempt + 1));
+        continue;
+      }
+      if (res.status === 503 || code === "DB_POOL_EXHAUSTED" || code === "P2024") {
+        if (attempt < browserRetries - 1) {
+          await sleepMs(800 * (attempt + 1));
+          continue;
+        }
+        throw new ApiRequestError("Service temporarily busy", 503, "DB_POOL_EXHAUSTED");
+      }
+      if (!res.ok) {
+        return {
+          data: [],
+          meta: {
+            page: options.page ?? 1,
+            limit,
+            total: 0,
+            totalPages: 1,
+            hasMore: false,
+          },
+        };
+      }
+      return JSON.parse(text) as CompaniesApiResponse;
+    } catch {
+      clearTimeout(timeout);
+      if (attempt < browserRetries - 1) {
+        await sleepMs(800 * (attempt + 1));
+        continue;
+      }
+    }
   }
-  return (await res.json()) as CompaniesApiResponse;
+
+  return {
+    data: [],
+    meta: {
+      page: options.page ?? 1,
+      limit,
+      total: 0,
+      totalPages: 1,
+      hasMore: false,
+    },
+  };
 }
 
 export async function fetchCompanyBySlug(

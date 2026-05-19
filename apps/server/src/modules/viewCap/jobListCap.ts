@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { Redis } from "ioredis";
 import type { FastifyRequest } from "fastify";
 import { resolveClerkUser } from "../../infrastructure/auth/clerkVerify.js";
+import { isListingDegradedDbError } from "../../infrastructure/db/listingDegradedResponse.js";
 import { checkAndIncrementViewCap, getJobViewCapState } from "./viewCap.service.js";
 import type { PaginatedResult } from "../../types/api.js";
 import { LIMITS, type CapMode } from "../../config/limits.js";
@@ -91,12 +92,20 @@ export async function buildCapContextFromRequest(
   prisma: PrismaClient,
   request: FastifyRequest,
 ): Promise<CapContext> {
-  const clerk = await resolveClerkUser(prisma, request.headers.authorization);
-  return {
-    internalUserId: clerk?.internalUserId ?? null,
-    ip: clientIp(request),
-    userEmail: clerk?.email ?? null,
-  };
+  const ip = clientIp(request);
+  try {
+    const clerk = await resolveClerkUser(prisma, request.headers.authorization);
+    return {
+      internalUserId: clerk?.internalUserId ?? null,
+      ip,
+      userEmail: clerk?.email ?? null,
+    };
+  } catch (err) {
+    if (isListingDegradedDbError(err)) {
+      return { internalUserId: null, ip, userEmail: null };
+    }
+    throw err;
+  }
 }
 
 function metaBase(

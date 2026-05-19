@@ -45,6 +45,7 @@ export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) 
   const [list, setList] = useState<CompanyListItem[]>(initialCompanies);
   const [meta, setMeta] = useState(initialMeta);
   const [listHydrating, setListHydrating] = useState(initialCompanies.length === 0);
+  const [listDegraded, setListDegraded] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [draftQ, setDraftQ] = useState(() => searchParams.get("q") ?? "");
 
@@ -58,35 +59,32 @@ export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) 
   const proOnlyCompaniesParams =
     sort !== "jobs" || hiring || remote;
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadCompanies = useCallback(async () => {
     setListHydrating(true);
-    void (async () => {
-      try {
-        const res = await fetchCompanies({
-          page: Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1),
-          limit: LIMIT,
-          q: q.trim() || undefined,
-          sort,
-          hiring: hiring || undefined,
-          remote: remote || undefined,
-        });
-        if (cancelled) return;
-        setList(res.data);
-        setMeta(res.meta);
-      } catch {
-        if (!cancelled) {
-          setList([]);
-          setMeta((m) => ({ ...m, total: 0, hasMore: false }));
-        }
-      } finally {
-        if (!cancelled) setListHydrating(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    setListDegraded(false);
+    try {
+      const res = await fetchCompanies({
+        page: Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1),
+        limit: LIMIT,
+        q: q.trim() || undefined,
+        sort,
+        hiring: hiring || undefined,
+        remote: remote || undefined,
+      });
+      setList(res.data);
+      setMeta(res.meta);
+    } catch {
+      setList([]);
+      setMeta((m) => ({ ...m, total: 0, hasMore: false }));
+      setListDegraded(true);
+    } finally {
+      setListHydrating(false);
+    }
   }, [q, sort, hiring, remote, searchParams]);
+
+  useEffect(() => {
+    void loadCompanies();
+  }, [loadCompanies]);
 
   /** Free tier: sort / hiring / remote filters are Pro-only; normalize URL and list. */
   useEffect(() => {
@@ -398,6 +396,19 @@ export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) 
                 className="h-36 animate-pulse rounded-2xl border border-ink/10 bg-ink/[0.06]"
               />
             ))}
+          </div>
+        ) : listDegraded ? (
+          <div
+            className="mt-10 rounded-2xl border border-dashed border-brand/25 bg-surface px-6 py-14 text-center"
+            role="status"
+          >
+            <p className="text-base font-medium text-ink">Companies are loading slowly</p>
+            <p className="mt-2 text-sm text-ink-muted">
+              The database is busy right now. Wait a moment and try again.
+            </p>
+            <Button type="button" className="mt-4" onClick={() => void loadCompanies()}>
+              Retry
+            </Button>
           </div>
         ) : list.length === 0 ? (
           <div
