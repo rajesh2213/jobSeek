@@ -36,6 +36,7 @@ import {
   logJobListMeteredSlow,
   summarizeJobDiscoveryFilters,
 } from "./jobListMeteredDiag.js";
+import { withListingDbSlot } from "../../infrastructure/db/listingDbConcurrency.js";
 import {
   isListingDegradedDbError,
   sendJobsListingDegraded,
@@ -150,26 +151,28 @@ export function registerJobRoutes(
         async () => {
           let out: Awaited<ReturnType<typeof runMeteredJobsList<JobWithCompany>>>;
           try {
-            out = await runMeteredJobsList<JobWithCompany>(
-              server.prisma,
-              redis,
-              capCtx,
-              bypassCap,
-              {
-                page,
-                limit: meteredLimit,
-                offset,
-                fetchList: (effectiveLimit) =>
-                  jobService.list({
-                    page,
-                    limit: effectiveLimit,
-                    paginationStride: meteredLimit,
-                    offset,
-                    filters,
-                    sort,
-                    includeProcessing,
-                  }),
-              },
+            out = await withListingDbSlot(() =>
+              runMeteredJobsList<JobWithCompany>(
+                server.prisma,
+                redis,
+                capCtx,
+                bypassCap,
+                {
+                  page,
+                  limit: meteredLimit,
+                  offset,
+                  fetchList: (effectiveLimit) =>
+                    jobService.list({
+                      page,
+                      limit: effectiveLimit,
+                      paginationStride: meteredLimit,
+                      offset,
+                      filters,
+                      sort,
+                      includeProcessing,
+                    }),
+                },
+              ),
             );
           } catch (err) {
             if (isListingDegradedDbError(err)) {

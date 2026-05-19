@@ -26,9 +26,21 @@ services=(
   jobseek-openclaw-scheduler
 )
 
+echo "Restarting jobseek-api..."
+sudo systemctl restart jobseek-api
+sleep 12
+
+batch=0
 for svc in "${services[@]}"; do
+  if [[ "$svc" == "jobseek-api" ]]; then
+    continue
+  fi
   echo "Restarting $svc..."
   sudo systemctl restart "$svc"
+  batch=$((batch + 1))
+  if (( batch % 5 == 0 )); then
+    sleep 4
+  fi
 done
 
 echo "Done."
