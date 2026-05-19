@@ -3,6 +3,8 @@ import { isDbPoolExhaustedError } from "./isDbPoolExhausted.js";
 
 export function isListingDegradedDbError(err: unknown): boolean {
   if (isDbPoolExhaustedError(err)) return true;
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg.includes(":closed") || msg.includes("FATAL: Internal error")) return true;
   const code =
     err && typeof err === "object" && "code" in err
       ? String((err as { code?: string }).code ?? "")
@@ -14,7 +16,6 @@ export function isListingDegradedDbError(err: unknown): boolean {
         : undefined;
     return meta?.code === "57014";
   }
-  const msg = err instanceof Error ? err.message : String(err);
   return msg.includes("statement timeout") || msg.includes("57014");
 }
 

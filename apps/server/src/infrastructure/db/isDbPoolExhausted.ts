@@ -10,6 +10,9 @@ export function isDbPoolExhaustedError(err: unknown): boolean {
     msg.includes("P2024") ||
     msg.includes("ECHECKOUTTIMEOUT") ||
     msg.includes("Timed out fetching a new connection") ||
-    msg.includes("unable to check out connection from the pool")
+    msg.includes("unable to check out connection from the pool") ||
+    msg.includes(":closed") ||
+    msg.includes("Error in connector") ||
+    msg.includes("FATAL: Internal error")
   );
 }
