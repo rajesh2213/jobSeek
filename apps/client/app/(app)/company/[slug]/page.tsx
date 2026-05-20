@@ -22,8 +22,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!company) {
     return { title: "Company not found | JobLoom" };
   }
-  const title = `${company.name} Jobs & Careers | JobLoom`;
-  const description = `Explore open roles at ${company.name}. Browse engineering, product, and remote jobs—verified listings with early apply links.`;
+  const open = typeof company.jobCount === "number" && company.jobCount > 0 ? company.jobCount : null;
+  const title =
+    open != null
+      ? `${open.toLocaleString()} open roles at ${company.name} · Hiring now | JobLoom`
+      : `${company.name} jobs & careers | JobLoom`;
+  const remoteClause = company.hasRemoteJobs ? " Includes remote-friendly openings." : "";
+  const description =
+    open != null
+      ? `${open.toLocaleString()} active listings at ${company.name}—apply from employer career pages.${remoteClause} Updated as new roles go live.`
+      : `Explore open roles at ${company.name}. Browse engineering, product, and remote jobs—verified listings with early apply links.${remoteClause}`;
   const canonical = absoluteUrl(`/company/${slug}`);
   const companyGateEnabled = process.env.SEO_COMPANY_QUALITY_GATE_ENABLED === "true";
   const forceNoindexAll = process.env.SEO_FORCE_NOINDEX_ALL === "true";
@@ -44,6 +52,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description,
     alternates: { canonical },
     openGraph: { title, description, url: canonical },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
     robots: { index: decision.index, follow: decision.follow },
   };
 }

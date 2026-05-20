@@ -9,7 +9,7 @@ import {
   resolveJobDetailSections,
   sectionsPlainTextForSeo,
 } from "../../../../lib/resolveJobDetailSections";
-import { filterSkillPillsForDisplay } from "../../../../lib/jobDisplay";
+import { filterSkillPillsForDisplay, jobDetailPinLocationText } from "../../../../lib/jobDisplay";
 import { mergeBrowseSkillQueries, tokensFromRequirementLines } from "../../../../lib/seoSkillTokens";
 import { Container } from "../../../../components/ui/Container";
 import { Card } from "../../../../components/ui/Card";
@@ -28,7 +28,7 @@ import { SeoBreadcrumbs } from "../../../../components/seo/SeoBreadcrumbs";
 import { UserLocalResetCaption } from "../../../../components/job/UserLocalResetCaption";
 import { EmailCaptureCard } from "../../../../components/email/EmailCaptureCard";
 import { JobDetailPosthogTracker } from "../../../../components/analytics/JobDetailPosthogTracker";
-import { jobDetailPinLocationText } from "../../../../lib/jobDisplay";
+import { buildJobDetailSeo } from "../../../../lib/seoJobDetail";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -43,19 +43,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const job = fetched.data;
   const sections = refineSectionsForDisplay(resolveJobDetailSections(job));
   const structured = sectionsPlainTextForSeo(sections);
-  const desc =
-    structured.slice(0, 160) ||
-    job.description?.slice(0, 160) ||
-    `View ${job.title} role details and apply.`;
+  const { title, description } = buildJobDetailSeo(job, {
+    plainDescriptionForSeo: structured,
+  });
   const canonical = absoluteUrl(`/job/${id}`);
   return {
-    title: `${job.title} at ${job.company.name} | JobLoom`,
-    description: desc,
+    title,
+    description,
     alternates: { canonical },
     openGraph: {
-      title: `${job.title} at ${job.company.name}`,
-      description: desc,
+      title,
+      description,
       url: canonical,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
     },
   };
 }

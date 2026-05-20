@@ -24,6 +24,53 @@ const POSTED_LABEL: Record<NonNullable<JobFilters["posted"]>, string> = {
   "1m": "last month",
 };
 
+/** Compact geography for SERP titles (identity match + screen space). */
+const TITLE_LOCATION_SHORT: Record<string, string> = {
+  US: "USA",
+  GB: "UK",
+  IN: "India",
+  CA: "Canada",
+  DE: "Germany",
+  AU: "Australia",
+  FR: "France",
+  NL: "Netherlands",
+  ES: "Spain",
+  IT: "Italy",
+  SE: "Sweden",
+  PL: "Poland",
+  SG: "Singapore",
+  AE: "UAE",
+  JP: "Japan",
+  BR: "Brazil",
+  MX: "Mexico",
+  ZA: "South Africa",
+};
+
+const LOCATION_DISPLAY: Record<string, string> = {
+  US: "the United States",
+  IN: "India",
+  GB: "the United Kingdom",
+  CA: "Canada",
+  DE: "Germany",
+  AU: "Australia",
+  FR: "France",
+  NL: "the Netherlands",
+  ES: "Spain",
+  IT: "Italy",
+  SE: "Sweden",
+  PL: "Poland",
+  SG: "Singapore",
+  AE: "the UAE",
+  JP: "Japan",
+  BR: "Brazil",
+  MX: "Mexico",
+  ZA: "South Africa",
+};
+
+function isLegacySeoTitleTemplate(): boolean {
+  return process.env.SEO_TITLE_TEMPLATE === "legacy";
+}
+
 export function getSeoMinJobsIndex(): number {
   const n = parseInt(process.env.NEXT_PUBLIC_SEO_MIN_JOBS_INDEX ?? "5", 10);
   return Number.isFinite(n) && n >= 0 ? n : 5;
@@ -38,7 +85,7 @@ export function resolveListingJobCount(
   return jobsOnPage > 0 ? jobsOnPage : 0;
 }
 
-export function buildJobsSeo(filters: JobFilters, total?: number): {
+function buildJobsSeoLegacy(filters: JobFilters, total?: number): {
   title: string;
   description: string;
 } {
@@ -67,6 +114,16 @@ export function buildJobsSeo(filters: JobFilters, total?: number): {
   const pagePart = filters.page && filters.page > 1 ? ` · Page ${filters.page}` : "";
   const title = `${countPrefix}${titleCore} Hiring Now (Updated Daily)${pagePart} | JobLoom`;
 
+  const { description } = buildJobsSeoDescriptionBody(filters, remoteish, total, titleCore);
+  return { title, description };
+}
+
+function buildJobsSeoDescriptionBody(
+  filters: JobFilters,
+  remoteish: boolean,
+  total: number | undefined,
+  _legacyTitleCore: string,
+): { description: string } {
   const refinements: string[] = [];
   if (filters.experience) {
     refinements.push(`${filters.experience} level`);
@@ -98,7 +155,150 @@ export function buildJobsSeo(filters: JobFilters, total?: number): {
     description = `${description} ${freshHint}`;
   }
 
+  return { description };
+}
+
+function refineryForDescription(filters: JobFilters): string[] {
+  const refinements: string[] = [];
+  if (filters.experience) refinements.push(`${filters.experience} level`);
+  if (filters.posted) refinements.push(POSTED_LABEL[filters.posted] ?? filters.posted);
+  if (filters.minSalary !== undefined && filters.minSalary > 0) {
+    refinements.push(`min. salary ${filters.minSalary.toLocaleString()}`);
+  }
+  if (filters.workTypes && filters.workTypes.length > 1) {
+    refinements.push(`types: ${filters.workTypes.join(", ")}`);
+  }
+  return refinements;
+}
+
+function titleSalaryFragment(minSalary: number): string {
+  if (minSalary >= 1000) return ` · From $${Math.round(minSalary / 1000)}k+`;
+  return ` · From $${minSalary.toLocaleString()}+`;
+}
+
+/** Prefer role > category > skills for query intent. */
+function primarySubjectTitle(filters: JobFilters): string {
+  if (filters.role?.trim()) return toTitleCase(filters.role.trim());
+  if (filters.category?.trim()) return toTitleCase(filters.category.trim());
+  if (filters.skills?.length) {
+    return filters.skills.slice(0, 2).map((s) => toTitleCase(s.trim())).filter(Boolean).join(", ");
+  }
+  return "";
+}
+
+function listingMidTitle(filters: JobFilters, remoteish: boolean, locShort: string, subject: string): string {
+  if (subject) {
+    if (remoteish && locShort) return `Remote ${subject} Jobs in ${locShort}`;
+    if (remoteish) return `Remote ${subject} Jobs`;
+    if (locShort) return `${subject} Jobs in ${locShort}`;
+    return `${subject} Jobs`;
+  }
+  if (remoteish && locShort) return `Remote Jobs in ${locShort}`;
+  if (remoteish) return `Remote Jobs`;
+  if (locShort) return `Jobs in ${locShort}`;
+  return "Jobs";
+}
+
+/** Prose location for meta description (longer form than title). */
+function descriptionLocationPhrase(filters: JobFilters): string {
+  const code = filters.country?.trim().toUpperCase();
+  if (code) return LOCATION_DISPLAY[code] ?? code;
+  if (filters.locations?.length) return filters.locations.slice(0, 2).join(", ");
+  if (filters.location?.trim()) return filters.location.trim();
+  return "";
+}
+
+function fitListingTitleCore(core: string, maxChars: number): string {
+  let s = core;
+  if (s.length <= maxChars) return s;
+  s = s.replace(/\s*·\s*From \$[^·]+$/, "");
+  if (s.length <= maxChars) return s;
+  s = s.replace(/\s*·\s*Hiring now\s*$/i, " · Hiring");
+  if (s.length <= maxChars) return s;
+  return `${s.slice(0, maxChars - 1).trimEnd()}…`;
+}
+
+function buildJobsSeoV2(filters: JobFilters, total?: number): {
+  title: string;
+  description: string;
+} {
+  const remoteish =
+    filters.workType === "remote" ||
+    filters.isRemote ||
+    (filters.workTypes?.length === 1 && filters.workTypes[0] === "remote");
+  const locCode = filters.country?.trim().toUpperCase() ?? "";
+  const locShort = locCode ? (TITLE_LOCATION_SHORT[locCode] ?? locCode) : "";
+  const subject = primarySubjectTitle(filters);
+  const mid = listingMidTitle(filters, remoteish, locShort, subject);
+  const pagePart = filters.page && filters.page > 1 ? ` · Page ${filters.page}` : "";
+  const refinements = refineryForDescription(filters);
+  const locPhrase = descriptionLocationPhrase(filters);
+
+  let title: string;
+  const hasSalaryTitle =
+    filters.minSalary !== undefined && filters.minSalary > 0 ? titleSalaryFragment(filters.minSalary) : "";
+
+  if (typeof total === "number" && total > 0) {
+    const coreRaw = `${total.toLocaleString()} ${mid} · Hiring now${hasSalaryTitle}`;
+    const core = fitListingTitleCore(coreRaw, 58);
+    title = `${core}${pagePart} | JobLoom`;
+  } else if (typeof total === "number" && total === 0) {
+    const exploreMid = subject
+      ? remoteish && locShort
+        ? `Remote ${subject} openings in ${locShort}`
+        : remoteish
+          ? `Remote ${subject} openings`
+          : locShort
+            ? `${subject} openings in ${locShort}`
+            : `${subject} openings`
+      : remoteish && locShort
+        ? `Remote openings in ${locShort}`
+        : remoteish
+          ? "Remote openings"
+          : locShort
+            ? `Openings in ${locShort}`
+            : "Job openings";
+    title = `Explore ${exploreMid} — listings refresh daily${pagePart} | JobLoom`;
+  } else {
+    const discoverSubject = subject
+      ? `${remoteish ? "remote " : ""}${subject} roles`
+      : remoteish
+        ? "remote roles from top employers"
+        : "roles from top employers";
+    title = `Discover ${discoverSubject} · New listings daily${pagePart} | JobLoom`;
+  }
+
+  const freshHint =
+    filters.posted && POSTED_LABEL[filters.posted]
+      ? `Highlighting ${POSTED_LABEL[filters.posted]} so you see the newest posts first.`
+      : "Listings refresh daily as companies publish to their career sites.";
+
+  const refineClause = refinements.length ? ` Filters: ${refinements.join("; ")}.` : "";
+
+  let description: string;
+  if (typeof total === "number" && total > 0) {
+    const geoBit = locPhrase ? ` in ${locPhrase}` : "";
+    const focus = subject ? `${remoteish ? "remote " : ""}${subject.toLowerCase()} jobs${geoBit}` : `${remoteish ? "remote " : ""}jobs${geoBit}`;
+    description = `${total.toLocaleString()} open roles for ${focus.trim()}—actively hiring. Sourced from employer career pages; apply early.${refineClause} ${freshHint}`;
+  } else if (typeof total === "number" && total === 0) {
+    const geoBit = locPhrase ? ` in ${locPhrase}` : "";
+    description = `Explore ${subject ? `${subject.toLowerCase()} openings` : "openings"}${geoBit} on JobLoom—new listings appear as companies hire.${refineClause} Direct career-page sourcing; widen filters or check back soon.`;
+  } else {
+    const geoBit = locPhrase ? ` (${locPhrase})` : "";
+    description = `Find ${remoteish ? "remote " : ""}${subject ? `${subject.toLowerCase()} roles` : "open roles"}${geoBit} from company career sites—discover openings early in one search.${refineClause} ${freshHint}`;
+  }
+
+  description = description.replace(/\s+/g, " ").trim();
+  if (description.length > 160) description = `${description.slice(0, 157).trimEnd()}…`;
+
   return { title, description };
+}
+
+export function buildJobsSeo(filters: JobFilters, total?: number): {
+  title: string;
+  description: string;
+} {
+  return isLegacySeoTitleTemplate() ? buildJobsSeoLegacy(filters, total) : buildJobsSeoV2(filters, total);
 }
 
 function hasDuplicateLikeFilters(filters: JobFilters): boolean {
@@ -116,6 +316,11 @@ export function formatJobDiscoveryBreadcrumbLabel(filters: JobFilters): string {
   return title
     .replace(/\s*\|\s*JobLoom$/i, "")
     .replace(/\s*·\s*Page \d+$/i, "")
+    .replace(/\s*·\s*Hiring Now \(Updated Daily\)\s*$/i, "")
+    .replace(/\s*·\s*Hiring now\s*$/i, "")
+    .replace(/\s*·\s*Hiring\s*$/i, "")
+    .replace(/\s*—\s*listings refresh daily\s*$/i, "")
+    .replace(/\s*·\s*New listings daily\s*$/i, "")
     .replace(/\s*\(by salary\)/i, "")
     .trim();
 }
@@ -180,6 +385,11 @@ export function jobsRouteMetadata(
       description,
       url: canonical,
     },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
     robots: { index: decision.index, follow: decision.follow },
   };
 }
@@ -201,13 +411,6 @@ function recordSeoDecisionCounter(surface: "jobs", reason: SeoPolicyReason): voi
 // ---------------------------------------------------------------------------
 // Dynamic intro for SEO landing pages
 // ---------------------------------------------------------------------------
-
-const LOCATION_DISPLAY: Record<string, string> = {
-  US: "the United States", IN: "India", GB: "the United Kingdom", CA: "Canada",
-  DE: "Germany", AU: "Australia", FR: "France", NL: "the Netherlands",
-  ES: "Spain", IT: "Italy", SE: "Sweden", PL: "Poland", SG: "Singapore",
-  AE: "the UAE", JP: "Japan", BR: "Brazil", MX: "Mexico", ZA: "South Africa",
-};
 
 /**
  * Deterministic page intro derived only from filters + the existing SSR listing
