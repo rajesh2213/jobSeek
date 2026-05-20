@@ -30,6 +30,72 @@ export type OpenClawPersistResult =
   | { status: "skipped"; reason: OpenClawPersistSkipReason }
   | { status: "updated_seen"; endpointId: string };
 
+export type OpenClawRediscoveryTouchSkipReason =
+  | "not_found"
+  | "not_openclaw_inventory"
+  | "active_endpoint"
+  | "dry_run"
+  | "suspicious_slug";
+
+export type OpenClawRediscoveryTouchResult =
+  | { status: "updated_seen"; endpointId: string }
+  | { status: "skipped"; reason: OpenClawRediscoveryTouchSkipReason };
+
+async function applyOpenClawDiscoverySeenUpdate(
+  prisma: PrismaClient,
+  existing: {
+    id: string;
+    isActive: boolean;
+    source: string | null;
+    companyId: string | null;
+    metadata: unknown;
+  },
+  input: {
+    candidate: AtsEndpointParseResult;
+    companyId: string;
+    sourceUrl: string;
+    canonicalCollision: boolean;
+  },
+): Promise<{ endpointId: string; intel: ReturnType<typeof parseOpenClawDiscoveryIntel> }> {
+  const { candidate, companyId, sourceUrl, canonicalCollision } = input;
+  const quality = computeDiscoveryConfidence({
+    candidate,
+    canonicalCollision,
+    sourceUrl,
+  });
+  const now = new Date();
+  const meta = mergeDiscoveryMetadataOnSeen(
+    existing.metadata,
+    candidate,
+    quality,
+    { canonicalCollision },
+  ) as unknown as Prisma.InputJsonValue;
+  await prisma.atsEndpoint.update({
+    where: { id: existing.id },
+    data: {
+      lastSeenAt: now,
+      metadata: meta,
+      ...(companyId && !existing.companyId ? { companyId } : {}),
+    },
+  });
+  const intel = parseOpenClawDiscoveryIntel(meta);
+  logger.info(
+    {
+      event: "openclaw_ats_endpoint_rediscovered",
+      provider: "openclaw",
+      endpointId: existing.id,
+      type: candidate.type,
+      slug: candidate.slug,
+      discovery_seen_count: intel?.discoverySeenCount,
+      activation_readiness_score: intel?.activationReadinessScore,
+      activation_candidate_tier: intel?.activationCandidateTier,
+      freshness_confidence: intel?.freshnessConfidence,
+    },
+    "openclaw_ats_endpoint_rediscovered",
+  );
+  return { endpointId: existing.id, intel };
+}
+
 /** Preloaded dedupe keys from DB (single query per sync). */
 export type OpenClawEndpointDedupeCache = {
   typeSlugKeys: Set<string>;
@@ -107,6 +173,45 @@ export function evaluateDiscoveryQuality(
 const OPENCLAW_DISCOVERY_SCORE = 3;
 
 /**
+ * Metadata-only bump when shadow eval hits an existing board (dedupe cache).
+ * Only touches inactive `source=openclaw` rows — never activates or enqueues crawls.
+ */
+export async function touchInactiveOpenClawEndpointOnRediscovery(
+  prisma: PrismaClient,
+  input: {
+    candidate: AtsEndpointParseResult;
+    companyId: string;
+    sourceUrl: string;
+    canonicalCollision: boolean;
+    dryRun: boolean;
+  },
+): Promise<OpenClawRediscoveryTouchResult> {
+  const { candidate, companyId, sourceUrl, canonicalCollision, dryRun } = input;
+  if (dryRun) return { status: "skipped", reason: "dry_run" };
+  if (isSuspiciousDiscoverySlug(candidate.type, candidate.slug)) {
+    return { status: "skipped", reason: "suspicious_slug" };
+  }
+
+  const existing = await prisma.atsEndpoint.findUnique({
+    where: { type_slug: { type: candidate.type, slug: candidate.slug } },
+    select: { id: true, isActive: true, source: true, companyId: true, metadata: true },
+  });
+  if (!existing) return { status: "skipped", reason: "not_found" };
+  if (existing.source !== "openclaw") {
+    return { status: "skipped", reason: "not_openclaw_inventory" };
+  }
+  if (existing.isActive) return { status: "skipped", reason: "active_endpoint" };
+
+  const { endpointId } = await applyOpenClawDiscoverySeenUpdate(prisma, existing, {
+    candidate,
+    companyId,
+    sourceUrl,
+    canonicalCollision,
+  });
+  return { status: "updated_seen", endpointId };
+}
+
+/**
  * Upsert inactive discovery endpoint. Does not enable crawling or parsing.
  */
 export async function persistInactiveOpenClawEndpoint(
@@ -137,38 +242,15 @@ export async function persistInactiveOpenClawEndpoint(
     });
 
     if (existing) {
-      const meta = mergeDiscoveryMetadataOnSeen(
-        existing.metadata,
+      await applyOpenClawDiscoverySeenUpdate(prisma, existing, {
         candidate,
-        quality,
-        { canonicalCollision },
-      ) as unknown as Prisma.InputJsonValue;
-      await prisma.atsEndpoint.update({
-        where: { id: existing.id },
-        data: {
-          lastSeenAt: now,
-          metadata: meta,
-          ...(companyId && !existing.companyId ? { companyId } : {}),
-        },
+        companyId,
+        sourceUrl,
+        canonicalCollision,
       });
       cache.typeSlugKeys.add(typeSlugKey);
       const boardKey = workdayBoardKeyFromCandidate(candidate);
       if (boardKey) cache.workdayBoardKeys.add(boardKey);
-      const intel = parseOpenClawDiscoveryIntel(meta);
-      logger.info(
-        {
-          event: "openclaw_ats_endpoint_rediscovered",
-          provider: "openclaw",
-          endpointId: existing.id,
-          type: candidate.type,
-          slug: candidate.slug,
-          discovery_seen_count: intel?.discoverySeenCount,
-          activation_readiness_score: intel?.activationReadinessScore,
-          activation_candidate_tier: intel?.activationCandidateTier,
-          freshness_confidence: intel?.freshnessConfidence,
-        },
-        "openclaw_ats_endpoint_rediscovered",
-      );
       return { status: "updated_seen", endpointId: existing.id };
     }
 

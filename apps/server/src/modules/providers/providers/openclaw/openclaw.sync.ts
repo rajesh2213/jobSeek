@@ -43,6 +43,7 @@ import {
   buildEndpointDedupeCache,
   persistInactiveOpenClawEndpoint,
   shouldSkipOpenClawPersist,
+  touchInactiveOpenClawEndpointOnRediscovery,
   type OpenClawEndpointDedupeCache,
 } from "./openclaw.atsPersist.js";
 import { runOpenClawInventoryIntelligenceSweep } from "./openclaw.inventorySweep.js";
@@ -563,64 +564,96 @@ export async function runOpenClawSync(ctx: OpenClawSyncContext): Promise<{
               await recordOpenClawAtsDiscoveryEval(redis, discoveryResult);
               mergeAtsDiscoveryIntoSummary(atsDiscoverySummary, discoveryResult);
 
-              if (
-                cfg.atsDiscoveryPersist &&
-                discoveryResult.outcome.status === "would_create" &&
-                jobRow?.companyId
-              ) {
-                const cand = discoveryResult.outcome.candidate;
-                const skipReason = shouldSkipOpenClawPersist({
-                  candidate: cand,
-                  cache: endpointDedupeCache,
-                  canonicalCollision,
-                  dryRun: cfg.dryRun,
-                  sourceUrl: sourceUrlForDiscovery,
-                });
-                if (skipReason) {
-                  atsDiscoverySummary.persist_skipped += 1;
-                  if (skipReason === "collision_in_sync") {
-                    await incrOpenClawMetric(redis, "ats_discovery_persist_skipped_collision", 1);
-                  } else if (skipReason === "low_confidence") {
-                    await incrOpenClawMetric(redis, "ats_discovery_persist_skipped_low_confidence", 1);
-                  } else if (skipReason === "suspicious_slug") {
-                    await incrOpenClawMetric(redis, "ats_discovery_persist_skipped_suspicious_slug", 1);
-                  } else if (
-                    skipReason === "existing_endpoint" ||
-                    skipReason === "existing_workday_board"
-                  ) {
-                    await incrOpenClawMetric(redis, "ats_discovery_persist_skipped_existing", 1);
-                  }
-                } else {
+              if (cfg.atsDiscoveryPersist && jobRow?.companyId) {
+                const cand =
+                  discoveryResult.outcome.status === "would_create" ||
+                  discoveryResult.outcome.status === "existing_endpoint"
+                    ? discoveryResult.outcome.candidate
+                    : null;
+
+                if (cand && discoveryResult.outcome.status === "existing_endpoint") {
                   try {
-                    const persistResult = await persistInactiveOpenClawEndpoint(ctx.prisma, {
-                      candidate: cand,
-                      companyId: jobRow.companyId,
-                      cache: endpointDedupeCache,
-                      sourceUrl: sourceUrlForDiscovery,
-                      canonicalCollision,
-                    });
-                    if (persistResult.status === "created") {
-                      atsDiscoverySummary.persist_created += 1;
-                      await incrOpenClawMetric(redis, "ats_discovery_persist_created", 1);
-                    } else if (persistResult.status === "updated_seen") {
+                    const touchResult = await touchInactiveOpenClawEndpointOnRediscovery(
+                      ctx.prisma,
+                      {
+                        candidate: cand,
+                        companyId: jobRow.companyId,
+                        sourceUrl: sourceUrlForDiscovery,
+                        canonicalCollision,
+                        dryRun: cfg.dryRun,
+                      },
+                    );
+                    if (touchResult.status === "updated_seen") {
                       atsDiscoverySummary.persist_updated_seen += 1;
                       await incrOpenClawMetric(redis, "ats_discovery_persist_updated_seen", 1);
-                    } else {
-                      atsDiscoverySummary.persist_skipped += 1;
-                      await incrOpenClawMetric(redis, "ats_discovery_persist_skipped_existing", 1);
                     }
-                  } catch (persistErr) {
+                  } catch (touchErr) {
                     logger.warn(
                       {
-                        event: "openclaw_ats_persist_failed",
+                        event: "openclaw_ats_rediscovery_touch_failed",
                         provider: "openclaw",
                         canonical_id: canonical.id,
                         type: cand.type,
                         slug: cand.slug,
-                        err: persistErr,
+                        err: touchErr,
                       },
-                      "openclaw_ats_persist_failed",
+                      "openclaw_ats_rediscovery_touch_failed",
                     );
+                  }
+                } else if (cand && discoveryResult.outcome.status === "would_create") {
+                  const skipReason = shouldSkipOpenClawPersist({
+                    candidate: cand,
+                    cache: endpointDedupeCache,
+                    canonicalCollision,
+                    dryRun: cfg.dryRun,
+                    sourceUrl: sourceUrlForDiscovery,
+                  });
+                  if (skipReason) {
+                    atsDiscoverySummary.persist_skipped += 1;
+                    if (skipReason === "collision_in_sync") {
+                      await incrOpenClawMetric(redis, "ats_discovery_persist_skipped_collision", 1);
+                    } else if (skipReason === "low_confidence") {
+                      await incrOpenClawMetric(redis, "ats_discovery_persist_skipped_low_confidence", 1);
+                    } else if (skipReason === "suspicious_slug") {
+                      await incrOpenClawMetric(redis, "ats_discovery_persist_skipped_suspicious_slug", 1);
+                    } else if (
+                      skipReason === "existing_endpoint" ||
+                      skipReason === "existing_workday_board"
+                    ) {
+                      await incrOpenClawMetric(redis, "ats_discovery_persist_skipped_existing", 1);
+                    }
+                  } else {
+                    try {
+                      const persistResult = await persistInactiveOpenClawEndpoint(ctx.prisma, {
+                        candidate: cand,
+                        companyId: jobRow.companyId,
+                        cache: endpointDedupeCache,
+                        sourceUrl: sourceUrlForDiscovery,
+                        canonicalCollision,
+                      });
+                      if (persistResult.status === "created") {
+                        atsDiscoverySummary.persist_created += 1;
+                        await incrOpenClawMetric(redis, "ats_discovery_persist_created", 1);
+                      } else if (persistResult.status === "updated_seen") {
+                        atsDiscoverySummary.persist_updated_seen += 1;
+                        await incrOpenClawMetric(redis, "ats_discovery_persist_updated_seen", 1);
+                      } else {
+                        atsDiscoverySummary.persist_skipped += 1;
+                        await incrOpenClawMetric(redis, "ats_discovery_persist_skipped_existing", 1);
+                      }
+                    } catch (persistErr) {
+                      logger.warn(
+                        {
+                          event: "openclaw_ats_persist_failed",
+                          provider: "openclaw",
+                          canonical_id: canonical.id,
+                          type: cand.type,
+                          slug: cand.slug,
+                          err: persistErr,
+                        },
+                        "openclaw_ats_persist_failed",
+                      );
+                    }
                   }
                 }
               }

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildEndpointDedupeCache,
   shouldSkipOpenClawPersist,
+  touchInactiveOpenClawEndpointOnRediscovery,
   workdayBoardKeyFromCandidate,
 } from "../../../../../src/modules/providers/providers/openclaw/openclaw.atsPersist.js";
 import { buildWorkdaySlug } from "../../../../../src/modules/atsDiscovery/atsUrlParser.js";
@@ -65,6 +66,28 @@ describe("shouldSkipOpenClawPersist", () => {
       sourceUrl: "https://boards.greenhouse.io/acme/jobs/1",
     });
     assert.equal(reason, "dry_run");
+  });
+});
+
+describe("touchInactiveOpenClawEndpointOnRediscovery", () => {
+  test("skips dry run without DB", async () => {
+    const result = await touchInactiveOpenClawEndpointOnRediscovery(
+      { atsEndpoint: { findUnique: async () => null } } as never,
+      {
+        candidate: {
+          type: "ashby",
+          slug: "acme",
+          baseUrl: "https://jobs.ashbyhq.com/acme",
+          crawlToken: "acme",
+        },
+        companyId: "c1",
+        sourceUrl: "https://jobs.ashbyhq.com/acme/j/1",
+        canonicalCollision: false,
+        dryRun: true,
+      },
+    );
+    assert.equal(result.status, "skipped");
+    if (result.status === "skipped") assert.equal(result.reason, "dry_run");
   });
 });
 
