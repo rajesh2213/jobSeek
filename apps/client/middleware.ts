@@ -26,16 +26,15 @@ export default clerkMiddleware(async (auth, req) => {
  * return `{ userId: null }`.
  *
  * Excluded (no server-side auth): /, /about, /privacy, /terms, /support, /billing,
- *   /companies, /company/*, /jobs/browse, /pricing, /sitemap.xml, /robots.txt,
- *   /sign-in, /sign-up, /applications, /saved-searches, /smart-apply,
- *   /features/* (public SEO landing pages), static assets.
+ *   /companies, /company/*, /job/*, /jobs, /jobs/* (SEO ISR), /jobs/browse, /pricing,
+ *   /sitemap.xml, /robots.txt, /sign-in, /sign-up, /applications, /saved-searches,
+ *   /smart-apply, /features/* (public SEO landing pages), /api/companies,
+ *   /api/seo/aggregations, static assets.
  */
 export const config = {
   matcher: [
     "/account/:path*",
-    "/job/:path*",
-    "/jobs",
-    "/jobs/:path+",
-    "/api/:path*",
+    "/api/jobs",
+    "/api/user/me",
   ],
 };

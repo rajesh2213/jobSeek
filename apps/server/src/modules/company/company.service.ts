@@ -281,6 +281,8 @@ export class CompanyService {
       filters?: Omit<JobDiscoveryFilters, "companyId">;
       sort?: "latest" | "salary_desc";
       includeProcessing?: boolean;
+      /** Force exact COUNT (e.g. pagination UI). */
+      includeExactTotal?: boolean;
     },
   ): Promise<{ company: Company; jobs: PaginatedResult<JobWithCompany> } | null> {
     const company = await this.companyRepository.findBySlug(slug);
@@ -291,9 +293,6 @@ export class CompanyService {
       companyId: company.id,
     };
 
-    const total = await this.jobRepository.countCanonicalFiltered(filters, {
-      includeProcessing: input.includeProcessing,
-    });
     const stride =
       typeof input.paginationStride === "number" && input.paginationStride > 0
         ? input.paginationStride
@@ -307,8 +306,27 @@ export class CompanyService {
       includeProcessing: input.includeProcessing,
     });
 
-    const totalPages = Math.ceil(total / stride) || 1;
-    const hasMore = skip + items.length < total;
+    const skipExactCount =
+      process.env.COMPANY_JOBS_SKIP_EXACT_COUNT === "1" &&
+      input.page <= 1 &&
+      !input.includeExactTotal;
+
+    let total: number | null;
+    let totalPages: number | undefined;
+    let hasMore: boolean;
+
+    if (skipExactCount) {
+      total = null;
+      totalPages = undefined;
+      hasMore = items.length === input.limit;
+    } else {
+      const exactTotal = await this.jobRepository.countCanonicalFiltered(filters, {
+        includeProcessing: input.includeProcessing,
+      });
+      total = exactTotal;
+      totalPages = Math.ceil(exactTotal / stride) || 1;
+      hasMore = skip + items.length < exactTotal;
+    }
 
     return {
       company,

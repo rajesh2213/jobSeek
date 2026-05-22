@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { loadCompanyBySlug } from "../../../../lib/jobsPageData";
+import {
+  loadCompanyBySlug,
+  loadCompanyHubInitialJobs,
+  stableJobFiltersKey,
+} from "../../../../lib/jobsPageData";
 import { buildBreadcrumbListJsonLd } from "../../../../lib/seo";
 import { absoluteUrl } from "../../../../lib/seoSite";
 import { decideCompanySeoPolicy } from "../../../../lib/seoIndexability";
@@ -84,13 +88,9 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
       ? hubFilters.limit
       : HUB_LIMIT;
 
-  const meta = {
-    page: 1,
-    pageSize: limit,
-    total: 0,
-    totalPages: 1,
-    hasMore: false,
-  };
+  const hubFiltersKey = stableJobFiltersKey(hubFilters);
+  const initialListing = await loadCompanyHubInitialJobs(slug, hubFiltersKey, limit);
+  const meta = initialListing.meta;
 
   return (
     <>
@@ -121,7 +121,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
       <CompanyHubPage
         company={company}
         slug={slug}
-        initialJobs={[]}
+        initialJobs={initialListing.jobs}
         initialMeta={meta}
         relatedCompanies={[]}
       />

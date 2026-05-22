@@ -33,6 +33,9 @@ import { EmailCaptureCard } from "../../../../components/email/EmailCaptureCard"
 import { JobDetailPosthogTracker } from "../../../../components/analytics/JobDetailPosthogTracker";
 import { buildJobDetailSeo } from "../../../../lib/seoJobDetail";
 
+/** Anonymous crawlers and repeat views share ISR; authenticated path stays dynamic via loader. */
+export const revalidate = 300;
+
 interface Props {
   params: Promise<{ id: string }>;
 }

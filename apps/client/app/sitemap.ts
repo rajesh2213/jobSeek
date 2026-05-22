@@ -12,11 +12,9 @@ import {
 } from "../lib/seoIndexability";
 
 /**
- * Deployment stabilization:
- * - Prevent build-time prerender execution for /sitemap.xml.
- * - Keep runtime generation on Node where Buffer/process telemetry is used.
+ * Runtime generation on Node (Buffer/process telemetry). Payload is memoized via
+ * `unstable_cache` below — do not force-dynamic or every sitemap poll pays full CPU.
  */
-export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 function parseBoundedIntEnv(

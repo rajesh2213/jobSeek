@@ -1361,8 +1361,12 @@ export async function fetchCompanyJobs(
     token?: string | null;
     /** Server-side only: pass through client IP chain to API for anon caps. */
     forwardedFor?: string | null;
+    /** Server-side internal SEO bypass (SSR crawlers). */
+    internalSeoSecret?: string | null;
     /** Server-side callsite label for SSR attribution. */
     ssrPage?: string;
+    /** Abort slow upstream reads (SSR budget). */
+    signal?: AbortSignal | null;
   } = {},
 ): Promise<JobsApiResponse> {
   const page = options.page ?? 1;
@@ -1379,13 +1383,23 @@ export async function fetchCompanyJobs(
   const headers = new Headers();
   const t = options.token?.trim();
   if (t) headers.set("Authorization", `Bearer ${t}`);
+  const internalSeoSecret = options.internalSeoSecret?.trim();
+  const internalBypass = typeof window === "undefined" && Boolean(internalSeoSecret);
+  if (internalBypass) {
+    headers.set("x-internal-seo", "true");
+    headers.set("x-internal-seo-secret", internalSeoSecret as string);
+  }
   const forwardedFor = options.forwardedFor?.trim();
   if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
   if (typeof window === "undefined") {
     headers.set("x-ssr-origin", "next-server");
     headers.set("x-ssr-page", options.ssrPage?.trim() || "company");
   }
-  const res = await fetch(url, { headers, cache: "no-store" });
+  const fetchOptions: RequestInit & { next?: { revalidate?: number } } = internalBypass
+    ? { headers, next: { revalidate: 120 } }
+    : { headers, cache: "no-store" };
+  if (options.signal) fetchOptions.signal = options.signal;
+  const res = await fetch(url, fetchOptions);
   if (res.status === 404) {
     return {
       data: [],

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   loadJobsDiscoveryPage,
@@ -52,7 +51,6 @@ interface Props {
 }
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
-  noStore();
   const { slug } = await params;
   const sp = await searchParams;
   const parsed = parseSlugWithMeta(slug);
@@ -78,7 +76,6 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 }
 
 export default async function JobsSeoPage({ params, searchParams }: Props) {
-  noStore();
   const { slug } = await params;
   const sp = await searchParams;
   const parsed = parseSlugWithMeta(slug);

@@ -3,12 +3,19 @@ import { auth } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
 import {
   fetchCompanyBySlug,
+  fetchCompanyJobs,
   fetchJobById,
   fetchJobs,
   type CompanyDetail,
   type JobDetailFetchResult,
+  type JobItem,
   type JobsApiResponse,
 } from "./api";
+import {
+  hasClerkSessionCookie,
+  ssrCompanyJobsEnabled,
+  usePublicSeoLoaders,
+} from "./ssrAuthMode";
 import {
   type JobFilters,
   MAX_JOB_FILTER_QUERY_TOKENS,
@@ -65,10 +72,7 @@ export function stableJobFiltersKey(filters: JobFilters): string {
   return JSON.stringify(sorted);
 }
 
-/**
- * One `GET /jobs` per request for a given filter set (shared by `generateMetadata` and page RSC).
- */
-export const loadJobsDiscoveryPage = cache(
+const loadJobsDiscoveryPageAuthenticated = cache(
   async (filtersKey: string): Promise<JobsApiResponse> => {
     try {
       const filters = JSON.parse(filtersKey) as JobFilters;
@@ -88,16 +92,49 @@ export const loadJobsDiscoveryPage = cache(
             forwardedFor,
             signal,
             ssrPage: "jobs",
-            // Do not send internal SEO bypass: user-facing discovery must mirror browser `fetchJobs`
-            // (metering + `viewCapUnlimited`). Bypass here hid the quota strip on first paint and let
-            // cached “unlimited” meta diverge from the first real client request (e.g. load more → 0/75
-            // when the IP bucket was already exhausted). Keep bypass for non-listing SSR (e.g. weekly count).
           },
         ),
       );
     } catch {
       return EMPTY_JOBS_RESPONSE;
     }
+  },
+);
+
+/** SEO / crawler listing SSR — internal bypass, no per-visitor IP (ISR-safe shared cache). */
+const loadJobsDiscoveryPagePublic = cache(
+  async (filtersKey: string): Promise<JobsApiResponse> => {
+    try {
+      const filters = JSON.parse(filtersKey) as JobFilters;
+      return await withSsrUpstreamTimeout((signal) =>
+        fetchJobs(
+          {
+            ...filters,
+            page: filters.page ?? 1,
+            limit: filters.limit ?? 20,
+          },
+          {
+            internalSeoSecret: process.env.INTERNAL_SEO_SECRET ?? null,
+            signal,
+            ssrPage: "jobs-seo",
+          },
+        ),
+      );
+    } catch {
+      return EMPTY_JOBS_RESPONSE;
+    }
+  },
+);
+
+/**
+ * One `GET /jobs` per request for a given filter set (shared by `generateMetadata` and page RSC).
+ */
+export const loadJobsDiscoveryPage = cache(
+  async (filtersKey: string): Promise<JobsApiResponse> => {
+    if (usePublicSeoLoaders() && !(await hasClerkSessionCookie())) {
+      return loadJobsDiscoveryPagePublic(filtersKey);
+    }
+    return loadJobsDiscoveryPageAuthenticated(filtersKey);
   },
 );
 
@@ -137,19 +174,7 @@ export function loadJobsListingDeferred(input: {
   return { jobsDataPromise };
 }
 
-/**
- * One fetch per request for a given job ID (shared by `generateMetadata` and page RSC).
- *
- * Mirrors the `loadJobsDiscoveryPage` deduplication pattern.  Without this wrapper both
- * `generateMetadata` and the page component independently call `auth()` + `fetchJobById`,
- * doubling the Clerk session resolution AND the upstream Fastify round-trip on every SSR.
- * React `cache()` deduplicates by argument identity within a single server render so the
- * second call is a no-op lookup.
- *
- * `fetchJobById` itself applies two-tier caching internally: ISR (5 min) for anonymous
- * traffic, `no-store` for authenticated requests — so metering is preserved.
- */
-export const loadJobDetailPage = cache(
+const loadJobDetailPageAuthenticated = cache(
   async (id: string): Promise<JobDetailFetchResult | null> => {
     try {
       const { getToken } = await auth();
@@ -165,6 +190,31 @@ export const loadJobDetailPage = cache(
   },
 );
 
+/** Anon job detail — no `x-forwarded-for` so Next Data Cache shares one entry per job id. */
+const loadJobDetailPagePublic = cache(
+  async (id: string): Promise<JobDetailFetchResult | null> => {
+    try {
+      return await withSsrUpstreamTimeout((signal) =>
+        fetchJobById(id, { signal }),
+      );
+    } catch {
+      return null;
+    }
+  },
+);
+
+/**
+ * One fetch per request for a given job ID (shared by `generateMetadata` and page RSC).
+ */
+export const loadJobDetailPage = cache(
+  async (id: string): Promise<JobDetailFetchResult | null> => {
+    if (usePublicSeoLoaders() && !(await hasClerkSessionCookie())) {
+      return loadJobDetailPagePublic(id);
+    }
+    return loadJobDetailPageAuthenticated(id);
+  },
+);
+
 /** Company hub SSR: never throw on upstream timeout/500. */
 export const loadCompanyBySlug = cache(async (slug: string): Promise<CompanyDetail | null> => {
   try {
@@ -173,3 +223,100 @@ export const loadCompanyBySlug = cache(async (slug: string): Promise<CompanyDeta
     return null;
   }
 });
+
+export interface CompanyHubInitialListing {
+  jobs: JobItem[];
+  meta: NonNullable<JobsApiResponse["meta"]>;
+}
+
+const emptyHubMeta = (limit: number): NonNullable<JobsApiResponse["meta"]> => ({
+  page: 1,
+  pageSize: limit,
+  total: 0,
+  totalPages: 1,
+  hasMore: false,
+});
+
+const loadCompanyHubInitialJobsPublic = cache(
+  async (
+    slug: string,
+    hubFiltersKey: string,
+    limit: number,
+  ): Promise<CompanyHubInitialListing> => {
+    try {
+      const filters = JSON.parse(hubFiltersKey) as Omit<JobFilters, "companyId">;
+      const res = await withSsrUpstreamTimeout((signal) =>
+        fetchCompanyJobs(slug, {
+          page: 1,
+          limit,
+          filters: {
+            ...filters,
+            page: undefined,
+            limit: undefined,
+            offset: undefined,
+          },
+          internalSeoSecret: process.env.INTERNAL_SEO_SECRET ?? null,
+          signal,
+          ssrPage: "company-seo",
+        }),
+      );
+      const meta = res.meta ?? emptyHubMeta(limit);
+      return { jobs: res.data, meta };
+    } catch {
+      return { jobs: [], meta: emptyHubMeta(limit) };
+    }
+  },
+);
+
+const loadCompanyHubInitialJobsAuthenticated = cache(
+  async (
+    slug: string,
+    hubFiltersKey: string,
+    limit: number,
+  ): Promise<CompanyHubInitialListing> => {
+    try {
+      const filters = JSON.parse(hubFiltersKey) as Omit<JobFilters, "companyId">;
+      const { getToken } = await auth();
+      const token = await getToken();
+      const h = await headers();
+      const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
+      const res = await withSsrUpstreamTimeout((signal) =>
+        fetchCompanyJobs(slug, {
+          page: 1,
+          limit,
+          filters: {
+            ...filters,
+            page: undefined,
+            limit: undefined,
+            offset: undefined,
+          },
+          token,
+          forwardedFor,
+          signal,
+          ssrPage: "company",
+        }),
+      );
+      const meta = res.meta ?? emptyHubMeta(limit);
+      return { jobs: res.data, meta };
+    } catch {
+      return { jobs: [], meta: emptyHubMeta(limit) };
+    }
+  },
+);
+
+/** First page of company jobs for SSR (crawlers + first paint). */
+export const loadCompanyHubInitialJobs = cache(
+  async (
+    slug: string,
+    hubFiltersKey: string,
+    limit: number,
+  ): Promise<CompanyHubInitialListing> => {
+    if (!ssrCompanyJobsEnabled()) {
+      return { jobs: [], meta: emptyHubMeta(limit) };
+    }
+    if (usePublicSeoLoaders() && !(await hasClerkSessionCookie())) {
+      return loadCompanyHubInitialJobsPublic(slug, hubFiltersKey, limit);
+    }
+    return loadCompanyHubInitialJobsAuthenticated(slug, hubFiltersKey, limit);
+  },
+);

@@ -35,6 +35,8 @@ export const getCompanyJobsQuerySchema: FastifySchema = {
       minSalary: { type: "integer", minimum: 0 },
       sort: { type: "string", enum: ["latest", "salary", "salary_desc"] },
       includeProcessing: { type: "boolean" },
+      /** When true, runs exact COUNT even if COMPANY_JOBS_SKIP_EXACT_COUNT is enabled for page 1. */
+      includeTotal: { type: "boolean" },
     },
     additionalProperties: false,
   },
