@@ -6,6 +6,8 @@ import {
   getSourceQualityWeight,
 } from "./jobRanking.service.js";
 import { logger } from "../utils/logger.js";
+import { deriveJobSkills } from "../utils/jobSkills.js";
+import { filterSkillsByJobContext } from "../utils/taxonomyNormalizer.js";
 import { isValidJobUrl } from "../utils/url.js";
 
 /**
@@ -49,6 +51,43 @@ export function mergeSkillsUnion(jobs: Pick<Job, "skills">[]): string[] {
     for (const x of j.skills ?? []) s.add(x);
   }
   return Array.from(s).sort();
+}
+
+/** Union duplicate-row skills, then apply occupation/category filters for the canonical title. */
+export function mergeSkillsUnionForCanonical(
+  jobs: Pick<Job, "skills">[],
+  title: string,
+  category: string,
+): string[] {
+  return filterSkillsByJobContext(mergeSkillsUnion(jobs), title, category);
+}
+
+/** Recompute skills from incoming ingest row; null when unchanged vs stored. */
+export function computeSkillsPatchFromReingest(
+  row: {
+    title: string;
+    description: string | null;
+    isRemote: boolean;
+    locationCity: string | null;
+    category: string | null;
+    skills: string[];
+  },
+  incoming: Pick<
+    DedupJobInput,
+    "title" | "description" | "isRemote" | "category" | "locationCity"
+  >,
+): string[] | null {
+  const next = deriveJobSkills({
+    title: incoming.title,
+    description: incoming.description ?? undefined,
+    location: incoming.locationCity ?? row.locationCity ?? undefined,
+    isRemote: incoming.isRemote,
+    category: incoming.category ?? row.category,
+  });
+  const curKey = [...(row.skills ?? [])].map((s) => s.trim().toLowerCase()).sort().join("\0");
+  const nextKey = [...next].map((s) => s.trim().toLowerCase()).sort().join("\0");
+  if (curKey === nextKey) return null;
+  return next;
 }
 
 /** Prefer ISO country from highest-quality source; ignore UNKNOWN when possible. */
@@ -378,7 +417,7 @@ export function aggregateCanonicalFromSources(jobs: Job[]): {
   const locMerged = mergeStructuredLocationFromSources(ordered);
   const country = locMerged.country;
   const category = mergeCategorySlug(ordered);
-  const skills = mergeSkillsUnion(ordered);
+  const skills = mergeSkillsUnionForCanonical(ordered, title, category);
 
   let isRemote = ordered[0].isRemote;
   for (let i = 1; i < ordered.length; i++) {

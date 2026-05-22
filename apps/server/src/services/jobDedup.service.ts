@@ -111,8 +111,9 @@ export async function deduplicateAndInsert(
       existingByUrl.id,
       input,
     );
+    const skillsMerged = await repo.mergeSkillsFromReingest(existingByUrl.id, input);
     let canonical = await repo.resolveCanonicalJob(existingByUrl);
-    if (postedMerged || locationMerged || workModeMerged) {
+    if (postedMerged || locationMerged || workModeMerged || skillsMerged) {
       await recomputeCanonical(repo, canonical.id);
       const fresh = await repo.findByIdRaw(canonical.id);
       if (fresh) canonical = fresh;
@@ -217,8 +218,9 @@ export async function deduplicateAndInsert(
           input,
         );
         const workModeMerged = await repo.mergeWorkModeFromReingest(existing.id, input);
+        const skillsMerged = await repo.mergeSkillsFromReingest(existing.id, input);
         let canonicalExisting = await repo.resolveCanonicalJob(existing);
-        if (postedMerged || locationMerged || workModeMerged) {
+        if (postedMerged || locationMerged || workModeMerged || skillsMerged) {
           await recomputeCanonical(repo, canonicalExisting.id);
           const fresh = await repo.findByIdRaw(canonicalExisting.id);
           if (fresh) canonicalExisting = fresh;

@@ -179,6 +179,40 @@ export function filterSkillsByDomainContradiction(
   return kept;
 }
 
+/** Categories where software-only slugs are dropped unless the title signals a tech role. */
+const CATEGORY_STRIPS_SOFTWARE_UNLESS_TECH_TITLE = new Set([
+  "healthcare",
+  "education",
+  "hr",
+]);
+
+/**
+ * Titles that may legitimately list software skills even when category is healthcare/other.
+ * e.g. "Engineer, Contact Center Technology", "Lead Tech Analyst, Finance Information Systems".
+ */
+export const TECH_COMPATIBLE_TITLE_RE =
+  /\b(software|engineer|engineering|developer|programmer|devops|sre|data\s*engineer|ml\s*engineer|machine\s*learning|platform\s*engineer|infrastructure|architect|backend|frontend|full[\s-]?stack|\btech\b|information\s+systems|contact\s+center\s+technology|systems\s+analyst|technical\s+operations|tech\s+analyst)\b/i;
+
+/**
+ * Apply title-based occupation filter, then category gate for non-tech industries.
+ */
+export function filterSkillsByJobContext(
+  skills: string[],
+  title: string,
+  category?: string | null,
+): string[] {
+  let out = filterSkillsByDomainContradiction(skills, title);
+  const cat = category?.trim().toLowerCase();
+  if (
+    cat &&
+    CATEGORY_STRIPS_SOFTWARE_UNLESS_TECH_TITLE.has(cat) &&
+    !TECH_COMPATIBLE_TITLE_RE.test(title)
+  ) {
+    out = out.filter((s) => !SOFTWARE_ONLY_SKILL_SLUGS.has(s.toLowerCase()));
+  }
+  return out;
+}
+
 /**
  * Resolve raw ATS location text → structured location (backend authority).
  */

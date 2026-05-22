@@ -4,7 +4,9 @@ import {
   normalizeSkills,
   normalizeJobAttributes,
   filterSkillsByDomainContradiction,
+  filterSkillsByJobContext,
 } from "../../../src/utils/taxonomyNormalizer.js";
+import { deriveJobSkills } from "../../../src/utils/jobSkills.js";
 import {
   SKILL_ALIAS_ENTRIES,
   SKILL_ALIAS_MAP,
@@ -216,6 +218,51 @@ describe("filterSkillsByDomainContradiction", () => {
     );
     assert.ok(!filtered.includes("docker"));
     assert.ok(filtered.includes("sql"));
+  });
+});
+
+describe("filterSkillsByJobContext", () => {
+  it("strips software skills from healthcare category when title is not tech", () => {
+    const filtered = filterSkillsByJobContext(
+      ["golang", "typescript", "aws", "recruiting", "excel"],
+      "Analyst, Performance Suite Analytics",
+      "healthcare",
+    );
+    assert.ok(!filtered.includes("golang"));
+    assert.ok(!filtered.includes("typescript"));
+    assert.ok(!filtered.includes("aws"));
+    assert.ok(filtered.includes("recruiting") || filtered.includes("excel"));
+  });
+
+  it("keeps software skills for healthcare title with tech signal", () => {
+    const filtered = filterSkillsByJobContext(
+      ["golang", "python", "kubernetes"],
+      "Engineer, Contact Center Technology",
+      "healthcare",
+    );
+    assert.ok(filtered.includes("golang"));
+    assert.ok(filtered.includes("python"));
+  });
+});
+
+describe("deriveJobSkills — Evolent-style boilerplate", () => {
+  const EVOLENT_BLOB = [
+    "Your Future Evolves Here Evolent partners with health plans.",
+    "Join Evolent for the mission. Stay for the culture.",
+    "Ongoing training provided. Support from leadership.",
+    "Must go to our careers page for more.",
+  ].join(" ");
+
+  it("does not tag Field Medical Director roles with golang/typescript", () => {
+    const skills = deriveJobSkills({
+      title: "Field Medical Director, Radiology (Pediatric and Adult Neurology)",
+      description: EVOLENT_BLOB,
+      isRemote: false,
+      category: "healthcare",
+    });
+    assert.ok(!skills.includes("golang"), `unexpected: ${skills}`);
+    assert.ok(!skills.includes("typescript"), `unexpected: ${skills}`);
+    assert.ok(!skills.includes("aws"), `unexpected: ${skills}`);
   });
 });
 

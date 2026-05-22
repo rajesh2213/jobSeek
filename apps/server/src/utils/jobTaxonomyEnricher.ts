@@ -1,6 +1,7 @@
 import type { DedupJobInput, NormalizedJob } from "../modules/crawler/crawler.types.js";
 import { logger } from "./logger.js";
 import { deriveExperienceLevel, deriveWorkType, extractSalaryMinUsd, normalizeJobAttributes } from "./taxonomyNormalizer.js";
+import { deriveJobSkills } from "./jobSkills.js";
 
 /**
  * Derive taxonomy + ISO country from raw ATS payload.
@@ -13,6 +14,14 @@ export function enrichDedupInput(
     description: input.description,
     location: input.location,
     isRemote: input.isRemote,
+  });
+  const skills = deriveJobSkills({
+    title: input.title,
+    description: input.description,
+    location: input.location,
+    isRemote: input.isRemote,
+    category: attrs.category,
+    taxonomySkills: attrs.skills,
   });
 
   let salaryMin: number | null = null;
@@ -55,7 +64,7 @@ export function enrichDedupInput(
     companyDomain: input.companyDomain,
     category: attrs.category,
     role: attrs.role,
-    skills: attrs.skills,
+    skills,
     country: attrs.country,
     locationCity: attrs.city,
     locationState: attrs.state,

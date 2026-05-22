@@ -3,8 +3,10 @@ import { describe, it } from "node:test";
 import type { Job } from "@prisma/client";
 import {
   computeLocationPatchFromReingest,
+  computeSkillsPatchFromReingest,
   computeWorkModePatchFromReingest,
   isMissingLocation,
+  mergeSkillsUnionForCanonical,
   mergeStructuredLocationFromSources,
 } from "../../../src/services/jobCanonical.service.js";
 import { deduplicateAndInsert } from "../../../src/services/jobDedup.service.js";
@@ -235,6 +237,68 @@ describe("computeWorkModePatchFromReingest", () => {
   });
 });
 
+describe("computeSkillsPatchFromReingest", () => {
+  it("returns patch when stale software skills are stored on healthcare row", () => {
+    const patch = computeSkillsPatchFromReingest(
+      {
+        title: "Field Medical Director, Radiology",
+        description: "Ongoing support. Go to careers.",
+        isRemote: false,
+        locationCity: null,
+        category: "healthcare",
+        skills: ["golang", "typescript", "aws", "recruiting"],
+      },
+      {
+        title: "Field Medical Director, Radiology",
+        description: "Ongoing support. Go to careers.",
+        isRemote: false,
+        category: "healthcare",
+        locationCity: null,
+      },
+    );
+    assert.notEqual(patch, null);
+    assert.ok(!patch!.includes("golang"));
+    assert.ok(!patch!.includes("typescript"));
+  });
+
+  it("returns null when stored skills already match recompute", () => {
+    const patch = computeSkillsPatchFromReingest(
+      {
+        title: "Financial Analyst",
+        description: "Excel and SQL required.",
+        isRemote: false,
+        locationCity: "NYC",
+        category: "finance",
+        skills: ["excel", "sql"],
+      },
+      {
+        title: "Financial Analyst",
+        description: "Excel and SQL required.",
+        isRemote: false,
+        category: "finance",
+        locationCity: "NYC",
+      },
+    );
+    assert.equal(patch, null);
+  });
+});
+
+describe("mergeSkillsUnionForCanonical", () => {
+  it("filters contaminated union for healthcare canonical title", () => {
+    const skills = mergeSkillsUnionForCanonical(
+      [
+        { skills: ["golang", "typescript"] },
+        { skills: ["aws", "recruiting"] },
+      ],
+      "Analyst, Performance Suite Analytics",
+      "healthcare",
+    );
+    assert.ok(!skills.includes("golang"));
+    assert.ok(!skills.includes("typescript"));
+    assert.ok(skills.includes("recruiting"));
+  });
+});
+
 describe("deduplicateAndInsert idempotent path", () => {
   it("merges structured location and recomputes canonical when location backfills", async () => {
     const existing = jobBase({
@@ -253,6 +317,7 @@ describe("deduplicateAndInsert idempotent path", () => {
       mergePostedAtIfEarlier: async () => false,
       mergeStructuredLocationFromReingest: async () => true,
       mergeWorkModeFromReingest: async () => false,
+      mergeSkillsFromReingest: async () => false,
       resolveCanonicalJob: async (j: Job) => j,
       findByIdRaw: async (id: string) =>
         id === existing.id ? { ...existing, country: "IE", locationCountry: "IE" } : null,

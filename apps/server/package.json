@@ -48,6 +48,7 @@
     "diagnose:redis-viewcap": "tsx scripts/diagnose.redis.viewcap.ts",
     "metrics": "tsx src/scripts/metrics.snapshot.ts",
     "explain:job-listing": "tsx scripts/explain.jobListing.ts",
+    "backfill:job-skills": "tsx src/scripts/backfillJobSkills.ts",
     "probe:job-list-shadow": "tsx scripts/probe.jobListShadow.ts",
     "diag:pg-activity": "tsx scripts/pgActivity.snapshot.ts",
     "ingestion:baseline": "tsx scripts/ingestion/captureBaseline.ts",

@@ -6,7 +6,7 @@ import { Prisma } from "@prisma/client";
 import { loadRootEnv } from "../infrastructure/env/loadEnv.js";
 import { prisma } from "../infrastructure/db/prisma.js";
 import { enrichJob } from "../modules/enrichment/enrichment.service.js";
-import { normalizeJobAttributes } from "../utils/taxonomyNormalizer.js";
+import { deriveJobSkills } from "../utils/jobSkills.js";
 import { logger } from "../utils/logger.js";
 
 function jsonObjectOrEmpty(value: Prisma.JsonValue | null | undefined): Record<string, unknown> {
@@ -34,6 +34,7 @@ async function main(): Promise<void> {
       description: true,
       isRemote: true,
       locationCity: true,
+      category: true,
       skills: true,
       enriched: true,
       parsedDescription: true,
@@ -45,13 +46,6 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
-
-  const attrs = normalizeJobAttributes({
-    title: row.title,
-    description: row.description ?? undefined,
-    location: row.locationCity ?? undefined,
-    isRemote: row.isRemote,
-  });
 
   const existingEnriched = jsonObjectOrEmpty(row.enriched);
   const computedEnriched = row.parsedDescription
@@ -67,7 +61,14 @@ async function main(): Promise<void> {
     ? tech.filter((x): x is string => typeof x === "string")
     : [];
 
-  const newSkills = attrs.skills;
+  const newSkills = deriveJobSkills({
+    title: row.title,
+    description: row.description ?? undefined,
+    location: row.locationCity ?? undefined,
+    isRemote: row.isRemote,
+    category: row.category,
+    enrichmentTechStack: techStack,
+  });
 
   await prisma.job.update({
     where: { id: jobId },

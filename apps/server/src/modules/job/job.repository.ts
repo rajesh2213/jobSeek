@@ -18,8 +18,10 @@ import { jobListRequestDiag } from "./jobListRequestContext.js";
 import { expandLocationFilter, getRegions } from "../../utils/locationResolver.js";
 import {
   computeLocationPatchFromReingest,
+  computeSkillsPatchFromReingest,
   computeWorkModePatchFromReingest,
 } from "../../services/jobCanonical.service.js";
+import { deriveJobSkills } from "../../utils/jobSkills.js";
 import { recordStatusTransition } from "../../services/jobStatusMetrics.service.js";
 import { jobParsedNoopSkipEnabled } from "../../utils/jobWriteOptimization.js";
 import {
@@ -36,42 +38,12 @@ const JOB_STATUS_READY: JobStatus = "ready";
 const JOB_STATUS_FAILED: JobStatus = "failed";
 const WORKDAY_ROOT_JOB_PATH_SNIPPET = "myworkdayjobs.com/job/";
 
-function maxMergedSkills(): number {
-  const n = Number(process.env.MAX_MERGED_SKILLS ?? "60");
-  return Math.max(1, Math.min(75, Number.isFinite(n) ? n : 60));
-}
-
 /**
  * Single derived value for `Job.effectivePostedAt` (matches SQL COALESCE(postedAt, createdAt)).
  * Never use wall-clock `now` here — only publication proxy or row ingest time.
  */
 function deriveEffectivePostedAt(postedAt: Date | null, createdAt: Date): Date {
   return postedAt ?? createdAt;
-}
-
-/** Union taxonomy + parsed tech; capped to avoid search/ranking bloat. */
-function mergeJobSkillsList(taxonomySkills: string[], techStack: string[], max: number): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const s of taxonomySkills) {
-    const t = s.trim();
-    if (!t) continue;
-    const k = t.toLowerCase();
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(t);
-    if (out.length >= max) return out;
-  }
-  for (const s of techStack) {
-    const t = s.trim();
-    if (!t) continue;
-    const k = t.toLowerCase();
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(t);
-    if (out.length >= max) return out;
-  }
-  return out;
 }
 
 function safeApplyUrl(url: string | null | undefined): string | null {
@@ -1660,6 +1632,44 @@ export function createJobRepository(prisma: PrismaClient) {
     /**
      * Promote `isRemote` / `workType` when re-ingest parser output is richer (never demotes remote).
      */
+    async mergeSkillsFromReingest(
+      id: string,
+      incoming: Pick<
+        DedupJobInput,
+        "title" | "description" | "isRemote" | "category" | "locationCity"
+      >,
+    ): Promise<boolean> {
+      const row = await prisma.job.findUnique({
+        where: { id },
+        select: {
+          title: true,
+          description: true,
+          isRemote: true,
+          locationCity: true,
+          category: true,
+          skills: true,
+        },
+      });
+      if (!row) return false;
+      const patch = computeSkillsPatchFromReingest(row, incoming);
+      logger.info(
+        {
+          event: "skills_merge",
+          jobId: id,
+          applied: patch !== null,
+          beforeCount: row.skills?.length ?? 0,
+          afterCount: patch?.length ?? row.skills?.length ?? 0,
+        },
+        "skills_merge",
+      );
+      if (!patch) return false;
+      await prisma.job.update({
+        where: { id },
+        data: { skills: patch },
+      });
+      return true;
+    },
+
     async mergeWorkModeFromReingest(
       id: string,
       incoming: Pick<DedupJobInput, "isRemote" | "workType">,
@@ -1921,7 +1931,11 @@ export function createJobRepository(prisma: PrismaClient) {
           skills: true,
           source: true,
           sourceUrl: true,
+          title: true,
           description: true,
+          isRemote: true,
+          locationCity: true,
+          category: true,
           workType: true,
         },
       });
@@ -1956,8 +1970,17 @@ export function createJobRepository(prisma: PrismaClient) {
         ...computedEnriched,
       };
       const tech = computedEnriched.techStack;
-      const techStack: string[] = Array.isArray(tech) ? tech.filter((x): x is string => typeof x === "string") : [];
-      const mergedSkills = mergeJobSkillsList(existing.skills ?? [], techStack, maxMergedSkills());
+      const techStack: string[] = Array.isArray(tech)
+        ? tech.filter((x): x is string => typeof x === "string")
+        : [];
+      const mergedSkills = deriveJobSkills({
+        title: existing.title,
+        description: existing.description ?? undefined,
+        location: existing.locationCity ?? undefined,
+        isRemote: existing.isRemote,
+        category: existing.category,
+        enrichmentTechStack: techStack,
+      });
 
       if (jobParsedNoopSkipEnabled() && !shouldUpdateParsed) {
         const sameParsed =
