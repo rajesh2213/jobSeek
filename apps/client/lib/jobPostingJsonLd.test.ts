@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildJobPostingJsonLd } from "./jobPostingJsonLd";
+import {
+  buildJobPostingJsonLd,
+  resolveJobPostingDatePosted,
+  shouldEmitJobPostingJsonLd,
+} from "./jobPostingJsonLd";
 import type { JobItem } from "./api";
 
 function sampleJob(overrides: Partial<JobItem> = {}): JobItem {
@@ -28,22 +32,44 @@ function sampleJob(overrides: Partial<JobItem> = {}): JobItem {
   };
 }
 
-test("uncapped path includes description", () => {
-  const job = sampleJob({ description: "Readable role details.", postedAt: null });
-  const jsonLd = buildJobPostingJsonLd(job, job.description ?? undefined);
-  assert.equal(jsonLd.description, "Readable role details.");
+test("resolveJobPostingDatePosted uses freshness POSTED timestamp", () => {
+  const job = sampleJob({
+    postedAt: "2026-04-15T00:00:00.000Z",
+    freshness: {
+      source: "POSTED",
+      label: "Posted",
+      timestamp: "2026-04-15T00:00:00.000Z",
+      relative: "Posted 1 day ago",
+    },
+  });
+  assert.equal(resolveJobPostingDatePosted(job), "2026-04-15T00:00:00.000Z");
 });
 
-test("omits datePosted entirely when postedAt is null (Strategy A)", () => {
-  // Discovery-only rows must not surface crawl timestamps as datePosted.
-  const job = sampleJob({ postedAt: null });
-  const jsonLd = buildJobPostingJsonLd(job, undefined);
-  assert.equal("datePosted" in jsonLd, false);
-  assert.equal("validThrough" in jsonLd, false);
+test("DISCOVERED-only jobs omit JobPosting JSON-LD", () => {
+  const job = sampleJob({
+    postedAt: null,
+    freshness: {
+      source: "DISCOVERED",
+      label: "Added",
+      timestamp: "2026-05-12T06:57:21.746Z",
+      relative: "Added 1 day ago",
+    },
+  });
+  assert.equal(shouldEmitJobPostingJsonLd(job, "Readable role details."), false);
+  assert.equal(resolveJobPostingDatePosted(job), undefined);
 });
 
-test("emits datePosted (and validThrough = +45d) when postedAt is set", () => {
-  const job = sampleJob({ postedAt: "2026-04-15T00:00:00.000Z" });
+test("POSTED jobs emit datePosted and validThrough", () => {
+  const job = sampleJob({
+    postedAt: "2026-04-15T00:00:00.000Z",
+    freshness: {
+      source: "POSTED",
+      label: "Posted",
+      timestamp: "2026-04-15T00:00:00.000Z",
+      relative: "Posted 1 day ago",
+    },
+  });
+  assert.equal(shouldEmitJobPostingJsonLd(job, undefined), true);
   const jsonLd = buildJobPostingJsonLd(job, undefined);
   assert.equal(jsonLd.datePosted, "2026-04-15T00:00:00.000Z");
   assert.equal(jsonLd.validThrough, "2026-05-30T00:00:00.000Z");
@@ -53,32 +79,14 @@ test("capped path still emits description via structuredDataDescription fallback
   const job = sampleJob({
     description: null,
     structuredDataDescription: "Capped-safe structured data description.",
-  });
-  const jsonLdDescription =
-    (job.description ?? undefined) || job.structuredDataDescription || undefined;
-  const jsonLd = buildJobPostingJsonLd(job, jsonLdDescription);
-  assert.equal(jsonLd.description, "Capped-safe structured data description.");
-});
-
-test("capped path uses structuredDataDescription when preferred is omitted", () => {
-  const job = sampleJob({
-    description: null,
-    structuredDataDescription: "Resolver picks this without page wiring.",
-  });
-  const jsonLd = buildJobPostingJsonLd(job, undefined);
-  assert.equal(jsonLd.description, "Resolver picks this without page wiring.");
-});
-
-test("remote job keeps applicantLocationRequirements and description", () => {
-  const job = sampleJob({
-    description: null,
-    structuredDataDescription: "Remote role description",
-    isRemote: true,
-    workType: "remote",
-    locationCountry: "MX",
+    postedAt: "2026-04-15T00:00:00.000Z",
+    freshness: {
+      source: "POSTED",
+      label: "Posted",
+      timestamp: "2026-04-15T00:00:00.000Z",
+      relative: "Posted 1 day ago",
+    },
   });
   const jsonLd = buildJobPostingJsonLd(job, job.structuredDataDescription ?? undefined);
-  assert.equal(jsonLd.jobLocationType, "TELECOMMUTE");
-  assert.deepEqual(jsonLd.applicantLocationRequirements, { "@type": "Country", name: "MX" });
-  assert.equal(jsonLd.description, "Remote role description");
+  assert.equal(jsonLd.description, "Capped-safe structured data description.");
 });

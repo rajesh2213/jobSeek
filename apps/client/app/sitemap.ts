@@ -125,6 +125,7 @@ interface SitemapQualityMetrics {
   jobsStalePct: number;
   landingCategoryHubs: number;
   landingLocationHubs: number;
+  landingSkillHubs: number;
   landingRoleHubs: number;
   landingCombined: number;
 }
@@ -137,6 +138,7 @@ function computeSitemapQualityMetrics(input: SitemapQualityInput): SitemapQualit
   let landingWithLastmod = 0;
   let landingCategoryHubs = 0;
   let landingLocationHubs = 0;
+  let landingSkillHubs = 0;
   let landingRoleHubs = 0;
   let landingCombined = 0;
   for (const entry of landing) {
@@ -144,6 +146,7 @@ function computeSitemapQualityMetrics(input: SitemapQualityInput): SitemapQualit
     const path = typeof entry.url === "string" ? entry.url : "";
     if (/\/jobs\/category\/[^/]+$/.test(path)) landingCategoryHubs++;
     else if (/\/jobs\/location\/[^/]+$/.test(path)) landingLocationHubs++;
+    else if (/\/jobs\/skill\/[^/]+$/.test(path)) landingSkillHubs++;
     else if (/\/jobs\/role\/[^/]+$/.test(path)) landingRoleHubs++;
     else if (path.includes("/jobs/")) landingCombined++;
   }
@@ -171,6 +174,7 @@ function computeSitemapQualityMetrics(input: SitemapQualityInput): SitemapQualit
     jobsStalePct: jobCount > 0 ? Math.round((jobsStale / jobCount) * 100) : 0,
     landingCategoryHubs,
     landingLocationHubs,
+    landingSkillHubs,
     landingRoleHubs,
     landingCombined,
   };

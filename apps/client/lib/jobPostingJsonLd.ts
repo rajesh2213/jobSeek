@@ -15,6 +15,27 @@ const COUNTRY_CURRENCY: Record<string, string> = {
   SG: "SGD",
 };
 
+/**
+ * Google Job Posting requires `datePosted` for valid rich results.
+ * Only emit when the backend freshness contract says POSTED (real publish date).
+ */
+export function resolveJobPostingDatePosted(job: JobItem): string | undefined {
+  if (job.freshness?.source === "POSTED" && job.freshness.timestamp) {
+    return firstValidPostedIso(job.freshness.timestamp);
+  }
+  return firstValidPostedIso(job.postedAt);
+}
+
+/** True when JobPosting JSON-LD should be emitted (has description + valid datePosted). */
+export function shouldEmitJobPostingJsonLd(
+  job: JobItem,
+  description: string | undefined,
+): boolean {
+  const resolved = resolveDescription(job, description);
+  if (!resolved) return false;
+  return resolveJobPostingDatePosted(job) != null;
+}
+
 export function buildJobPostingJsonLd(
   job: JobItem,
   description: string | undefined,
@@ -22,18 +43,9 @@ export function buildJobPostingJsonLd(
   const url = absoluteUrl(`/job/${job.id}`);
   const country = (job.locationCountry || job.country || "").trim();
   const cc = country.length === 2 ? country.toUpperCase() : "";
-  const currency = cc ? COUNTRY_CURRENCY[cc] ?? "USD" : "USD";
-  /**
-   * Strategy A (freshness-overhaul Phase 6): only emit `datePosted` when we have a
-   * real employer-supplied publish date. We MUST NOT pass crawl/discovery
-   * timestamps to Google as if they were `datePosted` — that contaminates Rich
-   * Results with fake freshness and harms long-term SEO trust.
-   *
-   * Schema.org allows `datePosted` to be omitted; Google treats missing `datePosted`
-   * as "use crawl-time-of-page" which is the correct fallback for discovery-only rows.
-   */
-  const datePosted = firstValidPostedIso(job.postedAt);
-  const validThrough = computeValidThrough(job.postedAt);
+  const currency = cc ? (COUNTRY_CURRENCY[cc] ?? "USD") : "USD";
+  const datePosted = resolveJobPostingDatePosted(job);
+  const validThrough = computeValidThrough(datePosted);
   const resolvedDescription = resolveDescription(job, description);
 
   const org: Record<string, unknown> = {
@@ -57,9 +69,7 @@ export function buildJobPostingJsonLd(
         addressCountry: cc || country || undefined,
       },
     },
-    /** Only when freshnessSource === POSTED. Omit otherwise. */
-    ...(datePosted ? { datePosted } : {}),
-    /** validThrough mirrors datePosted: only emit when we actually have a publish date to extend from. */
+    datePosted,
     ...(validThrough ? { validThrough } : {}),
     employmentType: employmentType(job.workType),
     description: resolvedDescription || undefined,
@@ -98,13 +108,9 @@ function employmentType(workType: string | undefined): string | undefined {
   return undefined;
 }
 
-/**
- * Strategy A: validThrough is only meaningful when `datePosted` is emitted.
- * Returns `postedAt + 45 days` when postedAt is a valid ISO string, else `undefined`.
- */
-function computeValidThrough(postedAt: string | null): string | undefined {
-  if (!postedAt) return undefined;
-  const d = new Date(postedAt);
+function computeValidThrough(datePosted: string | undefined): string | undefined {
+  if (!datePosted) return undefined;
+  const d = new Date(datePosted);
   if (Number.isNaN(d.getTime())) return undefined;
   d.setUTCDate(d.getUTCDate() + 45);
   return d.toISOString();
@@ -125,7 +131,6 @@ function resolveDescription(job: JobItem, preferred: string | undefined): string
   const candidates = [
     preferred,
     job.description ?? undefined,
-    /** Capped-detail API: UI `description` is null; this field preserves SSR JSON-LD only. */
     job.structuredDataDescription ?? undefined,
     extras.descriptionText ?? undefined,
     extras.rawDescription ?? undefined,

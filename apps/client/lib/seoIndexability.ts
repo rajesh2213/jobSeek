@@ -5,6 +5,7 @@ export type SeoPolicyReason =
   | "allow_jobs_canonical_leaf"
   | "allow_jobs_category_leaf"
   | "allow_jobs_location_leaf"
+  | "allow_jobs_skill_leaf"
   | "allow_jobs_experience_leaf"
   | "allow_job_detail"
   | "allow_company_default"
@@ -94,7 +95,10 @@ export function hasUnknownJobQueryParams(searchParamKeys: string[]): boolean {
   return false;
 }
 
-export function classifyJobRefinement(filters: JobFilters): {
+export function classifyJobRefinement(
+  filters: JobFilters,
+  searchParamKeys: string[] = [],
+): {
   hasPagination: boolean;
   hasDeepRefinement: boolean;
   hasDisallowedParam: boolean;
@@ -111,10 +115,11 @@ export function classifyJobRefinement(filters: JobFilters): {
       (typeof filters.minSalary === "number" && filters.minSalary > 0) ||
       Boolean(filters.companyId),
   );
+  const experienceFromQuery = searchParamKeys.includes("experience");
   const hasDeepRefinement = Boolean(
     multiTokenRefinement ||
       Boolean(filters.posted) ||
-      Boolean(filters.experience) ||
+      (experienceFromQuery && Boolean(filters.experience)) ||
       (typeof filters.limit === "number" && filters.limit !== DEFAULT_JOBS_LIMIT),
   );
   return { hasPagination, hasDeepRefinement, hasDisallowedParam };
@@ -133,7 +138,10 @@ export function decideJobsListingSeoPolicy(input: {
     return noindex("noindex_disallowed_param");
   }
 
-  const { hasPagination, hasDeepRefinement, hasDisallowedParam } = classifyJobRefinement(filters);
+  const { hasPagination, hasDeepRefinement, hasDisallowedParam } = classifyJobRefinement(
+    filters,
+    searchParamKeys,
+  );
 
   if (routeKind === "jobs-root") {
     const hasQuery = searchParamKeys.length > 0;
@@ -194,6 +202,9 @@ function classifyCanonicalLeaf(filters: JobFilters): SeoPolicyReason {
   }
   if (hasLocation && !hasRole && !hasCategory && !hasSkill && !hasExperience) {
     return "allow_jobs_location_leaf";
+  }
+  if (hasSkill && !hasRole && !hasCategory && !hasLocation && !hasExperience) {
+    return "allow_jobs_skill_leaf";
   }
   if (hasExperience && !hasLocation && !hasRole && !hasCategory && !hasSkill) {
     return "allow_jobs_experience_leaf";

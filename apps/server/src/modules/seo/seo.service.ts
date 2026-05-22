@@ -27,8 +27,11 @@ export interface SeoLandingGenerationStats {
   rolesConsidered: number;
   locationsConsidered: number;
   experiencesConsidered: number;
+  skillsConsidered: number;
   categoriesEmitted: number;
   locationHubsEmitted: number;
+  skillHubsEmitted: number;
+  skillLocationHubsEmitted: number;
   estimatedCountQueries: number;
   estimatedTotalQueries: number;
   batchDurationMs?: number;
@@ -47,8 +50,7 @@ function parsePositiveIntEnv(
 }
 
 /**
- * Builds slugs that match client `parseSlug` / `filtersToSlug`: category must lead the path
- * (see `apps/client/lib/slug-parser.ts`). Bare skill-only URLs are not supported by the parser.
+ * Builds slugs that match client `parseSlug` / `filtersToSlug` (see `apps/client/lib/slug-parser.ts`).
  */
 export function createSeoService(prisma: PrismaClient) {
   const excludedSql = Prisma.join(
@@ -240,6 +242,109 @@ export function createSeoService(prisma: PrismaClient) {
     return lookup;
   }
 
+  function normalizeSkillSlug(input: string): string {
+    return input
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80);
+  }
+
+  async function topSkillSlugs(limit: number): Promise<Array<{ skill: string; count: number }>> {
+    const cap = Math.min(200, Math.max(10, limit));
+    const rows = await prisma.$queryRaw<Array<{ skill: string; count: bigint }>>`
+      SELECT LOWER(TRIM(s.skill)) AS skill, COUNT(*)::bigint AS count
+      FROM "Job" j
+      CROSS JOIN LATERAL unnest(j.skills) AS s(skill)
+      WHERE j."canonicalJobId" IS NULL
+        AND j."isActive" = true
+        AND (j."expiresAt" IS NULL OR j."expiresAt" > NOW())
+        AND (j."status" = 'ready' OR j."status" IS NULL)
+        AND j.role NOT IN (${excludedSql})
+        AND array_length(j.skills, 1) IS NOT NULL
+        AND array_length(j.skills, 1) > 0
+        AND LENGTH(TRIM(s.skill)) > 1
+      GROUP BY LOWER(TRIM(s.skill))
+      ORDER BY count DESC
+      LIMIT ${cap}
+    `;
+    return rows
+      .map((r) => ({ skill: normalizeSkillSlug(r.skill), count: Number(r.count) }))
+      .filter((r) => r.skill.length > 0);
+  }
+
+  interface SkillLocationCountRow {
+    skill: string;
+    location_country: string | null;
+    work_type: string | null;
+    c: bigint;
+  }
+
+  /** Skill × location counts for top skills only (bounded scan). */
+  async function batchSkillLocationCounts(
+    skillSlugs: string[],
+  ): Promise<SkillLocationCountRow[]> {
+    if (skillSlugs.length === 0) return [];
+    const skillsSql = Prisma.join(skillSlugs.map((s) => Prisma.sql`${s}`));
+    return prisma.$queryRaw<SkillLocationCountRow[]>`
+      SELECT LOWER(TRIM(s.skill)) AS skill,
+             j."locationCountry" AS location_country,
+             j."workType"        AS work_type,
+             COUNT(*)::bigint    AS c
+      FROM "Job" j
+      CROSS JOIN LATERAL unnest(j.skills) AS s(skill)
+      WHERE j."canonicalJobId" IS NULL
+        AND j."isActive" = true
+        AND (j."expiresAt" IS NULL OR j."expiresAt" > NOW())
+        AND (j."status" = 'ready' OR j."status" IS NULL)
+        AND j.role NOT IN (${excludedSql})
+        AND LOWER(TRIM(s.skill)) IN (${skillsSql})
+      GROUP BY LOWER(TRIM(s.skill)), j."locationCountry", j."workType"
+    `;
+  }
+
+  function buildSkillLocationLookup(
+    rows: SkillLocationCountRow[],
+    locations: readonly string[],
+  ): CountLookup {
+    const lookup: CountLookup = new Map();
+    const inc = (key: string, n: number) => lookup.set(key, (lookup.get(key) ?? 0) + n);
+
+    const countryToTokens = new Map<string, string[]>();
+    const workTypeToTokens = new Map<string, string[]>();
+    for (const loc of locations) {
+      const f = locationTokenToFilter(loc);
+      if (f.country) {
+        const arr = countryToTokens.get(f.country) ?? [];
+        arr.push(loc);
+        countryToTokens.set(f.country, arr);
+      } else if (f.workType) {
+        const arr = workTypeToTokens.get(f.workType) ?? [];
+        arr.push(loc);
+        workTypeToTokens.set(f.workType, arr);
+      }
+    }
+
+    for (const row of rows) {
+      const n = Number(row.c);
+      const skill = normalizeSkillSlug(row.skill);
+      const country = row.location_country;
+      const wt = row.work_type;
+      const matchedLocTokens: string[] = [];
+      if (country && countryToTokens.has(country)) {
+        matchedLocTokens.push(...countryToTokens.get(country)!);
+      }
+      if (wt && workTypeToTokens.has(wt)) {
+        matchedLocTokens.push(...workTypeToTokens.get(wt)!);
+      }
+      for (const locToken of matchedLocTokens) {
+        inc(`${skill}|${locToken}`, n);
+      }
+    }
+    return lookup;
+  }
+
   async function listSeoLandingEntries(input: {
     minCount: number;
     maxSlugs: number;
@@ -260,6 +365,13 @@ export function createSeoService(prisma: PrismaClient) {
       1,
       SEO_DIMENSIONS.experience.length,
     );
+    const skillLimit = parsePositiveIntEnv(process.env.SEO_LANDING_MAX_SKILL_SLUGS, 40, 5, 80);
+    const skillLocationLimit = parsePositiveIntEnv(
+      process.env.SEO_LANDING_MAX_SKILL_LOCATION_PAIRS,
+      120,
+      0,
+      500,
+    );
     const selectedLocations = SEO_DIMENSIONS.locations.slice(0, locationLimit);
     const selectedExperiences = SEO_DIMENSIONS.experience.slice(0, experienceLimit);
 
@@ -273,13 +385,18 @@ export function createSeoService(prisma: PrismaClient) {
 
     const roles = await topRoleSlugs(Math.min(roleLimit, maxSlugs));
     const roleNames = roles.map((r) => r.role);
+    const skills = await topSkillSlugs(skillLimit);
+    const skillNames = skills.map((s) => s.skill);
 
     const needsEurope = selectedLocations.some(
       (l) => locationTokenToFilter(l).location != null,
     );
-    const [dimRows, europeRows] = await Promise.all([
+    const [dimRows, europeRows, skillLocRows] = await Promise.all([
       batchCountsByDimensions(roleNames),
       needsEurope ? batchEuropeCounts(roleNames) : Promise.resolve([]),
+      skillNames.length > 0 && skillLocationLimit > 0
+        ? batchSkillLocationCounts(skillNames)
+        : Promise.resolve([]),
     ]);
 
     const counts = buildCountLookup(
@@ -288,6 +405,7 @@ export function createSeoService(prisma: PrismaClient) {
       selectedLocations,
       selectedExperiences,
     );
+    const skillLocCounts = buildSkillLocationLookup(skillLocRows, selectedLocations);
     const batchDurationMs = Date.now() - batchStart;
 
     // ── Category hub pages ─────────────────────────────────────────────
@@ -331,6 +449,42 @@ export function createSeoService(prisma: PrismaClient) {
         if (!slug) continue;
         push(slug, locTotal);
         locationHubsEmitted++;
+      }
+    }
+
+    // ── Skill hub pages ────────────────────────────────────────────────
+    let skillHubsEmitted = 0;
+    let skillLocationHubsEmitted = 0;
+    for (const s of skills) {
+      if (out.length >= maxSlugs) break;
+      if (s.count >= minCount) {
+        const slug = filtersToJobListingSlug({ skills: [s.skill] });
+        if (slug) {
+          push(slug, s.count);
+          skillHubsEmitted++;
+        }
+      }
+    }
+
+    let skillLocationPairs = 0;
+    for (const s of skills) {
+      if (out.length >= maxSlugs || skillLocationPairs >= skillLocationLimit) break;
+      for (const loc of selectedLocations) {
+        if (out.length >= maxSlugs || skillLocationPairs >= skillLocationLimit) break;
+        const locFilter = locationTokenToFilter(loc);
+        if (!locFilter.country && !locFilter.isRemote && !locFilter.workType) continue;
+        const c = skillLocCounts.get(`${s.skill}|${loc}`) ?? 0;
+        if (c < minCount) continue;
+        const slug =
+          filtersToJobListingSlug({
+            skills: [s.skill],
+            country: locFilter.country,
+            isRemote: locFilter.isRemote,
+            workType: locFilter.workType,
+          }) || `skill/${s.skill}/location/${loc}`;
+        push(slug, c);
+        skillLocationHubsEmitted++;
+        skillLocationPairs++;
       }
     }
 
@@ -381,16 +535,20 @@ export function createSeoService(prisma: PrismaClient) {
     const rolesConsidered = roles.length;
     const locationsConsidered = selectedLocations.length;
     const experiencesConsidered = selectedExperiences.length;
+    const skillsConsidered = skills.length;
     return {
       entries: out.slice(0, maxSlugs),
       stats: {
         rolesConsidered,
         locationsConsidered,
         experiencesConsidered,
+        skillsConsidered,
         categoriesEmitted,
         locationHubsEmitted,
-        estimatedCountQueries: 3,
-        estimatedTotalQueries: 3,
+        skillHubsEmitted,
+        skillLocationHubsEmitted,
+        estimatedCountQueries: 4,
+        estimatedTotalQueries: 4,
         batchDurationMs,
       },
     };

@@ -427,21 +427,9 @@ export function filtersToSlug(
   return segments.join("/");
 }
 
+/** Public listing links use the same canonical shape as metadata (no duplicate slug facets in query). */
 export function buildJobsListingUrl(filters: JobFilters): string {
-  const qs = filtersToSearchParams(filters).toString();
-  const slug = filtersToSlug({
-    category: filters.category,
-    role: filters.role,
-    skills: filters.skills,
-    country: filters.country,
-    isRemote: filters.isRemote,
-    workType: filters.workType,
-    experience: filters.experience,
-  });
-  if (slug) {
-    return qs ? `/jobs/${slug}?${qs}` : `/jobs/${slug}`;
-  }
-  return qs ? `/jobs?${qs}` : "/jobs";
+  return getCanonicalJobListingUrl(filters);
 }
 
 const DEFAULT_LISTING_LIMIT = 20;
@@ -474,7 +462,10 @@ export function getCanonicalJobListingUrl(filters: JobFilters): string {
   if (filters.offset !== undefined && filters.offset > 0) {
     p.set("offset", String(filters.offset));
   }
-  if (filters.experience) p.set("experience", filters.experience);
+  const slugHasExperience = slug.includes("/experience/");
+  if (filters.experience && !slugHasExperience) {
+    p.set("experience", filters.experience);
+  }
   if (filters.posted) p.set("posted", filters.posted);
   if (filters.minSalary !== undefined && filters.minSalary > 0) {
     p.set("minSalary", String(filters.minSalary));
@@ -514,6 +505,26 @@ export function normalizeRelatedSlugPath(slug: string): string {
   if (!clean) return "/jobs";
   const withoutJobs = clean.startsWith("jobs/") ? clean.slice(5) : clean;
   return canonicalizeSlugPath(withoutJobs.split("/").filter(Boolean));
+}
+
+/** Build the request URL for redirect comparison (pathname + raw query). */
+export function buildIncomingJobListingUrl(
+  pathname: string,
+  searchParams: Record<string, string | string[] | undefined>,
+): string {
+  const p = new URLSearchParams();
+  for (const [key, raw] of Object.entries(searchParams)) {
+    if (raw == null) continue;
+    if (Array.isArray(raw)) {
+      for (const v of raw) {
+        if (typeof v === "string" && v.length > 0) p.append(key, v);
+      }
+    } else if (typeof raw === "string" && raw.length > 0) {
+      p.set(key, raw);
+    }
+  }
+  const qs = p.toString();
+  return qs ? `${pathname}?${qs}` : pathname;
 }
 
 export function isCanonicalListingPath(path: string): boolean {

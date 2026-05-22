@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { loadJobDetailPage } from "../../../../lib/jobsPageData";
-import { buildJobPostingJsonLd } from "../../../../lib/jobPostingJsonLd";
+import {
+  buildJobPostingJsonLd,
+  shouldEmitJobPostingJsonLd,
+} from "../../../../lib/jobPostingJsonLd";
 import { absoluteUrl } from "../../../../lib/seoSite";
 import {
   refineSectionsForDisplay,
@@ -90,7 +93,8 @@ export default async function JobDetailPage({ params }: Props) {
   const jsonLdDescription =
     structuredText || job.description || job.structuredDataDescription || undefined;
 
-  const jsonLd = buildJobPostingJsonLd(job, jsonLdDescription);
+  const emitJobPostingLd = shouldEmitJobPostingJsonLd(job, jsonLdDescription);
+  const jsonLd = emitJobPostingLd ? buildJobPostingJsonLd(job, jsonLdDescription) : null;
 
   return (
     <main className="min-h-screen">
@@ -196,7 +200,9 @@ export default async function JobDetailPage({ params }: Props) {
 
         <SimilarJobsDeferred job={job} />
         <SeoFooterLinks browseSkills={browseFooterSkills} />
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        {jsonLd ? (
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        ) : null}
       </Container>
     </main>
   );

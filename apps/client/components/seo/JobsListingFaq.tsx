@@ -28,6 +28,7 @@ const LOCATION_DISPLAY: Record<string, string> = {
 function buildFaqEntries(filters?: JobFilters, total?: number): FaqEntry[] {
   const role = filters?.role?.trim();
   const category = filters?.category?.trim();
+  const skill = filters?.skills?.[0]?.trim();
   const isRemote =
     filters?.workType === "remote" || filters?.isRemote === true;
   const country = filters?.country?.trim()?.toUpperCase();
@@ -46,6 +47,20 @@ function buildFaqEntries(filters?: JobFilters, total?: number): FaqEntry[] {
     entries.push({
       question: `What skills are typically required for ${t} roles?`,
       answer: `${t} roles commonly require a mix of technical and domain skills that vary by seniority and industry. Browse individual listings on this page to see the specific requirements for each opening.`,
+    });
+  }
+
+  if (skill && !role && !category) {
+    const t = toTitle(skill);
+    entries.push({
+      question: `How many ${t} jobs are available${isRemote ? " remotely" : loc ? ` in ${loc}` : ""}?`,
+      answer: countStr
+        ? `There are ${countStr} active listings requiring ${t.toLowerCase()} on JobLoom, aggregated from company career pages and refreshed daily.`
+        : `${t} roles are listed as companies publish new openings on JobLoom.`,
+    });
+    entries.push({
+      question: `What kinds of roles use ${t}?`,
+      answer: `Browse this page to see employers hiring for ${t.toLowerCase()} across engineering, data, product, and other teams — with filters for location and work type.`,
     });
   }
 

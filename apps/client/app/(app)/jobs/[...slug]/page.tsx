@@ -20,6 +20,7 @@ import {
 import { JobsSearchPage } from "../../../../components/job/JobsSearchPage";
 import { JOB_CATEGORIES } from "../../../../lib/taxonomy";
 import {
+  buildIncomingJobListingUrl,
   getCanonicalJobListingUrl,
   normalizeRelatedSlugPath,
   parseJobFiltersFromSearch,
@@ -89,7 +90,8 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
   const canonicalPath = getCanonicalJobListingUrl(filters);
   const canonicalSlugPath = canonicalPath.split("?")[0] ?? "/jobs";
   const incomingPath = `/jobs/${slug.join("/")}`;
-  if (incomingPath !== canonicalSlugPath || !parsed.validCanonical) {
+  const incomingFull = buildIncomingJobListingUrl(incomingPath, sp);
+  if (!parsed.validCanonical || incomingFull !== canonicalPath) {
     redirect(canonicalPath);
   }
   const filtersKey = stableJobFiltersKey(filters);

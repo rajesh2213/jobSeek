@@ -142,14 +142,45 @@ test("refinement classifier treats multi-filters as deep refinement", () => {
   assert.equal(out.hasDisallowedParam, false);
 });
 
-test("canonical listing path check ignores query strings", () => {
+test("canonical listing URLs omit slug facets duplicated in query", () => {
   const categoryHref = buildJobsListingUrl({ category: "engineering" });
-  assert.equal(categoryHref, "/jobs/category/engineering?category=engineering");
+  assert.equal(categoryHref, "/jobs/category/engineering");
   assert.equal(isCanonicalListingPath(categoryHref), true);
 
   const skillHref = buildJobsListingUrl({ skills: ["react"] });
-  assert.equal(skillHref, "/jobs/skill/react?skills=react");
+  assert.equal(skillHref, "/jobs/skill/react");
   assert.equal(isCanonicalListingPath(skillHref), true);
+
+  const expHref = buildJobsListingUrl({
+    role: "software-engineer",
+    experience: "mid",
+  });
+  assert.equal(expHref, "/jobs/role/software-engineer/experience/3-5-years");
+  assert.equal(isCanonicalListingPath(expHref), true);
+});
+
+test("slug-encoded experience is indexable (not query refinement)", () => {
+  const decision = decideJobsListingSeoPolicy({
+    routeKind: "jobs-slug",
+    filters: { role: "software-engineer", experience: "mid" },
+    searchParamKeys: [],
+    canonicalPath: "/jobs/role/software-engineer/experience/3-5-years",
+    validCanonicalSlugPath: true,
+  });
+  assert.equal(decision.index, true);
+  assert.equal(decision.reason, "allow_jobs_canonical_leaf");
+});
+
+test("skill-only slug gets allow_jobs_skill_leaf reason", () => {
+  const decision = decideJobsListingSeoPolicy({
+    routeKind: "jobs-slug",
+    filters: { skills: ["typescript"] },
+    searchParamKeys: [],
+    canonicalPath: "/jobs/skill/typescript",
+    validCanonicalSlugPath: true,
+  });
+  assert.equal(decision.index, true);
+  assert.equal(decision.reason, "allow_jobs_skill_leaf");
 });
 
 test("category-only slug gets allow_jobs_category_leaf reason", () => {
@@ -186,12 +217,24 @@ test("location-only slug gets allow_jobs_location_leaf reason", () => {
   assert.equal(remote.reason, "allow_jobs_location_leaf");
 });
 
-test("experience-only refinement gets noindex_experience_refinement reason", () => {
+test("experience-only slug path is indexable when encoded in URL path", () => {
+  const decision = decideJobsListingSeoPolicy({
+    routeKind: "jobs-slug",
+    filters: { experience: "senior" },
+    searchParamKeys: [],
+    canonicalPath: "/jobs/experience/6-plus-years",
+    validCanonicalSlugPath: true,
+  });
+  assert.equal(decision.index, true);
+  assert.equal(decision.reason, "allow_jobs_experience_leaf");
+});
+
+test("experience query param on role slug stays noindex refinement", () => {
   const decision = decideJobsListingSeoPolicy({
     routeKind: "jobs-slug",
     filters: { role: "backend-developer", experience: "senior" },
-    searchParamKeys: [],
-    canonicalPath: "/jobs/role/backend-developer/experience/6-plus-years",
+    searchParamKeys: ["experience"],
+    canonicalPath: "/jobs/role/backend-developer?experience=senior",
     validCanonicalSlugPath: true,
   });
   assert.equal(decision.index, false);
