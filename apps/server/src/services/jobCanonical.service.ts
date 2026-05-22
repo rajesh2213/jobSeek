@@ -211,6 +211,35 @@ export function computeLocationPatchFromReingest(
   return { country, locationCountry, locationCity, locationState, locationRegion };
 }
 
+/**
+ * Promote remote/hybrid on re-ingest when parser output improves; never demote remote → onsite.
+ */
+export function computeWorkModePatchFromReingest(
+  row: Pick<Job, "isRemote" | "workType">,
+  incoming: Pick<DedupJobInput, "isRemote" | "workType">,
+): { isRemote: boolean; workType: string } | null {
+  if (incoming.workType === "hybrid" && row.workType !== "hybrid") {
+    return { isRemote: row.isRemote || incoming.isRemote, workType: "hybrid" };
+  }
+  if (incoming.isRemote && !row.isRemote) {
+    const workType =
+      incoming.workType === "hybrid"
+        ? "hybrid"
+        : incoming.workType === "remote"
+          ? "remote"
+          : "remote";
+    return { isRemote: true, workType };
+  }
+  if (
+    incoming.workType === "remote" &&
+    row.workType === "onsite" &&
+    incoming.isRemote
+  ) {
+    return { isRemote: true, workType: "remote" };
+  }
+  return null;
+}
+
 /** Prefer category from highest-quality source; ignore `other` when possible. */
 export function mergeCategorySlug(jobs: Job[]): string {
   const sorted = [...jobs].sort(

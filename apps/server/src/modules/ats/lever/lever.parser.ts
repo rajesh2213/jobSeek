@@ -26,11 +26,13 @@ export function parseLeverJobs(
     if (!title || !sourceUrl) continue;
 
     const location = normalizeLocation(job.categories?.location);
+    const description = sanitizeHtml(job.descriptionPlain ?? job.description);
     normalized.push({
       title,
-      description: sanitizeHtml(job.descriptionPlain ?? job.description),
+      description,
       location,
-      isRemote: inferRemote(location),
+      isRemote:
+        inferRemote(location) || inferRemote(title) || inferRemote(description),
       source: "lever",
       sourceUrl,
       postedAt: parseLeverPostedAt(job.createdAt),

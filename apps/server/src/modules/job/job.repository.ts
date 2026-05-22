@@ -16,7 +16,10 @@ import {
 } from "../../utils/jobListPerf.js";
 import { jobListRequestDiag } from "./jobListRequestContext.js";
 import { expandLocationFilter, getRegions } from "../../utils/locationResolver.js";
-import { computeLocationPatchFromReingest } from "../../services/jobCanonical.service.js";
+import {
+  computeLocationPatchFromReingest,
+  computeWorkModePatchFromReingest,
+} from "../../services/jobCanonical.service.js";
 import { recordStatusTransition } from "../../services/jobStatusMetrics.service.js";
 import { jobParsedNoopSkipEnabled } from "../../utils/jobWriteOptimization.js";
 import {
@@ -1649,6 +1652,37 @@ export function createJobRepository(prisma: PrismaClient) {
           locationCity: patch.locationCity,
           locationState: patch.locationState,
           locationRegion: patch.locationRegion,
+        },
+      });
+      return true;
+    },
+
+    /**
+     * Promote `isRemote` / `workType` when re-ingest parser output is richer (never demotes remote).
+     */
+    async mergeWorkModeFromReingest(
+      id: string,
+      incoming: Pick<DedupJobInput, "isRemote" | "workType">,
+    ): Promise<boolean> {
+      const row = await prisma.job.findUnique({ where: { id } });
+      if (!row) return false;
+      const patch = computeWorkModePatchFromReingest(row, incoming);
+      logger.info(
+        {
+          event: "work_mode_merge",
+          jobId: id,
+          existing: { isRemote: row.isRemote, workType: row.workType },
+          incoming: { isRemote: incoming.isRemote, workType: incoming.workType },
+          applied: patch !== null,
+        },
+        "work_mode_merge",
+      );
+      if (!patch) return false;
+      await prisma.job.update({
+        where: { id },
+        data: {
+          isRemote: patch.isRemote,
+          workType: patch.workType,
         },
       });
       return true;

@@ -8,6 +8,13 @@ import {
 } from "../../../src/utils/locationResolver.js";
 
 describe("resolveLocation subnational City, FullRegionName", () => {
+  it("resolves City (CC) parenthetical country codes", () => {
+    const r = resolveLocation("Barcelona (ES)");
+    assert.equal(r.country, "ES");
+    assert.equal(r.city, "Barcelona");
+    assert.equal(r.isRemote, false);
+  });
+
   it("resolves US city and full state name", () => {
     const r = resolveLocation("San Francisco, California");
     assert.equal(r.country, "US");

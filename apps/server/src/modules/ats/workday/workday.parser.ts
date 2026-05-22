@@ -324,6 +324,7 @@ export function parseWorkdayJob(
   const locationLine = buildWorkdayLocationLine(job, listingUrl);
   const isRemote =
     inferRemote(locationLine) ||
+    inferRemote(listingUrl) ||
     inferRemote(title) ||
     inferRemote(job.locationsText) ||
     inferRemote(description) ||

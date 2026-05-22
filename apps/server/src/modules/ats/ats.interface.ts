@@ -109,6 +109,8 @@ export function inferRemote(text: string | undefined): boolean {
   const s = text.toLowerCase();
   if (s.includes("remote")) return true;
   if (/\b(wfh|work\s*from\s*home|work-from-home)\b/.test(s)) return true;
+  if (/\b(work\s*at\s*home|work-at-home)\b/.test(s)) return true;
+  if (/\b(telecommute|tele-commute|work\s+anywhere)\b/.test(s)) return true;
   if (/(fully|100%)\s*remote/.test(s)) return true;
   return false;
 }

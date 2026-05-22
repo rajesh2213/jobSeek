@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import type { Job } from "@prisma/client";
 import {
   computeLocationPatchFromReingest,
+  computeWorkModePatchFromReingest,
   isMissingLocation,
   mergeStructuredLocationFromSources,
 } from "../../../src/services/jobCanonical.service.js";
@@ -202,6 +203,38 @@ describe("computeLocationPatchFromReingest", () => {
   });
 });
 
+describe("computeWorkModePatchFromReingest", () => {
+  it("promotes onsite → remote when incoming is remote", () => {
+    const row = jobBase({ isRemote: false, workType: "onsite" });
+    const patch = computeWorkModePatchFromReingest(row, {
+      isRemote: true,
+      workType: undefined,
+    });
+    assert.ok(patch);
+    assert.equal(patch!.isRemote, true);
+    assert.equal(patch!.workType, "remote");
+  });
+
+  it("promotes to hybrid when incoming workType is hybrid", () => {
+    const row = jobBase({ isRemote: false, workType: "onsite" });
+    const patch = computeWorkModePatchFromReingest(row, {
+      isRemote: true,
+      workType: "hybrid",
+    });
+    assert.ok(patch);
+    assert.equal(patch!.workType, "hybrid");
+  });
+
+  it("returns null when already remote", () => {
+    const row = jobBase({ isRemote: true, workType: "remote" });
+    const patch = computeWorkModePatchFromReingest(row, {
+      isRemote: true,
+      workType: "remote",
+    });
+    assert.equal(patch, null);
+  });
+});
+
 describe("deduplicateAndInsert idempotent path", () => {
   it("merges structured location and recomputes canonical when location backfills", async () => {
     const existing = jobBase({
@@ -219,6 +252,7 @@ describe("deduplicateAndInsert idempotent path", () => {
       updateLastSeenById: async () => {},
       mergePostedAtIfEarlier: async () => false,
       mergeStructuredLocationFromReingest: async () => true,
+      mergeWorkModeFromReingest: async () => false,
       resolveCanonicalJob: async (j: Job) => j,
       findByIdRaw: async (id: string) =>
         id === existing.id ? { ...existing, country: "IE", locationCountry: "IE" } : null,

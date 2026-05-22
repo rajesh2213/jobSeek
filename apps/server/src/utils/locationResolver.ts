@@ -726,6 +726,15 @@ function tryResolveCityCommaSubnationalRegion(
   return null;
 }
 
+/** "Barcelona (ES)" → "Barcelona, ES" so comma-based city/country resolution applies. */
+function normalizeParenthesizedCountryCode(text: string): string {
+  const m = text.match(/^(.+?)\s*\(([A-Za-z]{2})\)\s*$/);
+  if (!m) return text;
+  const iso = tryIsoCodeToken(m[2]!);
+  if (!iso) return text;
+  return `${m[1]!.trim()}, ${iso}`;
+}
+
 /**
  * Parse free-text / ATS location lines into structured fields + ISO country.
  */
@@ -737,6 +746,8 @@ export function resolveLocation(raw: string): ResolvedLocation {
     .replace(/\s+/g, " ")
     .replace(/^[,;\s.|]+|[,;\s.|]+$/g, "")
     .trim();
+
+  text = normalizeParenthesizedCountryCode(text);
 
   let city: string | null = null;
   let state: string | null = null;
@@ -1000,6 +1011,13 @@ export function testLocationResolver(): void {
       fn: () => {
         const r = resolveLocation("Remote - Europe");
         return r.isRemote === true && r.region === "Europe";
+      },
+    },
+    {
+      name: "Barcelona (ES)",
+      fn: () => {
+        const r = resolveLocation("Barcelona (ES)");
+        return r.country === "ES" && r.city === "Barcelona" && r.isRemote === false;
       },
     },
     {

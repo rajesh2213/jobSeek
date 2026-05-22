@@ -74,11 +74,17 @@ export function parseAshbyJobs(
     if (!title || !sourceUrl) continue;
 
     const location = getAshbyLocation(job);
+    const workplaceType =
+      typeof job.workplaceType === "string" ? job.workplaceType.trim() : "";
     normalized.push({
       title,
       description: sanitizeHtml(job.descriptionPlain ?? job.descriptionHtml),
       location,
-      isRemote: Boolean(job.isRemote) || inferRemote(location),
+      isRemote:
+        Boolean(job.isRemote) ||
+        inferRemote(location) ||
+        inferRemote(workplaceType) ||
+        inferRemote(title),
       source: "ashby",
       sourceUrl,
       postedAt: parseDate(job.publishedAt ?? job.postedDate ?? job.createdAt),
