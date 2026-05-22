@@ -28,15 +28,19 @@ function SidebarSkeleton() {
 export function SeoAggregationSidebarHydrator({
   filtersSlug,
   initial,
+  /** SSR already called aggregations but returned empty (timeout or no signal). Skip skeleton flash. */
+  ssrAttempted = false,
 }: {
   filtersSlug: string;
   initial: SeoAggregationsData | null;
+  ssrAttempted?: boolean;
 }) {
   const initialReady = Boolean(initial && hasAggregationSidebarContent(initial));
   const [data, setData] = useState<SeoAggregationsData | null>(
     initialReady ? initial : null,
   );
-  const [loading, setLoading] = useState(!initialReady);
+  /** Only show skeleton when client is the first fetcher; not after SSR empty/timeout. */
+  const [loading, setLoading] = useState(!initialReady && !ssrAttempted);
 
   useEffect(() => {
     if (initialReady || !filtersSlug.trim()) {
@@ -45,7 +49,8 @@ export function SeoAggregationSidebarHydrator({
     }
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
+    const clientTimeoutMs = ssrAttempted ? 8000 : 15000;
+    const timer = setTimeout(() => controller.abort(), clientTimeoutMs);
 
     void fetch(`/api/seo/aggregations?filters=${encodeURIComponent(filtersSlug)}`, {
       signal: controller.signal,
@@ -69,7 +74,7 @@ export function SeoAggregationSidebarHydrator({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [filtersSlug, initialReady]);
+  }, [filtersSlug, initialReady, ssrAttempted]);
 
   if (data && hasAggregationSidebarContent(data)) {
     return <SeoAggregationSidebar data={data} />;

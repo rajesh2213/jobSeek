@@ -180,6 +180,7 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
           ? aggregations
           : null
       }
+      ssrAttempted
     />
   ) : null;
 

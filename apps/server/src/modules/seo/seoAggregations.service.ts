@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { buildDiscoveryWhereSql, type JobDiscoveryFilters } from "../job/job.repository.js";
 import { readCachedAggregations, writeCachedAggregations } from "./seoAggregationCache.js";
-import { aggregationQueryTimeoutMs, withAggregationTimeout } from "./seoAggregationTimeout.js";
+import { withAggregationTimeout } from "./seoAggregationTimeout.js";
 
 export interface SeoAggregations {
   topSkills: Array<{ skill: string; count: number }>;
@@ -10,8 +10,8 @@ export interface SeoAggregations {
   hiringTrend: Array<{ day: string; count: number }>;
 }
 
-/** Cap rows scanned for skill unnest — sidebar signal, not analytics-grade totals. */
-const SKILL_AGGREGATION_JOB_CAP = 4000;
+/** Cap jobs scanned per aggregation query — sidebar signal, not analytics-grade totals. */
+const AGGREGATION_JOB_SCAN_CAP = 8000;
 
 function hasAggregationContent(data: SeoAggregations): boolean {
   if (data.topSkills.length > 0 || data.topCompanies.length > 0) return true;
@@ -25,79 +25,153 @@ function hasAggregationContent(data: SeoAggregations): boolean {
 }
 
 export function createSeoAggregationsService(prisma: PrismaClient) {
+  function isSkillOnlyHub(filters: JobDiscoveryFilters): boolean {
+    return (
+      (filters.skills?.length ?? 0) === 1 &&
+      !filters.role?.trim() &&
+      !filters.category?.trim() &&
+      !filters.country?.trim() &&
+      !filters.location?.trim() &&
+      filters.isRemote !== true &&
+      filters.workType !== "remote" &&
+      !filters.experienceLevel
+    );
+  }
+
   async function fetchAggregations(filters: JobDiscoveryFilters): Promise<SeoAggregations> {
     const whereSql = buildDiscoveryWhereSql(filters);
-    const txTimeout = aggregationQueryTimeoutMs();
+    const skillOnly = isSkillOnlyHub(filters);
 
-    return prisma.$transaction(
-      async (tx) => {
-        const topCompaniesRows = await tx.$queryRaw<
-          Array<{ companyId: string; name: string; count: bigint }>
-        >`
-          SELECT j."companyId" AS "companyId", c.name AS name, COUNT(*)::bigint AS count
-          FROM "Job" j
-          JOIN "Company" c ON c.id = j."companyId"
-          WHERE ${whereSql}
-          GROUP BY j."companyId", c.name
-          ORDER BY count DESC
-          LIMIT 10
-        `;
+    type AggRow = {
+      top_skills: Array<{ skill: string; count: number }> | null;
+      top_companies: Array<{ companyId: string; name: string; count: number }> | null;
+      salary: { avg: number | null; min: number | null; max: number | null } | null;
+      hiring_trend: Array<{ day: string; count: number }> | null;
+    };
 
-        const salaryRows = await tx.$queryRaw<
-          Array<{ avg: number | null; min: number | null; max: number | null }>
-        >`
-          SELECT
-            AVG(j."salaryMin")::float8 AS avg,
-            MIN(j."salaryMin")::int AS min,
-            MAX(j."salaryMin")::int AS max
-          FROM "Job" j
-          WHERE ${whereSql}
-            AND j."salaryMin" IS NOT NULL
-            AND j."salaryMin" > 0
-        `;
-
-        const trendRows = await tx.$queryRaw<Array<{ day: string; count: bigint }>>`
-          SELECT TO_CHAR(DATE_TRUNC('day', j."postedAt"), 'YYYY-MM-DD') AS day,
-                 COUNT(*)::bigint AS count
-          FROM "Job" j
-          WHERE ${whereSql}
-            AND j."postedAt" IS NOT NULL
-            AND j."postedAt" >= NOW() - INTERVAL '14 days'
-          GROUP BY DATE_TRUNC('day', j."postedAt")
-          ORDER BY DATE_TRUNC('day', j."postedAt") DESC
-          LIMIT 14
-        `;
-
-        const topSkillsRows = await tx.$queryRaw<Array<{ skill: string; count: bigint }>>`
-          WITH recent_jobs AS (
-            SELECT j.skills
+    const [row] = skillOnly
+      ? await prisma.$queryRaw<AggRow[]>`
+          WITH sampled AS (
+            SELECT
+              j."companyId" AS "companyId",
+              c.name AS name,
+              j."salaryMin" AS "salaryMin",
+              j."postedAt" AS "postedAt"
             FROM "Job" j
+            JOIN "Company" c ON c.id = j."companyId"
             WHERE ${whereSql}
-            LIMIT ${SKILL_AGGREGATION_JOB_CAP}
+            LIMIT ${AGGREGATION_JOB_SCAN_CAP}
+          ),
+          top_companies AS (
+            SELECT "companyId", name, COUNT(*)::int AS count
+            FROM sampled
+            GROUP BY "companyId", name
+            ORDER BY count DESC
+            LIMIT 10
+          ),
+          salary_stats AS (
+            SELECT
+              AVG("salaryMin")::float8 AS avg,
+              MIN("salaryMin")::int AS min,
+              MAX("salaryMin")::int AS max
+            FROM sampled
+            WHERE "salaryMin" IS NOT NULL AND "salaryMin" > 0
+          ),
+          hiring_trend AS (
+            SELECT TO_CHAR(DATE_TRUNC('day', "postedAt"), 'YYYY-MM-DD') AS day,
+                   COUNT(*)::int AS count
+            FROM sampled
+            WHERE "postedAt" IS NOT NULL
+              AND "postedAt" >= NOW() - INTERVAL '14 days'
+            GROUP BY DATE_TRUNC('day', "postedAt")
+            ORDER BY day DESC
+            LIMIT 14
           )
-          SELECT LOWER(TRIM(s.skill)) AS skill, COUNT(*)::bigint AS count
-          FROM recent_jobs rj
-          CROSS JOIN LATERAL unnest(rj.skills) AS s(skill)
-          WHERE LENGTH(TRIM(s.skill)) > 1
-          GROUP BY LOWER(TRIM(s.skill))
-          ORDER BY count DESC
-          LIMIT 10
+          SELECT
+            '[]'::json AS top_skills,
+            (SELECT COALESCE(json_agg(tc.*), '[]'::json) FROM top_companies tc) AS top_companies,
+            (SELECT row_to_json(s) FROM salary_stats s) AS salary,
+            (SELECT COALESCE(json_agg(ht.*), '[]'::json) FROM hiring_trend ht) AS hiring_trend
+        `
+      : await prisma.$queryRaw<AggRow[]>`
+          WITH sampled AS (
+            SELECT
+              j."companyId" AS "companyId",
+              c.name AS name,
+              j."salaryMin" AS "salaryMin",
+              j."postedAt" AS "postedAt",
+              j.skills AS skills
+            FROM "Job" j
+            JOIN "Company" c ON c.id = j."companyId"
+            WHERE ${whereSql}
+            ORDER BY j."listingFreshnessAt" DESC NULLS LAST
+            LIMIT ${AGGREGATION_JOB_SCAN_CAP}
+          ),
+          top_companies AS (
+            SELECT "companyId", name, COUNT(*)::int AS count
+            FROM sampled
+            GROUP BY "companyId", name
+            ORDER BY count DESC
+            LIMIT 10
+          ),
+          salary_stats AS (
+            SELECT
+              AVG("salaryMin")::float8 AS avg,
+              MIN("salaryMin")::int AS min,
+              MAX("salaryMin")::int AS max
+            FROM sampled
+            WHERE "salaryMin" IS NOT NULL AND "salaryMin" > 0
+          ),
+          hiring_trend AS (
+            SELECT TO_CHAR(DATE_TRUNC('day', "postedAt"), 'YYYY-MM-DD') AS day,
+                   COUNT(*)::int AS count
+            FROM sampled
+            WHERE "postedAt" IS NOT NULL
+              AND "postedAt" >= NOW() - INTERVAL '14 days'
+            GROUP BY DATE_TRUNC('day', "postedAt")
+            ORDER BY day DESC
+            LIMIT 14
+          ),
+          top_skills AS (
+            SELECT LOWER(TRIM(s.skill)) AS skill, COUNT(*)::int AS count
+            FROM sampled
+            CROSS JOIN LATERAL unnest(sampled.skills) AS s(skill)
+            WHERE LENGTH(TRIM(s.skill)) > 1
+            GROUP BY LOWER(TRIM(s.skill))
+            ORDER BY count DESC
+            LIMIT 10
+          )
+          SELECT
+            (SELECT COALESCE(json_agg(tc.*), '[]'::json) FROM top_skills tc) AS top_skills,
+            (SELECT COALESCE(json_agg(tc.*), '[]'::json) FROM top_companies tc) AS top_companies,
+            (SELECT row_to_json(s) FROM salary_stats s) AS salary,
+            (SELECT COALESCE(json_agg(ht.*), '[]'::json) FROM hiring_trend ht) AS hiring_trend
         `;
 
-        const salary = salaryRows[0] ?? { avg: null, min: null, max: null };
-        return {
-          topSkills: topSkillsRows.map((r) => ({ skill: r.skill, count: Number(r.count) })),
-          topCompanies: topCompaniesRows.map((r) => ({
-            companyId: r.companyId,
-            name: r.name,
-            count: Number(r.count),
-          })),
-          salary,
-          hiringTrend: trendRows.map((r) => ({ day: r.day, count: Number(r.count) })),
-        };
-      },
-      { timeout: txTimeout },
-    );
+    const parsed = row ?? {
+      top_skills: [],
+      top_companies: [],
+      salary: { avg: null, min: null, max: null },
+      hiring_trend: [],
+    };
+
+    const salary = parsed.salary ?? { avg: null, min: null, max: null };
+    return {
+      topSkills: (parsed.top_skills ?? []).map((r) => ({
+        skill: r.skill,
+        count: Number(r.count),
+      })),
+      topCompanies: (parsed.top_companies ?? []).map((r) => ({
+        companyId: r.companyId,
+        name: r.name,
+        count: Number(r.count),
+      })),
+      salary,
+      hiringTrend: (parsed.hiring_trend ?? []).map((r) => ({
+        day: r.day,
+        count: Number(r.count),
+      })),
+    };
   }
 
   async function safeFetchAggregations(filters: JobDiscoveryFilters): Promise<SeoAggregations> {

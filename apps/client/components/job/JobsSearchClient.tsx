@@ -1904,9 +1904,9 @@ export function JobsSearchClient({
           }
 
           return (
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_min(16rem,22rem)] lg:items-start">
+            <div className="grid gap-6 lg:grid-cols-1 lg:has-[aside]:grid-cols-[minmax(0,1fr)_min(16rem,22rem)] lg:items-start">
               <div className="min-w-0">{resultsMain}</div>
-              <div className="min-w-0 lg:sticky lg:top-24">{sidebarNode}</div>
+              <div className="min-w-0 lg:sticky lg:top-24 empty:hidden">{sidebarNode}</div>
             </div>
           );
         })()}
