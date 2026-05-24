@@ -110,6 +110,7 @@ export interface JobItem {
   role: string;
   skills: string[];
   salaryMin: number | null;
+  salaryMax?: number | null;
   sourceUrl: string;
   applyUrl?: string | null;
   /** @deprecated Prefer `freshness.timestamp` + `freshness.source === "POSTED"`. Still present for backward compatibility with v1 clients. */
@@ -1098,7 +1099,7 @@ export async function fetchSeoLandingPages(options?: {
 export interface SeoAggregationsResponse {
   data: {
     topSkills: Array<{ skill: string; count: number }>;
-    topCompanies: Array<{ companyId: string; name: string; count: number }>;
+    topCompanies: Array<{ companyId: string; name: string; slug?: string | null; count: number }>;
     salary: { avg: number | null; min: number | null; max: number | null };
     hiringTrend: Array<{ day: string; count: number }>;
   };

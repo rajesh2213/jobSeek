@@ -31,6 +31,7 @@ import { JobsListingFaq, buildFaqJsonLd } from "../../../../components/seo/JobsL
 import { SeoBreadcrumbs } from "../../../../components/seo/SeoBreadcrumbs";
 import { decideJobsListingSeoPolicy } from "../../../../lib/seoIndexability";
 import { SeoAggregationSidebarHydrator } from "../../../../components/seo/SeoAggregationSidebarHydrator";
+import { SeoAggregationBodyEnrichment } from "../../../../components/seo/SeoAggregationBodyEnrichment";
 import {
   hasAggregationSidebarContent,
   isSeoAggregationEnrichmentEnabled,
@@ -157,6 +158,9 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
           ))}
         </div>
       </section>
+      {aggregations && hasAggregationSidebarContent(aggregations) ? (
+        <SeoAggregationBodyEnrichment data={aggregations} />
+      ) : null}
     </>
   );
 
@@ -269,6 +273,23 @@ function buildCuratedRelatedSearchLinks(
     for (const loc of LOCATION_HUB_LINKS) {
       if (out.length >= MAX_LINKS) break;
       push(`/jobs/role/${role}/location/${loc.token}`, `${toTitle(role)} jobs in ${loc.label}`);
+    }
+  } else if (filters.skills?.length === 1 && !role && !category) {
+    const skill = filters.skills[0] ?? "";
+    if (skill) {
+      push(`/jobs/category/engineering`, "Engineering jobs");
+      push(`/jobs/category/data`, "Data jobs");
+      for (const loc of LOCATION_HUB_LINKS) {
+        if (out.length >= MAX_LINKS) break;
+        push(
+          `/jobs/skill/${skill}/location/${loc.token}`,
+          `${toTitle(skill)} jobs in ${loc.label}`,
+        );
+      }
+      for (const related of ["python", "javascript", "react", "java", "nodejs"]) {
+        if (out.length >= MAX_LINKS || related === skill) continue;
+        push(`/jobs/skill/${related}`, `${toTitle(related)} jobs`);
+      }
     }
   } else if (category && ALLOWED_CATEGORY.has(category)) {
     // Category page: link to representative roles within category, then category+location

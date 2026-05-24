@@ -8,6 +8,7 @@ import {
 import { buildBreadcrumbListJsonLd } from "../../../../lib/seo";
 import { absoluteUrl } from "../../../../lib/seoSite";
 import { decideCompanySeoPolicy } from "../../../../lib/seoIndexability";
+import { CompanyHubDiscoveryLinks } from "../../../../components/company/CompanyHubDiscoveryLinks";
 import { CompanyHubPage } from "../../../../components/company/CompanyHubPage";
 import { JsonLdScript } from "../../../../components/seo/JsonLdScript";
 import { SeoBreadcrumbs } from "../../../../components/seo/SeoBreadcrumbs";
@@ -117,6 +118,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
             centralizes real-time jobs from company career sites, so company pages like this stay connected to broader discovery on the homepage and listings.
           </p>
         </section>
+        <CompanyHubDiscoveryLinks jobs={initialListing.jobs} />
       </div>
       <CompanyHubPage
         company={company}

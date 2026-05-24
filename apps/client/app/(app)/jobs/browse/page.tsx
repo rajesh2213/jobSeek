@@ -6,6 +6,7 @@ import { fetchJobCategories, fetchJobSkills, fetchRoles } from "../../../../lib/
 export const dynamic = "force-dynamic";
 import { JOB_CATEGORIES } from "../../../../lib/taxonomy";
 import { buildJobsListingUrl, isCanonicalListingPath } from "../../../../lib/slug-parser";
+import { FEATURED_SEO_HUBS } from "../../../../lib/seoFeaturedHubs";
 import { Container } from "../../../../components/ui/Container";
 
 export const metadata: Metadata = {
@@ -54,6 +55,24 @@ export default async function JobsBrowsePage() {
             programmatic SEO index.
           </p>
         </header>
+
+        <section className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-ink/45">Featured hubs</h2>
+          <p className="text-sm text-ink/60">
+            High-signal discovery pages indexed for search — start here for popular skills and categories.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {FEATURED_SEO_HUBS.map((hub) => (
+              <Link
+                key={hub.href}
+                href={hub.href}
+                className="rounded-full bg-brand/5 px-3 py-1.5 text-sm font-medium text-brand no-underline ring-1 ring-brand/20 hover:bg-brand/10"
+              >
+                {hub.label}
+              </Link>
+            ))}
+          </div>
+        </section>
 
         <section className="space-y-3">
           <h2 className="text-xs font-bold uppercase tracking-wider text-ink/45">Categories</h2>

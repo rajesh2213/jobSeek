@@ -29,6 +29,7 @@ export interface SeoLandingGenerationStats {
   experiencesConsidered: number;
   skillsConsidered: number;
   categoriesEmitted: number;
+  categoryLocationHubsEmitted: number;
   locationHubsEmitted: number;
   skillHubsEmitted: number;
   skillLocationHubsEmitted: number;
@@ -365,12 +366,18 @@ export function createSeoService(prisma: PrismaClient) {
       1,
       SEO_DIMENSIONS.experience.length,
     );
-    const skillLimit = parsePositiveIntEnv(process.env.SEO_LANDING_MAX_SKILL_SLUGS, 40, 5, 80);
+    const skillLimit = parsePositiveIntEnv(process.env.SEO_LANDING_MAX_SKILL_SLUGS, 50, 5, 80);
     const skillLocationLimit = parsePositiveIntEnv(
       process.env.SEO_LANDING_MAX_SKILL_LOCATION_PAIRS,
-      120,
+      140,
       0,
       500,
+    );
+    const categoryLocationLimit = parsePositiveIntEnv(
+      process.env.SEO_LANDING_MAX_CATEGORY_LOCATION_PAIRS,
+      48,
+      0,
+      200,
     );
     const selectedLocations = SEO_DIMENSIONS.locations.slice(0, locationLimit);
     const selectedExperiences = SEO_DIMENSIONS.experience.slice(0, experienceLimit);
@@ -422,6 +429,35 @@ export function createSeoService(prisma: PrismaClient) {
       const estimatedCount = Math.max(minCount, Math.floor(totalJobCount / JOB_CATEGORIES.length));
       push(`category/${cat}`, estimatedCount);
       categoriesEmitted++;
+    }
+
+    // ── Category + location hubs (reuse role×location totals — no extra query) ──
+    let categoryLocationHubsEmitted = 0;
+    let categoryLocationPairs = 0;
+    const catsForLocation = JOB_CATEGORIES.filter((c) => c !== "other");
+    for (const cat of catsForLocation) {
+      if (out.length >= maxSlugs || categoryLocationPairs >= categoryLocationLimit) break;
+      for (const loc of selectedLocations) {
+        if (out.length >= maxSlugs || categoryLocationPairs >= categoryLocationLimit) break;
+        const locFilter = locationTokenToFilter(loc);
+        if (!locFilter.country && !locFilter.isRemote && !locFilter.workType) continue;
+        let locTotal = 0;
+        for (const r of roles) {
+          locTotal += counts.get(`${r.role}|${loc}|`) ?? 0;
+        }
+        if (locTotal < minCount) continue;
+        const slug = filtersToJobListingSlug({
+          category: cat,
+          country: locFilter.country,
+          isRemote: locFilter.isRemote,
+          workType: locFilter.workType,
+        });
+        if (!slug) continue;
+        const estimated = Math.max(minCount, Math.floor(locTotal / catsForLocation.length));
+        push(slug, estimated);
+        categoryLocationHubsEmitted++;
+        categoryLocationPairs++;
+      }
     }
 
     // ── Location hub pages ─────────────────────────────────────────────
@@ -544,6 +580,7 @@ export function createSeoService(prisma: PrismaClient) {
         experiencesConsidered,
         skillsConsidered,
         categoriesEmitted,
+        categoryLocationHubsEmitted,
         locationHubsEmitted,
         skillHubsEmitted,
         skillLocationHubsEmitted,

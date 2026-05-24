@@ -86,12 +86,24 @@ export function SeoAggregationSidebar({ data }: { data: SeoAggregationsData }) {
         <section className="space-y-2">
           <p className="text-xs font-semibold text-ink/70">Top hiring companies</p>
           <ul className="space-y-1.5 text-xs text-ink/80">
-            {topCompanies.slice(0, 6).map((c) => (
-              <li key={c.companyId} className="flex justify-between gap-2">
-                <span className="truncate font-medium text-ink">{c.name}</span>
-                <span className="shrink-0 text-ink/45">{c.count.toLocaleString()}</span>
-              </li>
-            ))}
+            {topCompanies.slice(0, 6).map((c) => {
+              const href = c.slug?.trim() ? `/company/${c.slug.trim()}` : null;
+              return (
+                <li key={c.companyId} className="flex justify-between gap-2">
+                  {href ? (
+                    <Link
+                      href={href}
+                      className="truncate font-medium text-ink no-underline hover:text-brand"
+                    >
+                      {c.name}
+                    </Link>
+                  ) : (
+                    <span className="truncate font-medium text-ink">{c.name}</span>
+                  )}
+                  <span className="shrink-0 text-ink/45">{c.count.toLocaleString()}</span>
+                </li>
+              );
+            })}
           </ul>
         </section>
       ) : null}

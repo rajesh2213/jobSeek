@@ -56,6 +56,8 @@ export function buildJobPostingJsonLd(
     org.sameAs = `https://${job.company.domain.replace(/^https?:\/\//, "")}`;
   }
 
+  const address = buildJobPostingAddress(job, cc, country);
+
   const base: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "JobPosting",
@@ -64,10 +66,7 @@ export function buildJobPostingJsonLd(
     hiringOrganization: org,
     jobLocation: {
       "@type": "Place",
-      address: {
-        "@type": "PostalAddress",
-        addressCountry: cc || country || undefined,
-      },
+      address,
     },
     datePosted,
     ...(validThrough ? { validThrough } : {}),
@@ -85,19 +84,61 @@ export function buildJobPostingJsonLd(
     }
   }
 
-  if (job.salaryMin != null && job.salaryMin > 0) {
-    base.baseSalary = {
+  const salary = buildBaseSalary(job, currency);
+  if (salary) base.baseSalary = salary;
+
+  return base;
+}
+
+function buildJobPostingAddress(
+  job: JobItem,
+  countryCode: string,
+  countryRaw: string,
+): Record<string, unknown> {
+  const address: Record<string, unknown> = {
+    "@type": "PostalAddress",
+    addressCountry: countryCode || countryRaw || undefined,
+  };
+  const city = job.locationCity?.trim();
+  const region = job.locationState?.trim() || job.locationRegion?.trim();
+  if (city) address.addressLocality = city;
+  if (region) address.addressRegion = region;
+  return address;
+}
+
+function buildBaseSalary(
+  job: JobItem,
+  currency: string,
+): Record<string, unknown> | null {
+  const min = job.salaryMin;
+  const max = job.salaryMax;
+  const hasMin = typeof min === "number" && min > 0;
+  const hasMax = typeof max === "number" && max > 0;
+  if (!hasMin && !hasMax) return null;
+
+  if (hasMin && hasMax && max! >= min!) {
+    return {
       "@type": "MonetaryAmount",
       currency,
       value: {
         "@type": "QuantitativeValue",
-        value: job.salaryMin,
+        minValue: min,
+        maxValue: max,
         unitText: "YEAR",
       },
     };
   }
 
-  return base;
+  const value = hasMin ? min : max;
+  return {
+    "@type": "MonetaryAmount",
+    currency,
+    value: {
+      "@type": "QuantitativeValue",
+      value,
+      unitText: "YEAR",
+    },
+  };
 }
 
 function employmentType(workType: string | undefined): string | undefined {

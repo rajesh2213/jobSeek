@@ -90,3 +90,29 @@ test("capped path still emits description via structuredDataDescription fallback
   const jsonLd = buildJobPostingJsonLd(job, job.structuredDataDescription ?? undefined);
   assert.equal(jsonLd.description, "Capped-safe structured data description.");
 });
+
+test("buildJobPostingJsonLd includes address and salary range when present", () => {
+  const job = sampleJob({
+    locationCity: "San Francisco",
+    locationState: "CA",
+    locationCountry: "US",
+    country: "US",
+    salaryMin: 120000,
+    salaryMax: 160000,
+    postedAt: "2026-04-15T00:00:00.000Z",
+    freshness: {
+      source: "POSTED",
+      label: "Posted",
+      timestamp: "2026-04-15T00:00:00.000Z",
+      relative: "Posted 1 day ago",
+    },
+  });
+  const jsonLd = buildJobPostingJsonLd(job, "Role details.");
+  const address = (jsonLd.jobLocation as { address: Record<string, unknown> }).address;
+  assert.equal(address.addressLocality, "San Francisco");
+  assert.equal(address.addressRegion, "CA");
+  assert.equal(address.addressCountry, "US");
+  const value = (jsonLd.baseSalary as { value: Record<string, unknown> }).value;
+  assert.equal(value.minValue, 120000);
+  assert.equal(value.maxValue, 160000);
+});

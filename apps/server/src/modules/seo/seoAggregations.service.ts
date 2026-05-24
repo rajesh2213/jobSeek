@@ -5,7 +5,7 @@ import { withAggregationTimeout } from "./seoAggregationTimeout.js";
 
 export interface SeoAggregations {
   topSkills: Array<{ skill: string; count: number }>;
-  topCompanies: Array<{ companyId: string; name: string; count: number }>;
+  topCompanies: Array<{ companyId: string; name: string; slug: string | null; count: number }>;
   salary: { avg: number | null; min: number | null; max: number | null };
   hiringTrend: Array<{ day: string; count: number }>;
 }
@@ -44,7 +44,7 @@ export function createSeoAggregationsService(prisma: PrismaClient) {
 
     type AggRow = {
       top_skills: Array<{ skill: string; count: number }> | null;
-      top_companies: Array<{ companyId: string; name: string; count: number }> | null;
+      top_companies: Array<{ companyId: string; name: string; slug: string | null; count: number }> | null;
       salary: { avg: number | null; min: number | null; max: number | null } | null;
       hiring_trend: Array<{ day: string; count: number }> | null;
     };
@@ -55,6 +55,7 @@ export function createSeoAggregationsService(prisma: PrismaClient) {
             SELECT
               j."companyId" AS "companyId",
               c.name AS name,
+              c.slug AS slug,
               j."salaryMin" AS "salaryMin",
               j."postedAt" AS "postedAt"
             FROM "Job" j
@@ -63,9 +64,9 @@ export function createSeoAggregationsService(prisma: PrismaClient) {
             LIMIT ${AGGREGATION_JOB_SCAN_CAP}
           ),
           top_companies AS (
-            SELECT "companyId", name, COUNT(*)::int AS count
+            SELECT "companyId", name, slug, COUNT(*)::int AS count
             FROM sampled
-            GROUP BY "companyId", name
+            GROUP BY "companyId", name, slug
             ORDER BY count DESC
             LIMIT 10
           ),
@@ -98,6 +99,7 @@ export function createSeoAggregationsService(prisma: PrismaClient) {
             SELECT
               j."companyId" AS "companyId",
               c.name AS name,
+              c.slug AS slug,
               j."salaryMin" AS "salaryMin",
               j."postedAt" AS "postedAt",
               j.skills AS skills
@@ -108,9 +110,9 @@ export function createSeoAggregationsService(prisma: PrismaClient) {
             LIMIT ${AGGREGATION_JOB_SCAN_CAP}
           ),
           top_companies AS (
-            SELECT "companyId", name, COUNT(*)::int AS count
+            SELECT "companyId", name, slug, COUNT(*)::int AS count
             FROM sampled
-            GROUP BY "companyId", name
+            GROUP BY "companyId", name, slug
             ORDER BY count DESC
             LIMIT 10
           ),
@@ -164,6 +166,7 @@ export function createSeoAggregationsService(prisma: PrismaClient) {
       topCompanies: (parsed.top_companies ?? []).map((r) => ({
         companyId: r.companyId,
         name: r.name,
+        slug: r.slug ?? null,
         count: Number(r.count),
       })),
       salary,

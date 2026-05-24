@@ -10,6 +10,7 @@ import {
   jobsRouteMetadata,
 } from "../../../lib/seo";
 import { JobsSearchPage } from "../../../components/job/JobsSearchPage";
+import { redirect } from "next/navigation";
 import { getCanonicalJobListingUrl, parseJobFiltersFromSearch } from "../../../lib/slug-parser";
 import { decideJobsListingSeoPolicy } from "../../../lib/seoIndexability";
 import { JsonLdScript } from "../../../components/seo/JsonLdScript";
@@ -42,6 +43,19 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 export default async function JobsPage({ searchParams }: Props) {
   const sp = await searchParams;
   const filters = parseJobFiltersFromSearch(sp);
+  const searchParamKeys = Object.keys(sp).filter(Boolean).sort();
+  if (searchParamKeys.length > 0) {
+    const canonical = getCanonicalJobListingUrl(filters);
+    const incomingQs = new URLSearchParams();
+    for (const key of searchParamKeys) {
+      const raw = sp[key];
+      if (typeof raw === "string" && raw.length > 0) incomingQs.set(key, raw);
+    }
+    const incoming = incomingQs.toString() ? `/jobs?${incomingQs.toString()}` : "/jobs";
+    if (incoming !== canonical) {
+      redirect(canonical);
+    }
+  }
 
   /** Client hydrates listings — avoids Vercel SSR timeout when API pool is busy. */
   const response = EMPTY_JOBS_RESPONSE;
