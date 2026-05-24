@@ -27,7 +27,7 @@ export function SeoAggregationBodyEnrichment({ data }: { data: SeoAggregationsDa
   if (!showSkills && !showCompanies) return null;
 
   return (
-    <div className="mt-3 space-y-3 sm:mt-4">
+    <div className="space-y-3">
       {showSkills ? (
         <section className="rounded-xl border border-ink/10 bg-surface px-3 py-3 sm:px-4 sm:py-4">
           <h3 className="text-xs font-semibold text-ink sm:text-sm">Trending skills in these results</h3>

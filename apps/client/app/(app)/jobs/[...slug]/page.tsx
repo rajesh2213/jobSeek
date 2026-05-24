@@ -158,19 +158,20 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
           ))}
         </div>
       </section>
-      {fetchAggregations ? (
-        <SeoAggregationBodyHydrator
-          filtersSlug={filtersSlug}
-          initial={
-            aggregations && hasAggregationSidebarContent(aggregations)
-              ? aggregations
-              : null
-          }
-          ssrAttempted={Boolean(fetchAggregations)}
-        />
-      ) : null}
     </>
   );
+
+  const listingAfterResults = fetchAggregations ? (
+    <SeoAggregationBodyHydrator
+      filtersSlug={filtersSlug}
+      initial={
+        aggregations && hasAggregationSidebarContent(aggregations)
+          ? aggregations
+          : null
+      }
+      ssrAttempted={Boolean(fetchAggregations)}
+    />
+  ) : null;
 
   const faqJsonLd = indexable ? buildFaqJsonLd(filters, total) : null;
   const listingFaq =
@@ -205,6 +206,7 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
       listingSidebar={listingSidebar}
       seoAggregationFiltersSlug={fetchAggregations ? filtersSlug : undefined}
       listingFaq={listingFaq}
+      listingAfterResults={listingAfterResults}
     />
   );
 }

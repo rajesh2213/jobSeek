@@ -102,6 +102,7 @@ interface Props {
   listingSidebar?: ReactNode;
   seoAggregationFiltersSlug?: string;
   listingFaq?: ReactNode;
+  listingAfterResults?: ReactNode;
 }
 
 function seoAggregationFiltersSlugFromPathname(pathname: string): string | null {
@@ -433,6 +434,7 @@ export function JobsSearchClient({
   listingSidebar,
   seoAggregationFiltersSlug,
   listingFaq,
+  listingAfterResults,
 }: Props) {
   const { getToken, isSignedIn, isLoaded: authLoaded } = useAuth();
   const { isPro } = useAccountPlan();
@@ -1885,6 +1887,9 @@ export function JobsSearchClient({
                     {loadingMore ? "Loading…" : "Load more"}
                   </Button>
                 </div>
+              ) : null}
+              {listingAfterResults ? (
+                <div className="mt-10">{listingAfterResults}</div>
               ) : null}
             </>
           );

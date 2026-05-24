@@ -22,6 +22,8 @@ interface Props {
   seoAggregationFiltersSlug?: string;
   /** FAQ block rendered below job results (above related searches). */
   listingFaq?: ReactNode;
+  /** SEO enrichment below job list + load more (e.g. top companies, trending skills). */
+  listingAfterResults?: ReactNode;
 }
 
 export function JobsSearchPage({
@@ -33,6 +35,7 @@ export function JobsSearchPage({
   listingSidebar,
   seoAggregationFiltersSlug,
   listingFaq,
+  listingAfterResults,
 }: Props) {
   /* B1: Suspense wraps client subtree for progressive hydration; listing rows remain in SSR props. */
   return (
@@ -46,6 +49,7 @@ export function JobsSearchPage({
         listingSidebar={listingSidebar}
         seoAggregationFiltersSlug={seoAggregationFiltersSlug}
         listingFaq={listingFaq}
+        listingAfterResults={listingAfterResults}
       />
     </Suspense>
   );
