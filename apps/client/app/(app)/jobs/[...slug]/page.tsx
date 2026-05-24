@@ -144,34 +144,41 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
       <section className="mt-3 rounded-xl border border-ink/10 bg-surface px-3 py-2 text-xs leading-snug text-ink/75 sm:mt-4 sm:px-4 sm:py-3 sm:text-sm sm:leading-normal">
         <p>{buildDynamicIntro(filters, { total, jobs: response.data })}</p>
       </section>
-      <section className="mt-3 rounded-xl border border-ink/10 bg-surface px-3 py-3 sm:mt-4 sm:px-4 sm:py-4">
-        <h3 className="text-xs font-semibold text-ink sm:text-sm">Explore related searches</h3>
-        <div className="mt-1.5 flex flex-wrap gap-1.5 sm:mt-2 sm:gap-2">
-          {relatedSearchLinks.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-ink/80 no-underline ring-1 ring-ink/10 hover:text-brand"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </div>
-      </section>
     </>
   );
 
-  const listingAfterResults = fetchAggregations ? (
-    <SeoAggregationBodyHydrator
-      filtersSlug={filtersSlug}
-      initial={
-        aggregations && hasAggregationSidebarContent(aggregations)
-          ? aggregations
-          : null
-      }
-      ssrAttempted={Boolean(fetchAggregations)}
-    />
-  ) : null;
+  const listingAfterResults =
+    relatedSearchLinks.length > 0 || fetchAggregations ? (
+      <div className="space-y-3">
+        {relatedSearchLinks.length > 0 ? (
+          <section className="rounded-xl border border-ink/10 bg-surface px-3 py-3 sm:px-4 sm:py-4">
+            <h3 className="text-xs font-semibold text-ink sm:text-sm">Explore related searches</h3>
+            <div className="mt-1.5 flex flex-wrap gap-1.5 sm:mt-2 sm:gap-2">
+              {relatedSearchLinks.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-ink/80 no-underline ring-1 ring-ink/10 hover:text-brand"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
+        {fetchAggregations ? (
+          <SeoAggregationBodyHydrator
+            filtersSlug={filtersSlug}
+            initial={
+              aggregations && hasAggregationSidebarContent(aggregations)
+                ? aggregations
+                : null
+            }
+            ssrAttempted={Boolean(fetchAggregations)}
+          />
+        ) : null}
+      </div>
+    ) : null;
 
   const faqJsonLd = indexable ? buildFaqJsonLd(filters, total) : null;
   const listingFaq =
