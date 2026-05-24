@@ -31,7 +31,7 @@ import { JobsListingFaq, buildFaqJsonLd } from "../../../../components/seo/JobsL
 import { SeoBreadcrumbs } from "../../../../components/seo/SeoBreadcrumbs";
 import { decideJobsListingSeoPolicy } from "../../../../lib/seoIndexability";
 import { SeoAggregationSidebarHydrator } from "../../../../components/seo/SeoAggregationSidebarHydrator";
-import { SeoAggregationBodyEnrichment } from "../../../../components/seo/SeoAggregationBodyEnrichment";
+import { SeoAggregationBodyHydrator } from "../../../../components/seo/SeoAggregationBodyHydrator";
 import {
   hasAggregationSidebarContent,
   isSeoAggregationEnrichmentEnabled,
@@ -158,8 +158,16 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
           ))}
         </div>
       </section>
-      {aggregations && hasAggregationSidebarContent(aggregations) ? (
-        <SeoAggregationBodyEnrichment data={aggregations} />
+      {fetchAggregations ? (
+        <SeoAggregationBodyHydrator
+          filtersSlug={filtersSlug}
+          initial={
+            aggregations && hasAggregationSidebarContent(aggregations)
+              ? aggregations
+              : null
+          }
+          ssrAttempted={Boolean(fetchAggregations)}
+        />
       ) : null}
     </>
   );

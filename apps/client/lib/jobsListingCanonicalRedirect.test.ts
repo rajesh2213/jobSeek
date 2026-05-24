@@ -47,6 +47,11 @@ test("no redirect when canonical matches incoming", () => {
   assert.equal(dest, null);
 });
 
+test("no redirect for /jobs/browse path", () => {
+  const dest = resolveJobsListingCanonicalRedirectUrl(ORIGIN, "/jobs/browse", {});
+  assert.equal(dest, null);
+});
+
 test("no redirect for browse path", () => {
   const dest = resolveJobsListingCanonicalRedirectUrl(ORIGIN, "/jobs/browse", {
     skills: "typescript",

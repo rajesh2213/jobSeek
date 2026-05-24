@@ -57,6 +57,8 @@ export function resolveJobsListingCanonicalRedirectUrl(
 
 export function resolveJobsListingCanonicalRedirect(req: NextRequest): URL | null {
   const url = req.nextUrl;
+  if (!isJobsListingRedirectPath(url.pathname)) return null;
+
   const sp = searchParamsRecord(url);
 
   if (url.search.length === 0 && url.pathname !== "/jobs") {
