@@ -7,12 +7,15 @@ export const dynamic = "force-dynamic";
 import { JOB_CATEGORIES } from "../../../../lib/taxonomy";
 import { buildJobsListingUrl, isCanonicalListingPath } from "../../../../lib/slug-parser";
 import { FEATURED_SEO_HUBS } from "../../../../lib/seoFeaturedHubs";
+import { absoluteUrl } from "../../../../lib/seoSite";
 import { Container } from "../../../../components/ui/Container";
 
 export const metadata: Metadata = {
   title: "Browse jobs by category, skill, and location | JobLoom",
   description:
     "Explore indexed job discovery pages by category, tech stack, and location. Jump to high-signal searches with one click.",
+  alternates: { canonical: absoluteUrl("/jobs/browse") },
+  robots: { index: true, follow: true },
 };
 
 const BROWSE_LOCATIONS: ReadonlyArray<{ token: string; label: string }> = [

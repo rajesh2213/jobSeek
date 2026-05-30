@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { CompaniesSearchPage } from "../../../components/companies/CompaniesSearchPage";
+import { absoluteUrl } from "../../../lib/seoSite";
 
 export const metadata: Metadata = {
   title: "Companies | JobLoom",
   description:
     "Browse employers hiring now: tech companies careers, remote companies hiring, and startup jobs. Explore open roles and apply early.",
+  alternates: { canonical: absoluteUrl("/companies") },
+  robots: { index: true, follow: true },
 };
 
 interface Props {
