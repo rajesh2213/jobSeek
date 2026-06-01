@@ -3,10 +3,10 @@ import { unstable_cache } from "next/cache";
 import { headers } from "next/headers";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { resolveApiBaseUrl } from "../../../lib/apiBaseUrl";
 import { hasClerkSessionCookie } from "../../../lib/ssrAuthMode";
 
-const API_BASE =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000";
+const API_BASE = resolveApiBaseUrl();
 
 export const dynamic = "force-dynamic";
 

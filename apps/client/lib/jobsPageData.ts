@@ -176,30 +176,25 @@ export function loadJobsListingDeferred(input: {
 
 const loadJobDetailPageAuthenticated = cache(
   async (id: string): Promise<JobDetailFetchResult | null> => {
-    try {
-      const { getToken } = await auth();
-      const token = await getToken();
-      const h = await headers();
-      const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
-      return await withSsrUpstreamTimeout((signal) =>
-        fetchJobById(id, { token, forwardedFor, signal }),
-      );
-    } catch {
-      return null;
-    }
+    const { getToken } = await auth();
+    const token = await getToken();
+    const h = await headers();
+    const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
+    return await withSsrUpstreamTimeout((signal) =>
+      fetchJobById(id, { token, forwardedFor, signal }),
+    );
   },
 );
 
 /** Anon job detail — no `x-forwarded-for` so Next Data Cache shares one entry per job id. */
 const loadJobDetailPagePublic = cache(
   async (id: string): Promise<JobDetailFetchResult | null> => {
-    try {
-      return await withSsrUpstreamTimeout((signal) =>
-        fetchJobById(id, { signal }),
-      );
-    } catch {
-      return null;
-    }
+    return await withSsrUpstreamTimeout((signal) =>
+      fetchJobById(id, {
+        signal,
+        internalSeoSecret: process.env.INTERNAL_SEO_SECRET ?? null,
+      }),
+    );
   },
 );
 

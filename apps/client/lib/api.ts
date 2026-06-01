@@ -1,4 +1,5 @@
 import type { JobFilters } from "./slug-parser";
+import { resolveApiBaseUrl } from "./apiBaseUrl";
 import { formatUserLocalResetForMessage } from "./userLocalResetTime";
 
 export interface JobCompany {
@@ -238,8 +239,7 @@ export type JobDetailFetchResult = {
  * the API on another `PORT` and set `NEXT_PUBLIC_API_BASE_URL` (and `API_BASE_URL`
  * for SSR) to that origin, e.g. `http://127.0.0.1:3000`.
  */
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? "http://localhost:3000";
+export const API_BASE_URL = resolveApiBaseUrl();
 
 /** Free-tier AI resume–job match quota (rolling ~24h, server Redis). Null for Pro or when unavailable. */
 export interface ResumeMatchAiQuotaState {
@@ -1424,11 +1424,15 @@ export async function fetchJobById(
     token?: string | null;
     forwardedFor?: string | null;
     signal?: AbortSignal | null;
+    /** Server-only: forwarded to direct API when not using the Next proxy. */
+    internalSeoSecret?: string | null;
   },
 ): Promise<JobDetailFetchResult | null> {
   const headers = new Headers();
   const t = opts?.token?.trim();
   if (t) headers.set("Authorization", `Bearer ${t}`);
+
+  const isServer = typeof window === "undefined";
 
   /**
    * PRODUCTION-INTENT: Two-tier fetch strategy for job detail pages.
@@ -1450,7 +1454,7 @@ export async function fetchJobById(
     if (forwardedFor) headers.set("x-forwarded-for", forwardedFor);
     fetchOptions = { headers, cache: "no-store" };
   } else {
-    const internalSeoSecret = process.env.INTERNAL_SEO_SECRET?.trim();
+    const internalSeoSecret = opts?.internalSeoSecret?.trim() ?? process.env.INTERNAL_SEO_SECRET?.trim();
     if (internalSeoSecret) {
       headers.set("x-internal-seo", "true");
       headers.set("x-internal-seo-secret", internalSeoSecret);
@@ -1459,14 +1463,25 @@ export async function fetchJobById(
   }
   if (opts?.signal) fetchOptions.signal = opts.signal;
 
-  const res = await fetch(`${API_BASE_URL}/jobs/${id}`, fetchOptions);
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    throw new Error(`Failed to fetch job ${id}: ${res.status} ${res.statusText}`);
+  const url = `${API_BASE_URL}/jobs/${encodeURIComponent(id)}`;
+  const serverRetries = isServer ? 3 : 1;
+  for (let attempt = 0; attempt < serverRetries; attempt++) {
+    const res = await fetch(url, fetchOptions);
+    if (res.status === 404) return null;
+    const retryable = res.status === 429 || res.status === 503;
+    if (retryable && attempt < serverRetries - 1) {
+      await sleepMs(400 * (attempt + 1));
+      continue;
+    }
+    if (!res.ok) {
+      throw new Error(`Failed to fetch job ${id}: ${res.status} ${res.statusText}`);
+    }
+    const payload = (await res.json()) as JobApiResponse;
+    if (!payload.data) return null;
+    if (!isJobReady(payload.data)) return null;
+    return { data: payload.data, meta: payload.meta };
   }
-  const payload = (await res.json()) as JobApiResponse;
-  if (!isJobReady(payload.data)) return null;
-  return { data: payload.data, meta: payload.meta };
+  throw new Error(`Failed to fetch job ${id}: exhausted retries`);
 }
 
 export type SemanticMatchMap = Record<string, { bullet: string; similarity: number }>;

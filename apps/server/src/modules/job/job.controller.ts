@@ -79,7 +79,10 @@ export function registerJobRoutes(
       const tRouteStart = performance.now();
       const redis = getIoredis();
       const ip = clientIp(request);
-      const rl = await assertJobReadRateLimit(redis, ip);
+      const bypassRateLimit = isViewCapBypassRequest(request);
+      const rl = bypassRateLimit
+        ? { ok: true as const }
+        : await assertJobReadRateLimit(redis, ip);
       const tAfterRateLimit = performance.now();
       if (!rl.ok) {
         return reply.status(429).send({
@@ -315,7 +318,10 @@ export function registerJobRoutes(
     ) => {
       const redis = getIoredis();
       const ip = clientIp(request);
-      const rl = await assertJobReadRateLimit(redis, ip);
+      const bypassRateLimit = isViewCapBypassRequest(request);
+      const rl = bypassRateLimit
+        ? { ok: true as const }
+        : await assertJobReadRateLimit(redis, ip);
       if (!rl.ok) {
         return reply.status(429).send({
           error: "Too many requests",

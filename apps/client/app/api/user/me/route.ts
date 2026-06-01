@@ -3,8 +3,9 @@ import { NextResponse } from "next/server";
 import type { UserMeResponse } from "../../../../lib/api";
 import { PLAN_LIMITS } from "../../../../lib/planLimits";
 
-const API_BASE =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000";
+import { resolveApiBaseUrl } from "../../../../lib/apiBaseUrl";
+
+const API_BASE = resolveApiBaseUrl();
 
 /**
  * Proxies JobLoom usage from Fastify `GET /account/summary` using the active Clerk session.
