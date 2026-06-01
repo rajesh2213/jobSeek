@@ -38,7 +38,8 @@ export default clerkMiddleware(async (auth, req) => {
  * return `{ userId: null }`.
  *
  * Excluded (no server-side auth): /, /about, /privacy, /terms, /support, /billing,
- *   /companies, /company/*, /job/*, /jobs/browse, /pricing,
+ *   /companies, /company/*, /job/* (job detail SSR uses internal SEO loader, not auth()),
+ *   /jobs/browse, /pricing,
  *   /sitemap.xml, /robots.txt, /sign-in, /sign-up, /applications, /saved-searches,
  *   /smart-apply, /features/* (public SEO landing pages), /api/companies,
  *   /api/seo/aggregations, static assets.
@@ -49,6 +50,7 @@ export const config = {
     "/jobs/:path*",
     "/account/:path*",
     "/api/jobs",
+    "/api/jobs/:path*",
     "/api/user/me",
   ],
 };

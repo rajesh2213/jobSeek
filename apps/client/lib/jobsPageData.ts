@@ -174,39 +174,33 @@ export function loadJobsListingDeferred(input: {
   return { jobsDataPromise };
 }
 
-const loadJobDetailPageAuthenticated = cache(
-  async (id: string): Promise<JobDetailFetchResult | null> => {
-    const { getToken } = await auth();
-    const token = await getToken();
-    const h = await headers();
-    const forwardedFor = h.get("x-forwarded-for") ?? h.get("x-real-ip");
-    return await withSsrUpstreamTimeout((signal) =>
-      fetchJobById(id, { token, forwardedFor, signal }),
-    );
-  },
-);
-
 /** Anon job detail — no `x-forwarded-for` so Next Data Cache shares one entry per job id. */
 const loadJobDetailPagePublic = cache(
   async (id: string): Promise<JobDetailFetchResult | null> => {
-    return await withSsrUpstreamTimeout((signal) =>
-      fetchJobById(id, {
-        signal,
-        internalSeoSecret: process.env.INTERNAL_SEO_SECRET ?? null,
-      }),
-    );
+    try {
+      return await withSsrUpstreamTimeout((signal) =>
+        fetchJobById(id, {
+          signal,
+          internalSeoSecret: process.env.INTERNAL_SEO_SECRET ?? null,
+        }),
+      );
+    } catch {
+      return null;
+    }
   },
 );
 
 /**
  * One fetch per request for a given job ID (shared by `generateMetadata` and page RSC).
+ *
+ * Always uses the public SEO loader: `/job/*` is intentionally excluded from Clerk
+ * middleware (see middleware.ts). Calling `auth()` here breaks signed-in visitors with
+ * "Clerk can't detect clerkMiddleware". View-cap metering for signed-in users is handled
+ * on the API when the client refetches; SSR prioritizes a reliable first paint.
  */
 export const loadJobDetailPage = cache(
   async (id: string): Promise<JobDetailFetchResult | null> => {
-    if (usePublicSeoLoaders() && !(await hasClerkSessionCookie())) {
-      return loadJobDetailPagePublic(id);
-    }
-    return loadJobDetailPageAuthenticated(id);
+    return loadJobDetailPagePublic(id);
   },
 );
 
