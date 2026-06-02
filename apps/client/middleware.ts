@@ -1,24 +1,31 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import type { NextFetchEvent, NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { resolveJobsListingCanonicalRedirect } from "./lib/jobsListingCanonicalRedirect";
 
 const isProtectedRoute = createRouteMatcher(["/account(.*)"]);
 const isJobsListingRoute = createRouteMatcher(["/jobs", "/jobs/(.*)"]);
 
-export default clerkMiddleware(async (auth, req) => {
-  if (isJobsListingRoute(req)) {
-    const destination = resolveJobsListingCanonicalRedirect(req);
-    if (destination) {
-      return NextResponse.redirect(destination, 308);
-    }
-    return;
-  }
-
+const clerkAuthMiddleware = clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {
     const signInUrl = new URL("/sign-in", req.url).href;
     await auth.protect(undefined, { unauthenticatedUrl: signInUrl });
   }
 });
+
+/**
+ * Avoid invoking Clerk session resolution for high-volume public jobs listing traffic.
+ * `/jobs` canonicalization is handled here in plain middleware, while auth-aware routes
+ * continue through Clerk middleware below.
+ */
+export default async function middleware(req: NextRequest, event: NextFetchEvent) {
+  if (isJobsListingRoute(req)) {
+    const destination = resolveJobsListingCanonicalRedirect(req);
+    if (destination) return NextResponse.redirect(destination, 308);
+    return NextResponse.next();
+  }
+  return clerkAuthMiddleware(req, event);
+}
 
 /**
  * PRODUCTION-INTENT: Middleware scope is intentionally narrow for crawler scalability.
