@@ -22,7 +22,15 @@ import { getCompanyDiscoveryMetricsWithDb } from "../../services/companyDiscover
 
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 const SOURCES: DiscoverySourceType[] = discoverySources.map((s) => s.source);
-const ENRICH_BACKLOG_BATCH = 30;
+const DEFAULT_ENRICH_BACKLOG_BATCH = 30;
+const ENRICH_BACKLOG_BATCH = Math.max(
+  1,
+  Math.min(
+    500,
+    Number(process.env.DISCOVERY_ENRICH_BATCH_SIZE ?? String(DEFAULT_ENRICH_BACKLOG_BATCH)) ||
+      DEFAULT_ENRICH_BACKLOG_BATCH,
+  ),
+);
 
 async function runOnce(): Promise<void> {
   const queue = getDiscoveryQueue();
@@ -72,6 +80,7 @@ async function runOnce(): Promise<void> {
         ready_companies: metrics.readyCompanies,
         total_companies: metrics.totalCompanies,
         jobs_per_company: metrics.jobsPerCompany,
+        enrich_backlog_batch_size: ENRICH_BACKLOG_BATCH,
       },
     },
     "Discovery scheduler run completed",

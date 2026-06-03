@@ -40,6 +40,7 @@ import { takeAndResetParseStartsInWindow } from "../modules/ai/ai.service.js";
 import { shouldEnqueueJob } from "../services/recentJobSeen.service.js";
 import { normalizeJobUrl } from "../utils/normalizeJobUrl.js";
 import { recordIngestionFinished } from "../services/companyScore.service.js";
+import { startWorkerHeartbeat } from "../services/workerHeartbeat.service.js";
 import { hostname } from "node:os";
 import { computeJobContentHash } from "../utils/jobContentHash.js";
 import {
@@ -294,6 +295,7 @@ async function start(): Promise<void> {
 
   loadRootEnv();
   assertWorkerProcessEnv();
+  startWorkerHeartbeat("job-processing");
 
   const jobWorkerConc = jobWorkerConcurrency();
   logger.info(

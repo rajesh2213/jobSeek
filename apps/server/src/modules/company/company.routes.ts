@@ -36,7 +36,11 @@ type CompaniesAggResponseBody = {
     total: number;
     totalPages: number;
     hasMore: boolean;
-    stats: { totalTracked: number; hiringThisWeek: number };
+    stats: {
+      totalTracked: number;
+      hiringThisWeek: number;
+      activeHiringCompanies: number;
+    };
   };
 };
 

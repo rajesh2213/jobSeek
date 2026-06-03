@@ -24,6 +24,7 @@ import {
 } from "../services/companyDiscoveryMetrics.service.js";
 import { resolveDeferredEnrichmentPriority } from "../services/enrichmentPriority.service.js";
 import { ensureAtsEndpointTableReady } from "../modules/atsEndpoint/atsEndpointReadiness.js";
+import { startWorkerHeartbeat } from "../services/workerHeartbeat.service.js";
 
 function isPayload(data: unknown): data is EnrichCompanyJobPayload {
   return (
@@ -39,6 +40,8 @@ async function start(): Promise<void> {
   assertWorkerProcessEnv();
   await ensureAtsEndpointTableReady(prisma, "enrich_worker_boot");
 
+  startWorkerHeartbeat("enrich-company");
+
   getEnrichCompanyQueue();
 
   const enrichConc = Math.max(
@@ -46,7 +49,10 @@ async function start(): Promise<void> {
     Math.min(
       32,
       Number(
-        process.env.ENRICH_COMPANY_WORKER_CONCURRENCY ?? process.env.WORKER_CONCURRENCY ?? "4",
+        process.env.DISCOVERY_ENRICH_CONCURRENCY ??
+          process.env.ENRICH_COMPANY_WORKER_CONCURRENCY ??
+          process.env.WORKER_CONCURRENCY ??
+          "4",
       ) || 4,
     ),
   );

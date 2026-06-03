@@ -14,6 +14,7 @@ interface Props {
     stats?: {
       totalTracked: number;
       hiringThisWeek: number;
+      activeHiringCompanies: number;
     };
   };
 }

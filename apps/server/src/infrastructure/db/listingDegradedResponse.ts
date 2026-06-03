@@ -49,7 +49,7 @@ export function sendCompaniesListingDegraded(
       total: 0,
       totalPages: 1,
       hasMore: false,
-      stats: { totalTracked: 0, hiringThisWeek: 0 },
+      stats: { totalTracked: 0, hiringThisWeek: 0, activeHiringCompanies: 0 },
     },
     error: "Service temporarily busy",
     code: "DB_POOL_EXHAUSTED",

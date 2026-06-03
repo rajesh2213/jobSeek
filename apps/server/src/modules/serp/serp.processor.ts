@@ -18,6 +18,7 @@ import type { SerpApiResult } from "./serp.client.js";
 import { getRedisConnection } from "../../queues/job.queue.js";
 import { assertWorkerProcessEnv } from "../../infrastructure/env/validateWorkerEnv.js";
 import { registerWorkerShutdown } from "../../utils/workerShutdown.js";
+import { startWorkerHeartbeat } from "../../services/workerHeartbeat.service.js";
 import { recordSerpQueryPipelineTotals } from "../../services/atsPipelineCounters.service.js";
 import { logQueryMetrics } from "../../utils/queryMetrics.js";
 
@@ -675,6 +676,7 @@ function isRunBatchPayload(data: unknown): data is Record<string, never> {
 async function start(): Promise<void> {
   loadRootEnv();
   assertWorkerProcessEnv();
+  startWorkerHeartbeat("serp-ingestion");
   getSerpQueue();
 
   const worker = new Worker(

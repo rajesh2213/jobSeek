@@ -20,7 +20,7 @@ const EMPTY_COMPANIES_META = {
   total: 0,
   totalPages: 1,
   hasMore: false,
-  stats: { totalTracked: 0, hiringThisWeek: 0 },
+  stats: { totalTracked: 0, hiringThisWeek: 0, activeHiringCompanies: 0 },
 } as const;
 
 /** Client hydrates — avoids blocking SSR on slow `/companies` aggregation. */

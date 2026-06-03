@@ -4,6 +4,7 @@ import { prisma } from "../infrastructure/db/prisma.js";
 import { logger } from "../utils/logger.js";
 import { assertWorkerProcessEnv } from "../infrastructure/env/validateWorkerEnv.js";
 import { registerWorkerShutdown } from "../utils/workerShutdown.js";
+import { startWorkerHeartbeat } from "../services/workerHeartbeat.service.js";
 import { getRedisConnection } from "../queues/job.queue.js";
 import {
   COMPANY_SCORE_QUEUE_NAME,
@@ -25,6 +26,7 @@ function isPayload(data: unknown): data is ScoreRecomputePayload {
 async function start(): Promise<void> {
   loadRootEnv();
   assertWorkerProcessEnv();
+  startWorkerHeartbeat("company-score");
   getCompanyScoreQueue();
 
   const worker = new Worker(

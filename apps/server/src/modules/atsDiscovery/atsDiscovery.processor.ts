@@ -17,6 +17,7 @@ import {
 } from "../../queues/atsDiscovery.queue.js";
 import { assertWorkerProcessEnv } from "../../infrastructure/env/validateWorkerEnv.js";
 import { registerWorkerShutdown } from "../../utils/workerShutdown.js";
+import { startWorkerHeartbeat } from "../../services/workerHeartbeat.service.js";
 import { ensureAtsEndpointTableReady } from "../atsEndpoint/atsEndpointReadiness.js";
 import { createAtsEndpointService } from "../atsEndpoint/atsEndpoint.service.js";
 import { createAtsCrawlerStandard } from "../ats/AtsCrawlerStandard.js";
@@ -1131,6 +1132,7 @@ function isValidatePayload(data: unknown): data is ValidateEndpointPayload {
 async function start(): Promise<void> {
   loadRootEnv();
   assertWorkerProcessEnv();
+  startWorkerHeartbeat("discover-ats-endpoints");
   getAtsDiscoveryQueue();
 
   const tableOk = await ensureAtsEndpointTableReady(prisma, "ats_discovery_worker_boot");

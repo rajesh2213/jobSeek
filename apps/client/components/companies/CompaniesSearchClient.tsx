@@ -34,6 +34,7 @@ interface Props {
     stats?: {
       totalTracked: number;
       hiringThisWeek: number;
+      activeHiringCompanies: number;
     };
   };
 }
@@ -198,10 +199,12 @@ export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) 
         : null,
     [stats],
   );
-  const formattedWeek = useMemo(
+  const formattedActiveHiring = useMemo(
     () =>
       stats
-        ? new Intl.NumberFormat("en-US").format(stats.hiringThisWeek)
+        ? new Intl.NumberFormat("en-US").format(
+            stats.activeHiringCompanies ?? stats.hiringThisWeek,
+          )
         : null,
     [stats],
   );
@@ -221,13 +224,13 @@ export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) 
           <p className="mt-1 text-sm text-ink-muted">
             Discover employers, explore career pages, and jump into open roles.
           </p>
-          {formattedTotal != null && formattedWeek != null ? (
+          {formattedTotal != null && formattedActiveHiring != null ? (
             <div className="mt-4 flex flex-wrap gap-2">
               <span className="inline-flex rounded-full border border-ink/10 bg-surface px-3 py-1 text-xs font-medium text-ink/70 shadow-sm">
                 {formattedTotal} companies tracked
               </span>
               <span className="inline-flex rounded-full border border-ink/10 bg-surface px-3 py-1 text-xs font-medium text-ink/70 shadow-sm">
-                {formattedWeek} hiring this week
+                {formattedActiveHiring} actively hiring
               </span>
             </div>
           ) : null}

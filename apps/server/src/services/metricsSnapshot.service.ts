@@ -1,9 +1,24 @@
 import { CompanyStatus, type PrismaClient } from "@prisma/client";
+import type { Redis } from "ioredis";
 import {
   getJobsBlockedNotReadyTotal,
   getStatusTransitionTotals,
 } from "./jobStatusMetrics.service.js";
 import { getOpenClawMetricsForInternalSnapshot } from "../modules/providers/provider.registry.js";
+import {
+  buildAtsEndpointCoverageMetrics,
+  buildAtsRediscoveryBacklog,
+  buildCompanyCoverageStats,
+  buildDiscoveryFunnelStats,
+  type AtsEndpointCoverageMetrics,
+  type AtsRediscoveryBacklog,
+  type CompanyCoverageStats,
+  type DiscoveryFunnelStats,
+} from "./companyCoverage.service.js";
+import {
+  readWorkerHeartbeats,
+  type WorkerHeartbeatRow,
+} from "./workerHeartbeat.service.js";
 
 export interface CompanyDensityRow {
   companyId: string;
@@ -92,6 +107,11 @@ export interface MetricsSnapshot {
     } | null;
     metricsToday: Record<string, string>;
   };
+  companyCoverageStats?: CompanyCoverageStats;
+  discoveryFunnel?: DiscoveryFunnelStats;
+  atsRediscoveryBacklog?: AtsRediscoveryBacklog;
+  atsEndpointCoverage?: AtsEndpointCoverageMetrics;
+  workerHeartbeats?: WorkerHeartbeatRow[];
 }
 
 function pct(part: number, whole: number): number {
@@ -133,7 +153,10 @@ async function runMetricThunksSequential<T>(thunks: Array<() => Promise<T>>): Pr
   return out;
 }
 
-export async function buildMetricsSnapshot(prisma: PrismaClient): Promise<MetricsSnapshot> {
+export async function buildMetricsSnapshot(
+  prisma: PrismaClient,
+  redis?: Redis | null,
+): Promise<MetricsSnapshot> {
   const useSequentialMetrics = process.env.METRICS_SNAPSHOT_SEQUENTIAL?.trim() === "true";
   const taskFactories: Array<() => Promise<unknown>> = [
     () => prisma.company.count(),
@@ -442,6 +465,20 @@ export async function buildMetricsSnapshot(prisma: PrismaClient): Promise<Metric
 
   const openclaw = await getOpenClawMetricsForInternalSnapshot();
 
+  const [
+    companyCoverageStats,
+    discoveryFunnel,
+    atsRediscoveryBacklog,
+    atsEndpointCoverage,
+    workerHeartbeats,
+  ] = await Promise.all([
+    buildCompanyCoverageStats(prisma),
+    buildDiscoveryFunnelStats(prisma),
+    buildAtsRediscoveryBacklog(prisma),
+    buildAtsEndpointCoverageMetrics(prisma),
+    redis ? readWorkerHeartbeats(redis) : Promise.resolve(undefined),
+  ]);
+
   return {
     companies: {
       totalCompanies,
@@ -507,6 +544,11 @@ export async function buildMetricsSnapshot(prisma: PrismaClient): Promise<Metric
     topCompaniesByJobs: toDensityRows(topCountRows, namesById),
     bottomCompaniesByJobs: toDensityRows(bottomCountRows, namesById),
     generatedAt: new Date().toISOString(),
+    companyCoverageStats,
+    discoveryFunnel,
+    atsRediscoveryBacklog,
+    atsEndpointCoverage,
+    ...(workerHeartbeats ? { workerHeartbeats } : {}),
     ...(openclaw
       ? {
           openclaw: {

@@ -26,6 +26,25 @@ const DEFAULT_POOL_LIMIT = 100;
 const DEFAULT_BATCH_SIZE = 40;
 const MIN_BATCH_SIZE = 20;
 const MAX_BATCH_SIZE = 100;
+
+function poolLimitFromEnv(): number {
+  const raw =
+    process.env.ATS_ENDPOINT_POOL_SIZE ?? process.env.ATS_ENDPOINT_POOL_LIMIT ?? String(DEFAULT_POOL_LIMIT);
+  return Math.max(10, Math.min(100, Number(raw) || DEFAULT_POOL_LIMIT));
+}
+
+function batchSizeFromEnv(): number {
+  const raw = process.env.ATS_ENDPOINT_BATCH_SIZE ?? String(DEFAULT_BATCH_SIZE);
+  return Math.max(MIN_BATCH_SIZE, Math.min(MAX_BATCH_SIZE, Number(raw) || DEFAULT_BATCH_SIZE));
+}
+
+function cooldownMinutesFromEnv(envKey: string, defaultMinutes: number): number {
+  const raw = process.env[envKey];
+  if (raw == null || raw.trim() === "") return defaultMinutes;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return defaultMinutes;
+  return n;
+}
 // REQUIRED_SELECT
 const ATS_ENDPOINT_SCHED_SELECT = {
   id: true,
@@ -42,12 +61,31 @@ const ATS_ENDPOINT_SCHED_SELECT = {
  *   Hot (80+):  15 minutes
  *   Warm (40-79): 2 hours
  *   Cold (<40):  8 hours
- * Env overrides: ATS_COOLDOWN_HOT_MS, ATS_COOLDOWN_WARM_MS, ATS_COOLDOWN_COLD_MS
+ * Env overrides (minutes): ATS_ENDPOINT_HIGH|MEDIUM|LOW_PRIORITY_COOLDOWN_MINUTES
+ * Legacy ms overrides: ATS_COOLDOWN_HOT_MS, ATS_COOLDOWN_WARM_MS, ATS_COOLDOWN_COLD_MS
  */
 function endpointCooldownMs(score: number): number {
-  if (score >= 80) return Math.max(5 * 60_000, Number(process.env.ATS_COOLDOWN_HOT_MS ?? String(15 * 60_000)) || 15 * 60_000);
-  if (score >= 40) return Math.max(30 * 60_000, Number(process.env.ATS_COOLDOWN_WARM_MS ?? String(2 * 3600_000)) || 2 * 3600_000);
-  return Math.max(60 * 60_000, Number(process.env.ATS_COOLDOWN_COLD_MS ?? String(8 * 3600_000)) || 8 * 3600_000);
+  const hotMin = cooldownMinutesFromEnv("ATS_ENDPOINT_HIGH_PRIORITY_COOLDOWN_MINUTES", 15);
+  const warmMin = cooldownMinutesFromEnv("ATS_ENDPOINT_MEDIUM_PRIORITY_COOLDOWN_MINUTES", 120);
+  const coldMin = cooldownMinutesFromEnv("ATS_ENDPOINT_LOW_PRIORITY_COOLDOWN_MINUTES", 480);
+  if (score >= 80) {
+    const ms = envMsOrMinutes(process.env.ATS_COOLDOWN_HOT_MS, hotMin * 60_000);
+    return Math.max(5 * 60_000, ms);
+  }
+  if (score >= 40) {
+    const ms = envMsOrMinutes(process.env.ATS_COOLDOWN_WARM_MS, warmMin * 60_000);
+    return Math.max(30 * 60_000, ms);
+  }
+  const ms = envMsOrMinutes(process.env.ATS_COOLDOWN_COLD_MS, coldMin * 60_000);
+  return Math.max(60 * 60_000, ms);
+}
+
+function envMsOrMinutes(rawMs: string | undefined, fallbackMs: number): number {
+  if (rawMs != null && rawMs.trim() !== "") {
+    const ms = Number(rawMs);
+    if (Number.isFinite(ms) && ms > 0) return ms;
+  }
+  return fallbackMs;
 }
 
 function randomIntInclusive(min: number, max: number): number {
@@ -153,8 +191,8 @@ async function enqueuePrioritizedIngests(): Promise<void> {
   const queue = getIngestAtsEndpointQueue();
   const now = new Date();
   const nowMs = now.getTime();
-  const poolLimit = Math.max(10, Math.min(100, Number(process.env.ATS_ENDPOINT_POOL_LIMIT ?? String(DEFAULT_POOL_LIMIT)) || DEFAULT_POOL_LIMIT));
-  const baseBatchSize = Math.max(MIN_BATCH_SIZE, Math.min(MAX_BATCH_SIZE, Number(process.env.ATS_ENDPOINT_BATCH_SIZE ?? String(DEFAULT_BATCH_SIZE)) || DEFAULT_BATCH_SIZE));
+  const poolLimit = poolLimitFromEnv();
+  const baseBatchSize = batchSizeFromEnv();
   assertRequiredSelect("AtsEndpoint", "atsEndpoint.scheduler.findMany", ATS_ENDPOINT_SCHED_SELECT);
 
   const pool = await prisma.atsEndpoint.findMany({

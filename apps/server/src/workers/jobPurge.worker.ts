@@ -4,6 +4,7 @@ import { prisma } from "../infrastructure/db/prisma.js";
 import { logger } from "../utils/logger.js";
 import { assertWorkerProcessEnv } from "../infrastructure/env/validateWorkerEnv.js";
 import { registerWorkerShutdown } from "../utils/workerShutdown.js";
+import { startWorkerHeartbeat } from "../services/workerHeartbeat.service.js";
 import {
   closeJobPurgeQueue,
   JOB_PURGE_QUEUE_NAME,
@@ -204,6 +205,7 @@ async function runPurge(): Promise<{
 async function main(): Promise<void> {
   loadRootEnv();
   assertWorkerProcessEnv();
+  startWorkerHeartbeat("job-purge");
 
   logger.info(
     { event: "job_purge_worker_start", dryRun: DRY_RUN, batchSize: BATCH_SIZE, maxRows: MAX_ROWS_PER_RUN },

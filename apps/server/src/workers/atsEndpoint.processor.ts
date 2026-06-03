@@ -14,6 +14,7 @@ import {
 } from "../queues/ats-endpoint.queue.js";
 import { assertWorkerProcessEnv } from "../infrastructure/env/validateWorkerEnv.js";
 import { registerWorkerShutdown } from "../utils/workerShutdown.js";
+import { startWorkerHeartbeat } from "../services/workerHeartbeat.service.js";
 import { createCompanyRepository } from "../modules/company/company.repository.js";
 import { createJobRepository } from "../modules/job/job.repository.js";
 import { JobService } from "../modules/job/job.service.js";
@@ -238,6 +239,7 @@ async function start(): Promise<void> {
   });
   loadRootEnv();
   assertWorkerProcessEnv();
+  startWorkerHeartbeat("ingest-ats-endpoint");
 
   const jobRepository = createJobRepository(prisma);
   const companyService = new CompanyService(

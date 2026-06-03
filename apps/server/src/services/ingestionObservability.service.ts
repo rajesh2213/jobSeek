@@ -11,6 +11,8 @@ import { DISCOVERY_QUEUE_NAME } from "../queues/discovery.queue.js";
 import { DISCOVER_ATS_ENDPOINTS_QUEUE_NAME } from "../queues/atsDiscovery.queue.js";
 import { SERP_QUEUE_NAME } from "../queues/serp.queue.js";
 import { ENRICH_COMPANY_QUEUE_NAME } from "../queues/enrich-company.queue.js";
+import { getCompanyDiscoveryMetrics } from "./companyDiscoveryMetrics.service.js";
+import { readWorkerHeartbeats, type WorkerHeartbeatRow } from "./workerHeartbeat.service.js";
 
 export type QueueDepthRow = {
   name: string;
@@ -118,6 +120,18 @@ export type IngestionObservabilitySnapshot = {
   recoverableInactiveCount: number | null;
   /** Orphan active endpoints (no companyId). */
   orphanActiveCount: number | null;
+  /** Enrich queue lag + in-process enrichment counters for throughput scaling decisions. */
+  enrichThroughput: {
+    queueWaiting: number | null;
+    oldestWaitingMs: number | null;
+    inProcessAttempts: number;
+    inProcessFailures: number;
+    failureRate: number | null;
+    configuredBatchSize: number;
+    abortAggressiveScaling: boolean;
+    abortReasons: string[];
+  } | null;
+  workerHeartbeats: WorkerHeartbeatRow[] | null;
   notes: string[];
 };
 
@@ -499,6 +513,49 @@ export async function buildIngestionObservabilitySnapshot(
     notes.push("Redis client not provided; SERP heartbeat omitted.");
   }
 
+  let enrichThroughput: IngestionObservabilitySnapshot["enrichThroughput"] = null;
+  let workerHeartbeats: WorkerHeartbeatRow[] | null = null;
+  if (redis) {
+    try {
+      workerHeartbeats = await readWorkerHeartbeats(redis);
+    } catch {
+      notes.push("Worker heartbeat read failed.");
+    }
+  }
+
+  const enrichQueue = queues.find((q) => q.name === ENRICH_COMPANY_QUEUE_NAME);
+  const discoveryMetrics = getCompanyDiscoveryMetrics();
+  const enrichFailureDenom = discoveryMetrics.enrichmentSuccesses + discoveryMetrics.enrichmentFailures;
+  const enrichFailureRate =
+    enrichFailureDenom > 0 ? discoveryMetrics.enrichmentFailures / enrichFailureDenom : null;
+  const configuredBatchSize = Math.max(
+    1,
+    Math.min(
+      500,
+      Number(process.env.DISCOVERY_ENRICH_BATCH_SIZE ?? "30") || 30,
+    ),
+  );
+  const abortReasons: string[] = [];
+  if (enrichQueue && enrichQueue.oldestWaitingMs != null && enrichQueue.oldestWaitingMs > 30 * 60_000) {
+    abortReasons.push("enrich_queue_lag_gt_30m");
+  }
+  if (enrichFailureRate != null && enrichFailureRate > 0.25) {
+    abortReasons.push("enrich_failure_rate_gt_25pct");
+  }
+  if (ingestAtsQueueWaitP95Ms != null && ingestAtsQueueWaitP95Ms > 20 * 60_000) {
+    abortReasons.push("ingest_ats_queue_wait_p95_gt_20m");
+  }
+  enrichThroughput = {
+    queueWaiting: enrichQueue?.waiting ?? null,
+    oldestWaitingMs: enrichQueue?.oldestWaitingMs ?? null,
+    inProcessAttempts: discoveryMetrics.enrichmentAttempts,
+    inProcessFailures: discoveryMetrics.enrichmentFailures,
+    failureRate: enrichFailureRate,
+    configuredBatchSize,
+    abortAggressiveScaling: abortReasons.length > 0,
+    abortReasons,
+  };
+
   return {
     generatedAt,
     queues,
@@ -518,6 +575,8 @@ export async function buildIngestionObservabilitySnapshot(
     scoreTiers,
     recoverableInactiveCount,
     orphanActiveCount,
+    enrichThroughput,
+    workerHeartbeats,
     notes,
   };
 }

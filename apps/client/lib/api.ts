@@ -201,6 +201,7 @@ interface CompaniesApiResponse {
     stats?: {
       totalTracked: number;
       hiringThisWeek: number;
+      activeHiringCompanies: number;
     };
   };
 }

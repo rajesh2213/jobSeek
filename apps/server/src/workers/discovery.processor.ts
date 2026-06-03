@@ -17,6 +17,7 @@ import { getDiscoveryQueue, DISCOVERY_QUEUE_NAME, closeDiscoveryQueue } from "..
 import { getRedisConnection } from "../queues/job.queue.js";
 import { assertWorkerProcessEnv } from "../infrastructure/env/validateWorkerEnv.js";
 import { registerWorkerShutdown } from "../utils/workerShutdown.js";
+import { startWorkerHeartbeat } from "../services/workerHeartbeat.service.js";
 import { delay, normalizeDomain, randomIntInclusive } from "../utils/common.js";
 import { slugifyCompanyName } from "../utils/slugify.js";
 
@@ -88,6 +89,7 @@ async function throttleRequest(): Promise<void> {
 async function start(): Promise<void> {
   loadRootEnv();
   assertWorkerProcessEnv();
+  startWorkerHeartbeat("company-discovery");
 
   const companyService = new CompanyService(
     createCompanyRepository(prisma),

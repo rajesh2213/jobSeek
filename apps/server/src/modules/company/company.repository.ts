@@ -505,10 +505,22 @@ export function createCompanyRepository(prisma: PrismaClient) {
     async getCompaniesListingStats(): Promise<{
       totalTracked: number;
       hiringThisWeek: number;
+      activeHiringCompanies: number;
     }> {
       const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-      const countDistinctHiringCompaniesSql = () =>
+      const countDistinctActiveHiringSql = () =>
+        prisma.$queryRaw<[{ c: bigint }]>`
+          SELECT COUNT(DISTINCT "companyId")::bigint AS c
+          FROM "Job"
+          WHERE "canonicalJobId" IS NULL
+            AND "status" = 'ready'
+            AND "isActive" = true
+            AND description IS NOT NULL
+            AND description <> ''
+        `;
+
+      const countDistinctHiringThisWeekSql = () =>
         prisma.$queryRaw<[{ c: bigint }]>`
           SELECT COUNT(DISTINCT "companyId")::bigint AS c
           FROM "Job"
@@ -519,11 +531,15 @@ export function createCompanyRepository(prisma: PrismaClient) {
             AND "lastSeenAt" >= ${weekAgo}
         `;
 
-      const totalTracked = await prisma.company.count();
-      const aggRows = await countDistinctHiringCompaniesSql();
+      const [totalTracked, activeRows, weekRows] = await Promise.all([
+        prisma.company.count(),
+        countDistinctActiveHiringSql(),
+        countDistinctHiringThisWeekSql(),
+      ]);
       return {
         totalTracked,
-        hiringThisWeek: Number(aggRows[0]?.c ?? 0),
+        hiringThisWeek: Number(weekRows[0]?.c ?? 0),
+        activeHiringCompanies: Number(activeRows[0]?.c ?? 0),
       };
     },
   };

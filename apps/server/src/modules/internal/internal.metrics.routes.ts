@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { getIoredis } from "../../queues/job.queue.js";
 import { buildMetricsSnapshot } from "../../services/metricsSnapshot.service.js";
 
 /**
@@ -38,7 +39,8 @@ export function registerInternalMetricsRoutes(server: FastifyInstance): void {
       if (!isInternalMetricsAuthorized(request, reply)) {
         return;
       }
-      const snapshot = await buildMetricsSnapshot(server.prisma);
+      const redis = getIoredis();
+      const snapshot = await buildMetricsSnapshot(server.prisma, redis);
       return reply.send(snapshot);
     },
   );
