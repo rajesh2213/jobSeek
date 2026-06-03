@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { logger } from "../../utils/logger.js";
+import { applyOpenClawActiveScoreFloor } from "./openClawActiveScore.js";
 
 export interface ScoreInput {
   id: string;
@@ -120,6 +121,7 @@ export async function recomputeEndpointScore(
       lastFailureAt: true,
       createdAt: true,
       companyId: true,
+      source: true,
     },
   });
 
@@ -136,8 +138,17 @@ export async function recomputeEndpointScore(
     recentJobCount = jobCount;
   }
 
-  const { score: newScore, reasons } = computeEndpointScore(endpoint, recentJobCount);
+  const { score: computedScore, reasons } = computeEndpointScore(endpoint, recentJobCount);
+  const newScore = applyOpenClawActiveScoreFloor(
+    computedScore,
+    endpoint.source,
+    endpoint.isActive,
+  );
   const oldScore = endpoint.score;
+  const scoreReasons =
+    newScore > computedScore
+      ? [...reasons, `+${newScore - computedScore} openclaw_active_floor`]
+      : reasons;
 
   if (newScore !== oldScore) {
     await prisma.atsEndpoint.update({
@@ -153,11 +164,11 @@ export async function recomputeEndpointScore(
         slug: endpoint.slug,
         oldScore,
         newScore,
-        reasons,
+        reasons: scoreReasons,
       },
       "endpoint_score_updated",
     );
   }
 
-  return { oldScore, newScore, reasons };
+  return { oldScore, newScore, reasons: scoreReasons };
 }

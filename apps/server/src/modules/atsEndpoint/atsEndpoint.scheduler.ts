@@ -10,6 +10,7 @@ import {
   INGEST_ATS_ENDPOINT_QUEUE_NAME,
 } from "../../queues/ats-endpoint.queue.js";
 import { getEndpointPriority } from "./atsEndpointPriority.js";
+import { applyOpenClawActiveScoreFloor, OPENCLAW_SOURCE } from "./openClawActiveScore.js";
 import { assertRequiredSelect, logQueryMetrics } from "../../utils/queryMetrics.js";
 
 /**
@@ -32,6 +33,8 @@ const ATS_ENDPOINT_SCHED_SELECT = {
   score: true,
   successCount: true,
   lastCrawledAt: true,
+  source: true,
+  isActive: true,
 } as const;
 
 /**
@@ -57,7 +60,56 @@ type SchedEp = {
   score: number;
   successCount: number;
   lastCrawledAt: Date | null;
+  source?: string | null;
+  isActive?: boolean;
 };
+
+function isPastCooldown(lastCrawledAt: Date | null, score: number, nowMs: number): boolean {
+  if (lastCrawledAt == null) return true;
+  return lastCrawledAt.getTime() < nowMs - endpointCooldownMs(score);
+}
+
+/** Always schedule eligible active OpenClaw boards (reserved slots before global pool). */
+async function fetchEligibleOpenClawActiveEndpoints(nowMs: number): Promise<SchedEp[]> {
+  const rows = await prisma.atsEndpoint.findMany({
+    where: { source: OPENCLAW_SOURCE, isActive: true },
+    select: ATS_ENDPOINT_SCHED_SELECT,
+  });
+  const eligible = rows
+    .map((row) => {
+      const score = applyOpenClawActiveScoreFloor(row.score, row.source, row.isActive);
+      return { ...row, score };
+    })
+    .filter((row) => isPastCooldown(row.lastCrawledAt, row.score, nowMs));
+
+  eligible.sort((a, b) => {
+    const d = getEndpointPriority(b) - getEndpointPriority(a);
+    if (d !== 0) return d;
+    return a.id.localeCompare(b.id);
+  });
+  return eligible;
+}
+
+function mergeOpenClawReservedIntoBatch(
+  reserved: SchedEp[],
+  batch: SchedEp[],
+  maxTotal: number,
+): SchedEp[] {
+  const seen = new Set<string>();
+  const out: SchedEp[] = [];
+  for (const row of reserved) {
+    if (out.length >= maxTotal) break;
+    seen.add(row.id);
+    out.push(row);
+  }
+  for (const row of batch) {
+    if (out.length >= maxTotal) break;
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    out.push(row);
+  }
+  return out;
+}
 
 /**
  * Starvation guard: first pass respects global priority order but caps each `type`
@@ -134,8 +186,9 @@ async function enqueuePrioritizedIngests(): Promise<void> {
   const maxPerType = Number.isFinite(maxPerTypeRaw)
     ? Math.max(0, Math.min(50, Math.floor(maxPerTypeRaw)))
     : 12;
+  const openclawReserved = await fetchEligibleOpenClawActiveEndpoints(nowMs);
   const fair = fairBatchSlice(pool as SchedEp[], adaptiveBatchSize, maxPerType);
-  const top = fair.batch;
+  const top = mergeOpenClawReservedIntoBatch(openclawReserved, fair.batch, adaptiveBatchSize);
 
   if (maxPerType > 0 && top.length > 0) {
     const byType: Record<string, number> = {};
@@ -181,6 +234,8 @@ async function enqueuePrioritizedIngests(): Promise<void> {
       queue: INGEST_ATS_ENDPOINT_QUEUE_NAME,
       poolSize: pool.length,
       eligibleCount: pool.length,
+      openclaw_reserved: openclawReserved.length,
+      openclaw_reserved_ids: openclawReserved.map((r) => r.id),
       enqueued: top.length,
       batchSize: adaptiveBatchSize,
       baseBatchSize,
