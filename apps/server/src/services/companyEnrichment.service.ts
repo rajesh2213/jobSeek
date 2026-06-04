@@ -21,6 +21,7 @@ import { extractGreenhouseToken } from "../modules/discovery/extractors/greenhou
 import { extractLeverToken } from "../modules/discovery/extractors/lever.extractor.js";
 import { extractAshbyToken } from "../modules/discovery/extractors/ashby.extractor.js";
 import { extractWorkdayToken } from "../modules/discovery/extractors/workday.extractor.js";
+import { isInvalidAtsBoardToken } from "../modules/discovery/extractors/atsTokenValidation.js";
 import { logger } from "../utils/logger.js";
 import { fetchCareersHtml } from "../utils/fetchCareersHtml.js";
 import { resolveCompanyLogoUrl } from "../utils/companyLogo.js";
@@ -464,7 +465,23 @@ export async function processEnrichCompany(
     }
 
     if (atsType && html && isSupportedAtsType(atsType)) {
-      const token = atsBoardToken?.trim() || extractAtsBoardToken(atsType, html, careersUrl);
+      const freshToken = extractAtsBoardToken(atsType, html, careersUrl);
+      const storedToken = atsBoardToken?.trim() ?? null;
+      if (storedToken && isInvalidAtsBoardToken(storedToken)) {
+        logger.warn(
+          {
+            event: "invalid_ats_board_token_rejected",
+            companyId,
+            atsType,
+            rejectedToken: storedToken,
+            careersUrl,
+          },
+          "invalid_ats_board_token_rejected",
+        );
+      }
+      const token =
+        freshToken ??
+        (storedToken && !isInvalidAtsBoardToken(storedToken) ? storedToken : null);
       if (token) {
         atsBoardToken = token;
         await prisma.company.update({

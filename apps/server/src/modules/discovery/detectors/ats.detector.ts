@@ -1,4 +1,6 @@
 import type { AtsType } from "../../ats/ats.interface.js";
+import { sanitizeBoardToken } from "../extractors/atsTokenValidation.js";
+import { extractGreenhouseTokenFromUrl } from "../extractors/greenhouse.extractor.js";
 
 /** Canonical https homepage URL for a hostname (no path). */
 export function homepageUrlForDomain(domain: string): string {
@@ -101,28 +103,36 @@ export function extractAtsToken(url: string, atsType: string): string | null {
     const parts = u.pathname.split("/").filter(Boolean);
 
     if (atsType === "greenhouse" && host.includes("greenhouse.io")) {
-      if (parts[0] === "embed" && parts[1] === "job_board") {
-        const q = u.searchParams.get("for");
-        if (q?.trim()) return q.trim();
+      return extractGreenhouseTokenFromUrl(url.trim());
+    }
+    if (atsType === "lever" && host.includes("lever.co")) {
+      if (parts[0] === "jobs" && parts[1]) {
+        return sanitizeBoardToken(parts[1]!);
       }
-      if (parts[0] === "boards" && parts[1]) return parts[1]!;
-      if (parts.length >= 1 && host.startsWith("boards.")) {
-        return parts[0]!;
+      if (parts[0] === "v0" && parts[1] === "postings" && parts[2]) {
+        return sanitizeBoardToken(parts[2]!);
+      }
+      if (host === "jobs.lever.co" && parts[0]) {
+        return sanitizeBoardToken(parts[0]!);
       }
     }
-    if (atsType === "lever" && host.includes("lever.co") && parts[0] === "jobs" && parts[1]) {
-      return parts[1]!;
-    }
-    if (atsType === "ashby" && host.includes("ashbyhq.com") && parts[0] === "jobs" && parts[1]) {
-      return parts[1]!;
+    if (atsType === "ashby" && host.includes("ashbyhq.com")) {
+      if (host === "jobs.ashbyhq.com" && parts[0]) {
+        return sanitizeBoardToken(parts[0]);
+      }
+      if (parts[0] === "jobs" && parts[1]) {
+        return sanitizeBoardToken(parts[1]);
+      }
+      const jbIdx = parts.indexOf("job-board");
+      if (jbIdx >= 0 && parts[jbIdx + 1]) {
+        return sanitizeBoardToken(parts[jbIdx + 1]!);
+      }
+      return null;
     }
 
     if (atsType === "jobvite" && host.includes("jobvite.com")) {
-      // Common shapes:
-      // - https://jobs.jobvite.com/<company>/...
-      // - https://jobs.jobvite.com/jobs/<company>/...
-      if (parts.length >= 2 && parts[0] === "jobs") return parts[1]!;
-      if (parts[0]) return parts[0]!;
+      if (parts.length >= 2 && parts[0] === "jobs") return sanitizeBoardToken(parts[1]!);
+      if (parts[0]) return sanitizeBoardToken(parts[0]!);
     }
   } catch {
     return null;

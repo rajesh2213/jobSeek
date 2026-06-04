@@ -1,6 +1,10 @@
 import type { AtsType } from "../ats/ats.interface.js";
 import { CRAWLABLE_ATS_TYPES, isSupportedAtsType } from "../ats/ats.interface.js";
 import { normalizeAtsUrl } from "../../utils/normalizeAtsUrl.js";
+import {
+  isInvalidAtsBoardToken,
+  INVALID_WORKDAY_SITES,
+} from "../discovery/extractors/atsTokenValidation.js";
 
 export type AtsEndpointParseResult = {
   type: AtsType;
@@ -59,7 +63,8 @@ export function parseWorkdaySlug(slug: string): WorkdayTokenParts | null {
 
 function isValidWorkdayToken(t: WorkdayTokenParts | null): t is WorkdayTokenParts {
   if (!t) return false;
-  return Boolean(t.host?.trim() && t.tenant?.trim() && t.site?.trim());
+  if (!t.host?.trim() || !t.tenant?.trim() || !t.site?.trim()) return false;
+  return !INVALID_WORKDAY_SITES.has(t.site.trim().toLowerCase());
 }
 
 function parseWorkdayFromUrl(normalizedUrl: string): WorkdayTokenParts | null {
@@ -79,7 +84,7 @@ function parseWorkdayFromUrl(normalizedUrl: string): WorkdayTokenParts | null {
     }
 
     const site = pathParts[pathParts.length - 1]!;
-    if (!site) return null;
+    if (!site || INVALID_WORKDAY_SITES.has(site.toLowerCase())) return null;
     return { host, tenant, site };
   } catch {
     return null;
@@ -170,16 +175,33 @@ export function extractSlug(url: string, type: AtsType): string | null {
   if (type === "greenhouse" && host.includes("greenhouse.io")) {
     if (parts[0] === "embed" && parts[1] === "job_board") {
       const q = u.searchParams.get("for");
-      if (q?.trim()) return asciiSafeLower(q.trim());
+      if (q?.trim() && !isInvalidAtsBoardToken(q)) return asciiSafeLower(q.trim());
     }
-    if (parts[0] === "boards" && parts[1]) return asciiSafeLower(parts[1]!);
-    if (parts.length >= 1 && host.startsWith("boards.")) return asciiSafeLower(parts[0]!);
+    if (parts[0] === "boards" && parts[1] && !isInvalidAtsBoardToken(parts[1])) {
+      return asciiSafeLower(parts[1]!);
+    }
+    if (
+      parts.length >= 1 &&
+      (host.startsWith("boards.") || host.startsWith("job-boards.")) &&
+      !isInvalidAtsBoardToken(parts[0])
+    ) {
+      return asciiSafeLower(parts[0]!);
+    }
   }
   if (type === "lever" && host.includes("lever.co") && parts[0] === "jobs" && parts[1]) {
     return asciiSafeLower(parts[1]!);
   }
-  if (type === "ashby" && host.includes("ashbyhq.com") && parts[0] === "jobs" && parts[1]) {
-    return asciiSafeLower(parts[1]!);
+  if (type === "ashby" && host.includes("ashbyhq.com")) {
+    if (host === "jobs.ashbyhq.com" && parts[0] && !isInvalidAtsBoardToken(parts[0])) {
+      return asciiSafeLower(parts[0]);
+    }
+    if (parts[0] === "jobs" && parts[1] && !isInvalidAtsBoardToken(parts[1])) {
+      return asciiSafeLower(parts[1]!);
+    }
+    const jbIdx = parts.indexOf("job-board");
+    if (jbIdx >= 0 && parts[jbIdx + 1] && !isInvalidAtsBoardToken(parts[jbIdx + 1])) {
+      return asciiSafeLower(parts[jbIdx + 1]!);
+    }
   }
   if (type === "workable" && host.includes("workable.com")) {
     const idx = parts.findIndex((p) => p === "accounts" || p === "jobs");
@@ -308,7 +330,8 @@ export function parseCrawlableBoard(
     sourceUrl && sourceUrl.trim()
       ? extractSlug(sourceUrl.trim(), type)
       : null;
-  const slug = fromUrl ?? asciiSafeLower(token.split(/[/\s]+/g).pop() ?? token);
+  const rawFallback = asciiSafeLower(token.split(/[/\s]+/g).pop() ?? token);
+  const slug = fromUrl ?? (isInvalidAtsBoardToken(rawFallback) ? null : rawFallback);
   if (!slug) return null;
 
   return {
