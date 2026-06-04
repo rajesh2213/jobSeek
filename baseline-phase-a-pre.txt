@@ -1,0 +1,7 @@
+=== baseline 2026-05-18T19:54:02Z ===
+api_jobs_ttfb: 3.113601
+api_jobs_bytes: 51609
+vercel_jobs_ttfb: 0.754576
+vercel_jobs_gzip: 19607
+html_raw_kb 101
+rsc_kb 82

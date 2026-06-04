@@ -1,0 +1,266 @@
+{
+  "checkedAt": "2026-06-04T19:53:56.811Z",
+  "summary": {
+    "recovered": 21,
+    "withActiveEndpoint": 15,
+    "withJobs": 15,
+    "statusReady": 16,
+    "healthy": 15,
+    "duplicateTypeSlug": 0
+  },
+  "duplicateTypeSlugRows": [],
+  "companies": [
+    {
+      "name": "Airship",
+      "status": "ready",
+      "atsType": "greenhouse",
+      "token": "airship",
+      "endpoints": [
+        "greenhouse/airship (active)"
+      ],
+      "jobs": 19,
+      "readyJobs": 19,
+      "healthy": true
+    },
+    {
+      "name": "Brandwatch",
+      "status": "ready",
+      "atsType": "greenhouse",
+      "token": "brandwatch",
+      "endpoints": [
+        "greenhouse/brandwatch (active)"
+      ],
+      "jobs": 18,
+      "readyJobs": 18,
+      "healthy": true
+    },
+    {
+      "name": "ChargeLab",
+      "status": "ready",
+      "atsType": "lever",
+      "token": "chargelab-inc",
+      "endpoints": [
+        "lever/chargelab-inc (active)"
+      ],
+      "jobs": 1,
+      "readyJobs": 1,
+      "healthy": true
+    },
+    {
+      "name": "ContinuumGlobal, Inc",
+      "status": "ready",
+      "atsType": "lever",
+      "token": "continuumglobal",
+      "endpoints": [
+        "lever/continuumglobal (active)"
+      ],
+      "jobs": 2,
+      "readyJobs": 2,
+      "healthy": true
+    },
+    {
+      "name": "Correlation One",
+      "status": "ready",
+      "atsType": "greenhouse",
+      "token": "correlationone",
+      "endpoints": [
+        "greenhouse/correlationone (active)"
+      ],
+      "jobs": 30,
+      "readyJobs": 29,
+      "healthy": true
+    },
+    {
+      "name": "CX2",
+      "status": "ready",
+      "atsType": "lever",
+      "token": "cx2",
+      "endpoints": [
+        "lever/cx2 (active)"
+      ],
+      "jobs": 7,
+      "readyJobs": 7,
+      "healthy": true
+    },
+    {
+      "name": "Findigs",
+      "status": "ready",
+      "atsType": "lever",
+      "token": "findigs",
+      "endpoints": [
+        "lever/findigs (active)"
+      ],
+      "jobs": 12,
+      "readyJobs": 12,
+      "healthy": true
+    },
+    {
+      "name": "Floqast",
+      "status": "ready",
+      "atsType": "lever",
+      "token": "floqast",
+      "endpoints": [
+        "lever/floqast (active)"
+      ],
+      "jobs": 21,
+      "readyJobs": 21,
+      "healthy": true
+    },
+    {
+      "name": "Holmusk",
+      "status": "enriching",
+      "atsType": "lever",
+      "token": "holmusk",
+      "endpoints": [
+        "lever/holmusk"
+      ],
+      "jobs": 0,
+      "readyJobs": 0,
+      "healthy": false
+    },
+    {
+      "name": "Menti",
+      "status": "ready",
+      "atsType": "greenhouse",
+      "token": "mentimeter",
+      "endpoints": [
+        "greenhouse/mentimeter (active)"
+      ],
+      "jobs": 26,
+      "readyJobs": 26,
+      "healthy": true
+    },
+    {
+      "name": "Nevados Engineering",
+      "status": "ready",
+      "atsType": "lever",
+      "token": "nevados",
+      "endpoints": [
+        "lever/nevados"
+      ],
+      "jobs": 0,
+      "readyJobs": 0,
+      "healthy": false
+    },
+    {
+      "name": "Noibu",
+      "status": "enriching",
+      "atsType": "lever",
+      "token": "noibutechnologies",
+      "endpoints": [
+        "lever/noibutechnologies"
+      ],
+      "jobs": 0,
+      "readyJobs": 0,
+      "healthy": false
+    },
+    {
+      "name": "Outreach",
+      "status": "ready",
+      "atsType": "lever",
+      "token": "outreach",
+      "endpoints": [
+        "lever/outreach (active)"
+      ],
+      "jobs": 34,
+      "readyJobs": 34,
+      "healthy": true
+    },
+    {
+      "name": "Radformation",
+      "status": "ready",
+      "atsType": "lever",
+      "token": "radformation",
+      "endpoints": [
+        "lever/radformation (active)"
+      ],
+      "jobs": 5,
+      "readyJobs": 5,
+      "healthy": true
+    },
+    {
+      "name": "ResProp Management",
+      "status": "enriching",
+      "atsType": "greenhouse",
+      "token": "resprop",
+      "endpoints": [
+        "greenhouse/resprop"
+      ],
+      "jobs": 0,
+      "readyJobs": 0,
+      "healthy": false
+    },
+    {
+      "name": "saas.group",
+      "status": "ready",
+      "atsType": "greenhouse",
+      "token": "saasgroup",
+      "endpoints": [
+        "greenhouse/saasgroup (active)"
+      ],
+      "jobs": 10,
+      "readyJobs": 10,
+      "healthy": true
+    },
+    {
+      "name": "Sigma Computing",
+      "status": "ready",
+      "atsType": "greenhouse",
+      "token": "sigmacomputing",
+      "endpoints": [
+        "greenhouse/sigmacomputing (active)"
+      ],
+      "jobs": 68,
+      "readyJobs": 58,
+      "healthy": true
+    },
+    {
+      "name": "Superchat",
+      "status": "ready",
+      "atsType": "greenhouse",
+      "token": "superchat",
+      "endpoints": [
+        "greenhouse/superchat (active)"
+      ],
+      "jobs": 14,
+      "readyJobs": 14,
+      "healthy": true
+    },
+    {
+      "name": "Sysdig",
+      "status": "ready",
+      "atsType": "lever",
+      "token": "sysdig",
+      "endpoints": [
+        "lever/sysdig (active)"
+      ],
+      "jobs": 4,
+      "readyJobs": 4,
+      "healthy": true
+    },
+    {
+      "name": "Veho",
+      "status": "enriching",
+      "atsType": "lever",
+      "token": "veho",
+      "endpoints": [
+        "lever/veho"
+      ],
+      "jobs": 0,
+      "readyJobs": 0,
+      "healthy": false
+    },
+    {
+      "name": "VideaHealth",
+      "status": "enriching",
+      "atsType": "lever",
+      "token": "videahealth",
+      "endpoints": [
+        "lever/videahealth"
+      ],
+      "jobs": 0,
+      "readyJobs": 0,
+      "healthy": false
+    }
+  ]
+}

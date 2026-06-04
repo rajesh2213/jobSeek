@@ -1,0 +1,12 @@
+=== post-deploy 2026-05-18T19:55:38Z ===
+api_ttfb min=0.401 p50=0.469 max=0.617 avg=0.480
+api_bytes:51609
+job_keys ['applyUrl', 'category', 'company', 'companyId', 'country', 'createdAt', 'description', 'effectivePostedAt', 'experienceLevel', 'expiresAt', 'freshness', 'id', 'isActive', 'isRemote', 'lastSeenAt', 'locationCity', 'locationCountry', 'locationRegion', 'locationState', 'postedAt', 'previewLines', 'previewLinesSource', 'role', 'salaryMin', 'skills', 'source', 'sourceUrl', 'status', 'title', 'updatedAt', 'workType']
+has_description True previewLines 1
+company_keys ['careerPage', 'domain', 'id', 'logoUrl', 'name', 'openRoles', 'slug']
+avg_bytes_top [('description', 1161), ('company', 251), ('freshness', 113), ('previewLines', 105), ('applyUrl', 63), ('sourceUrl', 59), ('id', 38), ('companyId', 38)]
+total_json 51477
+=== POST (built) 2026-05-18T19:56:15Z ===
+api_ttfb min=0.432 p50=0.452 max=0.572 avg=0.477
+api_bytes: 21308
+jobs 20 preview_source responsibility

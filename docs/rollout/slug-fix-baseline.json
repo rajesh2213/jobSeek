@@ -1,0 +1,72 @@
+{
+  "capturedAt": "2026-06-04T13:17:43.583Z",
+  "tag": "baseline",
+  "metrics": {
+    "totalEndpoints": 1128,
+    "linkedEndpoints": 901,
+    "orphanEndpoints": 227,
+    "totalCompanies": 10347,
+    "companiesWithToken": 723,
+    "companiesReady": 724,
+    "distinctLinkedCompanies": 844,
+    "activeEndpoints": 809,
+    "activeLinked": 582,
+    "activeOrphans": 227,
+    "readyWithToken": 723,
+    "invalidTokens": 15
+  },
+  "collisions": [
+    {
+      "atsType": "ashby",
+      "atsBoardToken": "posting-api",
+      "count": 8
+    },
+    {
+      "atsType": "greenhouse",
+      "atsBoardToken": "embed",
+      "count": 7
+    },
+    {
+      "atsType": "workday",
+      "atsBoardToken": "{\"host\":\"coke.wd1.myworkdayjobs.com\",\"tenant\":\"coke\",\"site\":\"introduceYourself\"}",
+      "count": 2
+    },
+    {
+      "atsType": "lever",
+      "atsBoardToken": "octoenergy",
+      "count": 2
+    },
+    {
+      "atsType": "greenhouse",
+      "atsBoardToken": "harnessinc",
+      "count": 2
+    },
+    {
+      "atsType": "greenhouse",
+      "atsBoardToken": "figment",
+      "count": 2
+    },
+    {
+      "atsType": "ashby",
+      "atsBoardToken": "harrison",
+      "count": 2
+    },
+    {
+      "atsType": "lever",
+      "atsBoardToken": "avalerehealth",
+      "count": 2
+    }
+  ],
+  "badTokenGroups": [
+    {
+      "atsType": "ashby",
+      "atsBoardToken": "posting-api",
+      "count": 8
+    },
+    {
+      "atsType": "greenhouse",
+      "atsBoardToken": "embed",
+      "count": 7
+    }
+  ]
+}

@@ -1,0 +1,652 @@
+{
+  "timestamp": "2026-05-13T13:36:40.174Z",
+  "endpointCounts": [
+    {
+      "isActive": false,
+      "count": 153
+    },
+    {
+      "isActive": true,
+      "count": 692
+    }
+  ],
+  "providerDistribution": [
+    {
+      "type": "ashby",
+      "isActive": true,
+      "count": 170
+    },
+    {
+      "type": "ashby",
+      "isActive": false,
+      "count": 15
+    },
+    {
+      "type": "bamboohr",
+      "isActive": false,
+      "count": 3
+    },
+    {
+      "type": "greenhouse",
+      "isActive": true,
+      "count": 274
+    },
+    {
+      "type": "greenhouse",
+      "isActive": false,
+      "count": 31
+    },
+    {
+      "type": "jobvite",
+      "isActive": false,
+      "count": 3
+    },
+    {
+      "type": "lever",
+      "isActive": true,
+      "count": 114
+    },
+    {
+      "type": "lever",
+      "isActive": false,
+      "count": 30
+    },
+    {
+      "type": "teamtailor",
+      "isActive": true,
+      "count": 2
+    },
+    {
+      "type": "workday",
+      "isActive": false,
+      "count": 71
+    },
+    {
+      "type": "workday",
+      "isActive": true,
+      "count": 132
+    }
+  ],
+  "scoreDistribution": [
+    {
+      "bucket": "0-7",
+      "count": 697
+    },
+    {
+      "bucket": "8-39",
+      "count": 148
+    }
+  ],
+  "failureDistribution": [
+    {
+      "failureCount": 0,
+      "count": 662
+    },
+    {
+      "failureCount": 1,
+      "count": 24
+    },
+    {
+      "failureCount": 2,
+      "count": 1
+    },
+    {
+      "failureCount": 3,
+      "count": 5
+    },
+    {
+      "failureCount": 4,
+      "count": 1
+    },
+    {
+      "failureCount": 9,
+      "count": 2
+    },
+    {
+      "failureCount": 12,
+      "count": 5
+    },
+    {
+      "failureCount": 13,
+      "count": 1
+    },
+    {
+      "failureCount": 18,
+      "count": 5
+    },
+    {
+      "failureCount": 19,
+      "count": 1
+    },
+    {
+      "failureCount": 22,
+      "count": 1
+    },
+    {
+      "failureCount": 24,
+      "count": 2
+    },
+    {
+      "failureCount": 28,
+      "count": 1
+    },
+    {
+      "failureCount": 29,
+      "count": 3
+    },
+    {
+      "failureCount": 30,
+      "count": 5
+    },
+    {
+      "failureCount": 37,
+      "count": 1
+    },
+    {
+      "failureCount": 38,
+      "count": 5
+    },
+    {
+      "failureCount": 39,
+      "count": 119
+    },
+    {
+      "failureCount": 40,
+      "count": 1
+    }
+  ],
+  "freshnessHistogram": [
+    {
+      "bucket": "<30m",
+      "type": "ashby",
+      "count": 23
+    },
+    {
+      "bucket": "<30m",
+      "type": "greenhouse",
+      "count": 31
+    },
+    {
+      "bucket": "<30m",
+      "type": "lever",
+      "count": 15
+    },
+    {
+      "bucket": "<30m",
+      "type": "workday",
+      "count": 16
+    },
+    {
+      "bucket": ">24h",
+      "type": "greenhouse",
+      "count": 2
+    },
+    {
+      "bucket": ">24h",
+      "type": "workday",
+      "count": 26
+    },
+    {
+      "bucket": "1-2h",
+      "type": "ashby",
+      "count": 27
+    },
+    {
+      "bucket": "1-2h",
+      "type": "greenhouse",
+      "count": 34
+    },
+    {
+      "bucket": "1-2h",
+      "type": "lever",
+      "count": 15
+    },
+    {
+      "bucket": "1-2h",
+      "type": "teamtailor",
+      "count": 1
+    },
+    {
+      "bucket": "1-2h",
+      "type": "workday",
+      "count": 19
+    },
+    {
+      "bucket": "2-4h",
+      "type": "ashby",
+      "count": 59
+    },
+    {
+      "bucket": "2-4h",
+      "type": "greenhouse",
+      "count": 56
+    },
+    {
+      "bucket": "2-4h",
+      "type": "lever",
+      "count": 29
+    },
+    {
+      "bucket": "2-4h",
+      "type": "workday",
+      "count": 25
+    },
+    {
+      "bucket": "30m-1h",
+      "type": "ashby",
+      "count": 2
+    },
+    {
+      "bucket": "30m-1h",
+      "type": "greenhouse",
+      "count": 48
+    },
+    {
+      "bucket": "30m-1h",
+      "type": "lever",
+      "count": 2
+    },
+    {
+      "bucket": "30m-1h",
+      "type": "workday",
+      "count": 8
+    },
+    {
+      "bucket": "4-8h",
+      "type": "ashby",
+      "count": 54
+    },
+    {
+      "bucket": "4-8h",
+      "type": "greenhouse",
+      "count": 61
+    },
+    {
+      "bucket": "4-8h",
+      "type": "lever",
+      "count": 43
+    },
+    {
+      "bucket": "4-8h",
+      "type": "teamtailor",
+      "count": 1
+    },
+    {
+      "bucket": "4-8h",
+      "type": "workday",
+      "count": 24
+    },
+    {
+      "bucket": "8-24h",
+      "type": "ashby",
+      "count": 5
+    },
+    {
+      "bucket": "8-24h",
+      "type": "greenhouse",
+      "count": 40
+    },
+    {
+      "bucket": "8-24h",
+      "type": "lever",
+      "count": 7
+    },
+    {
+      "bucket": "8-24h",
+      "type": "workday",
+      "count": 13
+    },
+    {
+      "bucket": "never",
+      "type": "greenhouse",
+      "count": 2
+    },
+    {
+      "bucket": "never",
+      "type": "lever",
+      "count": 3
+    },
+    {
+      "bucket": "never",
+      "type": "workday",
+      "count": 1
+    }
+  ],
+  "companyCoverage": [
+    {
+      "bucket": "careers_unresolved",
+      "count": 7682
+    },
+    {
+      "bucket": "no_source",
+      "count": 1082
+    },
+    {
+      "bucket": "active_fresh",
+      "count": 420
+    },
+    {
+      "bucket": "ats_known_no_endpoint",
+      "count": 239
+    },
+    {
+      "bucket": "active_stale",
+      "count": 118
+    },
+    {
+      "bucket": "endpoint_inactive",
+      "count": 116
+    }
+  ],
+  "metrics": {
+    "total_endpoints": 845,
+    "active_endpoints": 692,
+    "inactive_endpoints": 153,
+    "orphan_active": 141,
+    "recently_succeeded_inactive": 50,
+    "companies_with_atstype_no_endpoint": 239,
+    "total_jobs": 117930,
+    "jobs_last_7d": 37694,
+    "freshly_monitored_companies": 420
+  },
+  "throughput24h": [
+    {
+      "hour": "2026-05-13T13:00:00.000Z",
+      "type": "ashby",
+      "count": 23
+    },
+    {
+      "hour": "2026-05-13T13:00:00.000Z",
+      "type": "workday",
+      "count": 20
+    },
+    {
+      "hour": "2026-05-13T13:00:00.000Z",
+      "type": "lever",
+      "count": 16
+    },
+    {
+      "hour": "2026-05-13T13:00:00.000Z",
+      "type": "greenhouse",
+      "count": 38
+    },
+    {
+      "hour": "2026-05-13T12:00:00.000Z",
+      "type": "lever",
+      "count": 4
+    },
+    {
+      "hour": "2026-05-13T12:00:00.000Z",
+      "type": "workday",
+      "count": 11
+    },
+    {
+      "hour": "2026-05-13T12:00:00.000Z",
+      "type": "ashby",
+      "count": 15
+    },
+    {
+      "hour": "2026-05-13T12:00:00.000Z",
+      "type": "greenhouse",
+      "count": 52
+    },
+    {
+      "hour": "2026-05-13T11:00:00.000Z",
+      "type": "lever",
+      "count": 24
+    },
+    {
+      "hour": "2026-05-13T11:00:00.000Z",
+      "type": "greenhouse",
+      "count": 46
+    },
+    {
+      "hour": "2026-05-13T11:00:00.000Z",
+      "type": "teamtailor",
+      "count": 1
+    },
+    {
+      "hour": "2026-05-13T11:00:00.000Z",
+      "type": "workday",
+      "count": 19
+    },
+    {
+      "hour": "2026-05-13T11:00:00.000Z",
+      "type": "ashby",
+      "count": 35
+    },
+    {
+      "hour": "2026-05-13T10:00:00.000Z",
+      "type": "workday",
+      "count": 13
+    },
+    {
+      "hour": "2026-05-13T10:00:00.000Z",
+      "type": "lever",
+      "count": 12
+    },
+    {
+      "hour": "2026-05-13T10:00:00.000Z",
+      "type": "greenhouse",
+      "count": 25
+    },
+    {
+      "hour": "2026-05-13T10:00:00.000Z",
+      "type": "ashby",
+      "count": 29
+    },
+    {
+      "hour": "2026-05-13T09:00:00.000Z",
+      "type": "workday",
+      "count": 15
+    },
+    {
+      "hour": "2026-05-13T09:00:00.000Z",
+      "type": "ashby",
+      "count": 30
+    },
+    {
+      "hour": "2026-05-13T09:00:00.000Z",
+      "type": "greenhouse",
+      "count": 28
+    },
+    {
+      "hour": "2026-05-13T09:00:00.000Z",
+      "type": "lever",
+      "count": 18
+    },
+    {
+      "hour": "2026-05-13T08:00:00.000Z",
+      "type": "ashby",
+      "count": 17
+    },
+    {
+      "hour": "2026-05-13T08:00:00.000Z",
+      "type": "lever",
+      "count": 20
+    },
+    {
+      "hour": "2026-05-13T08:00:00.000Z",
+      "type": "greenhouse",
+      "count": 25
+    },
+    {
+      "hour": "2026-05-13T08:00:00.000Z",
+      "type": "teamtailor",
+      "count": 1
+    },
+    {
+      "hour": "2026-05-13T08:00:00.000Z",
+      "type": "workday",
+      "count": 10
+    },
+    {
+      "hour": "2026-05-13T07:00:00.000Z",
+      "type": "ashby",
+      "count": 13
+    },
+    {
+      "hour": "2026-05-13T07:00:00.000Z",
+      "type": "lever",
+      "count": 9
+    },
+    {
+      "hour": "2026-05-13T07:00:00.000Z",
+      "type": "greenhouse",
+      "count": 13
+    },
+    {
+      "hour": "2026-05-13T07:00:00.000Z",
+      "type": "workday",
+      "count": 4
+    },
+    {
+      "hour": "2026-05-13T06:00:00.000Z",
+      "type": "ashby",
+      "count": 3
+    },
+    {
+      "hour": "2026-05-13T06:00:00.000Z",
+      "type": "workday",
+      "count": 1
+    },
+    {
+      "hour": "2026-05-13T06:00:00.000Z",
+      "type": "lever",
+      "count": 1
+    },
+    {
+      "hour": "2026-05-13T06:00:00.000Z",
+      "type": "greenhouse",
+      "count": 3
+    },
+    {
+      "hour": "2026-05-13T05:00:00.000Z",
+      "type": "lever",
+      "count": 2
+    },
+    {
+      "hour": "2026-05-13T05:00:00.000Z",
+      "type": "greenhouse",
+      "count": 1
+    },
+    {
+      "hour": "2026-05-13T04:00:00.000Z",
+      "type": "greenhouse",
+      "count": 3
+    },
+    {
+      "hour": "2026-05-13T04:00:00.000Z",
+      "type": "lever",
+      "count": 1
+    },
+    {
+      "hour": "2026-05-13T03:00:00.000Z",
+      "type": "ashby",
+      "count": 2
+    },
+    {
+      "hour": "2026-05-13T03:00:00.000Z",
+      "type": "workday",
+      "count": 3
+    },
+    {
+      "hour": "2026-05-13T03:00:00.000Z",
+      "type": "greenhouse",
+      "count": 10
+    },
+    {
+      "hour": "2026-05-13T03:00:00.000Z",
+      "type": "lever",
+      "count": 1
+    },
+    {
+      "hour": "2026-05-13T01:00:00.000Z",
+      "type": "lever",
+      "count": 3
+    },
+    {
+      "hour": "2026-05-13T01:00:00.000Z",
+      "type": "ashby",
+      "count": 3
+    },
+    {
+      "hour": "2026-05-13T01:00:00.000Z",
+      "type": "workday",
+      "count": 3
+    },
+    {
+      "hour": "2026-05-13T01:00:00.000Z",
+      "type": "greenhouse",
+      "count": 6
+    },
+    {
+      "hour": "2026-05-13T00:00:00.000Z",
+      "type": "greenhouse",
+      "count": 5
+    },
+    {
+      "hour": "2026-05-13T00:00:00.000Z",
+      "type": "workday",
+      "count": 1
+    },
+    {
+      "hour": "2026-05-12T19:00:00.000Z",
+      "type": "greenhouse",
+      "count": 3
+    },
+    {
+      "hour": "2026-05-12T18:00:00.000Z",
+      "type": "greenhouse",
+      "count": 1
+    },
+    {
+      "hour": "2026-05-12T18:00:00.000Z",
+      "type": "workday",
+      "count": 2
+    },
+    {
+      "hour": "2026-05-12T17:00:00.000Z",
+      "type": "greenhouse",
+      "count": 4
+    },
+    {
+      "hour": "2026-05-12T17:00:00.000Z",
+      "type": "workday",
+      "count": 1
+    },
+    {
+      "hour": "2026-05-12T16:00:00.000Z",
+      "type": "greenhouse",
+      "count": 2
+    },
+    {
+      "hour": "2026-05-12T15:00:00.000Z",
+      "type": "greenhouse",
+      "count": 4
+    },
+    {
+      "hour": "2026-05-12T15:00:00.000Z",
+      "type": "workday",
+      "count": 2
+    },
+    {
+      "hour": "2026-05-12T14:00:00.000Z",
+      "type": "greenhouse",
+      "count": 1
+    },
+    {
+      "hour": "2026-05-12T13:00:00.000Z",
+      "type": "workday",
+      "count": 1
+    }
+  ],
+  "envConfig": {
+    "ATS_ENDPOINT_WORKER_CONCURRENCY": "1",
+    "ATS_POOL_INGEST_CONCURRENCY": "2",
+    "ATS_PARSE_CONCURRENCY": "2",
+    "ATS_ENDPOINT_FETCH_TIMEOUT_MS": "600000",
+    "ATS_ENDPOINT_SCHEDULER_MAX_PER_TYPE": "10",
+    "WORKER_CONCURRENCY": "4"
+  }
+}

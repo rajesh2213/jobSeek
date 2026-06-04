@@ -6,7 +6,7 @@ Fill after each wave. Baseline: [POST_ROLLOUT_CPU_PREFLIGHT.md](./POST_ROLLOUT_C
 
 | Item | Status |
 |------|--------|
-| Git SHA | _fill after push_ |
+| Git SHA | `f4655f1` (pushed `main`) |
 | Vercel Ready | _yes/no_ |
 | VPS restart | _only if SEO_AGGREGATION_REDIS_CACHE set on API_ |
 | Sitemap 200 | _curl -sI /sitemap.xml_ |
@@ -17,7 +17,7 @@ Fill after each wave. Baseline: [POST_ROLLOUT_CPU_PREFLIGHT.md](./POST_ROLLOUT_C
 
 | Item | Status |
 |------|--------|
-| `SSR_PUBLIC_SEO_LOADERS=1` on Vercel | _yes/no_ |
+| `SSR_PUBLIC_SEO_LOADERS=1` on Vercel | **Set in Vercel dashboard** (default on when unset in code) |
 | Anon job detail JSON-LD | _yes/no_ |
 | Signed-in caps | _yes/no_ |
 
@@ -25,11 +25,11 @@ Fill after each wave. Baseline: [POST_ROLLOUT_CPU_PREFLIGHT.md](./POST_ROLLOUT_C
 
 | Item | Status |
 |------|--------|
-| Git SHA | _fill_ |
-| `SSR_COMPANY_JOBS=1` | _yes/no_ |
-| `COMPANY_JOBS_SKIP_EXACT_COUNT=1` on VPS | _yes/no_ |
-| `bash deploy/restart-jobseek.sh` | _done_ |
-| `curl health` | _200_ |
+| Git SHA | `f4655f1` |
+| `SSR_COMPANY_JOBS=1` | **Set in Vercel dashboard** (default on when unset in code) |
+| `COMPANY_JOBS_SKIP_EXACT_COUNT=1` on VPS | **Enable in `.env` then restart API** (code shipped; flag opt-in) |
+| `bash deploy/restart-jobseek.sh` | done on VPS |
+| `curl health` | verify below after restart |
 
 ## CPU delta (48h after Wave C)
 

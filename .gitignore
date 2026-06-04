@@ -75,6 +75,6 @@ apps/server/data/company-datasets/companies-*.csv
 apps/server/data/company-datasets/split/
 
 deploy-snapshots/
-docs/
+# docs/ — tracked for rollout/audit reports (large JSON audits kept)
 backups/
 apps/server/data/company-datasets/

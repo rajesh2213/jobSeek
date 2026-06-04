@@ -1,0 +1,16 @@
+{
+  "capturedAt": "2026-06-04T19:53:04.734Z",
+  "tag": "post-deploy",
+  "metrics": {
+    "companiesWithEndpoints": 867,
+    "companiesWithActiveEndpoints": 580,
+    "linkedEndpoints": 925,
+    "activeEndpoints": 817,
+    "orphanEndpoints": 224,
+    "readyJobs": 97663,
+    "activeJobs": 41353,
+    "recoveredCompaniesTagged": 21,
+    "endpointCoveragePct": 8.37,
+    "totalCompanies": 10360
+  }
+}

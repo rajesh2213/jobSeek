@@ -1,0 +1,51 @@
+{
+  "capturedAt": "2026-06-04T13:18:54.264Z",
+  "tag": "post-migration",
+  "metrics": {
+    "totalEndpoints": 1128,
+    "linkedEndpoints": 901,
+    "orphanEndpoints": 227,
+    "totalCompanies": 10347,
+    "companiesWithToken": 721,
+    "companiesReady": 724,
+    "distinctLinkedCompanies": 844,
+    "activeEndpoints": 809,
+    "activeLinked": 582,
+    "activeOrphans": 227,
+    "readyWithToken": 721,
+    "invalidTokens": 0
+  },
+  "collisions": [
+    {
+      "atsType": "lever",
+      "atsBoardToken": "octoenergy",
+      "count": 2
+    },
+    {
+      "atsType": "lever",
+      "atsBoardToken": "avalerehealth",
+      "count": 2
+    },
+    {
+      "atsType": "workday",
+      "atsBoardToken": "{\"host\":\"coke.wd1.myworkdayjobs.com\",\"tenant\":\"coke\",\"site\":\"introduceYourself\"}",
+      "count": 2
+    },
+    {
+      "atsType": "ashby",
+      "atsBoardToken": "harrison",
+      "count": 2
+    },
+    {
+      "atsType": "greenhouse",
+      "atsBoardToken": "harnessinc",
+      "count": 2
+    },
+    {
+      "atsType": "greenhouse",
+      "atsBoardToken": "figment",
+      "count": 2
+    }
+  ],
+  "badTokenGroups": []
+}

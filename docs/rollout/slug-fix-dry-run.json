@@ -1,0 +1,110 @@
+{
+  "rows": [
+    {
+      "company": "Fig",
+      "ats": "greenhouse",
+      "old": "embed",
+      "new": "figs15",
+      "action": "recover"
+    },
+    {
+      "company": "Synthesia",
+      "ats": "ashby",
+      "old": "posting-api",
+      "new": null,
+      "action": "clear"
+    },
+    {
+      "company": "Homesty",
+      "ats": "greenhouse",
+      "old": "embed",
+      "new": "phxpreview",
+      "action": "recover"
+    },
+    {
+      "company": "MarketFinance",
+      "ats": "ashby",
+      "old": "posting-api",
+      "new": "allica-bank",
+      "action": "recover"
+    },
+    {
+      "company": "Kota",
+      "ats": "ashby",
+      "old": "posting-api",
+      "new": "kota",
+      "action": "recover"
+    },
+    {
+      "company": "Bold Business",
+      "ats": "greenhouse",
+      "old": "embed",
+      "new": "boldbusiness",
+      "action": "recover"
+    },
+    {
+      "company": "Avantus",
+      "ats": "greenhouse",
+      "old": "embed",
+      "new": "avantus",
+      "action": "recover"
+    },
+    {
+      "company": "QA Wolf",
+      "ats": "ashby",
+      "old": "posting-api",
+      "new": "qawolf",
+      "action": "recover"
+    },
+    {
+      "company": "Accelevents",
+      "ats": "greenhouse",
+      "old": "embed",
+      "new": "accelevents",
+      "action": "recover"
+    },
+    {
+      "company": "SpotDraft",
+      "ats": "ashby",
+      "old": "posting-api",
+      "new": "spotdraft",
+      "action": "recover"
+    },
+    {
+      "company": "CloudTrucks",
+      "ats": "ashby",
+      "old": "posting-api",
+      "new": "cloudtrucks",
+      "action": "recover"
+    },
+    {
+      "company": "Kin Insurance",
+      "ats": "ashby",
+      "old": "posting-api",
+      "new": "kin",
+      "action": "recover"
+    },
+    {
+      "company": "CircleCI",
+      "ats": "greenhouse",
+      "old": "embed",
+      "new": null,
+      "action": "clear"
+    },
+    {
+      "company": "Cockroach Labs",
+      "ats": "greenhouse",
+      "old": "embed",
+      "new": "cockroachlabs",
+      "action": "recover"
+    },
+    {
+      "company": "Vanta",
+      "ats": "ashby",
+      "old": "posting-api",
+      "new": "vanta",
+      "action": "recover"
+    }
+  ],
+  "suspicious": []
+}
