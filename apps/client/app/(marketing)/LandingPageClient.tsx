@@ -18,6 +18,7 @@ import {
   DESKTOP_RAIL_OPTICAL_CENTER_SHIFT_CLASS,
 } from "../../components/layout/railInset";
 import { HERO_JOB_INDEX_TOTAL, SHOW_LANDING_TESTIMONIALS } from "../../lib/landingPublic";
+import { FeatureCtaBand } from "../../components/marketing/featurePagePrimitives";
 function mapRange(progress: MotionValue<number>, start: number, end: number, from: number, to: number) {
   return useTransform(progress, [start, end], [from, to]);
 }
@@ -415,17 +416,6 @@ function SolutionSection() {
           </motion.div>
         );})}
       </div>
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        className="mt-6 rounded-xl border border-ink/10 bg-white/60 p-4"
-      >
-        <p className="text-sm font-semibold text-ink">Move while listings are fresh.</p>
-        <p className="mt-1 text-sm text-ink/70">
-          Job search is noisy. JobLoom helps you centralize discovery, spot new posts faster, and stay organized—without promising interviews or offers.
-        </p>
-      </motion.div>
       </motion.div>
     </motion.section>
   );
@@ -643,6 +633,14 @@ export default function LandingPageClient() {
         </div>
       </div>
       {SHOW_LANDING_TESTIMONIALS ? <SocialProofSection /> : null}
+      <div className={`${DESKTOP_RAIL_INSET_CLASS} pb-16`}>
+        <FeatureCtaBand
+          title="Your next shortlist starts here"
+          body={`Search ${HERO_JOB_INDEX_TOTAL.toLocaleString()}+ roles from company career sites and boards in one feed, filter by fit, compare against your resume, get email alerts on saved searches and keep every save in one workspace.`}
+          primaryHref="/jobs"
+          primaryLabel="Find Jobs Smarter →"
+        />
+      </div>
       <ExitIntentCapture />
     </div>
   );
