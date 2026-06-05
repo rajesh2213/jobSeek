@@ -7,9 +7,7 @@ import {
   motion,
   AnimatePresence,
   useInView,
-  useMotionValue,
   useScroll,
-  useSpring,
   useTransform,
   type MotionValue,
 } from "framer-motion";
@@ -20,16 +18,6 @@ import {
   DESKTOP_RAIL_OPTICAL_CENTER_SHIFT_CLASS,
 } from "../../components/layout/railInset";
 import { HERO_JOB_INDEX_TOTAL, SHOW_LANDING_TESTIMONIALS } from "../../lib/landingPublic";
-import { PRO_ANNUAL_USD_PER_MONTH } from "../../lib/pricingDisplay";
-import { FREE_DAILY_JOBS, FREE_RESUME_MATCH_AI_PER_24H } from "../../lib/planLimits";
-
-const sectionReveal = {
-  initial: { opacity: 0, y: 20 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, amount: 0.25 },
-  transition: { duration: 0.45 },
-} as const;
-
 function mapRange(progress: MotionValue<number>, start: number, end: number, from: number, to: number) {
   return useTransform(progress, [start, end], [from, to]);
 }
@@ -251,9 +239,6 @@ function HeroSection({ progress }: { progress: MotionValue<number> }) {
               </Link>
             </motion.div>
           </motion.div>
-          <Link href="/pricing" className="rounded-full border border-ink/20 px-5 py-2.5 text-sm font-semibold text-ink/80">
-            See Pro plans
-          </Link>
         </div>
         <div className="order-2 mt-4 max-w-xl lg:order-none">
           <EmailCaptureCard
@@ -596,200 +581,6 @@ function SocialProofSection() {
   );
 }
 
-function PricingSection() {
-  const ref = useRef<HTMLElement | null>(null);
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start 110%", "end 28%"],
-  });
-  const sectionY = mapRange(scrollYProgress, 0, 0.14, 86, 0);
-  const sectionOpacity = mapRange(scrollYProgress, 0, 0.11, 0, 1);
-  const pricingWrapY = useTransform(scrollYProgress, [0, 0.14, 0.78, 1], [86, 0, 0, 52]);
-  const pricingWrapOpacity = useTransform(scrollYProgress, [0, 0.11, 0.74, 1], [0, 1, 1, 0.45]);
-  const centerBoostRaw = useTransform(scrollYProgress, [0.22, 0.48, 0.8], [1, 1.03, 1]);
-  const centerBoost = useSpring(centerBoostRaw, { stiffness: 180, damping: 28, mass: 0.5 });
-
-  const freeOpacity = useTransform(scrollYProgress, [0.16, 0.52, 0.9], [1, 0.78, 0.62]);
-  const freeScale = useTransform(scrollYProgress, [0.14, 0.5], [1, 0.98]);
-  const freeY = mapRange(scrollYProgress, 0.01, 0.22, 32, 0);
-
-  const proOpacity = mapRange(scrollYProgress, 0.01, 0.14, 0, 1);
-  const proY = mapRange(scrollYProgress, 0.01, 0.14, 22, 0);
-
-  const ctaMx = useMotionValue(0);
-  const ctaMy = useMotionValue(0);
-  const ctaSx = useSpring(ctaMx, { stiffness: 240, damping: 22, mass: 0.45 });
-  const ctaSy = useSpring(ctaMy, { stiffness: 240, damping: 22, mass: 0.45 });
-  const onCtaMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width - 0.5;
-    const y = (e.clientY - r.top) / r.height - 0.5;
-    ctaMx.set(x * 6);
-    ctaMy.set(y * 4);
-  };
-  const resetCtaMagnet = () => {
-    ctaMx.set(0);
-    ctaMy.set(0);
-  };
-
-  return (
-    <motion.section ref={ref} style={{ y: pricingWrapY, opacity: pricingWrapOpacity }} className="mx-auto w-full max-w-6xl px-4 pb-16 pt-8 sm:px-6">
-        <motion.h2 style={{ y: sectionY, opacity: sectionOpacity }} className="text-center text-3xl font-semibold sm:text-4xl">
-          The difference is how early you move.
-        </motion.h2>
-        <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-ink/70">
-          Triage faster, tighten your resume with clear signals, and stay organized from discovery to submit.
-        </p>
-        <p className="mx-auto mt-2 max-w-2xl text-center text-xs font-medium text-ink/55">
-          Pro is for unlimited browsing, resume insights, Smart Apply, and alerts-see the plan table for details.
-        </p>
-        <div className="mx-auto mt-8 grid max-w-3xl gap-4 md:grid-cols-2">
-          <motion.div
-            style={{ opacity: freeOpacity, scale: freeScale, y: freeY }}
-            transition={{ type: "spring", stiffness: 260, damping: 24 }}
-            className="rounded-2xl border border-ink/10 bg-white/45 p-5 opacity-90"
-          >
-            <p className="text-sm font-semibold">Free</p>
-            <p className="mt-1 text-4xl font-bold">$0</p>
-            <ul className="mt-3 space-y-1.5 text-sm text-ink/75">
-              <li>- Explore jobs - {FREE_DAILY_JOBS} jobs per day (midnight UTC)</li>
-              <li>- AI resume match — overall score ({FREE_RESUME_MATCH_AI_PER_24H} free per rolling 24h)</li>
-              <li className="text-ink/45">x No Smart Apply</li>
-              <li className="text-ink/45">x No email job alerts</li>
-            </ul>
-            <p className="mt-3 text-xs font-medium text-ink/55">Limited daily views - you may miss roles</p>
-          </motion.div>
-          <motion.div
-            style={{ opacity: proOpacity, y: proY }}
-            whileHover={{
-              scale: 1.02,
-              boxShadow: "0 12px 38px rgba(232,83,58,0.24), 0 0 0 1px rgba(232,83,58,0.2)",
-            }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            className="relative rounded-2xl border-2 border-brand bg-white p-5 shadow-[0_8px_30px_rgba(232,83,58,0.15)]"
-          >
-            <span className="absolute -top-2 right-4 rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase text-white">
-              Most popular
-            </span>
-            <p className="text-sm font-semibold">Pro Annual</p>
-            <p className="mt-1 text-4xl font-bold">
-              ${PRO_ANNUAL_USD_PER_MONTH.toFixed(2)}/mo
-            </p>
-            <ul className="mt-3 space-y-1.5 text-sm text-ink/80">
-              <li>- Unlimited jobs browsing</li>
-              <li>- Unlimited AI resume match + full gap breakdown</li>
-              <li>- Smart Apply</li>
-              <li>- Email job alerts on saved searches</li>
-            </ul>
-            <p className="mt-3 text-xs font-semibold text-brand">Never miss a role. Never lose track.</p>
-          </motion.div>
-        </div>
-        <p className="mx-auto mt-5 max-w-2xl text-center text-sm text-ink/65">
-          Many people upgrade when they want unlimited browsing, resume-scoring, Smart Apply, or email alerts on saved searches.
-        </p>
-        <div className="mt-6 text-center">
-          <motion.div
-            onMouseMove={onCtaMove}
-            onMouseLeave={resetCtaMagnet}
-            style={{ x: ctaSx, y: ctaSy, scale: centerBoost }}
-            transition={{ type: "spring", stiffness: 280, damping: 20 }}
-            className="inline-block"
-          >
-            <motion.div whileHover={{ scale: 1.03 }} transition={{ type: "spring", stiffness: 260, damping: 20 }}>
-              <motion.span
-                animate={{
-                  boxShadow: [
-                    "0 0 0 0 rgba(232,83,58,0.32)",
-                    "0 0 0 8px rgba(232,83,58,0)",
-                  ],
-                }}
-                transition={{ duration: 2.1, repeat: Infinity, ease: "easeOut" }}
-                className="inline-block rounded-full"
-              >
-                <Link
-                  href="/pricing"
-                  className="rounded-full bg-brand px-6 py-2.5 text-sm font-bold !text-white transition-colors hover:bg-brand-hover hover:!text-white"
-                >
-                  Unlock Pro now →
-                </Link>
-              </motion.span>
-            </motion.div>
-          </motion.div>
-        </div>
-    </motion.section>
-  );
-}
-
-function FinalUrgencySection() {
-  return (
-    <section className="relative z-0">
-      <motion.div
-        {...sectionReveal}
-        className="relative w-full bg-[linear-gradient(180deg,#1a1a1a_0%,#111111_100%)] py-20 text-center lg:py-20"
-      >
-      <div className="px-4 sm:px-6 lg:pl-[6px] lg:pr-6">
-      <div className="mx-auto max-w-3xl">
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand/80">Timing still matters</p>
-        <h3 className="mt-2 text-3xl font-semibold leading-snug text-white sm:text-4xl">
-          Job search rewards clarity—not chaos.
-        </h3>
-        <p className="mt-2 text-xl font-medium text-white/80 sm:text-2xl">
-          When you discover roles earlier and stay organized, you can be more deliberate about where you invest effort.
-        </p>
-        <p className="mx-auto mt-4 max-w-xl text-sm text-white/50">
-          Illustrative comparison—not a guarantee about applicant counts or outcomes. Your results depend on your profile, market, and how employers hire.
-        </p>
-
-        <div className="mx-auto mt-10 grid max-w-lg gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-4 text-left">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-white/35">
-              Scattered discovery
-            </p>
-            <p className="mt-2 text-lg font-extrabold text-red-400">
-              Late to new posts
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-white/45">
-              Easy to miss listings when you’re refreshing five sites and job boards every day.
-            </p>
-          </div>
-          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] px-5 py-4 text-left shadow-[0_0_20px_rgba(16,185,129,0.08)]">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/60">
-              Centralized on JobLoom
-            </p>
-            <p className="mt-2 text-lg font-extrabold text-emerald-400">
-              Earlier triage
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-white/45">
-              One searchable feed with fit signals—so you can respond to fresh posts with intention instead of panic.
-            </p>
-          </div>
-        </div>
-
-        <motion.div whileTap={{ scale: 0.97 }} className="mt-10 inline-block">
-          <motion.span
-            animate={{
-              boxShadow: [
-                "0 0 0 0 rgba(232,83,58,0.4)",
-                "0 0 0 10px rgba(232,83,58,0)",
-              ],
-            }}
-            transition={{ repeat: Infinity, duration: 1.8 }}
-            className="inline-block rounded-full"
-          >
-            <Link
-              href="/jobs"
-              className="rounded-full bg-brand px-8 py-3 text-sm font-bold !text-white shadow-lg transition-colors hover:bg-brand-hover hover:!text-white"
-            >
-              Open the job feed →
-            </Link>
-          </motion.span>
-        </motion.div>
-      </div>
-      </div>
-      </motion.div>
-    </section>
-  );
-}
 
 function ExitIntentCapture() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -849,11 +640,9 @@ export default function LandingPageClient() {
           <HeroSection progress={scrollYProgress} />
           <PainSection />
           <SolutionSection />
-          <PricingSection />
         </div>
       </div>
       {SHOW_LANDING_TESTIMONIALS ? <SocialProofSection /> : null}
-      <FinalUrgencySection />
       <ExitIntentCapture />
     </div>
   );
