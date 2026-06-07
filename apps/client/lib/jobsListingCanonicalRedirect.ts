@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { resolveJobsUuidMispathRedirectUrl } from "./jobCanonicalRedirect";
 import {
   buildIncomingJobListingUrl,
   getCanonicalJobListingUrl,
@@ -31,6 +32,9 @@ export function resolveJobsListingCanonicalRedirectUrl(
   pathname: string,
   searchParams: Record<string, string>,
 ): string | null {
+  const uuidMispath = resolveJobsUuidMispathRedirectUrl(origin, pathname);
+  if (uuidMispath) return uuidMispath;
+
   if (!isJobsListingRedirectPath(pathname)) return null;
 
   if (pathname === "/jobs") {
@@ -57,6 +61,10 @@ export function resolveJobsListingCanonicalRedirectUrl(
 
 export function resolveJobsListingCanonicalRedirect(req: NextRequest): URL | null {
   const url = req.nextUrl;
+
+  const uuidMispath = resolveJobsUuidMispathRedirectUrl(url.origin, url.pathname);
+  if (uuidMispath) return new URL(uuidMispath);
+
   if (!isJobsListingRedirectPath(url.pathname)) return null;
 
   const sp = searchParamsRecord(url);

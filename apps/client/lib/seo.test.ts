@@ -24,7 +24,7 @@ function withLegacy(run: () => void): void {
   }
 }
 
-test("buildJobsSeo v2: count + Remote + role + USA + Hiring now", () => {
+test("buildJobsSeo v2: count + Remote + role + USA + Apply early", () => {
   withV2(() => {
     const { title, description } = buildJobsSeo(
       {
@@ -37,13 +37,13 @@ test("buildJobsSeo v2: count + Remote + role + USA + Hiring now", () => {
     );
     assert.match(title, /1,243/);
     assert.match(title, /Remote Backend Developer Jobs in USA/i);
-    assert.match(title, /Hiring now/i);
+    assert.match(title, /Apply early/i);
     assert.match(description, /1,243/);
-    assert.match(description, /actively hiring/i);
+    assert.match(description, /apply early/i);
   });
 });
 
-test("buildJobsSeo v2: total zero uses Explore, no Hiring now", () => {
+test("buildJobsSeo v2: total zero uses Explore, no Apply early", () => {
   withV2(() => {
     const { title, description } = buildJobsSeo(
       {
@@ -55,7 +55,7 @@ test("buildJobsSeo v2: total zero uses Explore, no Hiring now", () => {
       0,
     );
     assert.match(title, /Explore/i);
-    assert.doesNotMatch(title, /Hiring now/i);
+    assert.doesNotMatch(title, /Apply early/i);
     assert.match(description, /Explore/i);
   });
 });

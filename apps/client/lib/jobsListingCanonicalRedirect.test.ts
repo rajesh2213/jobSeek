@@ -58,3 +58,9 @@ test("no redirect for browse path", () => {
   });
   assert.equal(dest, null);
 });
+
+test("redirects mistaken /jobs/{uuid} to /job/{uuid}", () => {
+  const uuid = "4409fb0f-a1b2-4c3d-9e8f-123456789abc";
+  const dest = resolveJobsListingCanonicalRedirectUrl(ORIGIN, `/jobs/${uuid}`, {});
+  assert.equal(dest, `${ORIGIN}/job/${uuid}`);
+});

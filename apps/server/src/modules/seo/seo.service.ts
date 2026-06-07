@@ -33,6 +33,7 @@ export interface SeoLandingGenerationStats {
   locationHubsEmitted: number;
   skillHubsEmitted: number;
   skillLocationHubsEmitted: number;
+  roleLocationHubsEmitted: number;
   estimatedCountQueries: number;
   estimatedTotalQueries: number;
   batchDurationMs?: number;
@@ -379,6 +380,12 @@ export function createSeoService(prisma: PrismaClient) {
       0,
       200,
     );
+    const roleLocationLimit = parsePositiveIntEnv(
+      process.env.SEO_LANDING_MAX_ROLE_LOCATION_PAIRS,
+      72,
+      0,
+      500,
+    );
     const selectedLocations = SEO_DIMENSIONS.locations.slice(0, locationLimit);
     const selectedExperiences = SEO_DIMENSIONS.experience.slice(0, experienceLimit);
 
@@ -524,7 +531,10 @@ export function createSeoService(prisma: PrismaClient) {
       }
     }
 
-    // ── Role-based pages (existing) ────────────────────────────────────
+    // ── Role-based pages ───────────────────────────────────────────────
+    // Role-only hubs stay fully emitted. Role×location pairs are ranked by
+    // job count and capped to reduce near-duplicate crawl/index pressure.
+    const roleLocCandidates: Array<{ slug: string; count: number }> = [];
     for (const r of roles) {
       if (out.length >= maxSlugs) break;
       if (r.count >= minCount) {
@@ -532,40 +542,26 @@ export function createSeoService(prisma: PrismaClient) {
       }
 
       for (const loc of selectedLocations) {
-        if (out.length >= maxSlugs) break;
         const c = counts.get(`${r.role}|${loc}|`) ?? 0;
-        if (c >= minCount) {
-          const locFilter = locationTokenToFilter(loc);
-          push(
-            filtersToJobListingSlug({
-              role: r.role,
-              country: locFilter.country,
-              isRemote: locFilter.isRemote,
-              workType: locFilter.workType,
-            }) || `role/${r.role}/location/${loc}`,
-            c,
-          );
-        }
+        if (c < minCount) continue;
+        const locFilter = locationTokenToFilter(loc);
+        const slug =
+          filtersToJobListingSlug({
+            role: r.role,
+            country: locFilter.country,
+            isRemote: locFilter.isRemote,
+            workType: locFilter.workType,
+          }) || `role/${r.role}/location/${loc}`;
+        roleLocCandidates.push({ slug, count: c });
       }
+    }
 
-      for (const exp of selectedExperiences) {
-        if (out.length >= maxSlugs) break;
-        const c = counts.get(`${r.role}||${exp}`) ?? 0;
-        if (c >= minCount) {
-          push(`role/${r.role}/experience/${exp}`, c);
-        }
-      }
-
-      for (const loc of selectedLocations) {
-        if (out.length >= maxSlugs) break;
-        for (const exp of selectedExperiences) {
-          if (out.length >= maxSlugs) break;
-          const c = counts.get(`${r.role}|${loc}|${exp}`) ?? 0;
-          if (c >= minCount) {
-            push(`role/${r.role}/location/${loc}/experience/${exp}`, c);
-          }
-        }
-      }
+    roleLocCandidates.sort((a, b) => b.count - a.count);
+    let roleLocationHubsEmitted = 0;
+    for (const { slug, count } of roleLocCandidates) {
+      if (out.length >= maxSlugs || roleLocationHubsEmitted >= roleLocationLimit) break;
+      push(slug, count);
+      roleLocationHubsEmitted++;
     }
 
     const rolesConsidered = roles.length;
@@ -584,6 +580,7 @@ export function createSeoService(prisma: PrismaClient) {
         locationHubsEmitted,
         skillHubsEmitted,
         skillLocationHubsEmitted,
+        roleLocationHubsEmitted,
         estimatedCountQueries: 4,
         estimatedTotalQueries: 4,
         batchDurationMs,

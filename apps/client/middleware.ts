@@ -1,10 +1,12 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { resolveJobDetailCanonicalRedirect } from "./lib/jobCanonicalRedirect";
 import { resolveJobsListingCanonicalRedirect } from "./lib/jobsListingCanonicalRedirect";
 
 const isProtectedRoute = createRouteMatcher(["/account(.*)"]);
 const isJobsListingRoute = createRouteMatcher(["/jobs", "/jobs/(.*)"]);
+const isJobDetailRoute = createRouteMatcher(["/job/:path*"]);
 
 const clerkAuthMiddleware = clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {
@@ -21,6 +23,11 @@ const clerkAuthMiddleware = clerkMiddleware(async (auth, req) => {
 export default async function middleware(req: NextRequest, event: NextFetchEvent) {
   if (isJobsListingRoute(req)) {
     const destination = resolveJobsListingCanonicalRedirect(req);
+    if (destination) return NextResponse.redirect(destination, 308);
+    return NextResponse.next();
+  }
+  if (isJobDetailRoute(req)) {
+    const destination = resolveJobDetailCanonicalRedirect(req);
     if (destination) return NextResponse.redirect(destination, 308);
     return NextResponse.next();
   }

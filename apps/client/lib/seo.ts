@@ -213,7 +213,9 @@ function fitListingTitleCore(core: string, maxChars: number): string {
   if (s.length <= maxChars) return s;
   s = s.replace(/\s*·\s*From \$[^·]+$/, "");
   if (s.length <= maxChars) return s;
-  s = s.replace(/\s*·\s*Hiring now\s*$/i, " · Hiring");
+  s = s.replace(/\s*·\s*Hiring now\s*$/i, " · Apply");
+  if (s.length <= maxChars) return s;
+  s = s.replace(/\s*·\s*Apply early\s*$/i, " · Apply");
   if (s.length <= maxChars) return s;
   return `${s.slice(0, maxChars - 1).trimEnd()}…`;
 }
@@ -239,7 +241,7 @@ function buildJobsSeoV2(filters: JobFilters, total?: number): {
     filters.minSalary !== undefined && filters.minSalary > 0 ? titleSalaryFragment(filters.minSalary) : "";
 
   if (typeof total === "number" && total > 0) {
-    const coreRaw = `${total.toLocaleString()} ${mid} · Hiring now${hasSalaryTitle}`;
+    const coreRaw = `${total.toLocaleString()} ${mid} · Apply early${hasSalaryTitle}`;
     const core = fitListingTitleCore(coreRaw, 58);
     title = `${core}${pagePart} | JobLoom`;
   } else if (typeof total === "number" && total === 0) {
@@ -279,7 +281,7 @@ function buildJobsSeoV2(filters: JobFilters, total?: number): {
   if (typeof total === "number" && total > 0) {
     const geoBit = locPhrase ? ` in ${locPhrase}` : "";
     const focus = subject ? `${remoteish ? "remote " : ""}${subject.toLowerCase()} jobs${geoBit}` : `${remoteish ? "remote " : ""}jobs${geoBit}`;
-    description = `${total.toLocaleString()} open roles for ${focus.trim()}—actively hiring. Sourced from employer career pages; apply early.${refineClause} ${freshHint}`;
+    description = `${total.toLocaleString()} open roles for ${focus.trim()}—apply early via employer career pages.${refineClause} ${freshHint}`;
   } else if (typeof total === "number" && total === 0) {
     const geoBit = locPhrase ? ` in ${locPhrase}` : "";
     description = `Explore ${subject ? `${subject.toLowerCase()} openings` : "openings"}${geoBit} on JobLoom—new listings appear as companies hire.${refineClause} Direct career-page sourcing; widen filters or check back soon.`;
@@ -436,6 +438,12 @@ export function buildDynamicIntro(
 
   const countStr = total ? `${total.toLocaleString()} ` : "";
 
+  if (filters.skills?.length === 1 && !role && !category && !country && !isRemote) {
+    const skill = filters.skills[0]?.trim();
+    if (skill) {
+      return `Browse ${countStr}${toTitleCase(skill)} jobs from company career sites—updated daily with new postings.${companySuffix}`;
+    }
+  }
   if (role && isRemote) {
     return `Browse ${countStr}remote ${toTitleCase(role)} jobs updated daily on JobLoom.${companySuffix}`;
   }

@@ -138,6 +138,32 @@ async function main() {
     console.log(`HTTP ${r.status} → ${r.headers.get("location") ?? "—"}  (${u.replace(BASE, "")})`);
   }
 
+  // ── Step 4: job UUID mispath + job detail query strip ──
+  console.log("\n--- Step 4: job URL canonical fixes ---");
+  const sampleJobUrl = urls.find((u) => u.includes("/job/"));
+  const sampleJobId = sampleJobUrl?.match(/\/job\/([^/?#]+)/)?.[1];
+  if (sampleJobId) {
+    const mispath = await fetchText(`${BASE}/jobs/${sampleJobId}`, { followRedirect: false });
+    const mispathOk =
+      (mispath.status === 308 || mispath.status === 301) &&
+      mispath.headers.get("location")?.includes(`/job/${sampleJobId}`);
+    console.log(
+      `${mispathOk ? "PASS" : "FAIL"} /jobs/{id} → /job/{id}: HTTP ${mispath.status} location=${mispath.headers.get("location") ?? "—"}`,
+    );
+
+    const withQuery = await fetchText(`${BASE}/job/${sampleJobId}?utm_source=test`, {
+      followRedirect: false,
+    });
+    const queryOk =
+      (withQuery.status === 308 || withQuery.status === 301) &&
+      withQuery.headers.get("location") === `${BASE}/job/${sampleJobId}`;
+    console.log(
+      `${queryOk ? "PASS" : "FAIL"} job detail query strip: HTTP ${withQuery.status} location=${withQuery.headers.get("location") ?? "—"}`,
+    );
+  } else {
+    console.log("SKIP job URL tests (no job URLs in sitemap sample)");
+  }
+
   console.log("\n--- Summary ---");
   console.log("Pattern failures:", noindexFindings.length ? noindexFindings : "none");
   console.log("Sitemap landing accidental noindex:", landingNoindex);

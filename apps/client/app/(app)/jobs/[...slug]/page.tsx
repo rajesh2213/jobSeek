@@ -245,10 +245,10 @@ const LOCATION_HUB_LINKS: ReadonlyArray<{ token: string; label: string }> = [
   { token: "remote", label: "Remote" },
   { token: "us", label: "US" },
   { token: "in", label: "India" },
-  { token: "gb", label: "UK" },
-  { token: "de", label: "Germany" },
-  { token: "ca", label: "Canada" },
 ];
+
+/** High-value locations only — avoids flooding crawlers with low-value role×location combos. */
+const ROLE_PAGE_LOCATION_LINKS = LOCATION_HUB_LINKS;
 
 /**
  * Hierarchy-aware related search links. Adapts link targets based on the
@@ -281,14 +281,22 @@ function buildCuratedRelatedSearchLinks(
   const hasLocation = Boolean(filters.country?.trim()) || isRemote;
   const inferredCategory = category || context?.dominantCategory;
 
-  if (role) {
-    // Role page: link to parent category hub, then role+location variants, then sibling roles
+  if (role && hasLocation) {
+    // Role+location leaf: link up to parent role/category — not sibling geo variants.
+    push(`/jobs/role/${role}`, `All ${toTitle(role)} jobs`);
     if (inferredCategory && ALLOWED_CATEGORY.has(inferredCategory)) {
       push(`/jobs/category/${inferredCategory}`, `All ${toTitle(inferredCategory)} jobs`);
     }
     if (!isRemote) push(`/jobs/role/${role}/location/remote`, `Remote ${toTitle(role)} jobs`);
-    for (const loc of LOCATION_HUB_LINKS) {
+  } else if (role) {
+    // Role page: parent category + top geo variants only.
+    if (inferredCategory && ALLOWED_CATEGORY.has(inferredCategory)) {
+      push(`/jobs/category/${inferredCategory}`, `All ${toTitle(inferredCategory)} jobs`);
+    }
+    if (!isRemote) push(`/jobs/role/${role}/location/remote`, `Remote ${toTitle(role)} jobs`);
+    for (const loc of ROLE_PAGE_LOCATION_LINKS) {
       if (out.length >= MAX_LINKS) break;
+      if (loc.token === "remote" && isRemote) continue;
       push(`/jobs/role/${role}/location/${loc.token}`, `${toTitle(role)} jobs in ${loc.label}`);
     }
   } else if (filters.skills?.length === 1 && !role && !category) {
@@ -318,7 +326,7 @@ function buildCuratedRelatedSearchLinks(
     if (!isRemote) push(`/jobs/category/${category}/location/remote`, `Remote ${toTitle(category)} jobs`);
     push(`/jobs/category/${category}/location/us`, `${toTitle(category)} jobs in the US`);
     push(`/jobs/category/${category}/location/in`, `${toTitle(category)} jobs in India`);
-  } else if (hasLocation) {
+  } else if (hasLocation && !role && !category) {
     // Location page: link to top categories and roles in this location
     const locToken = isRemote ? "remote" : (filters.country?.trim()?.toLowerCase() ?? "");
     const locLabel = isRemote ? "remote" : (filters.country?.trim()?.toUpperCase() ?? "");
@@ -340,8 +348,8 @@ function buildCuratedRelatedSearchLinks(
   const fallbacks: Array<{ href: string; label: string }> = [
     { href: "/jobs/category/engineering", label: "Engineering jobs" },
     { href: "/jobs/category/data", label: "Data jobs" },
-    { href: "/jobs/role/data-engineer/location/remote", label: "Remote data engineer jobs" },
-    { href: "/jobs/role/product-manager/location/us", label: "Product manager jobs in the US" },
+    { href: "/jobs/skill/typescript", label: "TypeScript jobs" },
+    { href: "/jobs/skill/python", label: "Python jobs" },
     { href: "/jobs/location/remote", label: "Remote jobs" },
   ];
   for (const f of fallbacks) {

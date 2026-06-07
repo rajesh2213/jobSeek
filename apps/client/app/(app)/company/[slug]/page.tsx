@@ -30,13 +30,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const open = typeof company.jobCount === "number" && company.jobCount > 0 ? company.jobCount : null;
   const title =
     open != null
-      ? `${open.toLocaleString()} open roles at ${company.name} · Hiring now | JobLoom`
-      : `${company.name} jobs & careers | JobLoom`;
-  const remoteClause = company.hasRemoteJobs ? " Includes remote-friendly openings." : "";
+      ? `${open.toLocaleString()} open roles at ${company.name} · Apply early | JobLoom`
+      : `${company.name} careers & jobs · Apply early | JobLoom`;
+  const remoteClause = company.hasRemoteJobs ? " Includes remote-friendly roles." : "";
   const description =
     open != null
-      ? `${open.toLocaleString()} active listings at ${company.name}—apply from employer career pages.${remoteClause} Updated as new roles go live.`
-      : `Explore open roles at ${company.name}. Browse engineering, product, and remote jobs—verified listings with early apply links.${remoteClause}`;
+      ? `${open.toLocaleString()} ${company.name} careers and open roles—apply directly on employer career sites.${remoteClause} Listings refresh daily.`
+      : `Explore ${company.name} careers on JobLoom. Browse engineering, product, and remote jobs—verified listings with early apply links.${remoteClause}`;
   const canonical = absoluteUrl(`/company/${slug}`);
   const companyGateEnabled = process.env.SEO_COMPANY_QUALITY_GATE_ENABLED === "true";
   const forceNoindexAll = process.env.SEO_FORCE_NOINDEX_ALL === "true";
