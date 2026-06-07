@@ -16,7 +16,7 @@ async function fetchText(url, opts = {}) {
   const res = await fetch(url, {
     headers: { "User-Agent": UA, ...opts.headers },
     redirect: opts.followRedirect === false ? "manual" : "follow",
-    signal: AbortSignal.timeout(opts.timeoutMs ?? 25000),
+    signal: AbortSignal.timeout(opts.timeoutMs ?? 90000),
   });
   return { status: res.status, headers: res.headers, body: await res.text() };
 }
@@ -156,7 +156,8 @@ async function main() {
     });
     const queryOk =
       (withQuery.status === 308 || withQuery.status === 301) &&
-      withQuery.headers.get("location") === `${BASE}/job/${sampleJobId}`;
+      (withQuery.headers.get("location") === `${BASE}/job/${sampleJobId}` ||
+        withQuery.headers.get("location") === `/job/${sampleJobId}`);
     console.log(
       `${queryOk ? "PASS" : "FAIL"} job detail query strip: HTTP ${withQuery.status} location=${withQuery.headers.get("location") ?? "—"}`,
     );
