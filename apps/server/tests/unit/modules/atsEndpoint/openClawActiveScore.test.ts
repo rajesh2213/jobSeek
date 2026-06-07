@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   applyOpenClawActiveScoreFloor,
   isOpenClawActiveEndpoint,
+  isOpenClawPastActiveCrawlCooldown,
+  openClawActiveCrawlCooldownMs,
   openClawSchedulerPriorityBoost,
 } from "../../../../src/modules/atsEndpoint/openClawActiveScore.js";
 
@@ -30,5 +32,26 @@ describe("openClawActiveScore", () => {
   test("openClawSchedulerPriorityBoost", () => {
     assert.equal(openClawSchedulerPriorityBoost("openclaw", true), 500);
     assert.equal(openClawSchedulerPriorityBoost("job", true), 0);
+  });
+
+  test("isOpenClawPastActiveCrawlCooldown", () => {
+    const prev = process.env.OPENCLAW_ACTIVE_CRAWL_COOLDOWN_MS;
+    process.env.OPENCLAW_ACTIVE_CRAWL_COOLDOWN_MS = String(4 * 60 * 60 * 1000);
+    try {
+      const now = Date.now();
+      assert.equal(isOpenClawPastActiveCrawlCooldown(null, now), true);
+      assert.equal(
+        isOpenClawPastActiveCrawlCooldown(new Date(now - 5 * 60 * 60 * 1000), now),
+        true,
+      );
+      assert.equal(
+        isOpenClawPastActiveCrawlCooldown(new Date(now - 1 * 60 * 60 * 1000), now),
+        false,
+      );
+      assert.equal(openClawActiveCrawlCooldownMs(), 4 * 60 * 60 * 1000);
+    } finally {
+      if (prev === undefined) delete process.env.OPENCLAW_ACTIVE_CRAWL_COOLDOWN_MS;
+      else process.env.OPENCLAW_ACTIVE_CRAWL_COOLDOWN_MS = prev;
+    }
   });
 });

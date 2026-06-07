@@ -10,7 +10,11 @@ import {
   INGEST_ATS_ENDPOINT_QUEUE_NAME,
 } from "../../queues/ats-endpoint.queue.js";
 import { getEndpointPriority } from "./atsEndpointPriority.js";
-import { applyOpenClawActiveScoreFloor, OPENCLAW_SOURCE } from "./openClawActiveScore.js";
+import {
+  applyOpenClawActiveScoreFloor,
+  isOpenClawPastActiveCrawlCooldown,
+  OPENCLAW_SOURCE,
+} from "./openClawActiveScore.js";
 import { assertRequiredSelect, logQueryMetrics } from "../../utils/queryMetrics.js";
 
 /**
@@ -102,11 +106,6 @@ type SchedEp = {
   isActive?: boolean;
 };
 
-function isPastCooldown(lastCrawledAt: Date | null, score: number, nowMs: number): boolean {
-  if (lastCrawledAt == null) return true;
-  return lastCrawledAt.getTime() < nowMs - endpointCooldownMs(score);
-}
-
 /** Always schedule eligible active OpenClaw boards (reserved slots before global pool). */
 async function fetchEligibleOpenClawActiveEndpoints(nowMs: number): Promise<SchedEp[]> {
   const rows = await prisma.atsEndpoint.findMany({
@@ -118,7 +117,7 @@ async function fetchEligibleOpenClawActiveEndpoints(nowMs: number): Promise<Sche
       const score = applyOpenClawActiveScoreFloor(row.score, row.source, row.isActive);
       return { ...row, score };
     })
-    .filter((row) => isPastCooldown(row.lastCrawledAt, row.score, nowMs));
+    .filter((row) => isOpenClawPastActiveCrawlCooldown(row.lastCrawledAt, nowMs));
 
   eligible.sort((a, b) => {
     const d = getEndpointPriority(b) - getEndpointPriority(a);
@@ -248,13 +247,15 @@ async function enqueuePrioritizedIngests(): Promise<void> {
     );
   }
 
+  const enqueueMs = Date.now();
   for (let i = 0; i < top.length; i++) {
     const ep = top[i]!;
     await queue.add(
       INGEST_ATS_ENDPOINT_JOB,
       { endpointId: ep.id },
       {
-        jobId: `sched-ingest-${ep.id}`,
+        // Unique jobId per tick — a failed `sched-ingest-{id}` must not block future crawls.
+        jobId: `sched-ingest-${ep.id}-${enqueueMs}-${i}`,
       },
     );
   }

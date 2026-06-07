@@ -1,6 +1,8 @@
 /**
- * One-shot repair: floor scores for active OpenClaw endpoints and enqueue recrawls.
- * Safe to re-run (idempotent score floor + fresh jobIds).
+ * Repair + optional activation for OpenClaw ATS boards.
+ * - Floors scores for active openclaw endpoints
+ * - Enqueues recrawls with unique jobIds (safe to re-run)
+ * - Optional: OPENCLAW_ACTIVATE_ENDPOINT_ID activates one inactive board first
  */
 import { loadRootEnv } from "../infrastructure/env/loadEnv.js";
 import { prisma } from "../infrastructure/db/prisma.js";
@@ -15,16 +17,44 @@ import {
   INGEST_ATS_ENDPOINT_JOB,
 } from "../queues/ats-endpoint.queue.js";
 
+async function activateOpenClawEndpoint(
+  endpointId: string,
+): Promise<{ id: string; slug: string; score: number } | null> {
+  const before = await prisma.atsEndpoint.findUnique({
+    where: { id: endpointId },
+    select: { id: true, slug: true, source: true, isActive: true, score: true },
+  });
+  if (!before) throw new Error(`endpoint not found: ${endpointId}`);
+  if (before.source !== OPENCLAW_SOURCE) throw new Error("refusing: not openclaw source");
+  if (before.isActive) return { id: before.id, slug: before.slug, score: before.score };
+
+  const score = applyOpenClawActiveScoreFloor(before.score, OPENCLAW_SOURCE, true);
+  const updated = await prisma.atsEndpoint.updateMany({
+    where: { id: endpointId, source: OPENCLAW_SOURCE, isActive: false },
+    data: { isActive: true, score },
+  });
+  if (updated.count !== 1) throw new Error(`activation updated ${updated.count} rows`);
+
+  return { id: before.id, slug: before.slug, score };
+}
+
 async function main(): Promise<void> {
   loadRootEnv();
   const minScore = openClawActiveMinScore();
+  const activateId = process.env.OPENCLAW_ACTIVATE_ENDPOINT_ID?.trim();
+
+  let activated: { id: string; slug: string; score: number } | null = null;
+  if (activateId) {
+    activated = await activateOpenClawEndpoint(activateId);
+  }
+
   const rows = await prisma.atsEndpoint.findMany({
     where: { source: OPENCLAW_SOURCE, isActive: true },
     select: { id: true, slug: true, score: true, lastCrawledAt: true },
   });
 
   if (rows.length === 0) {
-    console.log(JSON.stringify({ message: "no_active_openclaw_endpoints", minScore }));
+    console.log(JSON.stringify({ message: "no_active_openclaw_endpoints", minScore, activated }));
     return;
   }
 
@@ -57,6 +87,7 @@ async function main(): Promise<void> {
     JSON.stringify(
       {
         minScore,
+        activated,
         active_count: rows.length,
         score_updates: scoreUpdates,
         enqueued,
