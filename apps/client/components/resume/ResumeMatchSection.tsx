@@ -7,12 +7,16 @@ import type { JobItem, ResumeMatchAiQuotaState, ResumeSemanticMatchMeta } from "
 import { ApiRequestError, fetchResumeSemanticMatch } from "../../lib/api";
 import {
   trackResumeFirstMatchViewedOnce,
+  trackResumeFitConfidence,
+  trackResumeFitUnavailable,
+  trackResumeFitViewed,
   trackResumeMatchQuotaHit,
-  trackResumeMatchUnscorable,
   trackResumeMatchUpgradeClick,
 } from "../../lib/analytics/resumeMatchFunnel";
+import { confidenceLabel } from "../../lib/resumeFitConfidence";
 import {
   isResumeMatchInsufficient,
+  resumeFitConfidenceLine,
   resumeMatchInsufficientBody,
   resumeMatchInsufficientHint,
   resumeMatchInsufficientTitle,
@@ -69,14 +73,21 @@ function quotaHintLine(
   isPro: boolean,
   meta: ResumeSemanticMatchMeta | null,
   resumeMatchAi: ResumeMatchAiQuotaState | null,
+  semanticUnavailable: boolean,
 ): string | null {
   if (isPro) return null;
+  if (semanticUnavailable) {
+    const resetAt = meta?.quota?.resetAt ?? resumeMatchAi?.resetAt;
+    return resetAt
+      ? `AI enhancement unavailable — next slot after ${formatUserLocalResetForMessage(resetAt)}.`
+      : "AI enhancement unavailable — upgrade for semantic matching.";
+  }
   const q = meta?.quota ?? resumeMatchAi;
   if (!q) return null;
   if (q.remaining <= 0) {
-    return `Free AI matches used — next slot opens after ${formatUserLocalResetForMessage(q.resetAt)}.`;
+    return `AI enhancement unavailable — next slot after ${formatUserLocalResetForMessage(q.resetAt)}.`;
   }
-  return `${q.remaining} free AI match${q.remaining === 1 ? "" : "es"} left in your current window.`;
+  return `${q.remaining} free AI enhancement${q.remaining === 1 ? "" : "s"} left in your current window.`;
 }
 
 export function ResumeMatchSection({ job }: { job: JobItem }) {
@@ -88,13 +99,13 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ScoringResult | null>(null);
   const [matchMeta, setMatchMeta] = useState<ResumeSemanticMatchMeta | null>(null);
-  const [quotaWall, setQuotaWall] = useState<{ resetAt: string } | null>(null);
+  const [semanticUnavailable, setSemanticUnavailable] = useState(false);
   const pendingScoreAfterUploadRef = useRef(false);
 
   useEffect(() => {
     setResult(null);
     setMatchMeta(null);
-    setQuotaWall(null);
+    setSemanticUnavailable(false);
   }, [job.id]);
 
   const runScore = useCallback(async () => {
@@ -106,23 +117,19 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
     const token = await getToken();
     if (!token) return;
 
-    if (!jobHasMatchSignals(job)) {
-      const scored = scoreResume(text, bullets, job, {});
-      setResult(scored);
-      setMatchMeta(null);
-      trackResumeMatchUnscorable({ jobId: job.id });
-      return;
-    }
-
-    if (!isPro && resumeMatchAi && resumeMatchAi.remaining <= 0) {
-      setQuotaWall({ resetAt: resumeMatchAi.resetAt });
-      trackResumeMatchQuotaHit({ remaining: 0, jobId: job.id });
-      return;
-    }
+    const canTrySemantic =
+      isPro || !resumeMatchAi || resumeMatchAi.remaining > 0;
 
     let semantic: Record<string, { bullet: string; similarity: number }> = {};
     let meta: ResumeSemanticMatchMeta | null = null;
-    if (keywordStrings.length && bullets.length) {
+    let skippedSemantic = false;
+
+    if (
+      jobHasMatchSignals(job) &&
+      keywordStrings.length &&
+      bullets.length &&
+      canTrySemantic
+    ) {
       try {
         const res = await fetchResumeSemanticMatch(token, {
           keywords: keywordStrings,
@@ -133,19 +140,55 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
         setMatchMeta(meta);
         void refresh();
       } catch (e) {
-        if (e instanceof ApiRequestError && e.code === "RESUME_MATCH_AI_QUOTA_EXCEEDED" && e.resumeMatchAiQuota) {
-          setQuotaWall({ resetAt: e.resumeMatchAiQuota.resetAt });
+        if (e instanceof ApiRequestError && e.code === "RESUME_MATCH_AI_QUOTA_EXCEEDED") {
+          skippedSemantic = true;
           trackResumeMatchQuotaHit({ remaining: 0, jobId: job.id });
           void refresh();
         }
         semantic = {};
         setMatchMeta(null);
       }
+    } else if (
+      jobHasMatchSignals(job) &&
+      keywordStrings.length &&
+      bullets.length &&
+      !canTrySemantic
+    ) {
+      skippedSemantic = true;
+      trackResumeMatchQuotaHit({ remaining: 0, jobId: job.id });
+      setMatchMeta(null);
+    } else {
+      setMatchMeta(null);
     }
+
+    setSemanticUnavailable(skippedSemantic);
 
     const scored = scoreResume(text, bullets, job, semantic);
     setResult(scored);
-    if (meta && isResumeMatchScored(scored) && scored.score !== null && scored.score > 0) {
+
+    if (!isResumeMatchScored(scored)) {
+      trackResumeFitUnavailable({
+        jobId: job.id,
+        reason: scored.unavailableReason ?? "insufficient_signals",
+      });
+      return;
+    }
+
+    if (scored.score !== null && scored.confidenceLevel) {
+      trackResumeFitViewed({
+        jobId: job.id,
+        score: scored.score,
+        confidence: scored.confidenceLevel,
+        fitTier: scored.fitTier ?? null,
+      });
+      trackResumeFitConfidence({
+        jobId: job.id,
+        confidence: scored.confidenceLevel,
+        signalCount: scored.signalCount ?? 0,
+      });
+    }
+
+    if (meta && scored.score !== null && scored.score > 0) {
       void trackResumeFirstMatchViewedOnce({
         getToken,
         jobId: job.id,
@@ -161,7 +204,7 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
       return;
     }
     setBusy(true);
-    setQuotaWall(null);
+    setSemanticUnavailable(false);
     try {
       await runScore();
     } finally {
@@ -189,7 +232,7 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
   }
 
   const breakdownAllowed = matchMeta?.breakdownAllowed ?? isPro;
-  const hint = quotaHintLine(isPro, matchMeta, resumeMatchAi);
+  const hint = quotaHintLine(isPro, matchMeta, resumeMatchAi, semanticUnavailable);
 
   const openBreakdown = () => {
     if (!breakdownAllowed) {
@@ -200,44 +243,19 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
 
   return (
     <section className="rounded-2xl border border-ink/10 bg-surface/80 p-5 shadow-sm ring-1 ring-ink/5">
-      {quotaWall ? (
+      {!result ? (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-base font-semibold text-ink">
               <span aria-hidden className="mr-1.5">
                 📄
               </span>
-              Free AI match limit reached
-            </p>
-            <p className="mt-1 text-sm text-ink-muted">
-              You have used all free AI resume matches in your current 24-hour window. Upgrade for unlimited matches,
-              full gap analysis, and Smart Apply.
-            </p>
-            <p className="mt-2 text-xs font-medium text-ink/70">
-              Next free slot no earlier than {formatUserLocalResetForMessage(quotaWall.resetAt)}.
-            </p>
-          </div>
-          <Link
-            href="/pricing"
-            onClick={() => trackResumeMatchUpgradeClick({ surface: "resume_match_section_quota_wall", jobId: job.id })}
-            className="shrink-0 rounded-lg bg-brand px-4 py-2.5 text-center text-sm font-semibold text-white no-underline transition-colors hover:bg-brand-hover sm:self-center"
-          >
-            Upgrade to Pro →
-          </Link>
-        </div>
-      ) : !result ? (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-base font-semibold text-ink">
-              <span aria-hidden className="mr-1.5">
-                📄
-              </span>
-              Check your resume match
+              Check your resume fit
             </p>
             <p className="mt-1 text-sm text-ink-muted">
               {isPro
                 ? "See how well your profile fits this role."
-                : "See your AI match score for this role on the free tier — deeper keyword and gap breakdown is Pro-only."}
+                : "See your fit score on the free tier — keyword breakdown and semantic matching are Pro features."}
             </p>
             {hint ? <p className="mt-2 text-xs font-semibold text-brand/90">{hint}</p> : null}
           </div>
@@ -247,14 +265,16 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
             disabled={busy}
             className="shrink-0 rounded-lg border border-[rgba(0,0,0,0.15)] bg-white px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-ink/[0.03] disabled:opacity-60 dark:border-white/20 dark:bg-surface sm:self-center"
           >
-            {busy ? "Scoring…" : "Check match →"}
+            {busy ? "Scoring…" : "Check fit →"}
           </button>
         </div>
       ) : isResumeMatchInsufficient(result) ? (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-lg font-bold text-ink">{resumeMatchInsufficientTitle()}</p>
-            <p className="mt-2 text-sm leading-relaxed text-ink-muted">{resumeMatchInsufficientBody()}</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+              {resumeMatchInsufficientBody(result.unavailableReason)}
+            </p>
             <p className="mt-3 text-xs font-medium text-ink/70">{resumeMatchInsufficientHint()}</p>
           </div>
           <button
@@ -270,16 +290,42 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             {result.score !== null ? <MiniRing score={result.score} /> : null}
             <div className="min-w-0 flex-1">
-              <p className="text-lg font-bold text-ink">You match {result.score}%</p>
+              <p className="text-lg font-bold text-ink">Fit score: {result.score}%</p>
               <p className="mt-1 text-sm font-medium text-ink/90">
                 &ldquo;{resumeMatchSubtitle(result.grade)}&rdquo;
               </p>
+              {result.confidenceLevel ? (
+                <p className="mt-2 text-xs font-semibold text-ink/80">
+                  Confidence: {confidenceLabel(result.confidenceLevel)}
+                </p>
+              ) : null}
+              {result.confidenceLevel ? (
+                <p className="mt-0.5 text-xs text-ink-muted">
+                  {resumeFitConfidenceLine(result.confidenceLevel)}
+                </p>
+              ) : null}
               {isPro ? (
                 <p className="mt-2 text-sm text-ink-muted">
                   {result.matched.length} matched · {result.missing.length} gaps
                 </p>
               ) : null}
               {hint ? <p className="mt-2 text-xs font-semibold text-brand/90">{hint}</p> : null}
+              {semanticUnavailable && !isPro ? (
+                <p className="mt-2 text-xs font-semibold text-brand/90">
+                  <Link
+                    href="/pricing"
+                    onClick={() =>
+                      trackResumeMatchUpgradeClick({
+                        surface: "resume_match_section_semantic",
+                        jobId: job.id,
+                      })
+                    }
+                    className="underline"
+                  >
+                    Upgrade for semantic matching →
+                  </Link>
+                </p>
+              ) : null}
             </div>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">

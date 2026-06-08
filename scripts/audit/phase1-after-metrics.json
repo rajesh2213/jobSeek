@@ -1,0 +1,199 @@
+{
+  "mode": "after",
+  "measuredAt": "2026-06-08T22:10:43.055Z",
+  "totalActivePublishable": 16940,
+  "scorable": 16878,
+  "unscorable": 62,
+  "unscorablePct": "0.37%",
+  "tierBreakdown": {
+    "tier1": 13088,
+    "tier2": 3624,
+    "tier3": 166,
+    "unavailable": 62
+  },
+  "confidenceBreakdown": {
+    "high": 13088,
+    "medium": 3624,
+    "low": 166
+  },
+  "unavailableReasons": {
+    "insufficient_signals": 62
+  },
+  "topRemainingUnavailable": [
+    {
+      "id": "d880a77f-2c96-4c56-95ed-8b4867d1a684",
+      "title": "Senior Lead - Sales Planning",
+      "category": "sales",
+      "descriptionWords": 2,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "9a3844df-9be2-410d-8c25-37648c7e477f",
+      "title": "Senior Lead - Accessories Material Development",
+      "category": "other",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "0858ac69-7e62-4442-aff2-1a1087b05d77",
+      "title": "Lead - Accessories Developer  (Technical) Bags",
+      "category": "engineering",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "575ecb0a-133e-40a7-a2fc-f151cfd8ab04",
+      "title": "Head of Communications - EMEA",
+      "category": "management",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "6a00ec8f-7fca-4964-8c7b-7a86ca9d37f2",
+      "title": "Head of Communications - EMEA",
+      "category": "management",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "ee099841-3a71-4446-a2ff-79a86743f72d",
+      "title": "Senior Lead - Computational And Robotics Engineer, Lightspray",
+      "category": "engineering",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "1cf49927-2aa2-44bb-934d-6915ca9a237e",
+      "title": "Senior Lead - Distribution Center Network Design & Planning",
+      "category": "design",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "67400524-9148-498d-bb59-171b8b3a1fe2",
+      "title": "Senior Lead - Footwear Materials",
+      "category": "other",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "2ba1efa5-7418-4b8a-8bd1-6b28c9f8c44c",
+      "title": "Principal Engineer - Operations Technology",
+      "category": "engineering",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "723c0497-dd61-4de4-a0a4-8317b07ab2bb",
+      "title": "Principal Engineer - Operations Technology",
+      "category": "engineering",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "d46e3450-98c0-40d9-9548-c36c74a28df6",
+      "title": "Lead - Commercial Training Design",
+      "category": "design",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "02f95136-bbe2-4983-8bc6-9a7944cbf4e5",
+      "title": "Head of Color Design",
+      "category": "management",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "cacc4c7c-fd39-4d37-9232-32721283420a",
+      "title": "Lead - Reverse Logistics & Circularity",
+      "category": "operations",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "5cab8e8a-b517-4bcb-8279-825fce00dcc8",
+      "title": "Senior Lead - Global Process Owner IBP",
+      "category": "other",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "7f5a3175-5dad-49ea-8e4e-130180376537",
+      "title": "Lead - Color & Material Designer",
+      "category": "design",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "1fdc280b-00fc-4d91-aa90-09180c4b16d9",
+      "title": "第3事業柱責任者・事業部長 － 物流センター制御統括システム（WES）の新規開発管理・顧客新規開拓・事業グロースまで担当！",
+      "category": "other",
+      "descriptionWords": 3,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "3b73fca1-ff43-4b2f-a22a-78273690cbe3",
+      "title": "Store Leader, Kerry Parkside Shanghai",
+      "category": "other",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "a6a994d3-24cf-4d9b-887d-aa9c55ff1acc",
+      "title": "TEMPLATE",
+      "category": "other",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "d82aa8ef-406f-40f5-8c20-0b53b0f4c652",
+      "title": "Chief of Staff - Retail Strategy",
+      "category": "management",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "032c4c73-ee8f-4b53-9e10-523e809e39db",
+      "title": "Head of Data Science (Commercial AI)",
+      "category": "management",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "5bf210d9-1347-4219-bcd5-752a3944405c",
+      "title": "Store Leader, Dongguan MixC Village",
+      "category": "other",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "ff8299db-a659-4b75-978a-7e387883b92f",
+      "title": "Head of Business & Financial Communication",
+      "category": "management",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "bbcac986-212b-4b88-b1d6-820dcde69b11",
+      "title": "Store Leader, Regent Street",
+      "category": "other",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "fffb4c1b-bc30-424f-acd8-6933cf6cced3",
+      "title": "Associate Store Leader, Madrid",
+      "category": "other",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "68029bcc-47b3-4087-bfd4-9109bbf8e570",
+      "title": "Senior Lead - Data Governance",
+      "category": "other",
+      "descriptionWords": 1,
+      "reason": "insufficient_signals"
+    }
+  ]
+}

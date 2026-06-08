@@ -1,15 +1,17 @@
+import type { FitConfidence } from "./resumeFitConfidence";
+import { confidenceExplanation, confidenceLabel } from "./resumeFitConfidence";
 import type { ResumeMatchGrade, ScoringResult } from "./resumeScorer";
 
 /** Short label (panel header under score ring). */
 export function resumeGradeLabel(grade: ResumeMatchGrade | null): string {
-  if (grade === null) return "Match unavailable";
+  if (grade === null) return "Fit estimate unavailable";
   switch (grade) {
     case "excellent":
-      return "Strong match";
+      return "Strong fit";
     case "good":
-      return "Good match";
+      return "Good fit";
     case "fair":
-      return "Fair match";
+      return "Fair fit";
     default:
       return "Needs work";
   }
@@ -17,25 +19,31 @@ export function resumeGradeLabel(grade: ResumeMatchGrade | null): string {
 
 /** Longer line for job detail match section. */
 export function resumeMatchSubtitle(grade: ResumeMatchGrade | null): string {
-  if (grade === null) return "AI match analysis isn't available for this role right now";
+  if (grade === null) return "Fit estimate isn't available for this role right now";
   switch (grade) {
     case "excellent":
-      return "Strong match for this role";
+      return "Strong fit for this role";
     case "good":
-      return "Good match for this role";
+      return "Good fit for this role";
     case "fair":
-      return "Fair match for this role";
+      return "Fair fit for this role";
     default:
       return "Needs work to match this role";
   }
 }
 
 export function resumeMatchInsufficientTitle(): string {
-  return "Match unavailable";
+  return "Fit estimate unavailable";
 }
 
-export function resumeMatchInsufficientBody(): string {
-  return "We couldn't run an AI match analysis for this posting right now. That usually means the job description is too thin for our model—not a problem with your resume.";
+export function resumeMatchInsufficientBody(reason?: string | null): string {
+  if (reason === "empty_title" || reason === "empty_description") {
+    return "This job posting doesn't have enough information for a fit estimate. That's a data issue with the listing—not your resume.";
+  }
+  if (reason === "insufficient_signals") {
+    return "We couldn't extract enough job signals from this posting to produce a fit estimate.";
+  }
+  return "We couldn't produce a fit estimate for this posting right now.";
 }
 
 export function resumeMatchInsufficientHint(): string {
@@ -44,6 +52,11 @@ export function resumeMatchInsufficientHint(): string {
 
 export function resumeMatchInsufficientPanelNote(): string {
   return "Re-uploading your resume usually won't change this result for this specific posting.";
+}
+
+export function resumeFitConfidenceLine(confidence: FitConfidence | null | undefined): string | null {
+  if (!confidence) return null;
+  return `Confidence: ${confidenceLabel(confidence)} — ${confidenceExplanation(confidence)}`;
 }
 
 export function isResumeMatchInsufficient(result: ScoringResult): boolean {

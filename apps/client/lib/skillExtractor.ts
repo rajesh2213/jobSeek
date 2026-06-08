@@ -11,7 +11,9 @@ export type JobSkillSource =
   | "parsed_requirement"
   | "sparse_requirement"
   | "sparse_responsibility"
-  | "role_hint";
+  | "role_hint"
+  | "description_fallback"
+  | "title_family";
 
 export interface JobSkill {
   canonical: string;

@@ -1,5 +1,12 @@
 import type { JobItem } from "./api";
 import {
+  confidenceForFitTier,
+  type FitConfidence,
+  type FitSignalMetadata,
+  type FitTier,
+  type FitUnavailableReason,
+} from "./resumeFitConfidence";
+import {
   getCanonicalsFromRequirementLine,
   getCanonicalsFromTextLine,
   normalizeKeywordForMatch,
@@ -19,9 +26,14 @@ import {
 /** Minimum signals before we treat a job as scorable (primary or fallback). */
 export const MIN_JOB_MATCH_SIGNALS = 3;
 
+/** Minimum plain-text description length to attempt fit scoring. */
+const MIN_DESCRIPTION_CHARS = 10;
+
 const W_SPARSE_REQ = 0.65;
 const W_SPARSE_RESP = 0.55;
+const W_DESCRIPTION = 0.55;
 const W_ROLE_HINT = 0.6;
+const W_TITLE_FAMILY = 0.55;
 
 const PHRASE_STOP = new Set(
   `a an the and or but if in on at to for of as is are was were be been being
@@ -47,6 +59,11 @@ cross functional
 data driven
 machine learning
 deep learning
+patient care
+health insurance
+medical billing
+sales pipeline
+quality control
 `
     .toLowerCase()
     .split("\n")
@@ -64,6 +81,7 @@ roadmap okrs kpi kpis seo sem ppc
 salesforce hubspot zendesk intercom
 kubernetes docker aws azure gcp
 react typescript javascript nodejs postgresql mongodb redis
+recruiting negotiation accounting healthcare compliance
 `
     .toLowerCase()
     .split(/\s+/)
@@ -104,7 +122,121 @@ const ROLE_HINT_PACKS: RoleHintPack[] = [
     pattern: /\bcustomer\s*success\b|\baccount\s*manager\b/i,
     skills: ["salesforce", "crm", "zendesk", "hubspot", "analytics"],
   },
+  {
+    pattern:
+      /\b(software|backend|frontend|full[\s-]?stack|platform|devops|sre|site\s*reliability|ml|machine\s*learning)\s*(engineer|developer|architect)\b/i,
+    skills: ["software development", "git", "agile", "testing", "python", "sql"],
+  },
+  {
+    pattern: /\b(data\s*engineer|data\s*scientist|analytics\s*engineer)\b/i,
+    skills: ["python", "sql", "analytics", "machine learning", "postgresql"],
+  },
+  {
+    pattern:
+      /\b(account\s*executive|sales\s*(representative|rep|executive)|business\s*development|bdr\b|sdr\b|field\s*sales)\b/i,
+    skills: ["sales pipeline", "crm", "negotiation", "customer relationships", "excel"],
+  },
+  {
+    pattern: /\b(sales\s*associate|retail\s*associate|store\s*associate|cashier)\b/i,
+    skills: ["retail sales", "customer service", "inventory", "point of sale"],
+  },
+  {
+    pattern:
+      /\b(patient\s*access|medical\s*records|health\s*information|prior\s*auth|registration\s*clerk|intake\s*coordinator)\b/i,
+    skills: ["patient registration", "medical billing", "health insurance", "customer service"],
+  },
+  {
+    pattern:
+      /\b(physical\s*therapist|occupational\s*therapist|registered\s*nurse|rn\b|nurse\s*practitioner|clinical|therapist|pharmacist)\b/i,
+    skills: ["patient care", "clinical documentation", "healthcare compliance", "medical records"],
+  },
+  {
+    pattern: /\b(recruiter|talent\s*acquisition|hr\s*generalist|human\s*resources)\b/i,
+    skills: ["recruiting", "interviewing", "applicant tracking", "onboarding"],
+  },
+  {
+    pattern: /\b(consultant|consulting|advisory|advisor|adviser)\b/i,
+    skills: ["client engagement", "stakeholder management", "analytics", "communication"],
+  },
+  {
+    pattern:
+      /\b(program\s*officer|project\s*officer|implementation\s*officer|field\s*officer|monitoring\s*officer)\b/i,
+    skills: ["project coordination", "stakeholder management", "reporting", "communication"],
+  },
+  {
+    pattern: /\b(producer|production\s*coordinator|studio\s*producer|multimedia\s*producer)\b/i,
+    skills: ["project coordination", "content production", "communication", "planning"],
+  },
+  {
+    pattern: /\b(customer\s*(service|support|experience)|call\s*center|contact\s*center)\b/i,
+    skills: ["customer service", "conflict resolution", "crm", "communication"],
+  },
+  {
+    pattern: /\b(assembler|warehouse|machine\s*operator|production\s*worker|manufacturing)\b/i,
+    skills: ["quality control", "safety procedures", "production line", "inventory"],
+  },
+  {
+    pattern: /\bintern\b/i,
+    skills: ["communication", "team collaboration", "learning agility", "microsoft office"],
+  },
+  {
+    pattern:
+      /\b(supervisor|team\s*lead|coordinator|specialist|director|manager|executive|officer)\b/i,
+    skills: ["team leadership", "project coordination", "communication", "planning"],
+  },
 ];
+
+export interface JobMatchResolution {
+  skills: JobSkill[];
+  fitTier: FitTier | null;
+  confidence: FitConfidence | null;
+  signalCount: number;
+  sourceBreakdown: FitSignalMetadata["sourceBreakdown"];
+  unavailableReason: FitUnavailableReason | null;
+}
+
+function stripHtml(raw: string): string {
+  return raw
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#?\w+;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function normalizedJobDescription(raw: string | null | undefined): string {
+  return stripHtml(raw ?? "");
+}
+
+/** Text corpus for fit signals: full description, card previews, then parsed buckets. */
+export function jobDescriptionCorpus(job: JobItem): string {
+  const chunks: string[] = [];
+  const desc = normalizedJobDescription(job.description);
+  if (desc.length >= MIN_DESCRIPTION_CHARS) chunks.push(desc);
+  if (job.previewLines?.length) {
+    chunks.push(job.previewLines.map((line) => stripHtml(line)).join("\n"));
+  }
+  const pd = job.parsedDescription;
+  if (pd) {
+    for (const line of pd.requirement ?? []) chunks.push(line);
+    for (const line of pd.responsibility ?? []) chunks.push(line);
+    for (const line of pd.experience ?? []) chunks.push(line);
+    for (const line of pd.position ?? []) chunks.push(line);
+    for (const line of pd.other ?? []) chunks.push(line);
+  }
+  return chunks.join("\n").replace(/\s+/g, " ").trim();
+}
+
+export function getFitUnavailableReason(job: JobItem): FitUnavailableReason | null {
+  if (!job.title?.trim()) return "empty_title";
+  if (jobDescriptionCorpus(job).length < MIN_DESCRIPTION_CHARS) return "empty_description";
+  return null;
+}
 
 function cleanToken(w: string): string {
   return w
@@ -159,10 +291,14 @@ function sortAndCap(skills: JobSkill[]): JobSkill[] {
     .slice(0, MAX_RESUME_MATCH_KEYWORDS);
 }
 
-function collectSparseFallbackSkills(job: JobItem): JobSkill[] {
+function collectSignalsFromLines(
+  lines: string[],
+  source: JobSkillSource,
+  weight: number,
+): JobSkill[] {
   const byKey = new Map<string, JobSkill>();
 
-  const add = (raw: string, source: JobSkillSource, weight: number) => {
+  const add = (raw: string) => {
     const key = normalizeKeywordForMatch(raw);
     if (!isSparseFallbackKeyword(key)) return;
     if (!byKey.has(key)) {
@@ -170,38 +306,66 @@ function collectSparseFallbackSkills(job: JobItem): JobSkill[] {
     }
   };
 
-  for (const line of job.parsedDescription?.requirement ?? []) {
+  for (const line of lines) {
     for (const { canonical } of getCanonicalsFromRequirementLine(line)) {
-      add(canonical, "sparse_requirement", W_SPARSE_REQ);
+      add(canonical);
     }
     for (const token of tokenizeLine(line)) {
-      add(token, "sparse_requirement", W_SPARSE_REQ);
+      add(token);
     }
     for (const phrase of bigramsFromLine(line)) {
-      add(phrase, "sparse_requirement", W_SPARSE_REQ);
-    }
-  }
-
-  for (const line of job.parsedDescription?.responsibility ?? []) {
-    for (const { canonical } of getCanonicalsFromRequirementLine(line)) {
-      add(canonical, "sparse_responsibility", W_SPARSE_RESP);
-    }
-    for (const phrase of bigramsFromLine(line)) {
-      add(phrase, "sparse_responsibility", W_SPARSE_RESP);
-    }
-  }
-
-  for (const raw of job.skills ?? []) {
-    for (const { canonical } of getCanonicalsFromTextLine(raw)) {
-      add(canonical, "sparse_requirement", W_SPARSE_REQ);
+      add(phrase);
     }
   }
 
   return [...byKey.values()];
 }
 
-function collectRoleHintSkills(job: JobItem): JobSkill[] {
-  const haystack = `${job.title} ${job.role ?? ""}`.toLowerCase();
+function collectSparseFallbackSkills(job: JobItem): JobSkill[] {
+  const parts: string[] = [];
+  for (const line of job.parsedDescription?.requirement ?? []) parts.push(line);
+  for (const line of job.parsedDescription?.responsibility ?? []) parts.push(line);
+
+  const byKey = new Map<string, JobSkill>();
+  for (const s of collectSignalsFromLines(parts, "sparse_requirement", W_SPARSE_REQ)) {
+    byKey.set(s.canonical, s);
+  }
+  for (const s of collectSignalsFromLines(
+    job.parsedDescription?.responsibility ?? [],
+    "sparse_responsibility",
+    W_SPARSE_RESP,
+  )) {
+    if (!byKey.has(s.canonical)) byKey.set(s.canonical, s);
+  }
+
+  for (const raw of job.skills ?? []) {
+    for (const { canonical } of getCanonicalsFromTextLine(raw)) {
+      const key = normalizeKeywordForMatch(canonical);
+      if (isSparseFallbackKeyword(key) && !byKey.has(key)) {
+        byKey.set(key, { canonical: key, source: "sparse_requirement", weight: W_SPARSE_REQ });
+      }
+    }
+  }
+
+  return [...byKey.values()];
+}
+
+function collectDescriptionFallbackSkills(job: JobItem): JobSkill[] {
+  const chunks: string[] = [];
+  const desc = normalizedJobDescription(job.description);
+  if (desc.length >= MIN_DESCRIPTION_CHARS) chunks.push(desc);
+  if (job.previewLines?.length) {
+    chunks.push(...job.previewLines.map((line) => stripHtml(line)).filter(Boolean));
+  }
+  const text = chunks.join("\n").trim();
+  if (text.length < MIN_DESCRIPTION_CHARS) return [];
+  const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) lines.push(text);
+  return collectSignalsFromLines(lines, "description_fallback", W_DESCRIPTION);
+}
+
+function collectTitleFamilySkills(job: JobItem): JobSkill[] {
+  const haystack = `${job.title} ${job.role ?? ""}`;
   const out: JobSkill[] = [];
   const seen = new Set<string>();
 
@@ -209,33 +373,137 @@ function collectRoleHintSkills(job: JobItem): JobSkill[] {
     if (!pack.pattern.test(haystack)) continue;
     for (const skill of pack.skills) {
       const key = normalizeKeywordForMatch(skill);
-      if (seen.has(key) || !isSparseFallbackKeyword(key)) continue;
+      if (seen.has(key)) continue;
       seen.add(key);
-      out.push({ canonical: key, source: "role_hint", weight: W_ROLE_HINT });
+      out.push({ canonical: key, source: "title_family", weight: W_TITLE_FAMILY });
     }
   }
 
   return out;
 }
 
+/** @deprecated Use collectTitleFamilySkills — kept for tests referencing role hints. */
+function collectRoleHintSkills(job: JobItem): JobSkill[] {
+  return collectTitleFamilySkills(job);
+}
+
+function countSourceBreakdown(skills: JobSkill[]): FitSignalMetadata["sourceBreakdown"] {
+  const breakdown = {
+    taxonomy: 0,
+    enriched: 0,
+    parsed: 0,
+    description: 0,
+    titleFamily: 0,
+  };
+  for (const s of skills) {
+    if (s.source === "taxonomy") breakdown.taxonomy++;
+    else if (s.source === "enriched") breakdown.enriched++;
+    else if (
+      s.source === "parsed_requirement" ||
+      s.source === "sparse_requirement" ||
+      s.source === "sparse_responsibility"
+    ) {
+      breakdown.parsed++;
+    } else if (s.source === "description_fallback") breakdown.description++;
+    else if (s.source === "title_family" || s.source === "role_hint") breakdown.titleFamily++;
+  }
+  return breakdown;
+}
+
+function tier1Skills(job: JobItem): JobSkill[] {
+  const merged = new Map<string, JobSkill>();
+  mergeSkills(merged, extractJobSkills(job));
+  mergeSkills(merged, collectSparseFallbackSkills(job));
+  return sortAndCap([...merged.values()]);
+}
+
+export function resolveJobMatchSkillsWithMeta(job: JobItem): JobMatchResolution {
+  const hardFail = getFitUnavailableReason(job);
+  if (hardFail) {
+    return {
+      skills: [],
+      fitTier: null,
+      confidence: null,
+      signalCount: 0,
+      sourceBreakdown: {
+        taxonomy: 0,
+        enriched: 0,
+        parsed: 0,
+        description: 0,
+        titleFamily: 0,
+      },
+      unavailableReason: hardFail,
+    };
+  }
+
+  const tier1 = tier1Skills(job);
+  if (tier1.length >= MIN_JOB_MATCH_SIGNALS) {
+    return {
+      skills: tier1,
+      fitTier: 1,
+      confidence: confidenceForFitTier(1),
+      signalCount: tier1.length,
+      sourceBreakdown: countSourceBreakdown(tier1),
+      unavailableReason: null,
+    };
+  }
+
+  const merged2 = new Map<string, JobSkill>();
+  for (const s of tier1) merged2.set(s.canonical, s);
+  mergeSkills(merged2, collectDescriptionFallbackSkills(job));
+  const tier2 = sortAndCap([...merged2.values()]);
+  if (tier2.length >= MIN_JOB_MATCH_SIGNALS) {
+    return {
+      skills: tier2,
+      fitTier: 2,
+      confidence: confidenceForFitTier(2),
+      signalCount: tier2.length,
+      sourceBreakdown: countSourceBreakdown(tier2),
+      unavailableReason: null,
+    };
+  }
+
+  const merged3 = new Map<string, JobSkill>();
+  for (const s of tier2) merged3.set(s.canonical, s);
+  mergeSkills(merged3, collectTitleFamilySkills(job));
+  const tier3 = sortAndCap([...merged3.values()]);
+  if (tier3.length >= MIN_JOB_MATCH_SIGNALS) {
+    return {
+      skills: tier3,
+      fitTier: 3,
+      confidence: confidenceForFitTier(3),
+      signalCount: tier3.length,
+      sourceBreakdown: countSourceBreakdown(tier3),
+      unavailableReason: null,
+    };
+  }
+
+  if (tier3.length > 0) {
+    return {
+      skills: tier3,
+      fitTier: 3,
+      confidence: confidenceForFitTier(3),
+      signalCount: tier3.length,
+      sourceBreakdown: countSourceBreakdown(tier3),
+      unavailableReason: null,
+    };
+  }
+
+  return {
+    skills: [],
+    fitTier: null,
+    confidence: null,
+    signalCount: 0,
+    sourceBreakdown: countSourceBreakdown([]),
+    unavailableReason: "insufficient_signals",
+  };
+}
+
 /**
- * Resolve scorable job signals: dictionary skills first, then sparse JD fallback, then title role hints.
+ * Resolve scorable job signals: tier 1 structured, tier 2 description, tier 3 title family.
  */
 export function resolveJobMatchSkills(job: JobItem): JobSkill[] {
-  const merged = new Map<string, JobSkill>();
-
-  mergeSkills(merged, extractJobSkills(job));
-  if (merged.size >= MIN_JOB_MATCH_SIGNALS) {
-    return sortAndCap([...merged.values()]);
-  }
-
-  mergeSkills(merged, collectSparseFallbackSkills(job));
-  if (merged.size >= MIN_JOB_MATCH_SIGNALS) {
-    return sortAndCap([...merged.values()]);
-  }
-
-  mergeSkills(merged, collectRoleHintSkills(job));
-  return sortAndCap([...merged.values()]);
+  return resolveJobMatchSkillsWithMeta(job).skills;
 }
 
 /** Canonicals / keywords for semantic match API (stable order). */
@@ -244,5 +512,8 @@ export function jobMatchSignalsForSemantic(job: JobItem): string[] {
 }
 
 export function jobHasResolvableMatchSignals(job: JobItem): boolean {
-  return resolveJobMatchSkills(job).length > 0;
+  const resolution = resolveJobMatchSkillsWithMeta(job);
+  return resolution.skills.length > 0 && resolution.unavailableReason === null;
 }
+
+export { collectRoleHintSkills };

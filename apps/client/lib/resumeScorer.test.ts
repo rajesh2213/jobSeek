@@ -27,6 +27,8 @@ function minimalJob(overrides: Partial<JobItem> = {}): JobItem {
     employmentType: "full_time",
     postedAt: "2026-05-01T00:00:00.000Z",
     skills: [],
+    description:
+      "Experience with SQL analytics, agile delivery, cross-functional collaboration, and stakeholder management.",
     parsedDescription: emptyParsedDescription,
     ...overrides,
   } as JobItem;
@@ -37,9 +39,11 @@ test("jobHasMatchSignals: true for PM title via role hints when dictionary empty
   assert.equal(jobHasMatchSignals(job), true);
 });
 
-test("jobHasMatchSignals: false when no dictionary, JD, or role hints", () => {
+test("jobHasMatchSignals: false when no dictionary, JD, or text corpus", () => {
   const job = minimalJob({
     title: "Team Member",
+    description: "",
+    previewLines: [],
     parsedDescription: emptyParsedDescription,
   });
   assert.equal(jobHasMatchSignals(job), false);
@@ -64,7 +68,12 @@ test("scoreResume: insufficient_job_signals when no resolvable signals", () => {
   const result = scoreResume(
     "Built React apps",
     ["Led product roadmap"],
-    minimalJob({ title: "Team Member", parsedDescription: emptyParsedDescription }),
+    minimalJob({
+      title: "Team Member",
+      description: "",
+      previewLines: [],
+      parsedDescription: emptyParsedDescription,
+    }),
   );
   assert.equal(result.matchAvailability, "insufficient_job_signals");
   assert.equal(result.score, null);

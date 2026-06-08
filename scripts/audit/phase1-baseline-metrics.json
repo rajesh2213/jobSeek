@@ -1,0 +1,199 @@
+{
+  "mode": "baseline",
+  "measuredAt": "2026-06-08T22:04:23.898Z",
+  "totalActivePublishable": 16894,
+  "scorable": 13418,
+  "unscorable": 3476,
+  "unscorablePct": "20.58%",
+  "tierBreakdown": {
+    "tier1": 13418,
+    "tier2": 0,
+    "tier3": 0,
+    "unavailable": 3476
+  },
+  "confidenceBreakdown": {
+    "high": 13418,
+    "medium": 0,
+    "low": 0
+  },
+  "unavailableReasons": {
+    "insufficient_signals": 3476
+  },
+  "topRemainingUnavailable": [
+    {
+      "id": "ab35e17c-3dc7-4f6e-90e8-562d7e5813be",
+      "title": "Account Executive, Bilingual",
+      "category": "sales",
+      "descriptionWords": 10,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "67a88309-90e3-461d-8235-d09f13234378",
+      "title": "Account Executive",
+      "category": "sales",
+      "descriptionWords": 8,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "a6f8dc9a-fa3f-45aa-9df8-15a4a01dbdde",
+      "title": "Senior Staff Machine Learning Engineer, Guest & Host",
+      "category": "data",
+      "descriptionWords": 10,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "b56314d0-e0e4-4d60-9b6b-a2a7ffbca83a",
+      "title": "Software Quality Operations Specialist",
+      "category": "engineering",
+      "descriptionWords": 10,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "8b50336c-7305-4524-a1c1-2df6cd69d52b",
+      "title": "GTM Engineer",
+      "category": "engineering",
+      "descriptionWords": 11,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "b2a6399a-eb73-420e-a3f7-4ca8058151c7",
+      "title": "Personal Injury Attorney, Massachusetts",
+      "category": "legal",
+      "descriptionWords": 12,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "68ae7ad8-ccb8-48ae-b582-411922244528",
+      "title": "Delivery Consultant",
+      "category": "other",
+      "descriptionWords": 11,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "a3adeae4-9ade-4952-b450-423cfd4bf45a",
+      "title": "Part Time Recruiter",
+      "category": "hr",
+      "descriptionWords": 8,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "42245d2a-b9f7-4928-84f8-38e96faf2e9e",
+      "title": "Associate Recruiter",
+      "category": "hr",
+      "descriptionWords": 11,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "67e003e9-310f-48d4-a371-9ef41d93bb9d",
+      "title": "Medium Enterprise Account Executive",
+      "category": "sales",
+      "descriptionWords": 1110,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "ac556b64-1ee7-48bb-8bf7-237767f8d1b8",
+      "title": "Large Enterprise Customer Base Account Executive - Healthcare",
+      "category": "sales",
+      "descriptionWords": 1052,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "34459dad-1298-4c9e-800a-c16b747e2c17",
+      "title": "Director Partnership Success",
+      "category": "other",
+      "descriptionWords": 1774,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "6c7a4027-97a4-4d5d-a714-9171c21ef5c0",
+      "title": "Supervisor, Patient Access & Pre-Access",
+      "category": "other",
+      "descriptionWords": 1140,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "b258133e-66e6-4df6-99d7-b100c2b28823",
+      "title": "Supervisor, Patient Access & Pre-Access",
+      "category": "other",
+      "descriptionWords": 1140,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "be057392-9180-415d-b540-075e7d72781a",
+      "title": "Supervisor, Patient Access & Pre-Access",
+      "category": "other",
+      "descriptionWords": 1140,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "f014b7e3-dc5d-4ac4-a05e-332ddaf4283d",
+      "title": "Engineer II, FHIR",
+      "category": "engineering",
+      "descriptionWords": 92,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "b80ae070-7a4c-42c0-b101-50168a4fa11c",
+      "title": "Associate Specialist, Patient Access - PRN",
+      "category": "other",
+      "descriptionWords": 1047,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "1b817587-8254-4c63-adf8-8bc6a3e9c2a3",
+      "title": "TAM Enterprise",
+      "category": "other",
+      "descriptionWords": 315,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "43b67d5f-f6e7-42ce-9c81-7f83ebd0a5bf",
+      "title": "Principal SME",
+      "category": "other",
+      "descriptionWords": 682,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "ed7a2091-9b69-4faf-8cf3-830906890d7e",
+      "title": "Vice President, Product Management – CNAPP, AppSec and AI Security",
+      "category": "management",
+      "descriptionWords": 919,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "eb2d37c6-71a0-411a-a481-c9e025422940",
+      "title": "Sr Software Engineer",
+      "category": "engineering",
+      "descriptionWords": 397,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "098ad3b2-4857-40f6-82a2-a345eddfe4a0",
+      "title": "Director, SOX",
+      "category": "other",
+      "descriptionWords": 446,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "6427e989-da6e-40c0-9db3-867dd24e7d82",
+      "title": "Senior Security Research Engineer",
+      "category": "research",
+      "descriptionWords": 423,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "84b2bd09-9938-461b-b050-23ab8fb237e3",
+      "title": "Lead Workday HCM Engineer",
+      "category": "engineering",
+      "descriptionWords": 238,
+      "reason": "insufficient_signals"
+    },
+    {
+      "id": "10120920-6992-4f9b-81bd-58b2cc6a1cec",
+      "title": "Customer Service Representative",
+      "category": "other",
+      "descriptionWords": 490,
+      "reason": "insufficient_signals"
+    }
+  ]
+}

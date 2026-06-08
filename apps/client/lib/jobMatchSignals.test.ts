@@ -25,15 +25,24 @@ function minimalJob(overrides: Partial<JobItem> = {}): JobItem {
     location: "India",
     role: "product-manager",
     skills: [],
+    description:
+      "Experience with SQL analytics, agile delivery, cross-functional collaboration, and stakeholder management.",
     parsedDescription: emptyParsedDescription,
     ...overrides,
   } as JobItem;
 }
 
-test("resolveJobMatchSkills: role hints for PM title when dictionary empty", () => {
+test("resolveJobMatchSkills: PM title scorable when dictionary empty", () => {
   const skills = resolveJobMatchSkills(minimalJob());
   assert.ok(skills.length >= MIN_JOB_MATCH_SIGNALS);
-  assert.ok(skills.some((s) => s.source === "role_hint"));
+  assert.ok(
+    skills.some(
+      (s) =>
+        s.source === "title_family" ||
+        s.source === "role_hint" ||
+        s.source === "description_fallback",
+    ),
+  );
   assert.ok(skills.some((s) => s.canonical === "agile" || s.canonical === "sql"));
 });
 
@@ -60,14 +69,29 @@ test("resolveJobMatchSkills: sparse JD fallback from requirements", () => {
   );
 });
 
-test("jobHasResolvableMatchSignals: false only when title and JD lack all signals", () => {
+test("jobHasResolvableMatchSignals: false when title and corpus lack signals", () => {
   assert.equal(
     jobHasResolvableMatchSignals(
       minimalJob({
         title: "Team Member",
+        description: "",
+        previewLines: [],
         parsedDescription: emptyParsedDescription,
       }),
     ),
     false,
   );
+});
+
+test("resolveJobMatchSkills: description fallback when parsed buckets empty", () => {
+  const skills = resolveJobMatchSkills(
+    minimalJob({
+      title: "Operations Coordinator",
+      parsedDescription: emptyParsedDescription,
+      description:
+        "Requirements include SQL reporting, agile project delivery, Jira tracking, and excel dashboards for operations.",
+    }),
+  );
+  assert.ok(skills.length >= MIN_JOB_MATCH_SIGNALS);
+  assert.ok(skills.some((s) => s.source === "description_fallback"));
 });

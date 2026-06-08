@@ -93,3 +93,40 @@ export function trackResumeMatchUnscorable(params: { jobId: string }): void {
     ...attributionCustomData(),
   });
 }
+
+/** Fit score viewed with confidence tier (Phase 1). */
+export function trackResumeFitViewed(params: {
+  jobId: string;
+  score: number;
+  confidence: string;
+  fitTier: number | null;
+}): void {
+  trackMetaCustom("ResumeFitViewed", {
+    job_id: params.jobId,
+    score: String(params.score),
+    confidence: params.confidence,
+    fit_tier: params.fitTier == null ? "" : String(params.fitTier),
+    ...attributionCustomData(),
+  });
+}
+
+export function trackResumeFitUnavailable(params: { reason: string; jobId?: string }): void {
+  trackMetaCustom("ResumeFitUnavailable", {
+    reason: params.reason,
+    ...(params.jobId ? { job_id: params.jobId } : {}),
+    ...attributionCustomData(),
+  });
+}
+
+export function trackResumeFitConfidence(params: {
+  confidence: string;
+  signalCount: number;
+  jobId?: string;
+}): void {
+  trackMetaCustom("ResumeFitConfidence", {
+    confidence: params.confidence,
+    signal_count: String(params.signalCount),
+    ...(params.jobId ? { job_id: params.jobId } : {}),
+    ...attributionCustomData(),
+  });
+}

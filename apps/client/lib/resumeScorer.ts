@@ -15,9 +15,11 @@ import {
   computeSofterMissingMass,
   computeSofterScorePercent,
 } from "./resumeScoreSoftening";
+import type { FitConfidence, FitTier, FitUnavailableReason } from "./resumeFitConfidence";
 import {
   jobHasResolvableMatchSignals,
   resolveJobMatchSkills,
+  resolveJobMatchSkillsWithMeta,
 } from "./jobMatchSignals";
 import { jobSkillCanonicalsForSemantic, type JobSkill } from "./skillExtractor";
 
@@ -25,6 +27,8 @@ export {
   jobHasResolvableMatchSignals as jobHasMatchSignals,
   jobMatchSignalsForSemantic,
   resolveJobMatchSkills,
+  resolveJobMatchSkillsWithMeta,
+  getFitUnavailableReason,
   MIN_JOB_MATCH_SIGNALS,
 } from "./jobMatchSignals";
 
@@ -74,6 +78,10 @@ export interface ScoringResult {
     preferred: { matched: number; total: number };
   };
   topMissingKeywords: string[]; // up to 10, highest-priority missing
+  confidenceLevel?: FitConfidence | null;
+  signalCount?: number;
+  fitTier?: FitTier | null;
+  unavailableReason?: FitUnavailableReason | null;
   debug?: {
     extractedCanonicals: string[];
     matchedCanonicals: string[];
@@ -108,8 +116,11 @@ function jobHasMatchSignalsInternal(job: JobItem): boolean {
   return jobHasResolvableMatchSignals(job);
 }
 
-function buildInsufficientJobSignalsResult(jobId: string): ScoringResult {
-  const ck = insufficientCacheKey(jobId, isLegacyResumeScoring());
+function buildInsufficientJobSignalsResult(
+  jobId: string,
+  unavailableReason: FitUnavailableReason | null = "insufficient_signals",
+): ScoringResult {
+  const ck = `${insufficientCacheKey(jobId, isLegacyResumeScoring())}|r=${unavailableReason ?? "none"}`;
   const cached = scoreCache.get(ck);
   if (cached) return cached;
 
@@ -125,6 +136,10 @@ function buildInsufficientJobSignalsResult(jobId: string): ScoringResult {
       preferred: { matched: 0, total: 0 },
     },
     topMissingKeywords: [],
+    confidenceLevel: null,
+    signalCount: 0,
+    fitTier: null,
+    unavailableReason,
   };
   scoreCache.set(ck, result);
   return result;
@@ -158,7 +173,9 @@ export function getCachedScore(
 
 function jobSkillToKeywordResultBase(s: JobSkill): Omit<KeywordResult, "foundIn" | "suggestion"> {
   const isPreferred =
-    s.source === "parsed_requirement" || s.source === "sparse_responsibility";
+    s.source === "parsed_requirement" ||
+    s.source === "sparse_responsibility" ||
+    s.source === "description_fallback";
   return {
     keyword: s.canonical,
     category: isPreferred ? "preferred" : "required",
@@ -241,7 +258,11 @@ function scoreResumeSkills(
   job: JobItem,
   semanticMatches: Record<string, { bullet: string; similarity: number }>,
 ): ScoringResult {
-  const skills = resolveJobMatchSkills(job);
+  const resolution = resolveJobMatchSkillsWithMeta(job);
+  if (resolution.skills.length === 0 || resolution.unavailableReason) {
+    return buildInsufficientJobSignalsResult(job.id, resolution.unavailableReason);
+  }
+  const skills = resolution.skills;
   const ck = cacheKey(job.id, false, semanticMatches);
   const cached = scoreCache.get(ck);
   if (cached) return cached;
@@ -329,17 +350,27 @@ function scoreResumeSkills(
     matched,
     missing,
     partial,
+    confidenceLevel: resolution.confidence,
+    signalCount: resolution.signalCount,
+    fitTier: resolution.fitTier,
+    unavailableReason: null,
     breakdown: {
       required: {
         matched: matched.filter((k) => k.category === "required").length,
         total: skills.filter(
-          (s) => s.source !== "parsed_requirement" && s.source !== "sparse_responsibility",
+          (s) =>
+            s.source !== "parsed_requirement" &&
+            s.source !== "sparse_responsibility" &&
+            s.source !== "description_fallback",
         ).length,
       },
       preferred: {
         matched: matched.filter((k) => k.category === "preferred").length,
         total: skills.filter(
-          (s) => s.source === "parsed_requirement" || s.source === "sparse_responsibility",
+          (s) =>
+            s.source === "parsed_requirement" ||
+            s.source === "sparse_responsibility" ||
+            s.source === "description_fallback",
         ).length,
       },
     },
@@ -477,10 +508,10 @@ export function scoreResume(
   job: JobItem,
   semanticMatches: Record<string, { bullet: string; similarity: number }> = {},
 ): ScoringResult {
-  if (!jobHasMatchSignalsInternal(job)) {
-    return buildInsufficientJobSignalsResult(job.id);
-  }
   if (isLegacyResumeScoring()) {
+    if (!jobHasMatchSignalsInternal(job)) {
+      return buildInsufficientJobSignalsResult(job.id);
+    }
     return scoreResumeLegacy(resumeText, resumeBullets, job, semanticMatches);
   }
   return scoreResumeSkills(resumeText, resumeBullets, job, semanticMatches);

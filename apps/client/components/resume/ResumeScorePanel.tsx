@@ -6,8 +6,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { JobItem } from "../../lib/api";
 import { trackResumeMatchUpgradeClick } from "../../lib/analytics/resumeMatchFunnel";
+import { confidenceLabel } from "../../lib/resumeFitConfidence";
 import {
   isResumeMatchInsufficient,
+  resumeFitConfidenceLine,
   resumeGradeLabel,
   resumeMatchInsufficientBody,
   resumeMatchInsufficientHint,
@@ -227,13 +229,25 @@ export function ResumeScorePanel({
                     <p className="mt-0.5 line-clamp-2 px-2 text-xs text-ink-muted">
                       {job.title} · {job.company.name}
                     </p>
+                    {result && !insufficient && result.confidenceLevel ? (
+                      <p className="mt-1.5 text-xs font-semibold text-ink/80">
+                        Confidence: {confidenceLabel(result.confidenceLevel)}
+                      </p>
+                    ) : null}
+                    {result && !insufficient && result.confidenceLevel ? (
+                      <p className="mt-0.5 px-2 text-[11px] leading-snug text-ink-muted">
+                        {resumeFitConfidenceLine(result.confidenceLevel)}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
                 <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-5 py-4">
                   {result && insufficient ? (
                     <section className="flex flex-col gap-3 rounded-xl border border-ink/10 bg-ink/[0.03] p-4">
-                      <p className="text-sm leading-relaxed text-ink-muted">{resumeMatchInsufficientBody()}</p>
+                      <p className="text-sm leading-relaxed text-ink-muted">
+                        {resumeMatchInsufficientBody(result.unavailableReason)}
+                      </p>
                       <p className="text-sm text-ink-muted">{resumeMatchInsufficientPanelNote()}</p>
                       <p className="text-xs font-medium text-ink/70">{resumeMatchInsufficientHint()}</p>
                     </section>
