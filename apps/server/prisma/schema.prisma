@@ -80,6 +80,7 @@ model Company {
   updatedAt             DateTime              @updatedAt
   jobs                  Job[]
   atsEndpoints          AtsEndpoint[]
+  endpointLinks         CompanyAtsEndpoint[]
 
   @@index([priority, score])
   @@index([lastAttemptAt])
@@ -110,11 +111,28 @@ model AtsEndpoint {
   updatedAt      DateTime  @updatedAt
 
   company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  companyLinks CompanyAtsEndpoint[]
 
   @@unique([type, slug])
   @@index([companyId])
   @@index([type, isActive])
   @@index([source, score])
+}
+
+/// M:N link when multiple companies share one ATS board (e.g. acquisitions).
+model CompanyAtsEndpoint {
+  id         String   @id @default(uuid())
+  companyId  String
+  endpointId String
+  source     String   @default("link")
+  createdAt  DateTime @default(now())
+
+  company  Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  endpoint AtsEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, endpointId])
+  @@index([companyId])
+  @@index([endpointId])
 }
 
 model Job {

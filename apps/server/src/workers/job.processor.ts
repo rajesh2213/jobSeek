@@ -411,9 +411,14 @@ async function start(): Promise<void> {
           try {
             const endpoint = await prisma.atsEndpoint.findFirst({
               where: {
-                companyId: resolvedCompanyId,
                 type: resolvedAtsType,
                 isActive: true,
+                OR: [
+                  { companyId: resolvedCompanyId },
+                  {
+                    companyLinks: { some: { companyId: resolvedCompanyId } },
+                  },
+                ],
               },
               select: { id: true },
             });

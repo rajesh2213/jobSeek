@@ -62,9 +62,11 @@ export async function buildCompanyCoverageStats(
   ] = await Promise.all([
     prisma.company.count(),
     prisma.$queryRaw<[{ c: bigint }]>`
-      SELECT COUNT(DISTINCT "companyId")::bigint AS c
-      FROM "AtsEndpoint"
-      WHERE "companyId" IS NOT NULL
+      SELECT COUNT(DISTINCT cid)::bigint AS c FROM (
+        SELECT "companyId" AS cid FROM "AtsEndpoint" WHERE "companyId" IS NOT NULL
+        UNION
+        SELECT "companyId" AS cid FROM "CompanyAtsEndpoint"
+      ) x
     `,
     prisma.company.count({
       where: { status: CompanyStatus.ready, atsBoardToken: { not: null } },
@@ -118,7 +120,11 @@ export async function buildDiscoveryFunnelStats(
       (SELECT COUNT(*)::bigint FROM "Company" WHERE "atsType" IS NOT NULL OR EXISTS (
         SELECT 1 FROM "AtsEndpoint" e WHERE e."companyId" = "Company".id
       )) AS ats_detected,
-      (SELECT COUNT(DISTINCT "companyId")::bigint FROM "AtsEndpoint" WHERE "companyId" IS NOT NULL) AS endpoint_created,
+      (SELECT COUNT(DISTINCT cid)::bigint FROM (
+        SELECT "companyId" AS cid FROM "AtsEndpoint" WHERE "companyId" IS NOT NULL
+        UNION
+        SELECT "companyId" AS cid FROM "CompanyAtsEndpoint"
+      ) x) AS endpoint_created,
       (SELECT COUNT(DISTINCT "companyId")::bigint FROM "Job") AS jobs_ingested,
       (SELECT COUNT(DISTINCT "companyId")::bigint FROM "Job"
         WHERE "canonicalJobId" IS NULL

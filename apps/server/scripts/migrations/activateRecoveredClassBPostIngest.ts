@@ -18,6 +18,7 @@ async function main(): Promise<void> {
            COUNT(j.id)::bigint AS "jobCount"
     FROM "Company" c
     JOIN "AtsEndpoint" e ON e."companyId" = c.id
+      OR EXISTS (SELECT 1 FROM "CompanyAtsEndpoint" l WHERE l."companyId" = c.id AND l."endpointId" = e.id)
     LEFT JOIN "Job" j ON j."companyId" = c.id AND j.status = 'ready' AND j."isActive" = true
     WHERE c."discoverySource" LIKE ${`%${RECOVERED_TAG}%`}
       AND e."isActive" = false

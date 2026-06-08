@@ -50,6 +50,7 @@ async function main(): Promise<void> {
       atsType: { in: ["greenhouse", "lever", "ashby", "workday"] },
       OR: [{ atsBoardToken: null }, { atsBoardToken: "" }],
       atsEndpoints: { none: {} },
+      NOT: { discoverySource: { contains: "class_b_activation:dead_board" } },
     },
     select: {
       id: true,

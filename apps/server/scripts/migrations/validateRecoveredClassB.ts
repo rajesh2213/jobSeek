@@ -19,6 +19,7 @@ import {
 import {
   getIngestAtsEndpointQueue,
   INGEST_ATS_ENDPOINT_JOB,
+  closeIngestAtsEndpointQueue,
 } from "../../src/queues/ats-endpoint.queue.js";
 
 loadRootEnv();
@@ -136,6 +137,7 @@ async function main(): Promise<void> {
 
   console.log("\n=== Summary ===");
   console.log(JSON.stringify({ ...stats, tag: RECOVERED_TAG }, null, 2));
+  await closeIngestAtsEndpointQueue();
   await prisma.$disconnect();
 }
 

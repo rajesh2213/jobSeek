@@ -5,6 +5,11 @@ import {
   createAtsEndpointService,
   dedupeRegistrationsByTypeSlug,
 } from "../../src/modules/atsEndpoint/atsEndpoint.service.js";
+import {
+  companyHasActiveEndpoint,
+  getLinkedEndpointsForCompany,
+  linkCompanyToEndpoint,
+} from "../../src/modules/companyEndpoint/companyEndpointLink.service.js";
 
 export const RECOVERED_TAG = "class_b_token_recovery:recovered";
 export const ACTIVATION_TAG = "class_b_activation";
@@ -12,6 +17,7 @@ export const ACTIVATION_TAG = "class_b_activation";
 export type ActivationAction =
   | "create_endpoint"
   | "relink_endpoint"
+  | "link_shared_endpoint"
   | "validate_endpoint"
   | "enqueue_ingest"
   | "no_action_required"
@@ -78,10 +84,7 @@ export async function planActivation(
     return { ...base, action: "skip_unparseable", detail: "parseCrawlableBoard returned null" };
   }
 
-  const companyEndpoints = await prisma.atsEndpoint.findMany({
-    where: { companyId: company.id },
-    select: { id: true, type: true, slug: true, isActive: true, companyId: true },
-  });
+  const companyEndpoints = await getLinkedEndpointsForCompany(prisma, company.id);
 
   const globalEp = await prisma.atsEndpoint.findUnique({
     where: { type_slug: { type: parsed.type, slug: parsed.slug } },
@@ -131,8 +134,8 @@ export async function planActivation(
     }
     return {
       ...base,
-      action: "skip_collision",
-      detail: `endpoint owned by ${globalEp.companyId}`,
+      action: "link_shared_endpoint",
+      detail: `shared board owned by ${globalEp.companyId}`,
       endpointId: globalEp.id,
       parsed,
     };
@@ -158,7 +161,6 @@ export async function executeActivation(
   dryRun: boolean,
 ): Promise<{ endpointId: string | null; action: ActivationAction }> {
   if (
-    plan.action === "skip_collision" ||
     plan.action === "skip_unparseable" ||
     plan.action === "skip_no_token" ||
     plan.action === "no_action_required"
@@ -171,6 +173,17 @@ export async function executeActivation(
   }
 
   const { parsed } = plan;
+
+  if (plan.action === "link_shared_endpoint" && plan.endpointId) {
+    if (!dryRun) {
+      await linkCompanyToEndpoint(prisma, {
+        companyId: plan.companyId,
+        endpointId: plan.endpointId,
+        source: "shared_board",
+      });
+    }
+    return { endpointId: plan.endpointId, action: "link_shared_endpoint" };
+  }
 
   if (plan.action === "relink_endpoint" && plan.endpointId) {
     if (!dryRun) {
