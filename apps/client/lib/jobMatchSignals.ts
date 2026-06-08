@@ -278,6 +278,23 @@ export function isSparseFallbackKeyword(keyword: string): boolean {
   return isScorableResumeKeyword(k);
 }
 
+/** Stricter gate for Tier-2 description mining — dictionary + allowlist only, no generic JD tokens. */
+export function isDescriptionFallbackKeyword(keyword: string): boolean {
+  const raw = keyword.toLowerCase().trim().replace(/\s+/g, " ");
+  if (raw.length < 2) return false;
+  if (SPARSE_FALLBACK_COMPOUNDS.has(raw)) return true;
+  if (!raw.includes(" ")) {
+    if (SPARSE_FALLBACK_TOKENS.has(raw)) return true;
+    return getCanonicalsFromTextLine(raw).length > 0;
+  }
+  if (getCanonicalsFromTextLine(raw).length > 0) return true;
+  const parts = raw.split(/\s+/).filter(Boolean);
+  if (parts.length === 2 && isAcceptableResumeBigram(parts[0]!, parts[1]!)) {
+    return SPARSE_FALLBACK_COMPOUNDS.has(raw) || parts.every((p) => SPARSE_FALLBACK_TOKENS.has(p));
+  }
+  return false;
+}
+
 function mergeSkills(into: Map<string, JobSkill>, skills: JobSkill[]): void {
   for (const s of skills) {
     const prev = into.get(s.canonical);
@@ -291,14 +308,30 @@ function sortAndCap(skills: JobSkill[]): JobSkill[] {
     .slice(0, MAX_RESUME_MATCH_KEYWORDS);
 }
 
+function canonicalForDescriptionSignal(raw: string): string | null {
+  if (!isDescriptionFallbackKeyword(raw)) return null;
+  const dict = getCanonicalsFromTextLine(raw);
+  if (dict.length > 0) return dict[0]!.canonical;
+  const key = normalizeKeywordForMatch(raw);
+  return isDescriptionFallbackKeyword(key) ? key : null;
+}
+
 function collectSignalsFromLines(
   lines: string[],
   source: JobSkillSource,
   weight: number,
+  options?: { strictDescription?: boolean },
 ): JobSkill[] {
   const byKey = new Map<string, JobSkill>();
+  const strict = options?.strictDescription === true;
 
   const add = (raw: string) => {
+    if (strict) {
+      const canonical = canonicalForDescriptionSignal(raw);
+      if (!canonical || byKey.has(canonical)) return;
+      byKey.set(canonical, { canonical, source, weight });
+      return;
+    }
     const key = normalizeKeywordForMatch(raw);
     if (!isSparseFallbackKeyword(key)) return;
     if (!byKey.has(key)) {
@@ -310,11 +343,22 @@ function collectSignalsFromLines(
     for (const { canonical } of getCanonicalsFromRequirementLine(line)) {
       add(canonical);
     }
-    for (const token of tokenizeLine(line)) {
-      add(token);
-    }
-    for (const phrase of bigramsFromLine(line)) {
-      add(phrase);
+    if (strict) {
+      for (const phrase of bigramsFromLine(line)) {
+        add(phrase);
+      }
+      for (const token of tokenizeLine(line)) {
+        if (SPARSE_FALLBACK_TOKENS.has(normalizeKeywordForMatch(token))) {
+          add(token);
+        }
+      }
+    } else {
+      for (const token of tokenizeLine(line)) {
+        add(token);
+      }
+      for (const phrase of bigramsFromLine(line)) {
+        add(phrase);
+      }
     }
   }
 
@@ -361,7 +405,9 @@ function collectDescriptionFallbackSkills(job: JobItem): JobSkill[] {
   if (text.length < MIN_DESCRIPTION_CHARS) return [];
   const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean);
   if (lines.length === 0) lines.push(text);
-  return collectSignalsFromLines(lines, "description_fallback", W_DESCRIPTION);
+  return collectSignalsFromLines(lines, "description_fallback", W_DESCRIPTION, {
+    strictDescription: true,
+  });
 }
 
 function collectTitleFamilySkills(job: JobItem): JobSkill[] {

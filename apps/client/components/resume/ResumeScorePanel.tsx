@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { JobItem } from "../../lib/api";
 import { trackResumeMatchUpgradeClick } from "../../lib/analytics/resumeMatchFunnel";
-import { confidenceLabel } from "../../lib/resumeFitConfidence";
 import {
   isResumeMatchInsufficient,
   resumeFitConfidenceLine,
@@ -203,15 +202,15 @@ export function ResumeScorePanel({
                 exit={{ x: "100%" }}
                 transition={{ type: "spring", damping: 25 }}
               >
-                <div className="relative flex min-h-[200px] shrink-0 items-start border-b border-ink/10 px-4 pb-5 pt-3">
+                <div className="shrink-0 border-b border-ink/10 px-4 pb-5 pt-3">
                   <button
                     type="button"
                     onClick={onClose}
-                    className="relative z-10 rounded-lg border border-ink/15 px-2 py-1 text-sm font-semibold text-ink hover:bg-ink/5"
+                    className="rounded-lg border border-ink/15 px-2 py-1 text-sm font-semibold text-ink hover:bg-ink/5"
                   >
                     ✕
                   </button>
-                  <div className="absolute left-1/2 top-3 flex w-[min(100%,280px)] -translate-x-1/2 flex-col items-center text-center">
+                  <div className="mx-auto mt-3 flex w-full max-w-[300px] flex-col items-center text-center">
                     {result ? (
                       insufficient ? (
                         <UnscorableHeader />
@@ -226,16 +225,11 @@ export function ResumeScorePanel({
                           : resumeGradeLabel(result.grade)
                         : "—"}
                     </p>
-                    <p className="mt-0.5 line-clamp-2 px-2 text-xs text-ink-muted">
+                    <p className="mt-0.5 line-clamp-2 px-2 text-xs leading-snug text-ink-muted">
                       {job.title} · {job.company.name}
                     </p>
                     {result && !insufficient && result.confidenceLevel ? (
-                      <p className="mt-1.5 text-xs font-semibold text-ink/80">
-                        Confidence: {confidenceLabel(result.confidenceLevel)}
-                      </p>
-                    ) : null}
-                    {result && !insufficient && result.confidenceLevel ? (
-                      <p className="mt-0.5 px-2 text-[11px] leading-snug text-ink-muted">
+                      <p className="mt-2 max-w-full px-1 text-[11px] leading-relaxed text-ink-muted">
                         {resumeFitConfidenceLine(result.confidenceLevel)}
                       </p>
                     ) : null}

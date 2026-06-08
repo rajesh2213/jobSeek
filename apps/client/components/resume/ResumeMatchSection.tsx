@@ -13,7 +13,6 @@ import {
   trackResumeMatchQuotaHit,
   trackResumeMatchUpgradeClick,
 } from "../../lib/analytics/resumeMatchFunnel";
-import { confidenceLabel } from "../../lib/resumeFitConfidence";
 import {
   isResumeMatchInsufficient,
   resumeFitConfidenceLine,
@@ -295,12 +294,7 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
                 &ldquo;{resumeMatchSubtitle(result.grade)}&rdquo;
               </p>
               {result.confidenceLevel ? (
-                <p className="mt-2 text-xs font-semibold text-ink/80">
-                  Confidence: {confidenceLabel(result.confidenceLevel)}
-                </p>
-              ) : null}
-              {result.confidenceLevel ? (
-                <p className="mt-0.5 text-xs text-ink-muted">
+                <p className="mt-2 text-xs leading-relaxed text-ink-muted">
                   {resumeFitConfidenceLine(result.confidenceLevel)}
                 </p>
               ) : null}

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import type { JobItem } from "./api";
 import {
   MIN_JOB_MATCH_SIGNALS,
+  isDescriptionFallbackKeyword,
   jobHasResolvableMatchSignals,
   resolveJobMatchSkills,
 } from "./jobMatchSignals";
@@ -94,4 +95,45 @@ test("resolveJobMatchSkills: description fallback when parsed buckets empty", ()
   );
   assert.ok(skills.length >= MIN_JOB_MATCH_SIGNALS);
   assert.ok(skills.some((s) => s.source === "description_fallback"));
+});
+
+test("isDescriptionFallbackKeyword: rejects generic JD prose tokens", () => {
+  for (const word of [
+    "spanning",
+    "suites",
+    "phases",
+    "ranging",
+    "decision",
+    "dependencies",
+    "discovery",
+    "implement",
+    "maintain",
+    "integrated",
+    "campaigns",
+  ]) {
+    assert.equal(isDescriptionFallbackKeyword(word), false, word);
+  }
+});
+
+test("isDescriptionFallbackKeyword: accepts dictionary and allowlist skills", () => {
+  assert.equal(isDescriptionFallbackKeyword("python"), true);
+  assert.equal(isDescriptionFallbackKeyword("sql"), true);
+  assert.equal(isDescriptionFallbackKeyword("machine learning"), true);
+});
+
+test("resolveJobMatchSkills: description fallback skips generic prose gaps", () => {
+  const skills = resolveJobMatchSkills(
+    minimalJob({
+      title: "Machine Learning Engineer",
+      parsedDescription: emptyParsedDescription,
+      description:
+        "Design evaluation pipelines spanning offline model evaluation, simulation suites, and on-road regression releases. Requires Python, SQL, and Linux.",
+    }),
+  );
+  const canonicals = skills.map((s) => s.canonical);
+  assert.ok(skills.length >= MIN_JOB_MATCH_SIGNALS);
+  assert.ok(canonicals.includes("python"));
+  assert.ok(!canonicals.includes("spanning"));
+  assert.ok(!canonicals.includes("suites"));
+  assert.ok(!canonicals.includes("phases"));
 });
