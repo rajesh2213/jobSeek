@@ -1,14 +1,21 @@
 /**
- * Post-ingest: activate endpoints for recovered Class B companies that already have jobs.
+ * Post-ingest: activate endpoints that already have ingested jobs but remain inactive.
+ * Covers recovered Class B, token_wired, and shared_board cohorts.
+ *
  * Usage: cd apps/server && npx tsx scripts/migrations/activateRecoveredClassBPostIngest.ts [--dry-run]
  */
 import { loadRootEnv } from "../../src/infrastructure/env/loadEnv.js";
 import { prisma } from "../../src/infrastructure/db/prisma.js";
-import { RECOVERED_TAG, mergeTag, ACTIVATION_TAG } from "../rollout/classBActivationLib.js";
+import { mergeTag, ACTIVATION_TAG } from "../rollout/classBActivationLib.js";
 
 loadRootEnv();
 
 const DRY_RUN = process.argv.includes("--dry-run");
+const ACTIVATION_SOURCE_TAGS = [
+  "class_b_token_recovery:recovered",
+  "class_b_activation:token_wired",
+  "class_b_activation:shared_board",
+];
 
 async function main(): Promise<void> {
   const rows = await prisma.$queryRaw<
@@ -20,13 +27,18 @@ async function main(): Promise<void> {
     JOIN "AtsEndpoint" e ON e."companyId" = c.id
       OR EXISTS (SELECT 1 FROM "CompanyAtsEndpoint" l WHERE l."companyId" = c.id AND l."endpointId" = e.id)
     LEFT JOIN "Job" j ON j."companyId" = c.id AND j.status = 'ready' AND j."isActive" = true
-    WHERE c."discoverySource" LIKE ${`%${RECOVERED_TAG}%`}
+    WHERE (
+      c."discoverySource" LIKE '%class_b_token_recovery:recovered%'
+      OR c."discoverySource" LIKE '%class_b_activation:token_wired%'
+      OR c."discoverySource" LIKE '%class_b_activation:shared_board%'
+    )
       AND e."isActive" = false
     GROUP BY e.id, c.id, c.name
     HAVING COUNT(j.id) > 0
   `;
 
-  console.log(`Endpoints to activate (have jobs): ${rows.length} (${DRY_RUN ? "DRY" : "LIVE"})\n`);
+  console.log(`Endpoints to activate (have jobs): ${rows.length} (${DRY_RUN ? "DRY" : "LIVE"})`);
+  console.log(`Tags: ${ACTIVATION_SOURCE_TAGS.join(", ")}\n`);
 
   for (const r of rows) {
     const jobs = Number(r.jobCount);
