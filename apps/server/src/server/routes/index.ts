@@ -13,6 +13,7 @@ import { registerDodoBillingRoutes } from "../../modules/billing/dodo.controller
 import { registerSavedSearchRoutes } from "../../modules/saved-search/savedSearch.routes.js";
 import { registerApplicationsRoutes } from "../../modules/applications/applications.routes.js";
 import { registerGrowthEmailRoutes } from "../../modules/growthEmail/growthEmail.routes.js";
+import { createJobRepository } from "../../modules/job/job.repository.js";
 import { createSeoService } from "../../modules/seo/seo.service.js";
 import { registerSeoAggregationRoutes, registerSeoRoutes } from "../../modules/seo/seo.routes.js";
 import { createSeoAggregationsService } from "../../modules/seo/seoAggregations.service.js";
@@ -62,7 +63,8 @@ export async function registerRoutes(server: FastifyInstance): Promise<void> {
   createCompanyController(server);
   const seoService = createSeoService(server.prisma);
   const seoAggregations = createSeoAggregationsService(server.prisma);
-  registerSeoRoutes(server, seoService);
+  const jobRepository = createJobRepository(server.prisma);
+  registerSeoRoutes(server, seoService, jobRepository);
   registerSeoAggregationRoutes(server, seoAggregations);
   registerInternalMetricsRoutes(server);
   registerInternalIngestionRoutes(server);

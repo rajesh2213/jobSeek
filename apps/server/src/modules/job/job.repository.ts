@@ -30,6 +30,13 @@ import {
   ROLE_SUGGEST_EXTRA_EXCLUDED,
 } from "./jobListing.constants.js";
 import { computeJobQualityFlags } from "../../services/qualityFlags.service.js";
+import {
+  buildSitemapCursorWhereSql,
+  decodeSitemapJobCursor,
+  encodeSitemapJobCursor,
+  type SitemapJobCursor,
+  type SitemapJobRow,
+} from "./sitemapCursor.js";
 
 export type JobStatus = "processing" | "ready" | "failed";
 
@@ -688,6 +695,40 @@ export function sqlForCanonicalListingIds(input: {
   `;
 }
 
+/**
+ * Slim keyset query for SEO sitemap generation — same discovery WHERE + ORDER BY as
+ * `sqlForCanonicalListingIds` (latest sort), no OFFSET, no hydrate.
+ */
+export function sqlForCanonicalSitemapRows(input: {
+  limit: number;
+  cursor?: SitemapJobCursor | null;
+  filters?: JobDiscoveryFilters;
+  includeProcessing?: boolean;
+}): Prisma.Sql {
+  const whereSql = buildDiscoveryWhereSql(input.filters, {
+    includeProcessing: input.includeProcessing ?? false,
+  });
+  const cursor = input.cursor ?? null;
+  const cursorSql =
+    cursor === null ? Prisma.sql`TRUE` : buildSitemapCursorWhereSql(cursor);
+
+  return Prisma.sql`
+    SELECT
+      j.id,
+      j."postedAt",
+      j."createdAt",
+      j."listingFreshnessAt"
+    FROM "Job" j
+    WHERE ${whereSql}
+      AND (${cursorSql})
+    ORDER BY j."postedAt" DESC NULLS LAST,
+             j."listingFreshnessAt" DESC,
+             j."createdAt" DESC,
+             j.id ASC
+    LIMIT ${input.limit}
+  `;
+}
+
 function reorderJobsByCanonicalIds<T extends { id: string }>(jobs: T[], ids: string[]): void {
   const order = new Map(ids.map((id, i) => [id, i]));
   jobs.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
@@ -994,6 +1035,40 @@ export function createJobRepository(prisma: PrismaClient) {
       `;
       const rows = await prisma.$queryRaw<{ c: bigint }[]>(countQuery);
       return Number(rows[0]?.c ?? 0);
+    },
+
+    /**
+     * Keyset-paginated canonical jobs for sitemap — discovery filters only, slim columns.
+     */
+    async findManyCanonicalForSitemap(input: {
+      limit: number;
+      cursor?: string | null;
+      filters?: JobDiscoveryFilters;
+      includeProcessing?: boolean;
+    }): Promise<{ rows: SitemapJobRow[]; nextCursor: string | null }> {
+      const limit = Math.max(1, Math.min(1000, Math.floor(input.limit)));
+      let decodedCursor: SitemapJobCursor | null = null;
+      if (input.cursor) {
+        decodedCursor = decodeSitemapJobCursor(input.cursor);
+      }
+      const query = sqlForCanonicalSitemapRows({
+        limit,
+        cursor: decodedCursor,
+        filters: input.filters,
+        includeProcessing: input.includeProcessing,
+      });
+      const rows = await prisma.$queryRaw<SitemapJobRow[]>(query);
+      const last = rows.length > 0 ? rows[rows.length - 1] : null;
+      const nextCursor =
+        rows.length === limit && last
+          ? encodeSitemapJobCursor({
+              postedAt: last.postedAt,
+              listingFreshnessAt: last.listingFreshnessAt,
+              createdAt: last.createdAt,
+              id: last.id,
+            })
+          : null;
+      return { rows, nextCursor };
     },
 
     async listRoleSuggestions(): Promise<

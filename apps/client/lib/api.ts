@@ -1011,6 +1011,75 @@ export async function fetchJobs(
   throw new ApiRequestError("Failed to fetch jobs", 503, "DB_POOL_EXHAUSTED");
 }
 
+export interface SeoSitemapJobRow {
+  id: string;
+  postedAt: string | null;
+  createdAt: string;
+  listingFreshnessAt: string;
+}
+
+/** Server-side: `GET /seo/sitemap-jobs` — keyset cursor, slim payload for sitemap only. */
+export async function fetchSeoSitemapJobs(options?: {
+  cursor?: string | null;
+  limit?: number;
+  internalSeoSecret?: string | null;
+  signal?: AbortSignal | null;
+}): Promise<{
+  data: SeoSitemapJobRow[];
+  meta: {
+    count: number;
+    hasMore: boolean;
+    nextCursor: string | null;
+  };
+}> {
+  const params = new URLSearchParams();
+  if (options?.limit !== undefined) params.set("limit", String(options.limit));
+  if (options?.cursor) params.set("cursor", options.cursor);
+  const qs = params.toString();
+  const url = `${API_BASE_URL}/seo/sitemap-jobs${qs ? `?${qs}` : ""}`;
+  const headers = new Headers();
+  const secret = (options?.internalSeoSecret ?? process.env.INTERNAL_SEO_SECRET)?.trim();
+  if (secret && typeof window === "undefined") {
+    headers.set("x-internal-seo", "true");
+    headers.set("x-internal-seo-secret", secret);
+    headers.set("x-ssr-origin", "next-server");
+    headers.set("x-ssr-page", "sitemap");
+  }
+  const controller = new AbortController();
+  const timeoutMs = 12_000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const mergedSignal = options?.signal ?? controller.signal;
+  try {
+    const res = await fetch(url, {
+      headers,
+      cache: "no-store",
+      signal: mergedSignal,
+    });
+    clearTimeout(timeout);
+    if (res.status === 401) {
+      throw new Error("fetchSeoSitemapJobs: unauthorized");
+    }
+    if (!res.ok) {
+      throw new Error(`fetchSeoSitemapJobs: ${res.status}`);
+    }
+    const body = (await res.json()) as {
+      data?: SeoSitemapJobRow[];
+      meta?: { count?: number; hasMore?: boolean; nextCursor?: string | null };
+    };
+    return {
+      data: body.data ?? [],
+      meta: {
+        count: body.meta?.count ?? (body.data?.length ?? 0),
+        hasMore: body.meta?.hasMore === true,
+        nextCursor: body.meta?.nextCursor ?? null,
+      },
+    };
+  } catch (err) {
+    clearTimeout(timeout);
+    throw err;
+  }
+}
+
 export interface SeoLandingEntry {
   slug: string;
   count: number;

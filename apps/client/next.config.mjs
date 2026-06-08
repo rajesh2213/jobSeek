@@ -2,6 +2,15 @@
 const nextConfig = {
   transpilePackages: ["@jobseek/skill-constants"],
 
+  async rewrites() {
+    return [
+      {
+        source: "/sitemap-jobs-:partition.xml",
+        destination: "/sitemap-jobs/:partition",
+      },
+    ];
+  },
+
   // Dynamic filter query strings use string hrefs; keep untyped routes for DX.
 
   experimental: {

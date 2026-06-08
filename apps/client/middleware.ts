@@ -54,7 +54,8 @@ export default async function middleware(req: NextRequest, event: NextFetchEvent
  * Excluded (no server-side auth): /, /about, /privacy, /terms, /support, /billing,
  *   /companies, /company/*,
  *   /jobs/browse, /pricing,
- *   /sitemap.xml, /robots.txt, /sign-in, /sign-up, /applications, /saved-searches,
+ *   /sitemap.xml, /sitemap-*.xml, /sitemap-jobs/*, /robots.txt, /sign-in, /sign-up,
+ *   /applications, /saved-searches,
  *   /smart-apply, /features/* (public SEO landing pages), /api/companies,
  *   /api/seo/aggregations, static assets.
  */

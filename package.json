@@ -25,6 +25,7 @@
     "debug:location-failures": "npm run debug:location-failures -w @jobseek/server",
     "monitor:pipeline": "npm run monitor:pipeline -w @jobseek/server --",
     "seo:check-sitemap": "node scripts/check-sitemap-health.mjs",
+    "seo:validate-sitemap-cursor": "npm run validate:sitemap-cursor -w @jobseek/server",
     "generate:brand-assets": "node scripts/generate-jobloom-brand-assets.mjs",
     "build:ext": "npm run build:ext -w @jobseek/extension",
     "zip:ext": "npm run zip:ext -w @jobseek/extension",

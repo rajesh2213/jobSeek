@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { SeoService } from "./seo.service.js";
-import type { JobDiscoveryFilters } from "../job/job.repository.js";
+import type { JobDiscoveryFilters, JobRepository } from "../job/job.repository.js";
 import type { SeoAggregationsService } from "./seoAggregations.service.js";
 import { experienceSlugToLevel, locationTokenToFilter } from "./seoDimensions.js";
 
@@ -25,7 +25,11 @@ function parseBoundedEnvInt(
   return Math.max(min, Math.min(max, parsed));
 }
 
-export function registerSeoRoutes(server: FastifyInstance, seo: SeoService): void {
+export function registerSeoRoutes(
+  server: FastifyInstance,
+  seo: SeoService,
+  jobRepository: JobRepository,
+): void {
   function isInternalSeoAuthorized(request: FastifyRequest): boolean {
     const marker = request.headers["x-internal-seo"];
     const secret = request.headers["x-internal-seo-secret"];
@@ -81,6 +85,47 @@ export function registerSeoRoutes(server: FastifyInstance, seo: SeoService): voi
           estimatedCountQueries: stats.estimatedCountQueries,
           estimatedTotalQueries: stats.estimatedTotalQueries,
           batchDurationMs: stats.batchDurationMs,
+        },
+      });
+    },
+  );
+
+  server.get(
+    "/seo/sitemap-jobs",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      if (!isInternalSeoAuthorized(request)) {
+        return reply.status(401).send({
+          error: "Unauthorized",
+          code: "SEO_SITEMAP_JOBS_UNAUTHORIZED",
+        });
+      }
+
+      const q = request.query as Record<string, unknown>;
+      const defaultLimit = parseBoundedEnvInt(
+        process.env.SEO_SITEMAP_CURSOR_FETCH_LIMIT,
+        500,
+        1,
+        1000,
+      );
+      const limit = Math.max(1, parseIntSafe(q.limit, defaultLimit));
+      const cursor = typeof q.cursor === "string" ? q.cursor : undefined;
+
+      const { rows, nextCursor } = await jobRepository.findManyCanonicalForSitemap({
+        limit,
+        cursor: cursor ?? null,
+      });
+
+      return reply.send({
+        data: rows.map((row) => ({
+          id: row.id,
+          postedAt: row.postedAt?.toISOString() ?? null,
+          createdAt: row.createdAt.toISOString(),
+          listingFreshnessAt: row.listingFreshnessAt.toISOString(),
+        })),
+        meta: {
+          count: rows.length,
+          hasMore: nextCursor !== null,
+          nextCursor,
         },
       });
     },
