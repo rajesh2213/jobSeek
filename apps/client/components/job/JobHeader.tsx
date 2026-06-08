@@ -28,8 +28,8 @@ export function JobHeader({ job, applyHref, applyUrlLocked }: Props) {
         />
       </div>
       <h1 className="font-display text-3xl font-normal italic text-ink sm:text-4xl">{job.title}</h1>
-      <div className="flex flex-row flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0 flex-1 space-y-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-x-4 sm:gap-y-3">
+        <div className="min-w-0 space-y-3">
           <p className="text-sm text-ink/60">
             at{" "}
             <Link href={`/company/${job.company.slug}`} className="font-semibold text-ink no-underline hover:text-brand">
@@ -44,21 +44,21 @@ export function JobHeader({ job, applyHref, applyUrlLocked }: Props) {
                   <span className="shrink-0" aria-hidden>
                     📍
                   </span>
-                  <span className="min-w-0 truncate">{locationText}</span>
+                  <span className="min-w-0 sm:truncate">{locationText}</span>
                 </span>
               ) : null;
             })()}
             <WorkTypeOutlinePill job={job} className="shrink-0" />
           </div>
         </div>
-        <div className="shrink-0 flex items-center gap-2">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:shrink-0 sm:items-center">
           {applyUrlLocked ? (
             <Link
               href="/pricing"
               className={buttonClassName({
                 variant: "primary",
                 size: "md",
-                className: "no-underline",
+                className: "col-span-2 w-full justify-center no-underline sm:col-span-1 sm:w-auto",
               })}
             >
               Upgrade to view & apply
@@ -71,9 +71,10 @@ export function JobHeader({ job, applyHref, applyUrlLocked }: Props) {
               applyUrl={applyHref}
               variant="primary"
               size="md"
+              className="w-full justify-center sm:w-auto"
             />
           )}
-          <AppliedToggleButton jobId={job.id} size="md" />
+          <AppliedToggleButton jobId={job.id} size="md" className="w-full justify-center sm:w-auto" />
         </div>
       </div>
     </header>
