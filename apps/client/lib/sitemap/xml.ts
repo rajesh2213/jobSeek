@@ -1,6 +1,7 @@
 export interface SitemapUrlEntry {
   url: string;
-  lastModified: Date;
+  /** `unstable_cache` rehydrates Dates as ISO strings — accept both. */
+  lastModified: Date | string;
 }
 
 function escapeXml(value: string): string {
@@ -12,8 +13,9 @@ function escapeXml(value: string): string {
     .replace(/'/g, "&apos;");
 }
 
-function formatLastMod(date: Date): string {
-  return date.toISOString();
+function formatLastMod(date: Date | string): string {
+  if (date instanceof Date) return date.toISOString();
+  return new Date(date).toISOString();
 }
 
 export function buildUrlsetXml(entries: SitemapUrlEntry[]): string {
