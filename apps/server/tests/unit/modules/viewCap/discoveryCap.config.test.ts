@@ -6,7 +6,7 @@ import { LIMITS } from "../../../../src/config/limits.js";
 function expectedFreeTierDailyLimitFromEnv(): number {
   const parsed = Number.parseInt(process.env.FREE_TIER_DAILY_LIMIT ?? "", 10);
   if (Number.isFinite(parsed) && parsed > 0) return parsed;
-  return 75;
+  return 100;
 }
 
 describe("discovery list cap constants", () => {

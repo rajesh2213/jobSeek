@@ -6,7 +6,7 @@ function intFromEnv(raw: string | undefined, fallback: number): number {
 
 export const FREE_DAILY_JOBS = intFromEnv(
   process.env.NEXT_PUBLIC_FREE_TIER_DAILY_LIMIT,
-  75,
+  100,
 );
 
 /** Free signed-in: AI resume–job semantic scores per rolling ~24h (must match server `FREE_RESUME_MATCH_AI_PER_24H`). */

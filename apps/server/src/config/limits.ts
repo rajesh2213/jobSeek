@@ -18,7 +18,7 @@ function capMode(): CapMode {
 
 export const LIMITS = {
   MODE: capMode(),
-  FREE_TIER_DAILY_LIMIT: toPositiveInt(process.env.FREE_TIER_DAILY_LIMIT, 75),
+  FREE_TIER_DAILY_LIMIT: toPositiveInt(process.env.FREE_TIER_DAILY_LIMIT, 100),
   /** Signed-in free tier: AI resume–job semantic match calls per rolling 24h (Redis). */
   FREE_RESUME_MATCH_AI_PER_24H: toPositiveInt(process.env.FREE_RESUME_MATCH_AI_PER_24H, 3),
   DISCOVERY: {
