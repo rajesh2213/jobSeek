@@ -91,7 +91,18 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
 
   const hubFiltersKey = stableJobFiltersKey(hubFilters);
   const initialListing = await loadCompanyHubInitialJobs(slug, hubFiltersKey, limit);
-  const meta = initialListing.meta;
+  const metaFromListing = initialListing.meta;
+  const meta = {
+    ...metaFromListing,
+    total:
+      (metaFromListing.total ?? 0) > 0
+        ? metaFromListing.total
+        : company?.jobCount ?? metaFromListing.total ?? 0,
+    totalCount:
+      (metaFromListing.totalCount ?? metaFromListing.total ?? 0) > 0
+        ? (metaFromListing.totalCount ?? metaFromListing.total)
+        : company?.jobCount ?? metaFromListing.totalCount ?? metaFromListing.total ?? 0,
+  };
 
   return (
     <>

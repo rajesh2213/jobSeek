@@ -68,6 +68,33 @@ function hubFiltersFromSearchParams(sp: URLSearchParams): Omit<JobFilters, "comp
   return rest;
 }
 
+function resolveOpenRoleCount(input: {
+  listMeta: NonNullable<JobsApiResponse["meta"]>;
+  company: CompanyDetail | null;
+  listJobs: JobItem[];
+  initialHydrating: boolean;
+}): number | null {
+  const metaTotal =
+    typeof input.listMeta.total === "number"
+      ? input.listMeta.total
+      : typeof input.listMeta.totalCount === "number"
+        ? input.listMeta.totalCount
+        : null;
+  if (typeof metaTotal === "number" && metaTotal > 0) return metaTotal;
+  if (typeof input.company?.jobCount === "number" && input.company.jobCount > 0) {
+    return input.company.jobCount;
+  }
+  if (input.initialHydrating) return null;
+  if (typeof metaTotal === "number") return metaTotal;
+  if (input.listJobs.length > 0) return input.listJobs.length;
+  return 0;
+}
+
+function formatOpenRolesLabel(count: number | null): string | null {
+  if (count == null) return null;
+  return count === 1 ? "1 open role" : `${count} open roles`;
+}
+
 function buildCompanyHubPath(
   slug: string,
   filters: Omit<JobFilters, "companyId">,
@@ -136,7 +163,9 @@ export function CompanyHubClient({
     relatedCompanies,
   );
   const [initialHydrating, setInitialHydrating] = useState(
-    initialJobs.length === 0 && initialMeta.total === 0,
+    initialJobs.length === 0 &&
+      (initialMeta.total ?? 0) === 0 &&
+      !(initialCompany?.jobCount && initialCompany.jobCount > 0),
   );
   const [loadingMore, setLoadingMore] = useState(false);
 
@@ -191,14 +220,17 @@ export function CompanyHubClient({
     [router, slug],
   );
 
-  const totalRoles =
-    typeof listMeta.total === "number"
-      ? listMeta.total
-      : typeof listMeta.totalCount === "number"
-        ? listMeta.totalCount
-        : typeof resolvedCompany?.jobCount === "number"
-          ? resolvedCompany.jobCount
-          : listJobs.length;
+  const totalRoles = useMemo(
+    () =>
+      resolveOpenRoleCount({
+        listMeta,
+        company: resolvedCompany,
+        listJobs,
+        initialHydrating,
+      }),
+    [listMeta, resolvedCompany, listJobs, initialHydrating],
+  );
+  const openRolesLabel = formatOpenRolesLabel(totalRoles);
   const canLoadMore =
     Boolean(listMeta) &&
     (listMeta.hasMore === true ||
@@ -351,10 +383,10 @@ export function CompanyHubClient({
   }, [planLoaded, isPro, slug, urlFilters, router, getToken]);
 
   const emptyFiltered =
-    listJobs.length === 0 && totalRoles === 0 && filtersActive;
+    listJobs.length === 0 && (totalRoles ?? 0) === 0 && filtersActive;
 
   const emptyNoRoles =
-    listJobs.length === 0 && totalRoles === 0 && !filtersActive;
+    listJobs.length === 0 && (totalRoles ?? 0) === 0 && !filtersActive;
 
   const jobsLinkAll = useMemo(() => {
     if (!resolvedCompany) return "/jobs";
@@ -414,7 +446,9 @@ export function CompanyHubClient({
           />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-ink">{company.name}</p>
-            <p className="text-xs text-ink/50">{totalRoles} open roles</p>
+            <p className="text-xs text-ink/50">
+              {openRolesLabel ?? "Open roles"}
+            </p>
           </div>
           <Link
             href="#company-jobs"
@@ -451,10 +485,12 @@ export function CompanyHubClient({
               )}
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Badge tone="teal" caps={false}>
-                {totalRoles} open roles
-              </Badge>
-              {isPro && totalRoles > 0 ? (
+              {openRolesLabel ? (
+                <Badge tone="teal" caps={false}>
+                  {openRolesLabel}
+                </Badge>
+              ) : null}
+              {isPro && (totalRoles ?? 0) > 0 ? (
                 <Badge tone="brand" caps={false}>
                   Hiring now
                 </Badge>
@@ -590,7 +626,7 @@ export function CompanyHubClient({
               const capMode = listMeta.limit?.mode ?? "hard";
               const hardMode = capMode === "hard";
               const discoveryPhase = listMeta.discoveryPhase;
-              const totalMatches = listMeta.total ?? 0;
+              const totalMatches = listMeta.total ?? totalRoles ?? 0;
               const showDiscoveryWall = Boolean(
                 !isPro &&
                   hardMode &&

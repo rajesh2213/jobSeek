@@ -620,6 +620,22 @@ export function sqlForCanonicalListingIds(input: {
   });
   if (input.sort === "latest") {
     /*
+     * Company hub: sort by unified recency (listingFreshnessAt) so a job
+     * discovered yesterday ranks above a stale postedAt from two weeks ago.
+     * Global discovery keeps POSTED-before-DISCOVERED ordering for the main feed.
+     */
+    if (input.filters?.companyId) {
+      return Prisma.sql`
+        SELECT j.id FROM "Job" j
+        WHERE ${whereSql}
+        ORDER BY j."listingFreshnessAt" DESC,
+                 j."postedAt" DESC NULLS LAST,
+                 j."createdAt" DESC,
+                 j.id ASC
+        LIMIT ${input.limit} OFFSET ${input.offset}
+      `;
+    }
+    /*
      * Freshness-source-aware ordering (Phase 5 of the freshness-integrity overhaul):
      *
      *   1. j."postedAt" DESC NULLS LAST
