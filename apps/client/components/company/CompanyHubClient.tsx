@@ -191,7 +191,14 @@ export function CompanyHubClient({
     [router, slug],
   );
 
-  const totalRoles = listMeta.total ?? 0;
+  const totalRoles =
+    typeof listMeta.total === "number"
+      ? listMeta.total
+      : typeof listMeta.totalCount === "number"
+        ? listMeta.totalCount
+        : typeof resolvedCompany?.jobCount === "number"
+          ? resolvedCompany.jobCount
+          : listJobs.length;
   const canLoadMore =
     Boolean(listMeta) &&
     (listMeta.hasMore === true ||

@@ -357,7 +357,7 @@ export function registerCompanyRoutes(
       request: FastifyRequest<{ Params: CompanySlugParams }>,
       reply: FastifyReply,
     ) => {
-      const company = await companyService.getCompanyBySlug(request.params.slug);
+      const company = await companyService.getCompanyPublicDetail(request.params.slug);
       if (!company) {
         return reply.status(404).send({
           error: "Company not found",
@@ -368,6 +368,9 @@ export function registerCompanyRoutes(
         data: {
           ...company,
           name: companyDisplayName(company.name, company.domain),
+          createdAt: company.createdAt.toISOString(),
+          updatedAt: company.updatedAt.toISOString(),
+          lastCrawledAt: company.lastCrawledAt?.toISOString() ?? null,
         },
       });
     },

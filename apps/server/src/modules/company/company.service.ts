@@ -271,6 +271,23 @@ export class CompanyService {
     return this.companyRepository.findBySlug(slug);
   }
 
+  async getCompanyPublicDetail(
+    slug: string,
+  ): Promise<(Company & { jobCount: number; hasRemoteJobs: boolean }) | null> {
+    const company = await this.companyRepository.findBySlug(slug);
+    if (!company) return null;
+    const filters: JobDiscoveryFilters = { companyId: company.id };
+    const [jobCount, remoteCount] = await Promise.all([
+      this.jobRepository.countCanonicalFiltered(filters),
+      this.jobRepository.countCanonicalFiltered({ ...filters, isRemote: true }),
+    ]);
+    return {
+      ...company,
+      jobCount,
+      hasRemoteJobs: remoteCount > 0,
+    };
+  }
+
   async getCompanyJobs(
     slug: string,
     input: {
@@ -309,7 +326,8 @@ export class CompanyService {
     const skipExactCount =
       process.env.COMPANY_JOBS_SKIP_EXACT_COUNT === "1" &&
       input.page <= 1 &&
-      !input.includeExactTotal;
+      !input.includeExactTotal &&
+      !filters.companyId;
 
     let total: number | null;
     let totalPages: number | undefined;
