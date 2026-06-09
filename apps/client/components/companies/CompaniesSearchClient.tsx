@@ -2,7 +2,7 @@
 
 import { useInView } from "framer-motion";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   fetchCompanies,
@@ -15,6 +15,7 @@ import { useAccountPlan } from "../../lib/useAccountPlan";
 import { Button } from "../ui/Button";
 import { Input, inputBaseClass } from "../ui/Input";
 import { CompanyCard } from "./CompanyCard";
+import { CompanyStatsBadges } from "./CompanyStatsBadges";
 
 const LIMIT = 24;
 
@@ -46,6 +47,7 @@ export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) 
   const [list, setList] = useState<CompanyListItem[]>(initialCompanies);
   const [meta, setMeta] = useState(initialMeta);
   const [listHydrating, setListHydrating] = useState(initialCompanies.length === 0);
+  const [statsLoaded, setStatsLoaded] = useState(initialCompanies.length > 0);
   const [listDegraded, setListDegraded] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [draftQ, setDraftQ] = useState(() => searchParams.get("q") ?? "");
@@ -74,6 +76,7 @@ export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) 
       });
       setList(res.data);
       setMeta(res.meta);
+      if (res.meta.stats) setStatsLoaded(true);
     } catch {
       setList([]);
       setMeta((m) => ({ ...m, total: 0, hasMore: false }));
@@ -108,6 +111,7 @@ export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) 
       if (cancelled) return;
       setList(res.data);
       setMeta(res.meta);
+      if (res.meta.stats) setStatsLoaded(true);
     })();
     return () => {
       cancelled = true;
@@ -192,22 +196,11 @@ export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) 
   }, [inView, canLoadMore, loadingMore, onLoadMore]);
 
   const stats = meta.stats;
-  const formattedTotal = useMemo(
-    () =>
-      stats
-        ? new Intl.NumberFormat("en-US").format(stats.totalTracked)
-        : null,
-    [stats],
-  );
-  const formattedActiveHiring = useMemo(
-    () =>
-      stats
-        ? new Intl.NumberFormat("en-US").format(
-            stats.activeHiringCompanies ?? stats.hiringThisWeek,
-          )
-        : null,
-    [stats],
-  );
+  const statsPending = !statsLoaded;
+  const totalTracked = statsPending ? null : (stats?.totalTracked ?? null);
+  const activeHiring = statsPending
+    ? null
+    : (stats?.activeHiringCompanies ?? stats?.hiringThisWeek ?? null);
 
   const onSubmitSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -224,16 +217,11 @@ export function CompaniesSearchClient({ initialCompanies, initialMeta }: Props) 
           <p className="mt-1 text-sm text-ink-muted">
             Discover employers, explore career pages, and jump into open roles.
           </p>
-          {formattedTotal != null && formattedActiveHiring != null ? (
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="inline-flex rounded-full border border-ink/10 bg-surface px-3 py-1 text-xs font-medium text-ink/70 shadow-sm">
-                {formattedTotal} companies tracked
-              </span>
-              <span className="inline-flex rounded-full border border-ink/10 bg-surface px-3 py-1 text-xs font-medium text-ink/70 shadow-sm">
-                {formattedActiveHiring} actively hiring
-              </span>
-            </div>
-          ) : null}
+          <CompanyStatsBadges
+            totalTracked={totalTracked}
+            activeHiring={activeHiring}
+            loading={statsPending}
+          />
         </header>
 
         <div

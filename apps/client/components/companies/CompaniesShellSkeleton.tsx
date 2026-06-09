@@ -3,6 +3,10 @@ export function CompaniesShellSkeleton() {
     <div className="mx-auto min-h-screen max-w-[1100px] px-6 py-6">
       <div className="h-9 w-48 animate-pulse rounded-lg bg-ink/10" />
       <div className="mt-2 h-4 w-72 max-w-full animate-pulse rounded bg-ink/[0.06]" />
+      <div className="mt-4 flex flex-wrap gap-2">
+        <div className="h-7 w-36 animate-pulse rounded-full bg-ink/[0.06]" />
+        <div className="h-7 w-32 animate-pulse rounded-full bg-ink/[0.06]" />
+      </div>
       <div className="mt-6 flex flex-wrap gap-3">
         <div className="h-10 min-w-[12rem] flex-1 animate-pulse rounded-2xl bg-ink/[0.06]" />
         <div className="h-10 w-36 animate-pulse rounded-2xl bg-ink/[0.06]" />
