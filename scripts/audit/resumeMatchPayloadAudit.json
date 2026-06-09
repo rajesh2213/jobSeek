@@ -1,0 +1,20 @@
+{
+  "measuredAt": "2026-06-09T09:51:28.879Z",
+  "sampleSize": 500,
+  "jobsPerPage": 50,
+  "avgParsedDescriptionBytes": 1771,
+  "p50ParsedDescriptionBytes": 4,
+  "p95ParsedDescriptionBytes": 6838,
+  "avgBasePayloadPerJobBytes": 1772,
+  "avgFullPayloadPerJobBytes": 3564,
+  "avgSlimPayloadPerJobBytes": 2287,
+  "estimated50JobPageBaseKb": 87,
+  "estimated50JobPageFullKb": 174,
+  "estimated50JobPageSlimKb": 112,
+  "fullParsedExtraKbPerPage": 87,
+  "slimParsedExtraKbPerPage": 25,
+  "fullParsedKbPerPage": 87,
+  "slimParsedKbPerPage": 25,
+  "savingsPct": 71,
+  "note": "description remains null when previewLines exist (unchanged). parsedDescription is the egress delta."
+}

@@ -11,7 +11,8 @@ import {
 } from "./index";
 
 test("getCanonicalFromToken maps common aliases", () => {
-  assert.equal(getCanonicalFromToken("Postgres"), "postgresql");
+  assert.equal(getCanonicalFromToken("Postgres"), "postgres");
+  assert.equal(getCanonicalFromToken("postgresql"), "postgres");
   assert.equal(getCanonicalFromToken("nodejs"), "nodejs");
   assert.equal(getCanonicalFromToken("node"), null);
   assert.equal(getCanonicalFromToken("next"), null);
@@ -63,7 +64,8 @@ test("DICTIONARY_VERSION is stable and non-empty", () => {
 });
 
 test("getSkillDisplayLabel for enrichment-backed canonical", () => {
-  assert.equal(getSkillDisplayLabel("csharp"), "C#");
+  assert.equal(getSkillDisplayLabel("postgres"), "PostgreSQL");
+  assert.equal(getSkillDisplayLabel("salesforce"), "Salesforce");
 });
 
 test("normalizeLineForSkillScan", () => {

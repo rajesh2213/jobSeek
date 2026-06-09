@@ -1,0 +1,12 @@
+{
+  "measuredAt": "2026-06-09T08:45:51.600Z",
+  "sampleSize": 1000,
+  "oldClientCanonicalCount": 31,
+  "newClientCanonicalCount": 72,
+  "additionalSkillsDetected": 1303,
+  "jobsImproved": 679,
+  "averageSkillCoverageBefore": 0.72,
+  "averageSkillCoverageAfter": 2.023,
+  "averageSkillCoverageDelta": 1.303,
+  "jobsImprovedPct": "67.9%"
+}

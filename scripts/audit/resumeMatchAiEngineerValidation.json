@@ -1,0 +1,250 @@
+{
+  "measuredAt": "2026-06-09T09:54:59.730Z",
+  "results": [
+    {
+      "title": "AI Engineer",
+      "matched": true,
+      "family": "engineering.ai",
+      "signalCount": 6,
+      "fitTier": 3,
+      "confidence": "low",
+      "signals": [
+        {
+          "canonical": "agile",
+          "source": "title_family"
+        },
+        {
+          "canonical": "docker",
+          "source": "title_family"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "title_family"
+        },
+        {
+          "canonical": "python",
+          "source": "title_family"
+        },
+        {
+          "canonical": "sql",
+          "source": "title_family"
+        },
+        {
+          "canonical": "typescript",
+          "source": "title_family"
+        }
+      ],
+      "needsParsedDescription": false
+    },
+    {
+      "title": "Senior AI Engineer",
+      "matched": true,
+      "family": "engineering.ai",
+      "signalCount": 6,
+      "fitTier": 3,
+      "confidence": "low",
+      "signals": [
+        {
+          "canonical": "agile",
+          "source": "title_family"
+        },
+        {
+          "canonical": "docker",
+          "source": "title_family"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "title_family"
+        },
+        {
+          "canonical": "python",
+          "source": "title_family"
+        },
+        {
+          "canonical": "sql",
+          "source": "title_family"
+        },
+        {
+          "canonical": "typescript",
+          "source": "title_family"
+        }
+      ],
+      "needsParsedDescription": false
+    },
+    {
+      "title": "Lead AI Engineer",
+      "matched": true,
+      "family": "engineering.ai",
+      "signalCount": 6,
+      "fitTier": 3,
+      "confidence": "low",
+      "signals": [
+        {
+          "canonical": "agile",
+          "source": "title_family"
+        },
+        {
+          "canonical": "docker",
+          "source": "title_family"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "title_family"
+        },
+        {
+          "canonical": "python",
+          "source": "title_family"
+        },
+        {
+          "canonical": "sql",
+          "source": "title_family"
+        },
+        {
+          "canonical": "typescript",
+          "source": "title_family"
+        }
+      ],
+      "needsParsedDescription": false
+    },
+    {
+      "title": "Staff AI Engineer",
+      "matched": true,
+      "family": "engineering.ai",
+      "signalCount": 6,
+      "fitTier": 3,
+      "confidence": "low",
+      "signals": [
+        {
+          "canonical": "agile",
+          "source": "title_family"
+        },
+        {
+          "canonical": "docker",
+          "source": "title_family"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "title_family"
+        },
+        {
+          "canonical": "python",
+          "source": "title_family"
+        },
+        {
+          "canonical": "sql",
+          "source": "title_family"
+        },
+        {
+          "canonical": "typescript",
+          "source": "title_family"
+        }
+      ],
+      "needsParsedDescription": false
+    },
+    {
+      "title": "Principal AI Engineer",
+      "matched": true,
+      "family": "engineering.ai",
+      "signalCount": 6,
+      "fitTier": 3,
+      "confidence": "low",
+      "signals": [
+        {
+          "canonical": "agile",
+          "source": "title_family"
+        },
+        {
+          "canonical": "docker",
+          "source": "title_family"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "title_family"
+        },
+        {
+          "canonical": "python",
+          "source": "title_family"
+        },
+        {
+          "canonical": "sql",
+          "source": "title_family"
+        },
+        {
+          "canonical": "typescript",
+          "source": "title_family"
+        }
+      ],
+      "needsParsedDescription": false
+    },
+    {
+      "title": "Machine Learning Engineer",
+      "matched": true,
+      "family": "engineering.ai",
+      "signalCount": 6,
+      "fitTier": 3,
+      "confidence": "low",
+      "signals": [
+        {
+          "canonical": "agile",
+          "source": "title_family"
+        },
+        {
+          "canonical": "docker",
+          "source": "title_family"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "title_family"
+        },
+        {
+          "canonical": "python",
+          "source": "title_family"
+        },
+        {
+          "canonical": "sql",
+          "source": "title_family"
+        },
+        {
+          "canonical": "typescript",
+          "source": "title_family"
+        }
+      ],
+      "needsParsedDescription": false
+    },
+    {
+      "title": "ML Engineer",
+      "matched": true,
+      "family": "engineering.ai",
+      "signalCount": 6,
+      "fitTier": 3,
+      "confidence": "low",
+      "signals": [
+        {
+          "canonical": "agile",
+          "source": "title_family"
+        },
+        {
+          "canonical": "docker",
+          "source": "title_family"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "title_family"
+        },
+        {
+          "canonical": "python",
+          "source": "title_family"
+        },
+        {
+          "canonical": "sql",
+          "source": "title_family"
+        },
+        {
+          "canonical": "typescript",
+          "source": "title_family"
+        }
+      ],
+      "needsParsedDescription": false
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 export type FitConfidence = "high" | "medium" | "low";
 
-export type FitTier = 1 | 2 | 3;
+export type FitTier = 1 | 2 | 3 | 4;
 
 export interface FitSignalMetadata {
   confidence: FitConfidence;
@@ -18,12 +18,21 @@ export interface FitSignalMetadata {
 export type FitUnavailableReason =
   | "empty_title"
   | "empty_description"
-  | "insufficient_signals";
+  | "insufficient_signals"
+  | "insufficient_evidence";
+
+export function isLowConfidenceFitTier(tier: FitTier | null | undefined): boolean {
+  return tier === 3 || tier === 4;
+}
 
 export function confidenceForFitTier(tier: FitTier): FitConfidence {
   if (tier === 1) return "high";
   if (tier === 2) return "medium";
   return "low";
+}
+
+export function isTitleFamilyLowTier(tier: FitTier | null | undefined): boolean {
+  return tier === 4;
 }
 
 export function confidenceLabel(confidence: FitConfidence): string {

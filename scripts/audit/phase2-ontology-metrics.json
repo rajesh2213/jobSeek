@@ -1,0 +1,31 @@
+{
+  "mode": "phase2",
+  "measuredAt": "2026-06-09T08:49:29.878Z",
+  "note": "Phase 2 ontology unification validation on current corpus (17167 jobs)",
+  "totalActivePublishable": 17167,
+  "scorable": 16540,
+  "unscorable": 627,
+  "unscorablePct": "3.65%",
+  "tierBreakdown": {
+    "tier1": 13399,
+    "tier2": 775,
+    "tier3": 2366,
+    "unavailable": 627
+  },
+  "ontology": {
+    "serverCanonicalCount": 72,
+    "clientCanonicalCount": 72,
+    "divergenceCount": 0,
+    "hiddenServerSkillsPct": "0.6%"
+  },
+  "comparisonToOldDictionarySameCorpus": {
+    "oldDictionaryUnscorablePct": "4.09%",
+    "newDictionaryUnscorablePct": "3.65%",
+    "improvement": "0.44pp fewer unscorable"
+  },
+  "comparisonToPhase1Historical": {
+    "phase1AfterUnscorablePct": "0.37%",
+    "phase1AfterJobCount": 16940,
+    "note": "Historical 0.37% was on smaller corpus; current DB has more edge-case listings"
+  }
+}

@@ -1,0 +1,2290 @@
+{
+  "measuredAt": "2026-06-09T08:45:53.942Z",
+  "results": [
+    {
+      "targetSkill": "vue",
+      "jobId": "f0d7d03c-9f8d-4bd0-b8d7-402c0dd5da07",
+      "title": "Sr Software Engineer",
+      "company": "MANTL",
+      "jobSkills": [
+        "agile",
+        "nodejs",
+        "recruiting",
+        "scrum",
+        "vue"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "nodejs",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "scrum",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "vue",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "vue",
+      "jobId": "5f680f43-99df-460b-97b2-e1f71d8b0785",
+      "title": "Sr. Software Engineer (MANTL)",
+      "company": "MANTL",
+      "jobSkills": [
+        "agile",
+        "nodejs",
+        "recruiting",
+        "scrum",
+        "vue"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "nodejs",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "scrum",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "vue",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "vue",
+      "jobId": "f0712072-efc4-4546-a62c-e042443849eb",
+      "title": "Conseiller(ère) Technique en Nutrition , REACH Malaria - Madagascar",
+      "company": "Path",
+      "jobSkills": [
+        "vue"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "vue",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "vue",
+      "jobId": "c9ffd5dd-ea9b-4a81-92b2-8b793ec2213f",
+      "title": "Manager, Software Development Engineering",
+      "company": "Workday",
+      "jobSkills": [
+        "agile",
+        "airflow",
+        "angular",
+        "graphql",
+        "kubernetes",
+        "nodejs",
+        "python",
+        "recruiting",
+        "vue"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "airflow",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "angular",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "graphql",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "nodejs",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "python",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "vue",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "vue",
+      "jobId": "33b7bf49-8df6-4bd0-9388-e86a75e314d9",
+      "title": "ELYSIS - Spécialiste comptabilité  et finance/ Accounting and Finance Specialist",
+      "company": "Alcoa",
+      "jobSkills": [
+        "accounting",
+        "agile",
+        "excel",
+        "vue"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "accounting",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "excel",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "vue",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "vue",
+      "jobId": "30008d32-bd67-490d-b025-063da95ea080",
+      "title": "Senior Product Developer",
+      "company": "Epocare",
+      "jobSkills": [
+        "angular",
+        "aws",
+        "docker",
+        "react",
+        "redis",
+        "sql",
+        "tailwind",
+        "typescript",
+        "vue"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "angular",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "aws",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "docker",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "react",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "redis",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "sql",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "tailwind",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "typescript",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "vue",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "vue",
+      "jobId": "86efb39a-6432-4fcc-8f86-6d6483ac4619",
+      "title": "Senior Product Developer",
+      "company": "Epocare",
+      "jobSkills": [
+        "angular",
+        "aws",
+        "docker",
+        "react",
+        "redis",
+        "sql",
+        "tailwind",
+        "typescript",
+        "vue"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "angular",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "aws",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "docker",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "react",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "redis",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "sql",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "tailwind",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "typescript",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "vue",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "vue",
+      "jobId": "4df48e04-c669-4727-b91c-dca00b89ca86",
+      "title": "Web Developer",
+      "company": "Goodyear",
+      "jobSkills": [
+        "agile",
+        "angular",
+        "aws",
+        "nodejs",
+        "scrum",
+        "typescript",
+        "vue"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "angular",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "aws",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "nodejs",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "scrum",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "typescript",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "vue",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "spring",
+      "jobId": "fa7c7db2-492f-4cb7-b800-6ddcc40c6689",
+      "title": "Senior Software Engineer",
+      "company": "Qualys",
+      "jobSkills": [
+        "docker",
+        "java",
+        "kafka",
+        "kubernetes",
+        "spring",
+        "sql"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "docker",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "java",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kafka",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "spring",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "sql",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "spring",
+      "jobId": "28639b5f-6053-45b2-9d2b-7ad5f09edcfc",
+      "title": "Lead Software Engineer",
+      "company": "Qualys",
+      "jobSkills": [
+        "aws",
+        "azure",
+        "elasticsearch",
+        "gcp",
+        "java",
+        "jenkins",
+        "kubernetes",
+        "redis",
+        "spring"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "aws",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "azure",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "elasticsearch",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "gcp",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "java",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "jenkins",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "redis",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "spring",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "spring",
+      "jobId": "9219e24d-df52-49a3-87dd-b4789f214a40",
+      "title": "Senior Software Engineer",
+      "company": "Qualys",
+      "jobSkills": [
+        "docker",
+        "java",
+        "jenkins",
+        "kafka",
+        "kubernetes",
+        "redis",
+        "spring"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "docker",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "java",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "jenkins",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kafka",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "redis",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "spring",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "spring",
+      "jobId": "1bfac872-70cd-430c-9194-82af6bed9721",
+      "title": "Lead Software Engineer",
+      "company": "Qualys",
+      "jobSkills": [
+        "agile",
+        "elasticsearch",
+        "java",
+        "kafka",
+        "redis",
+        "scrum",
+        "spring"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "elasticsearch",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "java",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kafka",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "redis",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "scrum",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "spring",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "spring",
+      "jobId": "e0a0618b-af78-4a2a-a62b-43d4539a3359",
+      "title": "Senior Splunk Engineer",
+      "company": "Qualys",
+      "jobSkills": [
+        "elasticsearch",
+        "java",
+        "jenkins",
+        "kubernetes",
+        "python",
+        "redis",
+        "spring"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "elasticsearch",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "java",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "jenkins",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "python",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "redis",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "spring",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "spring",
+      "jobId": "88ba284c-21d1-452f-ad86-950dc8194fc8",
+      "title": "Software Engineer",
+      "company": "Qualys",
+      "jobSkills": [
+        "agile",
+        "aws",
+        "azure",
+        "docker",
+        "elasticsearch",
+        "gcp",
+        "java",
+        "kafka",
+        "kubernetes",
+        "react",
+        "redis",
+        "spring"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "aws",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "azure",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "docker",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "elasticsearch",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "gcp",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "java",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kafka",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "react",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "redis",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "spring",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "spring",
+      "jobId": "6845a2c0-1d8d-4793-b9e4-f891a1740d21",
+      "title": "Lead Software Engineer",
+      "company": "Qualys",
+      "jobSkills": [
+        "docker",
+        "java",
+        "kafka",
+        "kubernetes",
+        "redis",
+        "spring"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "docker",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "java",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kafka",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "redis",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "spring",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "spring",
+      "jobId": "0867132e-bcab-4859-a8c5-7fb5cd96ce94",
+      "title": "Staff Software Engineer",
+      "company": "Qualys",
+      "jobSkills": [
+        "agile",
+        "docker",
+        "elasticsearch",
+        "java",
+        "kafka",
+        "kubernetes",
+        "spring",
+        "sql"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "docker",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "elasticsearch",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "java",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kafka",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "spring",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "sql",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "django",
+      "jobId": "91213911-899b-4b0c-9800-88fdb5c61247",
+      "title": "Senior Python Back End Engineer",
+      "company": "Loadsmart",
+      "jobSkills": [
+        "django",
+        "postgres",
+        "python"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "django",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "postgres",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "python",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "django",
+      "jobId": "03796b26-9a4d-436c-8d1e-8cb48fa283bc",
+      "title": "Software Engineer",
+      "company": "Aerovironment",
+      "jobSkills": [
+        "django",
+        "linux",
+        "python",
+        "sql"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "django",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "linux",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "python",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "sql",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "django",
+      "jobId": "61b8082e-0fb1-4bef-9890-df77a82901f1",
+      "title": "Software Engineer III/Senior Software Engineer (Full Stack)",
+      "company": "Workday",
+      "jobSkills": [
+        "agile",
+        "aws",
+        "django",
+        "docker",
+        "elasticsearch",
+        "fastapi",
+        "java",
+        "kubernetes",
+        "postgres",
+        "python",
+        "recruiting",
+        "typescript"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "aws",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "django",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "docker",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "elasticsearch",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "fastapi",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "java",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "postgres",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "python",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "typescript",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "django",
+      "jobId": "ce82fad6-3f3b-40fd-8996-a7db5d94ad1e",
+      "title": "Senior Software Development Engineer, Agentic AI",
+      "company": "Workday",
+      "jobSkills": [
+        "agile",
+        "aws",
+        "django",
+        "docker",
+        "elasticsearch",
+        "fastapi",
+        "java",
+        "kubernetes",
+        "postgres",
+        "python",
+        "recruiting",
+        "typescript"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "aws",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "django",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "docker",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "elasticsearch",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "fastapi",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "java",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "postgres",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "python",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "typescript",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "django",
+      "jobId": "dd48339c-293b-4bc7-9234-f17ec0f74a9d",
+      "title": "Sr Software Development Engineer (Full Stack) - Evisort AI",
+      "company": "Workday",
+      "jobSkills": [
+        "agile",
+        "aws",
+        "django",
+        "docker",
+        "elasticsearch",
+        "fastapi",
+        "java",
+        "kubernetes",
+        "postgres",
+        "python",
+        "recruiting",
+        "typescript"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "aws",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "django",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "docker",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "elasticsearch",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "fastapi",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "java",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "postgres",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "python",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "typescript",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "django",
+      "jobId": "bf088435-8870-4028-81f3-923584a1af63",
+      "title": "Software Development Engineer (Full Stack) - Evisort AI",
+      "company": "Workday",
+      "jobSkills": [
+        "agile",
+        "aws",
+        "django",
+        "docker",
+        "elasticsearch",
+        "fastapi",
+        "java",
+        "kubernetes",
+        "postgres",
+        "python",
+        "recruiting",
+        "typescript"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "aws",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "django",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "docker",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "elasticsearch",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "fastapi",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "java",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "postgres",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "python",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "typescript",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "django",
+      "jobId": "657cbaf5-35ec-4b95-b838-b9ae4ff0f478",
+      "title": "Lead Data Engineer (GenAI / LLM Applications)",
+      "company": "Clario",
+      "jobSkills": [
+        "airflow",
+        "aws",
+        "django",
+        "excel",
+        "jira",
+        "pandas",
+        "postgres",
+        "powerbi",
+        "python",
+        "snowflake",
+        "sql"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "airflow",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "aws",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "django",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "excel",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "jira",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "pandas",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "postgres",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "powerbi",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "python",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "snowflake",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "sql",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "django",
+      "jobId": "329c3f43-d76c-4f47-8108-a75b9f938aad",
+      "title": "Software Engineering Manager",
+      "company": "Equifax",
+      "jobSkills": [
+        "agile",
+        "django",
+        "jenkins",
+        "jira",
+        "linux",
+        "mongodb",
+        "mysql",
+        "postgres",
+        "ruby",
+        "scrum",
+        "sql"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "django",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "jenkins",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "jira",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "linux",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "mongodb",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "mysql",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "postgres",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "ruby",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "scrum",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "sql",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "salesforce",
+      "jobId": "ebfff477-93c1-44cc-8356-c8e399dde4ca",
+      "title": "Field Account Executive",
+      "company": "Playlist",
+      "jobSkills": [
+        "golang",
+        "ios",
+        "negotiation",
+        "rust",
+        "salesforce",
+        "typescript"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "golang",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "negotiation",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "rust",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "salesforce",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "typescript",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "salesforce",
+      "jobId": "8dc43b8d-26b6-4d0f-bdbb-353fba723f4c",
+      "title": "Field Account Executive",
+      "company": "Playlist",
+      "jobSkills": [
+        "golang",
+        "ios",
+        "negotiation",
+        "rust",
+        "salesforce",
+        "typescript"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "golang",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "negotiation",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "rust",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "salesforce",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "typescript",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "salesforce",
+      "jobId": "ff2ab147-294b-49b1-91ba-310dd17ae986",
+      "title": "Field Account Executive",
+      "company": "Booker",
+      "jobSkills": [
+        "golang",
+        "ios",
+        "negotiation",
+        "rust",
+        "salesforce",
+        "typescript"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "golang",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "negotiation",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "rust",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "salesforce",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "typescript",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "salesforce",
+      "jobId": "e459b721-7f1d-4883-9952-b4ed908271c7",
+      "title": "Field Account Executive",
+      "company": "Booker",
+      "jobSkills": [
+        "golang",
+        "ios",
+        "negotiation",
+        "rust",
+        "salesforce",
+        "typescript"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "golang",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "negotiation",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "rust",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "salesforce",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "typescript",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "salesforce",
+      "jobId": "47216e43-3650-450e-a6b3-3b283988cd06",
+      "title": "Sales Enablement Manager",
+      "company": "Phreesia",
+      "jobSkills": [
+        "salesforce"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "salesforce",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "salesforce",
+      "jobId": "11edea8b-b980-4d22-bb8c-817a5bdb14c8",
+      "title": "Sales Development Representative - Night Shift",
+      "company": "Dennemeyer",
+      "jobSkills": [
+        "customer-support",
+        "salesforce"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "customer-support",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "salesforce",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "salesforce",
+      "jobId": "2a43abfc-496d-4825-b109-3f800b5bbab4",
+      "title": "Principal Application Specialist, RevPro",
+      "company": "Qualys",
+      "jobSkills": [
+        "accounting",
+        "salesforce",
+        "sql"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "accounting",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "salesforce",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "sql",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "salesforce",
+      "jobId": "b7903582-3645-446a-afe2-97634574a327",
+      "title": "Principal SalesForce Developer",
+      "company": "Qualys",
+      "jobSkills": [
+        "agile",
+        "jenkins",
+        "salesforce",
+        "scrum"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "jenkins",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "salesforce",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "scrum",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "recruiting",
+      "jobId": "c7f91e53-dd81-4236-8311-767b300649cf",
+      "title": "Senior Developer 2",
+      "company": "Arctic Wolf",
+      "jobSkills": [
+        "agile",
+        "aws",
+        "azure",
+        "customer-support",
+        "excel",
+        "gcp",
+        "github-actions",
+        "golang",
+        "graphql",
+        "nextjs",
+        "nodejs",
+        "react",
+        "recruiting",
+        "rust",
+        "scala",
+        "typescript",
+        "Node",
+        "Next.js"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "aws",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "azure",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "customer-support",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "excel",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "gcp",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "github-actions",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "golang",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "graphql",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "nextjs",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "nodejs",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "react",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "rust",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "scala",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "typescript",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "recruiting",
+      "jobId": "a8f9f8ac-3ebf-47c4-ac89-ac18725fb37e",
+      "title": "Electric Line Groundworker - Silverthorne, CO",
+      "company": "Xcel Energy",
+      "jobSkills": [
+        "recruiting"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "recruiting",
+      "jobId": "e01f8d11-1b25-41f0-af0d-eae08e260e12",
+      "title": "Sr. Network Engineer",
+      "company": "MANTL",
+      "jobSkills": [
+        "aws",
+        "customer-support",
+        "linux",
+        "recruiting"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "aws",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "customer-support",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "linux",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "recruiting",
+      "jobId": "8705c17e-a149-4541-8d10-4f499b30ada1",
+      "title": "Implementation Consultant",
+      "company": "Zenoti",
+      "jobSkills": [
+        "counseling",
+        "excel",
+        "recruiting"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "counseling",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "excel",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "recruiting",
+      "jobId": "6f54ba57-29d5-4b3e-8d00-00f4146c501e",
+      "title": "Technical Support Engineer (Statsig)",
+      "company": "Amplitude",
+      "jobSkills": [
+        "bigquery",
+        "recruiting",
+        "snowflake"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "bigquery",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "snowflake",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "recruiting",
+      "jobId": "48786689-325d-4e3c-9fe3-e426279e29e5",
+      "title": "Property Coordinator",
+      "company": "Kimco Realty",
+      "jobSkills": [
+        "customer-support",
+        "excel",
+        "recruiting"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "customer-support",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "excel",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "recruiting",
+      "jobId": "4ce44a28-f211-4fd2-8009-1e7aef140ac2",
+      "title": "Senior Workday HCM Engineer",
+      "company": "Qualys",
+      "jobSkills": [
+        "customer-support",
+        "excel",
+        "recruiting"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "customer-support",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "excel",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "recruiting",
+      "jobId": "5af37bff-cfe2-468d-b90f-3a68aae45a5b",
+      "title": "Sr. Manager, Professional Services – Health & Life Sciences",
+      "company": "UiPath",
+      "jobSkills": [
+        "agile",
+        "recruiting"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "agile",
+      "jobId": "c7f91e53-dd81-4236-8311-767b300649cf",
+      "title": "Senior Developer 2",
+      "company": "Arctic Wolf",
+      "jobSkills": [
+        "agile",
+        "aws",
+        "azure",
+        "customer-support",
+        "excel",
+        "gcp",
+        "github-actions",
+        "golang",
+        "graphql",
+        "nextjs",
+        "nodejs",
+        "react",
+        "recruiting",
+        "rust",
+        "scala",
+        "typescript",
+        "Node",
+        "Next.js"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "aws",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "azure",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "customer-support",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "excel",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "gcp",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "github-actions",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "golang",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "graphql",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "nextjs",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "nodejs",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "react",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "rust",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "scala",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "typescript",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "agile",
+      "jobId": "a09fd314-3261-444f-b18d-64cbb6498fc3",
+      "title": "Software Engineer - .NET - Career",
+      "company": "Equifax",
+      "jobSkills": [
+        "agile",
+        "angular",
+        "gcp",
+        "java",
+        "jenkins",
+        "jira",
+        "mysql",
+        "scrum",
+        "sql",
+        "terraform"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "angular",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "gcp",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "java",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "jenkins",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "jira",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "mysql",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "scrum",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "sql",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "terraform",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "agile",
+      "jobId": "e6b14a3b-2bbe-4e19-8d91-5ced10a04f79",
+      "title": "Technical Account Manager",
+      "company": "UiPath",
+      "jobSkills": [
+        "agile",
+        "java"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "java",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "agile",
+      "jobId": "c0ac316f-c09d-4416-b376-793449051a4f",
+      "title": "Software Architect (f/m/d)",
+      "company": "Dennemeyer",
+      "jobSkills": [
+        "agile",
+        "docker",
+        "kubernetes",
+        "scrum",
+        "sql"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "docker",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "kubernetes",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "scrum",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "sql",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "agile",
+      "jobId": "193f840c-4043-49fa-8c55-ce6f1c1850cb",
+      "title": "Product Marketing Manager",
+      "company": "Dennemeyer",
+      "jobSkills": [
+        "agile"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "agile",
+      "jobId": "9aba8b10-37e0-4463-aeaf-078e3e04d8b9",
+      "title": "Tech Lead C# (f/m/d)",
+      "company": "Dennemeyer",
+      "jobSkills": [
+        "agile",
+        "azure",
+        "scrum",
+        "sql"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "azure",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "scrum",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "sql",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "agile",
+      "jobId": "e5d4eb06-f217-42d9-8511-2640eacc064a",
+      "title": "Scrum Master (f/m/d)",
+      "company": "Dennemeyer",
+      "jobSkills": [
+        "agile",
+        "azure",
+        "jira",
+        "scrum"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "azure",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "jira",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "scrum",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "agile",
+      "jobId": "1cb1ffcc-289e-4dc7-a1fb-1bdfd2ac1015",
+      "title": "Business Analyst (f/m/d)",
+      "company": "Dennemeyer",
+      "jobSkills": [
+        "agile"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "excel",
+      "jobId": "c7f91e53-dd81-4236-8311-767b300649cf",
+      "title": "Senior Developer 2",
+      "company": "Arctic Wolf",
+      "jobSkills": [
+        "agile",
+        "aws",
+        "azure",
+        "customer-support",
+        "excel",
+        "gcp",
+        "github-actions",
+        "golang",
+        "graphql",
+        "nextjs",
+        "nodejs",
+        "react",
+        "recruiting",
+        "rust",
+        "scala",
+        "typescript",
+        "Node",
+        "Next.js"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "agile",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "aws",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "azure",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "customer-support",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "excel",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "gcp",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "github-actions",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "golang",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "graphql",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "nextjs",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "nodejs",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "react",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "rust",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "scala",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "typescript",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    },
+    {
+      "targetSkill": "excel",
+      "jobId": "8705c17e-a149-4541-8d10-4f499b30ada1",
+      "title": "Implementation Consultant",
+      "company": "Zenoti",
+      "jobSkills": [
+        "counseling",
+        "excel",
+        "recruiting"
+      ],
+      "resolvedSkills": [
+        {
+          "canonical": "counseling",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "excel",
+          "source": "taxonomy"
+        },
+        {
+          "canonical": "recruiting",
+          "source": "taxonomy"
+        }
+      ],
+      "allSignals": [],
+      "confidence": null,
+      "fitTier": null,
+      "detectsTarget": true
+    }
+  ]
+}

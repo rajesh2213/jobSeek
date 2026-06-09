@@ -1,0 +1,203 @@
+{
+  "measuredAt": "2026-06-09T08:41:25.146Z",
+  "sampleSize": 1000,
+  "totalActivePublishableJobs": 17166,
+  "ontology": {
+    "serverCanonicalCount": 72,
+    "clientCanonicalCount": 31,
+    "sharedCanonicalCount": 23,
+    "divergenceCount": 57,
+    "onlyOnServer": [
+      "accounting",
+      "agile",
+      "airflow",
+      "android",
+      "angular",
+      "ansible",
+      "bigquery",
+      "bookkeeping",
+      "cloudformation",
+      "counseling",
+      "customer-support",
+      "databricks",
+      "django",
+      "dynamodb",
+      "excel",
+      "fastapi",
+      "figma",
+      "flutter",
+      "github-actions",
+      "grafana",
+      "huggingface",
+      "jenkins",
+      "jira",
+      "kotlin",
+      "linux",
+      "negotiation",
+      "nursing",
+      "pandas",
+      "php",
+      "postgres",
+      "powerbi",
+      "project-management",
+      "prometheus",
+      "pytorch",
+      "react-native",
+      "recruiting",
+      "ruby",
+      "salesforce",
+      "scala",
+      "scikit-learn",
+      "scrum",
+      "snowflake",
+      "spark",
+      "spring",
+      "tableau",
+      "tailwind",
+      "teaching",
+      "tensorflow",
+      "vue"
+    ],
+    "onlyOnClient": [
+      "csharp",
+      "dotnet",
+      "grpc",
+      "javascript",
+      "nosql",
+      "opensearch",
+      "postgresql",
+      "rabbitmq"
+    ],
+    "serverAliasCount": 101
+  },
+  "jobs": {
+    "sampled": 1000,
+    "withTaxonomySkills": 712,
+    "withClientVisibleSkills": 229,
+    "withHiddenServerSkills": 678,
+    "hiddenServerSkillsPct": "95.2%"
+  },
+  "topMissingSkills": [
+    {
+      "skill": "excel",
+      "count": 222
+    },
+    {
+      "skill": "recruiting",
+      "count": 216
+    },
+    {
+      "skill": "project-management",
+      "count": 118
+    },
+    {
+      "skill": "agile",
+      "count": 103
+    },
+    {
+      "skill": "customer-support",
+      "count": 96
+    },
+    {
+      "skill": "linux",
+      "count": 65
+    },
+    {
+      "skill": "accounting",
+      "count": 63
+    },
+    {
+      "skill": "negotiation",
+      "count": 51
+    },
+    {
+      "skill": "salesforce",
+      "count": 48
+    },
+    {
+      "skill": "jira",
+      "count": 42
+    },
+    {
+      "skill": "scrum",
+      "count": 30
+    },
+    {
+      "skill": "jenkins",
+      "count": 26
+    },
+    {
+      "skill": "spring",
+      "count": 18
+    },
+    {
+      "skill": "powerbi",
+      "count": 13
+    },
+    {
+      "skill": "tableau",
+      "count": 13
+    },
+    {
+      "skill": "angular",
+      "count": 12
+    },
+    {
+      "skill": "pytorch",
+      "count": 10
+    },
+    {
+      "skill": "ansible",
+      "count": 10
+    },
+    {
+      "skill": "grafana",
+      "count": 10
+    },
+    {
+      "skill": "scala",
+      "count": 9
+    },
+    {
+      "skill": "tensorflow",
+      "count": 9
+    },
+    {
+      "skill": "counseling",
+      "count": 8
+    },
+    {
+      "skill": "teaching",
+      "count": 8
+    },
+    {
+      "skill": "prometheus",
+      "count": 8
+    },
+    {
+      "skill": "ruby",
+      "count": 8
+    },
+    {
+      "skill": "spark",
+      "count": 7
+    },
+    {
+      "skill": "pandas",
+      "count": 7
+    },
+    {
+      "skill": "github-actions",
+      "count": 5
+    },
+    {
+      "skill": "php",
+      "count": 5
+    },
+    {
+      "skill": "snowflake",
+      "count": 5
+    }
+  ],
+  "topMissingAliases": []
+}

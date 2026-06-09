@@ -6,20 +6,11 @@ export {
   CANONICAL_SET,
   ALIASES_BY_CANONICAL,
   dictionaryFingerprintPayload,
-} from "./dictionaryData.js";
-export {
-  MIN_ALIAS_LENGTH,
-  SKILL_ALIAS_ENTRIES,
-  SKILL_ALIAS_MAP,
-  KNOWN_SKILL_SLUGS,
-  isKnownSkillSlug,
-  type AliasMode,
-  type SkillAliasEntry,
-} from "./taxonomy.js";
-export { djb2Hash32 } from "./hash.js";
-export { keywordMatches, extractEnrichmentTechStack } from "./enrichment.js";
+} from "./dictionaryData.ts";
+export { djb2Hash32 } from "./hash.ts";
+export { keywordMatches, extractEnrichmentTechStack } from "./enrichment.ts";
 
-import { djb2Hash32 } from "./hash.js";
+import { djb2Hash32 } from "./hash.ts";
 import {
   ENRICHMENT_KEYWORDS,
   dictionaryFingerprintPayload,
@@ -27,7 +18,7 @@ import {
   TOKEN_TO_CANONICAL,
   CANONICAL_SET,
   CANONICAL_IDS,
-} from "./dictionaryData.js";
+} from "./dictionaryData.ts";
 
 export const DICTIONARY_VERSION: string = `djb2-${djb2Hash32(dictionaryFingerprintPayload())}`;
 

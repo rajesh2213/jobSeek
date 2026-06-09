@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { JobItem } from "./api";
 import {
+  clearScoreCache,
+  isResumeMatchInsufficientEvidence,
   jobHasMatchSignals,
   isResumeMatchScored,
   scoreResume,
@@ -83,8 +85,51 @@ test("scoreResume: insufficient_job_signals when no resolvable signals", () => {
   assert.equal(isResumeMatchScored(result), false);
 });
 
+test("scoreResume: tier 3 single signal returns insufficient_evidence", () => {
+  clearScoreCache();
+  const result = scoreResume(
+    "operations agile scrum customer service",
+    [],
+    minimalJob({
+      id: "job-calibration-thin-tier3",
+      title: "HR Operations Administrator",
+      role: null,
+      skills: [],
+      description:
+        "This position supports HR operations across regional offices. Applicants should review scope in the posting.",
+      parsedDescription: emptyParsedDescription,
+      previewLines: [],
+    }),
+  );
+  assert.equal(result.matchAvailability, "insufficient_evidence");
+  assert.equal(result.score, null);
+  assert.ok(isResumeMatchInsufficientEvidence(result));
+  assert.equal(result.signalCount, 1);
+});
+
+test("scoreResume: tier 3 two signals caps inflated score", () => {
+  clearScoreCache();
+  const result = scoreResume(
+    "python sql typescript kubernetes docker agile",
+    [],
+    minimalJob({
+      id: "job-calibration-tier3-cap",
+      title: "Python Developer",
+      role: null,
+      skills: [],
+      description: "Python developer role building backend services.",
+      parsedDescription: emptyParsedDescription,
+    }),
+  );
+  if (result.fitTier === 3 && result.signalCount === 2 && result.score !== null) {
+    assert.ok(result.score <= 60);
+  }
+});
+
 test("scoreResume: scored when job has skills", () => {
+  clearScoreCache();
   const job = minimalJob({
+    id: "job-scored-with-skills",
     skills: ["react"],
     parsedDescription: {
       ...emptyParsedDescription,

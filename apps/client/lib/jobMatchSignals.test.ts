@@ -5,7 +5,9 @@ import {
   MIN_JOB_MATCH_SIGNALS,
   isDescriptionFallbackKeyword,
   jobHasResolvableMatchSignals,
+  matchTitleFamilyLowPack,
   resolveJobMatchSkills,
+  resolveJobMatchSkillsWithMeta,
 } from "./jobMatchSignals";
 
 const emptyParsedDescription = {
@@ -119,6 +121,108 @@ test("isDescriptionFallbackKeyword: accepts dictionary and allowlist skills", ()
   assert.equal(isDescriptionFallbackKeyword("python"), true);
   assert.equal(isDescriptionFallbackKeyword("sql"), true);
   assert.equal(isDescriptionFallbackKeyword("machine learning"), true);
+});
+
+test("resolveJobMatchSkills: parsed requirements do not emit generic prose tokens", () => {
+  const skills = resolveJobMatchSkills(
+    minimalJob({
+      title: "Operations Coordinator",
+      parsedDescription: {
+        ...emptyParsedDescription,
+        requirement: [
+          "Seeking a senior contributor who combines practical expertise with scalable workflows and business execution.",
+        ],
+      },
+      description: "",
+      previewLines: [],
+    }),
+  );
+  const canonicals = skills.map((s) => s.canonical);
+  assert.ok(!canonicals.includes("contributor"));
+  assert.ok(!canonicals.includes("seeking"));
+  assert.ok(!canonicals.includes("combines"));
+});
+
+test("resolveJobMatchSkills: Senior AI Engineer scorable on list-shaped payload", () => {
+  const skills = resolveJobMatchSkills(
+    minimalJob({
+      title: "Senior AI Engineer",
+      role: "engineering",
+      skills: [],
+      description: null,
+      previewLines: [
+        "Cloudinary is seeking a Senior AI Engineer to drive automation, integrations, and AI enablement across the organization.",
+      ],
+      parsedDescription: {
+        ...emptyParsedDescription,
+        requirement: [
+          "Drive automation and AI enablement",
+          "Design scalable integrations",
+          "Python and cloud experience preferred",
+        ],
+      },
+    }),
+  );
+  assert.ok(skills.length >= MIN_JOB_MATCH_SIGNALS);
+  assert.ok(skills.some((s) => s.canonical === "python" || s.source === "title_family"));
+  assert.ok(!skills.some((s) => s.canonical === "contributor" || s.canonical === "enablement"));
+});
+
+test("resolveJobMatchSkills: tier 3.5 low-confidence recovery for Mine Designer", () => {
+  const resolution = resolveJobMatchSkillsWithMeta(
+    minimalJob({
+      title: "Mine Designer",
+      role: null,
+      description:
+        "This position is based in Western Australia. Applicants should review the full posting for scope and expectations.",
+      parsedDescription: {
+        ...emptyParsedDescription,
+        requirement: [
+          "Seeking a senior contributor who combines practical expertise with scalable workflows.",
+        ],
+      },
+      previewLines: [],
+    }),
+  );
+  assert.equal(resolution.fitTier, 4);
+  assert.equal(resolution.confidence, "low");
+  assert.ok(resolution.skills.length >= MIN_JOB_MATCH_SIGNALS);
+  assert.ok(resolution.skills.every((s) => s.source === "title_family_low"));
+  assert.ok(resolution.skills.some((s) => s.canonical === "design"));
+  assert.ok(!resolution.skills.some((s) => s.canonical === "contributor"));
+});
+
+test("scoreResume: title_family_low signals never appear as missing gaps", async () => {
+  const { scoreResume, clearScoreCache } = await import("./resumeScorer");
+  clearScoreCache();
+  const result = scoreResume(
+    "Experienced program manager with stakeholder communication skills.",
+    [],
+    minimalJob({
+      title: "Mine Designer",
+      role: null,
+      description:
+        "This position is based in Western Australia. Applicants should review the full posting for scope and expectations.",
+      parsedDescription: emptyParsedDescription,
+      previewLines: [],
+    }),
+  );
+  assert.equal(result.fitTier, 4);
+  assert.equal(result.missing.length, 0);
+});
+
+test("matchTitleFamilyLowPack: Physical Therapist and Account Executive families", () => {
+  const pt = matchTitleFamilyLowPack(
+    minimalJob({ title: "Physical Therapist", description: "Provide patient care in outpatient clinic." }),
+  );
+  assert.equal(pt?.family, "healthcare.therapy");
+  assert.ok(pt?.skills.includes("rehabilitation"));
+
+  const ae = matchTitleFamilyLowPack(
+    minimalJob({ title: "Account Executive", description: "Own enterprise sales pipeline and CRM hygiene." }),
+  );
+  assert.equal(ae?.family, "sales.account_executive");
+  assert.ok(ae?.skills.includes("negotiation"));
 });
 
 test("resolveJobMatchSkills: description fallback skips generic prose gaps", () => {

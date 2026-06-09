@@ -1,0 +1,28 @@
+{
+  "measuredAt": "2026-06-09T08:45:48.717Z",
+  "sampleSize": 1000,
+  "totalActivePublishableJobs": 17167,
+  "ontology": {
+    "serverCanonicalCount": 72,
+    "clientCanonicalCount": 72,
+    "sharedCanonicalCount": 72,
+    "divergenceCount": 0,
+    "onlyOnServer": [],
+    "onlyOnClient": [],
+    "serverAliasCount": 101
+  },
+  "jobs": {
+    "sampled": 1000,
+    "withTaxonomySkills": 712,
+    "withClientVisibleSkills": 712,
+    "withHiddenServerSkills": 4,
+    "hiddenServerSkillsPct": "0.6%"
+  },
+  "topMissingSkills": [
+    {
+      "skill": "scikit-learn",
+      "count": 4
+    }
+  ],
+  "topMissingAliases": []
+}

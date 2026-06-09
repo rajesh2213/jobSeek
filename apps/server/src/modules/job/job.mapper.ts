@@ -85,6 +85,7 @@ export function toJobListJson(job: JobWithCompanyRow): Record<string, unknown> {
   return {
     id: job.id,
     title: job.title,
+    role: job.role,
     status: job.status,
     country: job.country,
     locationCountry: job.locationCountry,

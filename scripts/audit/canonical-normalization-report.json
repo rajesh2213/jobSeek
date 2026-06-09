@@ -1,0 +1,479 @@
+{
+  "measuredAt": "2026-06-09T08:45:49.677Z",
+  "canonicalCount": 72,
+  "aliasEntryCount": 101,
+  "uniqueAliasCount": 101,
+  "tokenMapSize": 80,
+  "canonicals": [
+    {
+      "canonical": "aws",
+      "aliases": [
+        "amazon web services",
+        "aws"
+      ]
+    },
+    {
+      "canonical": "gcp",
+      "aliases": [
+        "gcp",
+        "google cloud",
+        "google cloud platform"
+      ]
+    },
+    {
+      "canonical": "azure",
+      "aliases": [
+        "azure",
+        "microsoft azure"
+      ]
+    },
+    {
+      "canonical": "terraform",
+      "aliases": [
+        "terraform"
+      ]
+    },
+    {
+      "canonical": "cloudformation",
+      "aliases": [
+        "cloud formation",
+        "cloudformation"
+      ]
+    },
+    {
+      "canonical": "pulumi",
+      "aliases": [
+        "pulumi"
+      ]
+    },
+    {
+      "canonical": "nodejs",
+      "aliases": [
+        "node.js",
+        "nodejs"
+      ]
+    },
+    {
+      "canonical": "python",
+      "aliases": [
+        "python"
+      ]
+    },
+    {
+      "canonical": "java",
+      "aliases": [
+        "java"
+      ]
+    },
+    {
+      "canonical": "golang",
+      "aliases": [
+        "golang"
+      ]
+    },
+    {
+      "canonical": "rust",
+      "aliases": [
+        "rust"
+      ]
+    },
+    {
+      "canonical": "ruby",
+      "aliases": [
+        "ruby"
+      ]
+    },
+    {
+      "canonical": "php",
+      "aliases": [
+        "php"
+      ]
+    },
+    {
+      "canonical": "scala",
+      "aliases": [
+        "scala"
+      ]
+    },
+    {
+      "canonical": "kotlin",
+      "aliases": [
+        "kotlin"
+      ]
+    },
+    {
+      "canonical": "fastapi",
+      "aliases": [
+        "fast api",
+        "fastapi"
+      ]
+    },
+    {
+      "canonical": "django",
+      "aliases": [
+        "django"
+      ]
+    },
+    {
+      "canonical": "spring",
+      "aliases": [
+        "spring boot",
+        "spring framework"
+      ]
+    },
+    {
+      "canonical": "react",
+      "aliases": [
+        "react.js",
+        "reactjs"
+      ]
+    },
+    {
+      "canonical": "vue",
+      "aliases": [
+        "vue",
+        "vue.js"
+      ]
+    },
+    {
+      "canonical": "angular",
+      "aliases": [
+        "angular"
+      ]
+    },
+    {
+      "canonical": "nextjs",
+      "aliases": [
+        "next.js",
+        "nextjs"
+      ]
+    },
+    {
+      "canonical": "svelte",
+      "aliases": [
+        "svelte"
+      ]
+    },
+    {
+      "canonical": "tailwind",
+      "aliases": [
+        "tailwind",
+        "tailwindcss"
+      ]
+    },
+    {
+      "canonical": "graphql",
+      "aliases": [
+        "graph ql",
+        "graphql"
+      ]
+    },
+    {
+      "canonical": "pytorch",
+      "aliases": [
+        "py torch",
+        "pytorch"
+      ]
+    },
+    {
+      "canonical": "tensorflow",
+      "aliases": [
+        "tensorflow"
+      ]
+    },
+    {
+      "canonical": "spark",
+      "aliases": [
+        "apache spark",
+        "pyspark"
+      ]
+    },
+    {
+      "canonical": "kafka",
+      "aliases": [
+        "kafka"
+      ]
+    },
+    {
+      "canonical": "airflow",
+      "aliases": [
+        "airflow",
+        "apache airflow"
+      ]
+    },
+    {
+      "canonical": "snowflake",
+      "aliases": [
+        "snowflake"
+      ]
+    },
+    {
+      "canonical": "databricks",
+      "aliases": [
+        "databricks"
+      ]
+    },
+    {
+      "canonical": "pandas",
+      "aliases": [
+        "pandas"
+      ]
+    },
+    {
+      "canonical": "scikit-learn",
+      "aliases": [
+        "scikit-learn",
+        "sklearn"
+      ]
+    },
+    {
+      "canonical": "huggingface",
+      "aliases": [
+        "hugging face",
+        "huggingface"
+      ]
+    },
+    {
+      "canonical": "postgres",
+      "aliases": [
+        "postgres",
+        "postgresql"
+      ]
+    },
+    {
+      "canonical": "mysql",
+      "aliases": [
+        "mysql"
+      ]
+    },
+    {
+      "canonical": "mongodb",
+      "aliases": [
+        "mongo",
+        "mongodb"
+      ]
+    },
+    {
+      "canonical": "redis",
+      "aliases": [
+        "redis"
+      ]
+    },
+    {
+      "canonical": "elasticsearch",
+      "aliases": [
+        "elasticsearch"
+      ]
+    },
+    {
+      "canonical": "dynamodb",
+      "aliases": [
+        "dynamo db",
+        "dynamodb"
+      ]
+    },
+    {
+      "canonical": "bigquery",
+      "aliases": [
+        "big query",
+        "bigquery"
+      ]
+    },
+    {
+      "canonical": "kubernetes",
+      "aliases": [
+        "k8s",
+        "kubernetes"
+      ]
+    },
+    {
+      "canonical": "docker",
+      "aliases": [
+        "docker"
+      ]
+    },
+    {
+      "canonical": "jenkins",
+      "aliases": [
+        "jenkins"
+      ]
+    },
+    {
+      "canonical": "github-actions",
+      "aliases": [
+        "github actions",
+        "github-actions"
+      ]
+    },
+    {
+      "canonical": "ansible",
+      "aliases": [
+        "ansible"
+      ]
+    },
+    {
+      "canonical": "prometheus",
+      "aliases": [
+        "prometheus"
+      ]
+    },
+    {
+      "canonical": "grafana",
+      "aliases": [
+        "grafana"
+      ]
+    },
+    {
+      "canonical": "android",
+      "aliases": [
+        "android"
+      ]
+    },
+    {
+      "canonical": "react-native",
+      "aliases": [
+        "react native",
+        "react-native"
+      ]
+    },
+    {
+      "canonical": "flutter",
+      "aliases": [
+        "flutter"
+      ]
+    },
+    {
+      "canonical": "figma",
+      "aliases": [
+        "figma"
+      ]
+    },
+    {
+      "canonical": "salesforce",
+      "aliases": [
+        "salesforce"
+      ]
+    },
+    {
+      "canonical": "jira",
+      "aliases": [
+        "jira"
+      ]
+    },
+    {
+      "canonical": "tableau",
+      "aliases": [
+        "tableau"
+      ]
+    },
+    {
+      "canonical": "powerbi",
+      "aliases": [
+        "power bi",
+        "powerbi"
+      ]
+    },
+    {
+      "canonical": "linux",
+      "aliases": [
+        "linux"
+      ]
+    },
+    {
+      "canonical": "typescript",
+      "aliases": [
+        "typescript"
+      ]
+    },
+    {
+      "canonical": "sql",
+      "aliases": [
+        "sql"
+      ]
+    },
+    {
+      "canonical": "excel",
+      "aliases": [
+        "excel"
+      ]
+    },
+    {
+      "canonical": "customer-support",
+      "aliases": [
+        "customer service",
+        "customer support",
+        "customer-support"
+      ]
+    },
+    {
+      "canonical": "recruiting",
+      "aliases": [
+        "recruiting"
+      ]
+    },
+    {
+      "canonical": "project-management",
+      "aliases": [
+        "project management",
+        "project-management"
+      ]
+    },
+    {
+      "canonical": "agile",
+      "aliases": [
+        "agile"
+      ]
+    },
+    {
+      "canonical": "scrum",
+      "aliases": [
+        "scrum"
+      ]
+    },
+    {
+      "canonical": "negotiation",
+      "aliases": [
+        "negotiation"
+      ]
+    },
+    {
+      "canonical": "accounting",
+      "aliases": [
+        "accounting"
+      ]
+    },
+    {
+      "canonical": "bookkeeping",
+      "aliases": [
+        "bookkeeping"
+      ]
+    },
+    {
+      "canonical": "nursing",
+      "aliases": [
+        "nursing"
+      ]
+    },
+    {
+      "canonical": "teaching",
+      "aliases": [
+        "teaching"
+      ]
+    },
+    {
+      "canonical": "counseling",
+      "aliases": [
+        "counseling"
+      ]
+    }
+  ],
+  "resolvedSynonymGroups": [],
+  "duplicateCanonicals": [],
+  "postgresNormalization": {
+    "canonical": "postgres",
+    "aliases": [
+      "postgres",
+      "postgresql"
+    ]
+  }
+}

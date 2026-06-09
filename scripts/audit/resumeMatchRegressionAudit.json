@@ -1,0 +1,595 @@
+{
+  "summary": {
+    "measuredAt": "2026-06-09T10:50:08.514Z",
+    "sampleSize": 2000,
+    "totalActivePublishable": 17516,
+    "phase1Commit": "c2e84c8",
+    "phase1Unscorable": 79,
+    "phase2Unscorable": 28,
+    "phase1UnscorablePct": "3.95%",
+    "phase2UnscorablePct": "1.40%",
+    "scorableToUnavailable": 9,
+    "unavailableToScorable": 60,
+    "ontologyRegression": 0,
+    "strictFilterRegression": 2,
+    "descriptionFallbackRegression": 0,
+    "titleFamilyMismatch": 0,
+    "nonEnglish": 6,
+    "corruptData": 0,
+    "parserGap": 0,
+    "other": 1,
+    "corpusDriftNote": "Historical Phase 1 after-metrics (0.37%) was on 16940 jobs Jun 8. Current sample uses latest 2000 by freshness on expanded corpus.",
+    "explainedPct": "100.0%"
+  },
+  "regressions": [
+    {
+      "jobId": "d48ee8e7-6914-4171-911c-ec49d06cfa02",
+      "title": "Experienced Investors (HNWI): 45-Minute Survey on Investment Strategies",
+      "company": "Terac",
+      "phase1Signals": [
+        {
+          "canonical": "industries",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "languages",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "participants",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "recruit",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "researchers",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "screen",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "study",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "terac",
+          "source": "sparse_requirement"
+        }
+      ],
+      "phase2Signals": [],
+      "phase1SignalCount": 8,
+      "phase2SignalCount": 0,
+      "phase1ListScorable": false,
+      "phase2ListScorable": false,
+      "rootCause": "other"
+    },
+    {
+      "jobId": "4aaf15cf-6de3-411c-90df-c262953e3eef",
+      "title": "Professionals With Corporate Cards: Feedback on Expense Workflows",
+      "company": "Terac",
+      "phase1Signals": [
+        {
+          "canonical": "business",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "common",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "demonstrate",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "employees",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "friction",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "helps",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "identify",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "industries",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "languages",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "navigate",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "participants",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "points",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "purchasing",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "recruit",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "researchers",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "screen",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "study",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "tasks",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "terac",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "tools",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "transactions",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "typically",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "workflows",
+          "source": "sparse_requirement"
+        }
+      ],
+      "phase2Signals": [],
+      "phase1SignalCount": 23,
+      "phase2SignalCount": 0,
+      "phase1ListScorable": false,
+      "phase2ListScorable": false,
+      "rootCause": "strict_filter_regression"
+    },
+    {
+      "jobId": "0c55a407-67e0-49f6-8ae8-75de69d7b8cb",
+      "title": "Employee Engagement Internship",
+      "company": "Equifax",
+      "phase1Signals": [
+        {
+          "canonical": "business",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "communications",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "field",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "final",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "organizational",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "psychology",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "related",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "university",
+          "source": "sparse_requirement"
+        }
+      ],
+      "phase2Signals": [],
+      "phase1SignalCount": 8,
+      "phase2SignalCount": 0,
+      "phase1ListScorable": false,
+      "phase2ListScorable": false,
+      "rootCause": "strict_filter_regression"
+    },
+    {
+      "jobId": "74fc6d48-e390-4bee-b047-b316c53c9a11",
+      "title": "technicien en laboratoire pré-analytique",
+      "company": "ezyVet",
+      "phase1Signals": [
+        {
+          "canonical": "14h00",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "6h-13h20",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "6h30",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "auxiliaire",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "avez-vous",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "besoin",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "biologie",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "connaissances",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "dical",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "formation",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "laboratoire",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "licence/bachelor",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "mardi",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "possible",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "poste",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "pourvoir",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "qualification",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "quivalente",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "rience",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "rinaire",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "samedi",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "semaine",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "taire/assistant",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "ussir",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "vendredi",
+          "source": "sparse_requirement"
+        }
+      ],
+      "phase2Signals": [],
+      "phase1SignalCount": 25,
+      "phase2SignalCount": 0,
+      "phase1ListScorable": false,
+      "phase2ListScorable": false,
+      "rootCause": "non_english"
+    },
+    {
+      "jobId": "3365998f-6885-44c9-9cd5-3e4497eb749c",
+      "title": "Operadora de Produção (Vaga Afirmativa para Mulheres)",
+      "company": "Alcoa",
+      "phase1Signals": [
+        {
+          "canonical": "authentic",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "belonging",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "empowered",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "place",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "sense",
+          "source": "sparse_requirement"
+        }
+      ],
+      "phase2Signals": [],
+      "phase1SignalCount": 5,
+      "phase2SignalCount": 0,
+      "phase1ListScorable": false,
+      "phase2ListScorable": false,
+      "rootCause": "non_english"
+    },
+    {
+      "jobId": "bf588d7d-576d-43d4-97b5-1fea552a2d13",
+      "title": "Operadora(or) de Refusão (Vaga Afirmativa para Pessoas com Deficiência)",
+      "company": "Alcoa",
+      "phase1Signals": [
+        {
+          "canonical": "authentic",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "belonging",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "empowered",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "place",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "sense",
+          "source": "sparse_requirement"
+        }
+      ],
+      "phase2Signals": [],
+      "phase1SignalCount": 5,
+      "phase2SignalCount": 0,
+      "phase1ListScorable": false,
+      "phase2ListScorable": false,
+      "rootCause": "non_english"
+    },
+    {
+      "jobId": "3e4a8a95-fa80-40f9-be84-16cd24c4fdc6",
+      "title": "Responsable régional, Gestion des projets majeurs",
+      "company": "Alcoa",
+      "phase1Signals": [
+        {
+          "canonical": "authentic",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "aware",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "belonging",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "eagle",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "empowered",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "faisons",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "galement",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "groupes",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "inclusion",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "mondiaux",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "partie",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "place",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "sense",
+          "source": "sparse_requirement"
+        }
+      ],
+      "phase2Signals": [],
+      "phase1SignalCount": 13,
+      "phase2SignalCount": 0,
+      "phase1ListScorable": false,
+      "phase2ListScorable": false,
+      "rootCause": "non_english"
+    },
+    {
+      "jobId": "3676fe98-8b9c-4cf0-a6ce-245675555674",
+      "title": "Conseiller(ère) santé et sécurité - (Alcoa | ABI)",
+      "company": "Alcoa",
+      "phase1Signals": [
+        {
+          "canonical": "1986",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "aluminerie",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "aluminum",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "authentic",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "aware",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "belonging",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "cancour",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "center-du-qu",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "eagle",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "empowered",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "established",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "faisons",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "galement",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "groupes",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "inclusion",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "industrial",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "location",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "mondiaux",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "partie",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "place",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "plant",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "production",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "sense",
+          "source": "sparse_requirement"
+        }
+      ],
+      "phase2Signals": [],
+      "phase1SignalCount": 23,
+      "phase2SignalCount": 0,
+      "phase1ListScorable": false,
+      "phase2ListScorable": false,
+      "rootCause": "non_english"
+    },
+    {
+      "jobId": "9a427574-f1b3-431e-adc4-7fd1d4825f29",
+      "title": "Judicial Law Clerk",
+      "company": "LegalTrustAI",
+      "phase1Signals": [
+        {
+          "canonical": "applicants",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "avoid",
+          "source": "sparse_requirement"
+        },
+        {
+          "canonical": "feature",
+          "source": "sparse_requirement"
+        }
+      ],
+      "phase2Signals": [],
+      "phase1SignalCount": 3,
+      "phase2SignalCount": 0,
+      "phase1ListScorable": false,
+      "phase2ListScorable": false,
+      "rootCause": "non_english"
+    }
+  ]
+}

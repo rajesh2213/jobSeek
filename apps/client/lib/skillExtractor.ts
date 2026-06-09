@@ -13,7 +13,8 @@ export type JobSkillSource =
   | "sparse_responsibility"
   | "role_hint"
   | "description_fallback"
-  | "title_family";
+  | "title_family"
+  | "title_family_low";
 
 export interface JobSkill {
   canonical: string;

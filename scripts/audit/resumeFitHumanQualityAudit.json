@@ -1,0 +1,4011 @@
+{
+  "measuredAt": "2026-06-09T12:30:50.400Z",
+  "recommendation": "NO_GO",
+  "blockers": [
+    "gap_violations:270",
+    "unreasonable_manual_samples:22/50",
+    "false_confidence:6"
+  ],
+  "part1_manualSampling": {
+    "sampleSize": 50,
+    "reasonableCount": 28,
+    "unreasonableCount": 22,
+    "jobs": [
+      {
+        "jobId": "829f2bf0-1ec4-4d17-8750-e9b606fc2c99",
+        "title": "Product Developer, Sr-Fullstack with Kafka",
+        "category": "Engineering",
+        "company": "Epocare",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "azure",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "kafka",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "nodejs",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "typescript",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "react",
+            "source": "parsed_requirement"
+          },
+          {
+            "canonical": "analytics",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "design",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "engineering",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "erp",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:design:verb"
+      },
+      {
+        "jobId": "0ad2908b-7166-42d1-8de7-b73a4fa60254",
+        "title": "Sr. Electrical Test Engineer - Space Technologies",
+        "category": "Engineering",
+        "company": "Aerovironment",
+        "fitTier": 2,
+        "confidence": "medium",
+        "signals": [
+          {
+            "canonical": "java",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "python",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "compliance",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "design",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "engineering",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "planning",
+            "source": "description_fallback"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:design:verb"
+      },
+      {
+        "jobId": "6e5c1ad9-5a7a-4d44-b67e-df786841d9ec",
+        "title": "Simulator technician l",
+        "category": "Engineering",
+        "company": "CAE",
+        "fitTier": 2,
+        "confidence": "medium",
+        "signals": [
+          {
+            "canonical": "customer-support",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "compliance",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "operations",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "safety",
+            "source": "description_fallback"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "2c9a39fa-98e3-449f-966a-e1632164b98d",
+        "title": "FLISR \"Protection and Coordination \" Engineer (Entry, Staff, Senior or Principal)",
+        "category": "Engineering",
+        "company": "Xcel Energy",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "accounting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "recruiting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "design",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "engineering",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "operations",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "research",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "research design",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:design:verb; bad_signal:research:verb"
+      },
+      {
+        "jobId": "f4591d4a-5786-4de3-8112-afaa2127f8a0",
+        "title": "Senior Software Developer - Authentication Team",
+        "category": "Engineering",
+        "company": "Workday",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "docker",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "grafana",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "java",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "jenkins",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "kotlin",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "kubernetes",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "mysql",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "postgres",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "prometheus",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "recruiting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "redis",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "scala",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "sql",
+            "source": "taxonomy"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "3c964258-af71-4c58-8715-7c5a4f7efec9",
+        "title": "Lead Instructor: Data Analytics (PowerBI)",
+        "category": "Data",
+        "company": "Correlation One",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "excel",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "powerbi",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "python",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "sql",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "teaching",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "analytics",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "operations",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "1e5f0f1f-e1a2-4c91-948a-4c536eba3f20",
+        "title": "Director, Analytics",
+        "category": "Data",
+        "company": "Iterative Health",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "bigquery",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "powerbi",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "python",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "salesforce",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "snowflake",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "sql",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "tableau",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "analytics",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "clinical",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "clinical research",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "design",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "kpi",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "kpis",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "looker",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "operations",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "planning",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "research",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:design:verb; bad_signal:research:verb"
+      },
+      {
+        "jobId": "62fbe0d6-7d51-474d-9d1d-97d517e51a2b",
+        "title": "Software Engineer, Machine Learning",
+        "category": "Data",
+        "company": "Figma",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "figma",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "python",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "pytorch",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "tensorflow",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "spark",
+            "source": "parsed_requirement"
+          },
+          {
+            "canonical": "design",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "engineering",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "machine learning",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:figma:company_name; bad_signal:design:verb"
+      },
+      {
+        "jobId": "3960e77d-e302-49d6-8697-795960f80b50",
+        "title": "Applied AI, Forward Deployed Machine Learning Engineer - Munich",
+        "category": "Data",
+        "company": "Mistral AI",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "python",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "pytorch",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "deep learning",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "machine learning",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "research",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:research:verb"
+      },
+      {
+        "jobId": "dced312d-a02f-485c-9e85-248ee9022eb2",
+        "title": "Analytics Engineer",
+        "category": "Data",
+        "company": "Ensemble Health Partners",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "databricks",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "sql",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "spark",
+            "source": "parsed_requirement"
+          },
+          {
+            "canonical": "analytics",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "clinical",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "compliance",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "design",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "engineering",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "healthcare",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "operations",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:design:verb; bad_signal:healthcare:company_name"
+      },
+      {
+        "jobId": "dc1d1564-5331-4e1f-ad4e-80d562f87f84",
+        "title": "AI Product Manager",
+        "category": "Product",
+        "company": "Air Apps",
+        "fitTier": 2,
+        "confidence": "medium",
+        "signals": [
+          {
+            "canonical": "engineering",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "machine learning",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "compliance",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "design",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "hiring",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "kpis",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "market research",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "planning",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "research",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "roadmap",
+            "source": "description_fallback"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:design:verb; bad_signal:research:verb"
+      },
+      {
+        "jobId": "7a40c829-14c3-48c2-8686-edb12599d951",
+        "title": "Product Manager, Ecosystem",
+        "category": "Product",
+        "company": "Floqast",
+        "fitTier": 2,
+        "confidence": "medium",
+        "signals": [
+          {
+            "canonical": "accounting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "compliance",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "engineering",
+            "source": "description_fallback"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "73939557-11f8-42b6-8c68-077c1d10d2ee",
+        "title": "Senior Product Manager, SAP",
+        "category": "Product",
+        "company": "Floqast",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "accounting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "compliance",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "engineering",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "0c3fbd09-ce63-45cd-abae-24f242e641df",
+        "title": "Product Manager - OMS",
+        "category": "Product",
+        "company": "Arcesium",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "accounting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "agile",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "recruiting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "engineering",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "95d36524-98a3-4f8b-97e1-dc1cb14ecc27",
+        "title": "Sr. Product Manager (Remote)",
+        "category": "Product",
+        "company": "Rula",
+        "fitTier": 2,
+        "confidence": "medium",
+        "signals": [
+          {
+            "canonical": "engineering",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "design",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "healthcare",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "hiring",
+            "source": "description_fallback"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:design:verb"
+      },
+      {
+        "jobId": "1f1c6156-b5b9-4f5b-ac61-933625db174b",
+        "title": "(US) Sr. Marketing Manager (1 year contract)",
+        "category": "Marketing",
+        "company": "PointClickCare",
+        "fitTier": 2,
+        "confidence": "medium",
+        "signals": [
+          {
+            "canonical": "healthcare",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "hiring",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "research",
+            "source": "description_fallback"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:research:verb"
+      },
+      {
+        "jobId": "7a731be3-4c18-4001-b1e6-7bc3662a1d97",
+        "title": "Product Growth Specialist",
+        "category": "Marketing",
+        "company": "Air Apps",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "a/b testing",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "compliance",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "design",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "engineering",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:design:verb; tier1_without_structured_signals"
+      },
+      {
+        "jobId": "e215001c-f053-4651-a9bc-5a94162799b1",
+        "title": "Marketing Operations Manager",
+        "category": "Marketing",
+        "company": "Magnetforensics",
+        "fitTier": 3,
+        "confidence": "low",
+        "signals": [
+          {
+            "canonical": "operations",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "communication",
+            "source": "title_family"
+          },
+          {
+            "canonical": "planning",
+            "source": "title_family"
+          },
+          {
+            "canonical": "project coordination",
+            "source": "title_family"
+          },
+          {
+            "canonical": "sales",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "team leadership",
+            "source": "title_family"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:communication:non_scorable_token"
+      },
+      {
+        "jobId": "06d67efe-4be1-40da-bd17-d2c4756a59be",
+        "title": "Specialist - Marketing, Hongkong",
+        "category": "Marketing",
+        "company": "Ooon",
+        "fitTier": 3,
+        "confidence": "low",
+        "signals": [
+          {
+            "canonical": "communication",
+            "source": "title_family"
+          },
+          {
+            "canonical": "planning",
+            "source": "title_family"
+          },
+          {
+            "canonical": "project coordination",
+            "source": "title_family"
+          },
+          {
+            "canonical": "team leadership",
+            "source": "title_family"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:communication:non_scorable_token"
+      },
+      {
+        "jobId": "a2dafe04-3532-479a-a2b0-e0ab30d2a940",
+        "title": "Events Marketing Manager",
+        "category": "Marketing",
+        "company": "Pivotal Health",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "figma",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "project-management",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "salesforce",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "b2b",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "b2b saas",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "design",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "healthcare",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "hubspot",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "saas",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "sales",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:design:verb; bad_signal:healthcare:company_name"
+      },
+      {
+        "jobId": "1ad2d987-3057-489c-b746-db63be03a8cb",
+        "title": "Account Executive - Maritime - MEA (Africa)",
+        "category": "Sales",
+        "company": "Kpler",
+        "fitTier": 3,
+        "confidence": "low",
+        "signals": [
+          {
+            "canonical": "communication",
+            "source": "title_family"
+          },
+          {
+            "canonical": "crm",
+            "source": "title_family"
+          },
+          {
+            "canonical": "customer relationships",
+            "source": "title_family"
+          },
+          {
+            "canonical": "excel",
+            "source": "title_family"
+          },
+          {
+            "canonical": "negotiation",
+            "source": "title_family"
+          },
+          {
+            "canonical": "planning",
+            "source": "title_family"
+          },
+          {
+            "canonical": "project coordination",
+            "source": "title_family"
+          },
+          {
+            "canonical": "sales",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "sales pipeline",
+            "source": "title_family"
+          },
+          {
+            "canonical": "team leadership",
+            "source": "title_family"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:communication:non_scorable_token"
+      },
+      {
+        "jobId": "17495222-04f9-4295-9873-42cf4a8063fc",
+        "title": "Field Account Executive",
+        "category": "Sales",
+        "company": "Playlist",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "negotiation",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "salesforce",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "sales",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "a8c2b0eb-41ac-47af-9ecd-9f7cbd170773",
+        "title": "Business Development Consultant: Weatherby",
+        "category": "Sales",
+        "company": "LocumsMart",
+        "fitTier": 2,
+        "confidence": "medium",
+        "signals": [
+          {
+            "canonical": "counseling",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "negotiation",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "healthcare",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "hiring",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "sales",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "sourcing",
+            "source": "description_fallback"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "63f938cd-e443-4342-97be-1bb3582ea497",
+        "title": "Sr. Team Leader, Sales Operations & Enablement",
+        "category": "Sales",
+        "company": "Goodyear",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "crm",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "kpis",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "operations",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "sales",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "sales operations",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "tier1_without_structured_signals"
+      },
+      {
+        "jobId": "06c106a3-47d5-4022-b04e-75789bbad10e",
+        "title": "Field Account Executive",
+        "category": "Sales",
+        "company": "Booker",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "golang",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "negotiation",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "rust",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "salesforce",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "typescript",
+            "source": "taxonomy"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "58924ac3-aea2-499d-a06d-8ecc3027f98d",
+        "title": "Customer Support Specialist - Philippines",
+        "category": "Customer Support",
+        "company": "brightwheel",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "customer-support",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "recruiting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "salesforce",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "intercom",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "zendesk",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "afa4ca4e-7bb3-4422-80c0-b5cc65f60b5d",
+        "title": "Sr. Associate People Support Specialist",
+        "category": "Customer Support",
+        "company": "Workday",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "customer-support",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "recruiting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "compliance",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "operations",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "08b28648-082d-4200-a9d2-f8511548c4b4",
+        "title": "Technical Customer Success Manager",
+        "category": "Customer Support",
+        "company": "Sentry",
+        "fitTier": 2,
+        "confidence": "medium",
+        "signals": [
+          {
+            "canonical": "excel",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "engineering",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "saas",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "sales",
+            "source": "description_fallback"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "34aed03a-0c26-40ae-b27e-72ddc7d44a9b",
+        "title": "Senior Product Support Specialist",
+        "category": "Customer Support",
+        "company": "Zenoti",
+        "fitTier": 2,
+        "confidence": "medium",
+        "signals": [
+          {
+            "canonical": "recruiting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "crm",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "hiring",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "inventory",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "operations",
+            "source": "description_fallback"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "6dcae2fe-cc0e-4d68-b6e6-9d2f2b15c53d",
+        "title": "German–English Customer Support Specialist (Remote, Contract-Based)",
+        "category": "Customer Support",
+        "company": "TransPerfect",
+        "fitTier": 3,
+        "confidence": "low",
+        "signals": [
+          {
+            "canonical": "customer-support",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "communication",
+            "source": "title_family"
+          },
+          {
+            "canonical": "conflict resolution",
+            "source": "title_family"
+          },
+          {
+            "canonical": "crm",
+            "source": "title_family"
+          },
+          {
+            "canonical": "planning",
+            "source": "title_family"
+          },
+          {
+            "canonical": "project coordination",
+            "source": "title_family"
+          },
+          {
+            "canonical": "team leadership",
+            "source": "title_family"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:communication:non_scorable_token"
+      },
+      {
+        "jobId": "956623b7-4cbe-44d7-8fa6-124c9ab3b198",
+        "title": "Clinical Start-Up & Trial Lead (Start-Up + CTL)",
+        "category": "Healthcare",
+        "company": "Fortrea",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "negotiation",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "project-management",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "gcp",
+            "source": "parsed_requirement"
+          },
+          {
+            "canonical": "clinical",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "clinical research",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "research",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:research:verb"
+      },
+      {
+        "jobId": "158ffd3f-dd82-4e13-94fa-8bdd714dbf19",
+        "title": "Medical Laboratory Technologist – 1st Shift",
+        "category": "Healthcare",
+        "company": "ezyVet",
+        "fitTier": 3,
+        "confidence": "low",
+        "signals": [
+          {
+            "canonical": "clinical",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "quality control",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "977fdd16-3d2a-48ee-8b5e-b565b07acfbf",
+        "title": "Clinical Social Worker - Fee For Service",
+        "category": "Healthcare",
+        "company": "Thriveworks",
+        "fitTier": 2,
+        "confidence": "medium",
+        "signals": [
+          {
+            "canonical": "clinical",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "health insurance",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "hiring",
+            "source": "description_fallback"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "a3d82552-85cc-4017-937a-f9d57b1051cf",
+        "title": "Clinical Social Worker - Fee For Service",
+        "category": "Healthcare",
+        "company": "Thriveworks",
+        "fitTier": 3,
+        "confidence": "low",
+        "signals": [
+          {
+            "canonical": "clinical",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "clinical documentation",
+            "source": "title_family"
+          },
+          {
+            "canonical": "healthcare compliance",
+            "source": "title_family"
+          },
+          {
+            "canonical": "hiring",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "medical records",
+            "source": "title_family"
+          },
+          {
+            "canonical": "patient care",
+            "source": "title_family"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "dcc2ae34-46e6-4d0e-8224-14315c66fc38",
+        "title": "Clinical Social Worker - Fee For Service",
+        "category": "Healthcare",
+        "company": "Thriveworks",
+        "fitTier": 2,
+        "confidence": "medium",
+        "signals": [
+          {
+            "canonical": "clinical",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "health insurance",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "hiring",
+            "source": "description_fallback"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "d41e2db9-08c2-44b0-aa9c-0267b7350a83",
+        "title": "Online Yoga Instructor Flexible Role Â£20 Â£40 hr",
+        "category": "Recruiting",
+        "company": "FindTutors",
+        "fitTier": 3,
+        "confidence": "low",
+        "signals": [
+          {
+            "canonical": "teaching",
+            "source": "taxonomy"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "0e116b7c-920c-4fe1-b465-a82ebb9bd4a7",
+        "title": "Senior Talent Acquisition Specialist",
+        "category": "Recruiting",
+        "company": "Motive",
+        "fitTier": 3,
+        "confidence": "low",
+        "signals": [
+          {
+            "canonical": "applicant tracking",
+            "source": "title_family"
+          },
+          {
+            "canonical": "communication",
+            "source": "title_family"
+          },
+          {
+            "canonical": "interviewing",
+            "source": "title_family"
+          },
+          {
+            "canonical": "onboarding",
+            "source": "title_family"
+          },
+          {
+            "canonical": "planning",
+            "source": "title_family"
+          },
+          {
+            "canonical": "project coordination",
+            "source": "title_family"
+          },
+          {
+            "canonical": "recruiting",
+            "source": "title_family"
+          },
+          {
+            "canonical": "talent acquisition",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "team leadership",
+            "source": "title_family"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:communication:non_scorable_token"
+      },
+      {
+        "jobId": "a3adeae4-9ade-4952-b450-423cfd4bf45a",
+        "title": "Part Time Recruiter",
+        "category": "Recruiting",
+        "company": "Cro Metrics",
+        "fitTier": 3,
+        "confidence": "low",
+        "signals": [
+          {
+            "canonical": "recruiting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "applicant tracking",
+            "source": "title_family"
+          },
+          {
+            "canonical": "interviewing",
+            "source": "title_family"
+          },
+          {
+            "canonical": "onboarding",
+            "source": "title_family"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "42245d2a-b9f7-4928-84f8-38e96faf2e9e",
+        "title": "Associate Recruiter",
+        "category": "Recruiting",
+        "company": "Lago",
+        "fitTier": 3,
+        "confidence": "low",
+        "signals": [
+          {
+            "canonical": "applicant tracking",
+            "source": "title_family"
+          },
+          {
+            "canonical": "interviewing",
+            "source": "title_family"
+          },
+          {
+            "canonical": "onboarding",
+            "source": "title_family"
+          },
+          {
+            "canonical": "recruiting",
+            "source": "title_family"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "6890a563-b4a6-42ce-9b03-bb1896612ee4",
+        "title": "Senior HR Business Partner",
+        "category": "Recruiting",
+        "company": "Cohere",
+        "fitTier": 2,
+        "confidence": "medium",
+        "signals": [
+          {
+            "canonical": "sales",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "design",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "hiring",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "planning",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "research",
+            "source": "description_fallback"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:design:verb; bad_signal:research:verb"
+      },
+      {
+        "jobId": "02c2bf18-5c58-45c4-8ea2-114968aa45f7",
+        "title": "Strategic Finance, GTM",
+        "category": "Finance",
+        "company": "Descript",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "sql",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "analytics",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "b2b",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "b2b b2c",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "b2c",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "b2c saas",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "design",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "saas",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "sales",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:design:verb"
+      },
+      {
+        "jobId": "26931d27-5796-4809-b8d1-c4c00076b026",
+        "title": "Finance Manager",
+        "category": "Finance",
+        "company": "Kin Insurance",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "accounting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "counseling",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "customer-support",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "excel",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "recruiting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "hiring",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "planning",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "675c886c-a72b-4aa0-96d1-fcee0d172f67",
+        "title": "Financial Controller",
+        "category": "Finance",
+        "company": "Air Apps",
+        "fitTier": 2,
+        "confidence": "medium",
+        "signals": [
+          {
+            "canonical": "accounting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "excel",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "compliance",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "erp",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "hiring",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "operations",
+            "source": "description_fallback"
+          },
+          {
+            "canonical": "planning",
+            "source": "description_fallback"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "ba1d08a0-189a-4d8b-8af0-495d9cdeed9e",
+        "title": "Consultant, Finance and Admin Officer STRengthening Infectious disease DEtection Systems (STRIDES) , Epidemic Preparedness & Response",
+        "category": "Finance",
+        "company": "Path",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "accounting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "excel",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "project-management",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "compliance",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "064dbee2-3a9b-4f00-8385-a8b4b9dcb18a",
+        "title": "FP&A Business Partner / Controller (m/w/d)",
+        "category": "Finance",
+        "company": "ResMed",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "accounting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "excel",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "salesforce",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "tableau",
+            "source": "taxonomy"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "fc03337e-b0d5-4d7c-a12a-3b6984fcb67e",
+        "title": "Strategy and Operations Associate",
+        "category": "Operations",
+        "company": "Finni Health",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "accounting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "excel",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "powerbi",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "sql",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "analytics",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "design",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "hiring",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "looker",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "operations",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": false,
+        "notes": "bad_signal:design:verb"
+      },
+      {
+        "jobId": "78383890-c078-4916-9d44-5567f01f279c",
+        "title": "Manager, Business Operations",
+        "category": "Operations",
+        "company": "Natera",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "accounting",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "negotiation",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "project-management",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "compliance",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "healthcare",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "healthcare operations",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "operations",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "operations healthcare",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "sourcing",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "db92fc71-e9f6-4668-b239-cd318994a3e5",
+        "title": "Operations Assistant – Property Management",
+        "category": "Operations",
+        "company": "Bridge33 Capital",
+        "fitTier": 3,
+        "confidence": "low",
+        "signals": [
+          {
+            "canonical": "operations",
+            "source": "description_fallback"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "2334b0f0-1d96-4cca-ad50-14089f5abe7d",
+        "title": "Supply Chain Planner",
+        "category": "Operations",
+        "company": "Estrid",
+        "fitTier": 1,
+        "confidence": "high",
+        "signals": [
+          {
+            "canonical": "excel",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "powerbi",
+            "source": "taxonomy"
+          },
+          {
+            "canonical": "erp",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "inventory",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "inventory planning",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "operations",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "planning",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "planning inventory",
+            "source": "sparse_requirement"
+          },
+          {
+            "canonical": "sales",
+            "source": "sparse_requirement"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      },
+      {
+        "jobId": "7918c091-cf02-4a78-a19b-1aa42e51bc5f",
+        "title": "HR Operations Administrator – Danish Speaking",
+        "category": "Operations",
+        "company": "SD Worx",
+        "fitTier": 3,
+        "confidence": "low",
+        "signals": [
+          {
+            "canonical": "operations",
+            "source": "description_fallback"
+          }
+        ],
+        "looksReasonable": true,
+        "notes": "Signals align with title and tier."
+      }
+    ]
+  },
+  "part2_gapQuality": {
+    "jobsScored": 500,
+    "violationCount": 270,
+    "targetMet": false,
+    "violations": [
+      {
+        "jobId": "3a24cd32-0768-4d4c-aab8-68ddfcb5708b",
+        "title": "Simulator Technician",
+        "company": "CAE",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "ef813975-75da-4423-9450-d6487087d677",
+        "title": "Principal Engineer - Agentic Engineering",
+        "company": "Equifax",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "fcf59282-99b0-488c-bcaf-2e0436c96873",
+        "title": "Software Engineer (Level 2)",
+        "company": "Aerovironment",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "4fa3379f-0348-4987-b328-2e8f12249c59",
+        "title": "Content Services Solution Engineer",
+        "company": "TransPerfect",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "23bcd646-7d38-4a20-8b56-086546a814ce",
+        "title": "Junior Outcomes Technician - FSP Team",
+        "company": "Fortrea",
+        "chipType": "matched",
+        "keyword": "research",
+        "reason": "verb"
+      },
+      {
+        "jobId": "5a06f623-1d67-457c-9765-df9cd60f78df",
+        "title": "AV Cleared Hiring Event – FS Poly Software Engineering & FS/CI Poly Analyst",
+        "company": "Aerovironment",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "be708c31-4de0-4789-8ae6-d94dc2edd756",
+        "title": "Director of Sales – Industrial",
+        "company": "Advanced Input Systems",
+        "chipType": "matched",
+        "keyword": "communication",
+        "reason": "non_scorable_token"
+      },
+      {
+        "jobId": "ee446b38-d405-42f5-9801-c39843188fab",
+        "title": "Customer Operations Specialist",
+        "company": "Octopus Energy US",
+        "chipType": "matched",
+        "keyword": "communication",
+        "reason": "non_scorable_token"
+      },
+      {
+        "jobId": "30ecb058-54c1-440a-8776-0f5d0c8be26b",
+        "title": "Executive Assistant",
+        "company": "Octopus Energy",
+        "chipType": "matched",
+        "keyword": "research",
+        "reason": "verb"
+      },
+      {
+        "jobId": "412edecd-32e1-400a-9732-82972320a2b3",
+        "title": "PRN Telemetry Technician - Early Phase Clinical Research - Dallas, TX",
+        "company": "Fortrea",
+        "chipType": "matched",
+        "keyword": "research",
+        "reason": "verb"
+      },
+      {
+        "jobId": "b0bc4393-eca5-440e-97d0-60a062a404cc",
+        "title": "Physical Therapist",
+        "company": "Luna Care",
+        "chipType": "matched",
+        "keyword": "healthcare",
+        "reason": "company_name"
+      },
+      {
+        "jobId": "b0bc4393-eca5-440e-97d0-60a062a404cc",
+        "title": "Physical Therapist",
+        "company": "Luna Care",
+        "chipType": "matched",
+        "keyword": "patient care",
+        "reason": "company_name"
+      },
+      {
+        "jobId": "b0bc4393-eca5-440e-97d0-60a062a404cc",
+        "title": "Physical Therapist",
+        "company": "Luna Care",
+        "chipType": "missing",
+        "keyword": "healthcare compliance",
+        "reason": "company_name"
+      },
+      {
+        "jobId": "cf9e2ec6-9a7b-4821-aef4-78073a0be9cf",
+        "title": "Account Coordinator, Paid Social",
+        "company": "DEPT®",
+        "chipType": "matched",
+        "keyword": "communication",
+        "reason": "non_scorable_token"
+      },
+      {
+        "jobId": "f3121d3b-8250-4cc5-96b8-b2d107dd280c",
+        "title": "Simulator Technician",
+        "company": "CAE",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "537fdc4c-1c4f-4927-b001-1e8c69d55da4",
+        "title": "Software Engineer - Robotics Generalist",
+        "company": "Aerovironment",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "6d617ac1-65e9-43ee-aa14-6628d11a8d17",
+        "title": "Operation Project Manager",
+        "company": "CAE",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "aa86d27b-aea0-4be6-8ef6-1fbcecabff0e",
+        "title": "SEO Specialist",
+        "company": "TransPerfect",
+        "chipType": "matched",
+        "keyword": "research",
+        "reason": "verb"
+      },
+      {
+        "jobId": "9ebc70e1-5c22-4e75-adf5-5599c1902208",
+        "title": "CRA II, London (client-dedicated)",
+        "company": "Fortrea",
+        "chipType": "matched",
+        "keyword": "research",
+        "reason": "verb"
+      },
+      {
+        "jobId": "42f7954a-6133-449c-82e9-6fe24e8b942b",
+        "title": "Clinical Research Nurse II (RN's & LPN's) / Madison, WI (On-Site)",
+        "company": "Fortrea",
+        "chipType": "matched",
+        "keyword": "research",
+        "reason": "verb"
+      },
+      {
+        "jobId": "d6c93ab2-4a03-4aeb-8fd1-e8e274e3af9e",
+        "title": "Solution Consultant - Student (Student Finance, Financial Aid)",
+        "company": "Workday",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "8d15e66f-3c44-47eb-b9d8-ea3094fb72f8",
+        "title": "Aircraft Maintenance Engineer (Avionics)",
+        "company": "CAE",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "c42442b8-637e-4b91-95ed-211c218794be",
+        "title": "Project Coordinator",
+        "company": "TransPerfect",
+        "chipType": "matched",
+        "keyword": "communication",
+        "reason": "non_scorable_token"
+      },
+      {
+        "jobId": "b258133e-66e6-4df6-99d7-b100c2b28823",
+        "title": "Supervisor, Patient Access & Pre-Access",
+        "company": "Ensemble Health Partners",
+        "chipType": "matched",
+        "keyword": "healthcare",
+        "reason": "company_name"
+      },
+      {
+        "jobId": "b258133e-66e6-4df6-99d7-b100c2b28823",
+        "title": "Supervisor, Patient Access & Pre-Access",
+        "company": "Ensemble Health Partners",
+        "chipType": "matched",
+        "keyword": "research",
+        "reason": "verb"
+      },
+      {
+        "jobId": "543afa3e-e2f6-4a33-919d-f71374495423",
+        "title": "Java Developer | Kragujevac",
+        "company": "TransPerfect",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "a3c4297c-5d2c-4c7a-9449-8acf1b32b26b",
+        "title": "Content Designer",
+        "company": "TransPerfect",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "a3c4297c-5d2c-4c7a-9449-8acf1b32b26b",
+        "title": "Content Designer",
+        "company": "TransPerfect",
+        "chipType": "matched",
+        "keyword": "research",
+        "reason": "verb"
+      },
+      {
+        "jobId": "e12949b0-6f83-4de8-ab01-69d695eb6af9",
+        "title": "SAP S/4 SD OTC Lead – Private Cloud (RISE)",
+        "company": "Techwave",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "25d32c4e-6b28-49f4-8b26-28bab32f03c8",
+        "title": "Sr. Electrical Engineer - Space Technologies",
+        "company": "Aerovironment",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "a88399e3-5e80-4002-8bdf-c22aaa30eae0",
+        "title": "College Persistence Advisor",
+        "company": "Sponsors for Educational Opportunity",
+        "chipType": "matched",
+        "keyword": "salesforce",
+        "reason": "company_name"
+      },
+      {
+        "jobId": "a88399e3-5e80-4002-8bdf-c22aaa30eae0",
+        "title": "College Persistence Advisor",
+        "company": "Sponsors for Educational Opportunity",
+        "chipType": "matched",
+        "keyword": "research",
+        "reason": "verb"
+      },
+      {
+        "jobId": "012a6396-560c-41c8-a837-8f2bcebbe45c",
+        "title": "Lead - Data Engineer",
+        "company": "Equifax",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "dee74f6a-ebe6-4dce-862b-a2f3a390e6ec",
+        "title": "Clinical Research Technician I, Early Phase Clinical Research - Daytona Beach, FL",
+        "company": "Fortrea",
+        "chipType": "matched",
+        "keyword": "research",
+        "reason": "verb"
+      },
+      {
+        "jobId": "2cace5d6-745f-4734-ad5b-f18207008e5e",
+        "title": "Research Technician (On-call) / Madison, WI (On-Site)",
+        "company": "Fortrea",
+        "chipType": "matched",
+        "keyword": "research",
+        "reason": "verb"
+      },
+      {
+        "jobId": "30815f18-7010-400e-a0c1-7d7d5aef4f80",
+        "title": "Simulator Technicians I-IV",
+        "company": "CAE",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "935282d3-2eab-4dee-bda2-fb79e05aed94",
+        "title": "Senior Technical Designer - Medidata RAVE certified",
+        "company": "Fortrea",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "0d999665-f801-48fb-9a89-fdb93626fb13",
+        "title": "Patient Access Specialist - Part-time",
+        "company": "Ensemble Health Partners",
+        "chipType": "matched",
+        "keyword": "healthcare",
+        "reason": "company_name"
+      },
+      {
+        "jobId": "0d999665-f801-48fb-9a89-fdb93626fb13",
+        "title": "Patient Access Specialist - Part-time",
+        "company": "Ensemble Health Partners",
+        "chipType": "matched",
+        "keyword": "research",
+        "reason": "verb"
+      },
+      {
+        "jobId": "f307f755-7b4c-44f7-889a-a07b5194f63b",
+        "title": "Junior QA Engineer",
+        "company": "Aerovironment",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "7cb580a3-eacb-4fd0-9375-5875f33408bb",
+        "title": "Cloud Engineer II",
+        "company": "Rackspace",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "e63f4e37-ae70-4218-af3e-d4e186a0cb76",
+        "title": "C130J Pilot SME",
+        "company": "CAE",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "b8ed34e6-5407-474d-9b37-5cc71fb6a06d",
+        "title": "Director of Engineering, Directed Energy Systems",
+        "company": "Aerovironment",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "b69982c9-142b-4d1a-88a8-c27f26c5112e",
+        "title": "Centralized Study Specialist - Document Reviewer",
+        "company": "Fortrea",
+        "chipType": "matched",
+        "keyword": "research",
+        "reason": "verb"
+      },
+      {
+        "jobId": "dab69af7-dc6e-4df4-9aa3-1c8813d72116",
+        "title": "Software Development Engineer--Pipedream Connect",
+        "company": "Workday",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "14423c99-013f-4177-8175-35c42206ace2",
+        "title": "Workday Consultant - Absence & Time Tracking | Workday Advisory services",
+        "company": "Workday",
+        "chipType": "matched",
+        "keyword": "research",
+        "reason": "verb"
+      },
+      {
+        "jobId": "2607235c-9b04-4fa9-9964-9fa40290a1c8",
+        "title": "Senior Solution Consulting Director, South Europe",
+        "company": "Workday",
+        "chipType": "matched",
+        "keyword": "design",
+        "reason": "verb"
+      },
+      {
+        "jobId": "e5406034-6147-4333-8019-b7a68027a819",
+        "title": "FSP SCRA I (Shenyang, Changchun, Harbin)",
+        "company": "Fortrea",
+        "chipType": "matched",
+        "keyword": "research",
+        "reason": "verb"
+      },
+      {
+        "jobId": "5e3c9c0d-e9a6-4a1c-816c-59a8205c0c11",
+        "title": "Regional Talent Acquisition Specialist",
+        "company": "Adventus",
+        "chipType": "matched",
+        "keyword": "communication",
+        "reason": "non_scorable_token"
+      },
+      {
+        "jobId": "50a88a1d-0978-48c9-a175-bcf1626337e4",
+        "title": "AI Workflow Creators: 30-Minute Survey on Agent Tools",
+        "company": "Terac",
+        "chipType": "matched",
+        "keyword": "research",
+        "reason": "verb"
+      }
+    ]
+  },
+  "part3_scoreDistribution": {
+    "sampleSize": 481,
+    "histogram": {
+      "0-20": 1,
+      "20-40": 13,
+      "40-60": 53,
+      "60-80": 200,
+      "80-100": 214
+    },
+    "avgScore": 72,
+    "medianScore": 78,
+    "p95Score": 89,
+    "clusteringNote": "Possible score inflation (median > 75)"
+  },
+  "part4_tier4Audit": {
+    "tier4JobCount": 15,
+    "suspiciousCount": 0,
+    "suspiciousMappings": [],
+    "catalogReview": [
+      {
+        "family": "engineering.design",
+        "exampleTitle": "Mine Designer",
+        "expectedSignals": [
+          "engineering",
+          "safety",
+          "operations",
+          "design"
+        ],
+        "liveExample": {
+          "title": "Senior UI/UX Designer – UI Focused",
+          "signals": [
+            "design",
+            "engineering",
+            "operations",
+            "safety"
+          ],
+          "sensible": true,
+          "suspicious": []
+        }
+      },
+      {
+        "family": "healthcare.therapy",
+        "exampleTitle": "Physical Therapist",
+        "expectedSignals": [
+          "rehabilitation",
+          "therapy",
+          "healthcare"
+        ],
+        "liveExample": null
+      },
+      {
+        "family": "hr.recruiting",
+        "exampleTitle": "Recruiter",
+        "expectedSignals": [
+          "recruiting",
+          "sourcing",
+          "hiring"
+        ],
+        "liveExample": null
+      },
+      {
+        "family": "sales.account_executive",
+        "exampleTitle": "Account Executive",
+        "expectedSignals": [
+          "sales",
+          "crm",
+          "pipeline",
+          "negotiation"
+        ],
+        "liveExample": null
+      }
+    ],
+    "allTier4Jobs": [
+      {
+        "jobId": "5728652a-bc31-4d1d-869b-40da46c9e4a3",
+        "title": "Lead IT Engineer",
+        "family": "engineering.generic",
+        "expectedSkills": [
+          "engineering",
+          "project management",
+          "safety",
+          "operations",
+          "design"
+        ],
+        "signals": [
+          "design",
+          "engineering",
+          "operations",
+          "safety"
+        ],
+        "sensible": true,
+        "suspicious": []
+      },
+      {
+        "jobId": "aa97f2e6-9ce6-457a-8ae2-518fc976aea1",
+        "title": "Senior Business Analyst",
+        "family": "data.analytics",
+        "expectedSkills": [
+          "sql",
+          "python",
+          "tableau",
+          "looker",
+          "analytics",
+          "excel"
+        ],
+        "signals": [
+          "analytics",
+          "excel",
+          "looker",
+          "python",
+          "sql",
+          "tableau"
+        ],
+        "sensible": true,
+        "suspicious": []
+      },
+      {
+        "jobId": "f4c2abb6-f346-470e-b879-6f0a69857fb5",
+        "title": "Field Service Engineer",
+        "family": "engineering.generic",
+        "expectedSkills": [
+          "engineering",
+          "project management",
+          "safety",
+          "operations",
+          "design"
+        ],
+        "signals": [
+          "design",
+          "engineering",
+          "operations",
+          "safety"
+        ],
+        "sensible": true,
+        "suspicious": []
+      },
+      {
+        "jobId": "f0b30685-2cd4-4718-b9a3-d70ec29c51fe",
+        "title": "Field Service Engineer",
+        "family": "engineering.generic",
+        "expectedSkills": [
+          "engineering",
+          "project management",
+          "safety",
+          "operations",
+          "design"
+        ],
+        "signals": [
+          "design",
+          "engineering",
+          "operations",
+          "safety"
+        ],
+        "sensible": true,
+        "suspicious": []
+      },
+      {
+        "jobId": "8b50336c-7305-4524-a1c1-2df6cd69d52b",
+        "title": "GTM Engineer",
+        "family": "engineering.generic",
+        "expectedSkills": [
+          "engineering",
+          "project management",
+          "safety",
+          "operations",
+          "design"
+        ],
+        "signals": [
+          "design",
+          "engineering",
+          "operations",
+          "safety"
+        ],
+        "sensible": true,
+        "suspicious": []
+      },
+      {
+        "jobId": "b2a6399a-eb73-420e-a3f7-4ca8058151c7",
+        "title": "Personal Injury Attorney, Massachusetts",
+        "family": "legal.compliance",
+        "expectedSkills": [
+          "compliance",
+          "communication",
+          "research",
+          "documentation",
+          "negotiation"
+        ],
+        "signals": [
+          "compliance",
+          "documentation",
+          "negotiation",
+          "research"
+        ],
+        "sensible": true,
+        "suspicious": []
+      },
+      {
+        "jobId": "8b2a42df-14c5-48b8-bfb2-49dd1cb862fe",
+        "title": "Histology Technician – 2nd Shift",
+        "family": "trades.skilled",
+        "expectedSkills": [
+          "safety",
+          "operations",
+          "quality control",
+          "engineering",
+          "project management"
+        ],
+        "signals": [
+          "engineering",
+          "operations",
+          "quality control",
+          "safety"
+        ],
+        "sensible": true,
+        "suspicious": []
+      },
+      {
+        "jobId": "db1b44d8-ac30-4b93-a076-df67bd08fe41",
+        "title": "Field Technician - Tires as a Service",
+        "family": "trades.skilled",
+        "expectedSkills": [
+          "safety",
+          "operations",
+          "quality control",
+          "engineering",
+          "project management"
+        ],
+        "signals": [
+          "engineering",
+          "operations",
+          "quality control",
+          "safety"
+        ],
+        "sensible": true,
+        "suspicious": []
+      },
+      {
+        "jobId": "8f40f035-eff0-4cda-93e4-b4d35eeaa8a9",
+        "title": "Senior QA Engineer",
+        "family": "engineering.generic",
+        "expectedSkills": [
+          "engineering",
+          "project management",
+          "safety",
+          "operations",
+          "design"
+        ],
+        "signals": [
+          "design",
+          "engineering",
+          "operations",
+          "safety"
+        ],
+        "sensible": true,
+        "suspicious": []
+      },
+      {
+        "jobId": "f1c795bc-9469-4ad5-b61c-aebefba68e94",
+        "title": "Senior UI/UX Designer – UI Focused",
+        "family": "engineering.design",
+        "expectedSkills": [
+          "engineering",
+          "project management",
+          "safety",
+          "operations",
+          "design"
+        ],
+        "signals": [
+          "design",
+          "engineering",
+          "operations",
+          "safety"
+        ],
+        "sensible": true,
+        "suspicious": []
+      },
+      {
+        "jobId": "f760f9ab-46de-4b26-95a8-62e3e7231e41",
+        "title": "Technical Support Engineer",
+        "family": "engineering.generic",
+        "expectedSkills": [
+          "engineering",
+          "project management",
+          "safety",
+          "operations",
+          "design"
+        ],
+        "signals": [
+          "design",
+          "engineering",
+          "operations",
+          "safety"
+        ],
+        "sensible": true,
+        "suspicious": []
+      },
+      {
+        "jobId": "d7532aa9-0a7e-4b3f-b40d-a55b49b6b389",
+        "title": "Corporate IT Automation Engineer",
+        "family": "engineering.generic",
+        "expectedSkills": [
+          "engineering",
+          "project management",
+          "safety",
+          "operations",
+          "design"
+        ],
+        "signals": [
+          "design",
+          "engineering",
+          "operations",
+          "safety"
+        ],
+        "sensible": true,
+        "suspicious": []
+      },
+      {
+        "jobId": "65f457e3-674b-4435-9fea-e624943aed2a",
+        "title": "Principal Hardware Design Engineer – Computing Products",
+        "family": "engineering.generic",
+        "expectedSkills": [
+          "engineering",
+          "project management",
+          "safety",
+          "operations",
+          "design"
+        ],
+        "signals": [
+          "design",
+          "engineering",
+          "operations",
+          "safety"
+        ],
+        "sensible": true,
+        "suspicious": []
+      },
+      {
+        "jobId": "73548bd5-0e20-410e-8e9b-4e9a720d8fd1",
+        "title": "Senior Product Engineer, AI",
+        "family": "engineering.generic",
+        "expectedSkills": [
+          "engineering",
+          "project management",
+          "safety",
+          "operations",
+          "design"
+        ],
+        "signals": [
+          "design",
+          "engineering",
+          "operations",
+          "safety"
+        ],
+        "sensible": true,
+        "suspicious": []
+      },
+      {
+        "jobId": "1b780c0a-523f-4782-aa09-7490192e0bda",
+        "title": "Customer Engineer",
+        "family": "engineering.generic",
+        "expectedSkills": [
+          "engineering",
+          "project management",
+          "safety",
+          "operations",
+          "design"
+        ],
+        "signals": [
+          "design",
+          "engineering",
+          "operations",
+          "safety"
+        ],
+        "sensible": true,
+        "suspicious": []
+      }
+    ]
+  },
+  "part5_confidenceHonesty": {
+    "confidenceAppearsAccurate": false,
+    "falseConfidenceCount": 6,
+    "falseConfidenceExamples": [
+      {
+        "jobId": "fcd9b32c-7e30-4f6c-9d09-90d4d977f3a7",
+        "title": "Production Technician",
+        "fitTier": 3,
+        "confidence": "low",
+        "sourceBreakdown": {
+          "taxonomy": 0,
+          "enriched": 0,
+          "parsed": 0,
+          "description": 1,
+          "titleFamily": 0
+        },
+        "topSignals": [
+          "hiring"
+        ],
+        "appearsAccurate": false,
+        "issues": [
+          "tier3_without_title_family"
+        ]
+      },
+      {
+        "jobId": "2f8469bf-885a-4518-8d0c-35e4390e5d7a",
+        "title": "Claims Litigation Senior Analyst",
+        "fitTier": 3,
+        "confidence": "low",
+        "sourceBreakdown": {
+          "taxonomy": 0,
+          "enriched": 0,
+          "parsed": 1,
+          "description": 0,
+          "titleFamily": 0
+        },
+        "topSignals": [
+          "compliance"
+        ],
+        "appearsAccurate": false,
+        "issues": [
+          "tier3_without_title_family"
+        ]
+      },
+      {
+        "jobId": "3a531aa8-cb55-4e7c-ba36-2ee50ef530b8",
+        "title": "Freelance Introducer",
+        "fitTier": 3,
+        "confidence": "low",
+        "sourceBreakdown": {
+          "taxonomy": 0,
+          "enriched": 0,
+          "parsed": 1,
+          "description": 0,
+          "titleFamily": 0
+        },
+        "topSignals": [
+          "sales"
+        ],
+        "appearsAccurate": false,
+        "issues": [
+          "tier3_without_title_family"
+        ]
+      },
+      {
+        "jobId": "f00875ad-9368-4f9a-9df0-7bb5b2eb3852",
+        "title": "Contracts Administrator",
+        "fitTier": 3,
+        "confidence": "low",
+        "sourceBreakdown": {
+          "taxonomy": 0,
+          "enriched": 0,
+          "parsed": 0,
+          "description": 2,
+          "titleFamily": 0
+        },
+        "topSignals": [
+          "engineering",
+          "research"
+        ],
+        "appearsAccurate": false,
+        "issues": [
+          "tier3_without_title_family"
+        ]
+      },
+      {
+        "jobId": "592615b0-e610-4839-944a-e141860982e3",
+        "title": "Facilities Associate (20hrs per week) - Sydney",
+        "fitTier": 3,
+        "confidence": "low",
+        "sourceBreakdown": {
+          "taxonomy": 0,
+          "enriched": 0,
+          "parsed": 0,
+          "description": 1,
+          "titleFamily": 0
+        },
+        "topSignals": [
+          "planning"
+        ],
+        "appearsAccurate": false,
+        "issues": [
+          "tier3_without_title_family"
+        ]
+      },
+      {
+        "jobId": "8d42c2b0-6c99-4981-9c1c-8ac5ad690323",
+        "title": "Simulator Technician",
+        "fitTier": 3,
+        "confidence": "low",
+        "sourceBreakdown": {
+          "taxonomy": 0,
+          "enriched": 0,
+          "parsed": 0,
+          "description": 1,
+          "titleFamily": 0
+        },
+        "topSignals": [
+          "operations"
+        ],
+        "appearsAccurate": false,
+        "issues": [
+          "tier3_without_title_family"
+        ]
+      }
+    ],
+    "samplesByTier": {
+      "high": [
+        {
+          "jobId": "0721006b-809d-47af-94b1-aec1806eed87",
+          "title": "SW Engineer II ( Full Stack Java Spring Boot)",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 10,
+            "enriched": 0,
+            "parsed": 2,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "angular",
+            "ansible",
+            "azure",
+            "github-actions",
+            "java",
+            "jenkins"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "f422c176-bf32-414a-8456-e030588887ab",
+          "title": "Technical Project Manager",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 3,
+            "enriched": 0,
+            "parsed": 2,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "jira",
+            "project-management",
+            "recruiting",
+            "engineering",
+            "planning"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "8903b8dd-5f39-40a6-ab09-3d6fca7d0bfd",
+          "title": "Remote Bilingual Interpreter (English <> Target Language)",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 4,
+            "enriched": 0,
+            "parsed": 1,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "customer-support",
+            "golang",
+            "recruiting",
+            "typescript",
+            "healthcare"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "67384c53-c160-4f98-b939-4d0364fa56d3",
+          "title": "Client Success Manager II, Data & Marketing",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 3,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "jira",
+            "recruiting",
+            "salesforce"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "1ae5a194-7f6e-4d76-b4ea-a5b8a233a6ef",
+          "title": "Instructional Designer",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 2,
+            "enriched": 0,
+            "parsed": 1,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "negotiation",
+            "project-management",
+            "design"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "417cef83-5c42-45f3-8e5f-e180b7cfcd9e",
+          "title": "Builder Chief",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 3,
+            "enriched": 0,
+            "parsed": 2,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "postgres",
+            "python",
+            "ruby",
+            "react",
+            "design"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "e9166a05-3cd9-4d7b-aa2e-f02931bc0129",
+          "title": "eDiscovery Project Manager - Antitrust",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 7,
+            "enriched": 0,
+            "parsed": 2,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "customer-support",
+            "excel",
+            "golang",
+            "redis",
+            "rust",
+            "sql"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "ed9e3ad9-18ef-4109-92b2-296c8cae20e7",
+          "title": "Localization Project Manager － Korean speaker",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 5,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "customer-support",
+            "excel",
+            "golang",
+            "scala",
+            "typescript"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "278300ff-e864-4b6d-8bb4-dd926b7ed6e7",
+          "title": "FSP CRA (Hong Kong)",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 5,
+            "enriched": 0,
+            "parsed": 6,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "customer-support",
+            "gcp",
+            "negotiation",
+            "nursing",
+            "recruiting",
+            "clinical"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "95b88abd-6404-454e-933c-28f6a2576356",
+          "title": "Account Manager",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 3,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "customer-support",
+            "excel",
+            "recruiting"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "e24082e4-935e-4506-b90d-e2d757d4cf5f",
+          "title": "Patient Care Coordinator (Oklahoma City, OK)",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 2,
+            "enriched": 0,
+            "parsed": 5,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "excel",
+            "nursing",
+            "clinical",
+            "clinical operations",
+            "healthcare",
+            "operations"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "0b04485b-54fd-4d46-aa97-cc047f8e045c",
+          "title": "Senior Accountant, Financial Reporting",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 5,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "accounting",
+            "customer-support",
+            "excel",
+            "golang",
+            "typescript"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "3d704ebb-c99c-4b05-b697-9f43c27ad3d5",
+          "title": "ERP Product Manager for CSF",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 3,
+            "enriched": 0,
+            "parsed": 3,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "accounting",
+            "excel",
+            "project-management",
+            "erp",
+            "product discovery",
+            "sales"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "c5d373a4-2c9f-492e-a5e6-70389bd44243",
+          "title": "Clinical Reimbursement Assistant - Genetic Testing",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 3,
+            "enriched": 0,
+            "parsed": 3,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "counseling",
+            "nursing",
+            "salesforce",
+            "clinical",
+            "compliance",
+            "healthcare"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "9ba37859-2eff-45b6-8b22-2531eb5a4be9",
+          "title": "FSP CRA I/II(Hefei)",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 3,
+            "enriched": 0,
+            "parsed": 5,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "customer-support",
+            "gcp",
+            "nursing",
+            "clinical",
+            "clinical operations",
+            "clinical research"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "f5e674d6-0ca8-48ca-83c2-64bbec3fc371",
+          "title": "Director of Operations - Commercial Aviation Training (CAT)",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 7,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "compliance",
+            "engineering",
+            "kpis",
+            "operations",
+            "planning",
+            "safety"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "0f2e46e9-118f-4c75-8fe4-f1cc164c7daa",
+          "title": "Power Plant Fleet Engineer (Entry, Staff, Senior, or Principal Level)",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 2,
+            "enriched": 0,
+            "parsed": 4,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "accounting",
+            "recruiting",
+            "design",
+            "engineering",
+            "research",
+            "research design"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "e2218570-d0c2-476c-a801-dadd22fe7ae9",
+          "title": "Technology Consultant (Kubernetes)",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 5,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "azure",
+            "customer-support",
+            "docker",
+            "kubernetes",
+            "linux"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "a1924fef-91ac-4cdc-9da5-4b82801debcc",
+          "title": "Operations Manager - Aurora, CO",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 1,
+            "enriched": 0,
+            "parsed": 3,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "recruiting",
+            "compliance",
+            "operations",
+            "safety"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "846c1175-fa54-4827-b924-5727713f3aa0",
+          "title": "Salesforce Developer",
+          "fitTier": 1,
+          "confidence": "high",
+          "sourceBreakdown": {
+            "taxonomy": 2,
+            "enriched": 0,
+            "parsed": 2,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "recruiting",
+            "salesforce",
+            "design",
+            "hiring"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        }
+      ],
+      "medium": [
+        {
+          "jobId": "7d736430-d569-4f38-ba3e-75aa94f2c7c7",
+          "title": "Senior Principal Product Manager",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 1,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 6,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "jira",
+            "analytics",
+            "compliance",
+            "design",
+            "engineering",
+            "operations"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "25fbb9c5-65db-470d-b793-688e6d60df7e",
+          "title": "Utility Worker C - Temporary - Alamosa, Colorado",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 1,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 2,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "recruiting",
+            "hiring",
+            "talent acquisition"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "d0fda6fb-5738-4ad0-a25c-517d6a30228e",
+          "title": "Medical Device & Diagnostics - CRA 2 - US Remote",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 1,
+            "enriched": 0,
+            "parsed": 1,
+            "description": 2,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "nursing",
+            "clinical",
+            "clinical research",
+            "research"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "f3c52881-1ca9-4254-ac4d-89b6256cd833",
+          "title": "Flight Test Operator II",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 1,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 3,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "excel",
+            "compliance",
+            "operations",
+            "safety"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "b0866980-e46e-4ab0-b841-e8a58e162f72",
+          "title": "Senior Software Engineer, Developer Infrastructure",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 2,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 2,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "docker",
+            "python",
+            "engineering",
+            "health insurance"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "8a29bc21-bda2-4483-8a87-c6b00cd7d59d",
+          "title": "Premium Service Engineer",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 2,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 1,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "ansible",
+            "linux",
+            "engineering"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "899ab3b6-b2c6-4dc0-bf98-2c20879145ab",
+          "title": "Assembler",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 3,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "hiring",
+            "inventory",
+            "sales"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "12dd4cbb-3c46-43fb-8d54-3e1fd7c244e8",
+          "title": "Field Account Executive",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 2,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 3,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "negotiation",
+            "salesforce",
+            "b2b",
+            "okrs",
+            "sales"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "84c95513-7cf3-4ca0-9098-3da1f2a7e428",
+          "title": "Regional Risk Specialist - 12 Months Fixed-Term",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 1,
+            "description": 3,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "safety",
+            "design",
+            "engineering",
+            "operations"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "94557502-9483-4c7b-8561-390b7750a356",
+          "title": "LSW (Masters of Social Work) - Full Time Hybrid",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 1,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 3,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "counseling",
+            "clinical",
+            "health insurance",
+            "hiring"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "f91ad52b-bed0-4a06-a022-195ad0bb5fd0",
+          "title": "CRA 1/2 & Sr. CRAs - CAR-T - Oncology, French Speaking - Canada",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 1,
+            "enriched": 0,
+            "parsed": 1,
+            "description": 2,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "nursing",
+            "clinical",
+            "clinical research",
+            "research"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "731c80c8-45b5-4f58-b9a0-d015a70b6440",
+          "title": "Content Editor",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 4,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "hiring",
+            "operations",
+            "segment",
+            "talent acquisition"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "4cc05674-2a17-4a6b-a0b8-7bf8c99ebc3e",
+          "title": "Engenheira Química Pleno (Vaga Afirmativa para Mulheres)",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 2,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 1,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "excel",
+            "powerbi",
+            "operations"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "e45a001a-3eea-46a8-b2d0-a5cfb10a1785",
+          "title": "Sr. GMP Quality Specialist - Daytona Beach, FL",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 1,
+            "enriched": 0,
+            "parsed": 1,
+            "description": 6,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "gcp",
+            "compliance",
+            "clinical",
+            "clinical research",
+            "engineering",
+            "planning"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "ff760ed1-f41f-487f-89dc-06824b4b13a8",
+          "title": "Senior System Administrator",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 2,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 2,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "linux",
+            "python",
+            "compliance",
+            "design"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "88dd16bf-9766-474a-a191-c792fe170387",
+          "title": "Optical Test Engineer - Space Technologies",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 2,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 3,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "java",
+            "python",
+            "compliance",
+            "design",
+            "engineering"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "f36fb289-a662-4ff0-ac8d-f25daca568bf",
+          "title": "SAP PP Consultant",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 1,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 3,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "excel",
+            "analytics",
+            "engineering",
+            "planning"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "7f1addcc-153f-4ede-83a6-f82c59dc152f",
+          "title": "CRA II - Sponsor Dedicated",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 1,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 3,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "nursing",
+            "clinical",
+            "hiring",
+            "safety"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "582505c0-a62d-469b-9028-5a9f389d2bf5",
+          "title": "Accounting Consultant",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 2,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 1,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "accounting",
+            "recruiting",
+            "talent acquisition"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "4c790365-2dfd-4246-a0b2-8206e0bf7594",
+          "title": "Commercial Account Development Rep - Swedish Speaking",
+          "fitTier": 2,
+          "confidence": "medium",
+          "sourceBreakdown": {
+            "taxonomy": 1,
+            "enriched": 0,
+            "parsed": 1,
+            "description": 1,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "salesforce",
+            "sales",
+            "segment"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        }
+      ],
+      "low": [
+        {
+          "jobId": "fcd9b32c-7e30-4f6c-9d09-90d4d977f3a7",
+          "title": "Production Technician",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 1,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "hiring"
+          ],
+          "appearsAccurate": false,
+          "issues": [
+            "tier3_without_title_family"
+          ]
+        },
+        {
+          "jobId": "1a2fb60c-02b1-465a-85df-9a7d66b1d7f6",
+          "title": "Customer Service OP",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 1,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 0,
+            "titleFamily": 3
+          },
+          "topSignals": [
+            "customer-support",
+            "communication",
+            "conflict resolution",
+            "crm"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "2f8469bf-885a-4518-8d0c-35e4390e5d7a",
+          "title": "Claims Litigation Senior Analyst",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 1,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "compliance"
+          ],
+          "appearsAccurate": false,
+          "issues": [
+            "tier3_without_title_family"
+          ]
+        },
+        {
+          "jobId": "99bb4595-b0d9-426c-8bce-0e2f232f7f5a",
+          "title": "Physical Therapist",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 2,
+            "titleFamily": 4
+          },
+          "topSignals": [
+            "clinical documentation",
+            "healthcare",
+            "healthcare compliance",
+            "medical records",
+            "patient care",
+            "therapy"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "3a531aa8-cb55-4e7c-ba36-2ee50ef530b8",
+          "title": "Freelance Introducer",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 1,
+            "description": 0,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "sales"
+          ],
+          "appearsAccurate": false,
+          "issues": [
+            "tier3_without_title_family"
+          ]
+        },
+        {
+          "jobId": "f00875ad-9368-4f9a-9df0-7bb5b2eb3852",
+          "title": "Contracts Administrator",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 2,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "engineering",
+            "research"
+          ],
+          "appearsAccurate": false,
+          "issues": [
+            "tier3_without_title_family"
+          ]
+        },
+        {
+          "jobId": "8d81148c-12c4-4361-89c5-7114ebea5982",
+          "title": "Clinical Data Manager",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 1,
+            "titleFamily": 8
+          },
+          "topSignals": [
+            "clinical",
+            "clinical documentation",
+            "communication",
+            "healthcare compliance",
+            "medical records",
+            "patient care"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "d3c56460-5703-4a83-ae65-69a39c742bfa",
+          "title": "Senior Product Manager – Platform Engineering",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 1,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 0,
+            "titleFamily": 14
+          },
+          "topSignals": [
+            "recruiting",
+            "agile",
+            "analytics",
+            "communication",
+            "figma",
+            "jira"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "592615b0-e610-4839-944a-e141860982e3",
+          "title": "Facilities Associate (20hrs per week) - Sydney",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 1,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "planning"
+          ],
+          "appearsAccurate": false,
+          "issues": [
+            "tier3_without_title_family"
+          ]
+        },
+        {
+          "jobId": "8d42c2b0-6c99-4981-9c1c-8ac5ad690323",
+          "title": "Simulator Technician",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 1,
+            "titleFamily": 0
+          },
+          "topSignals": [
+            "operations"
+          ],
+          "appearsAccurate": false,
+          "issues": [
+            "tier3_without_title_family"
+          ]
+        },
+        {
+          "jobId": "4bdb5626-55c7-42b9-99d3-a074deb6af3d",
+          "title": "Senior ILS Manager (m/w/d)",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 0,
+            "titleFamily": 4
+          },
+          "topSignals": [
+            "communication",
+            "planning",
+            "project coordination",
+            "team leadership"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "a685c39f-e530-412d-ba86-05fb4afa53b6",
+          "title": "Scheduling Coordinator",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 2,
+            "titleFamily": 4
+          },
+          "topSignals": [
+            "analytics",
+            "communication",
+            "planning",
+            "project coordination",
+            "sales",
+            "team leadership"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "5ec30278-7c6d-4664-b678-c72e083086ec",
+          "title": "Project Manager",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 0,
+            "titleFamily": 10
+          },
+          "topSignals": [
+            "agile",
+            "communication",
+            "confluence",
+            "jira",
+            "kanban",
+            "planning"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "74061b7a-a4f8-4810-801b-be84b6799c7d",
+          "title": "Physical Therapist",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 2,
+            "titleFamily": 4
+          },
+          "topSignals": [
+            "clinical documentation",
+            "healthcare",
+            "healthcare compliance",
+            "medical records",
+            "patient care",
+            "therapy"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "cbb1b841-5bcb-40c2-8eb0-62424e07e37c",
+          "title": "Data Analyst, Value-Based Care Analytics",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 1,
+            "titleFamily": 7
+          },
+          "topSignals": [
+            "analytics",
+            "excel",
+            "healthcare",
+            "looker",
+            "postgres",
+            "python"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "513935cc-d05c-4bcc-9a28-1f3bc5d70e98",
+          "title": "Account Executive SME",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 1,
+            "titleFamily": 9
+          },
+          "topSignals": [
+            "communication",
+            "crm",
+            "customer relationships",
+            "excel",
+            "negotiation",
+            "planning"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "e7e9fb70-b336-4c1e-9e69-791e368ef5e7",
+          "title": "Policy and Advocacy Officer, Global Health Technologies Coalition (GHTC)",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 1,
+            "description": 1,
+            "titleFamily": 4
+          },
+          "topSignals": [
+            "operations",
+            "communication",
+            "planning",
+            "project coordination",
+            "research",
+            "team leadership"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "5627da83-d866-4489-a811-2d81a2843186",
+          "title": "Sales Associate - Part Time Seasonal",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 2,
+            "titleFamily": 4
+          },
+          "topSignals": [
+            "customer-support",
+            "hiring",
+            "inventory",
+            "point of sale",
+            "retail sales",
+            "sales"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "1d10e658-d313-4fcc-9041-8c0dd35c26b8",
+          "title": "Account Executive, Enterprise",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 0,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 2,
+            "titleFamily": 8
+          },
+          "topSignals": [
+            "communication",
+            "crm",
+            "customer relationships",
+            "excel",
+            "negotiation",
+            "planning"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        },
+        {
+          "jobId": "ead34061-0191-44ea-8673-7a5aee6fb40f",
+          "title": "Project Coordinator",
+          "fitTier": 3,
+          "confidence": "low",
+          "sourceBreakdown": {
+            "taxonomy": 1,
+            "enriched": 0,
+            "parsed": 0,
+            "description": 0,
+            "titleFamily": 4
+          },
+          "topSignals": [
+            "typescript",
+            "communication",
+            "planning",
+            "project coordination",
+            "team leadership"
+          ],
+          "appearsAccurate": true,
+          "issues": []
+        }
+      ]
+    }
+  }
+}

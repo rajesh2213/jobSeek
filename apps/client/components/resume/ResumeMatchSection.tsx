@@ -15,11 +15,16 @@ import {
 } from "../../lib/analytics/resumeMatchFunnel";
 import {
   isResumeMatchInsufficient,
+  isResumeMatchInsufficientEvidence,
   resumeFitConfidenceLine,
+  resumeLowConfidenceEstimateLabel,
   resumeMatchInsufficientBody,
+  resumeMatchInsufficientEvidenceBody,
+  resumeMatchInsufficientEvidenceTitle,
   resumeMatchInsufficientHint,
   resumeMatchInsufficientTitle,
   resumeMatchSubtitle,
+  shouldEmphasizeConfidenceOverScore,
 } from "../../lib/resumeGradeLabel";
 import {
   extractJobKeywords,
@@ -284,20 +289,52 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
             Learn more →
           </button>
         </div>
+      ) : isResumeMatchInsufficientEvidence(result) ? (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-lg font-bold text-ink">{resumeMatchInsufficientEvidenceTitle()}</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+              {resumeMatchInsufficientEvidenceBody()}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => openBreakdown()}
+            className="shrink-0 rounded-lg border border-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-ink/5 dark:bg-surface sm:self-center"
+          >
+            Learn more →
+          </button>
+        </div>
       ) : (
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             {result.score !== null ? <MiniRing score={result.score} /> : null}
             <div className="min-w-0 flex-1">
-              <p className="text-lg font-bold text-ink">Fit score: {result.score}%</p>
-              <p className="mt-1 text-sm font-medium text-ink/90">
-                &ldquo;{resumeMatchSubtitle(result.grade)}&rdquo;
-              </p>
-              {result.confidenceLevel ? (
-                <p className="mt-2 text-xs leading-relaxed text-ink-muted">
-                  {resumeFitConfidenceLine(result.confidenceLevel)}
-                </p>
-              ) : null}
+              {shouldEmphasizeConfidenceOverScore(result) ? (
+                <>
+                  <p className="text-lg font-bold text-amber-800 dark:text-amber-200">
+                    {resumeLowConfidenceEstimateLabel()}
+                  </p>
+                  {result.confidenceLevel ? (
+                    <p className="mt-1 text-sm font-semibold text-ink">
+                      {resumeFitConfidenceLine(result.confidenceLevel, result.fitTier)}
+                    </p>
+                  ) : null}
+                  <p className="mt-2 text-sm font-medium text-ink-muted">Fit score: {result.score}%</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-lg font-bold text-ink">Fit score: {result.score}%</p>
+                  <p className="mt-1 text-sm font-medium text-ink/90">
+                    &ldquo;{resumeMatchSubtitle(result.grade)}&rdquo;
+                  </p>
+                  {result.confidenceLevel ? (
+                    <p className="mt-2 text-xs leading-relaxed text-ink-muted">
+                      {resumeFitConfidenceLine(result.confidenceLevel, result.fitTier)}
+                    </p>
+                  ) : null}
+                </>
+              )}
               {isPro ? (
                 <p className="mt-2 text-sm text-ink-muted">
                   {result.matched.length} matched · {result.missing.length} gaps

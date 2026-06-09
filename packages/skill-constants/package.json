@@ -6,10 +6,12 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./taxonomy": "./dist/taxonomy.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "generate": "tsx scripts/generateDictionary.ts",
+    "build": "npm run generate && tsc -p tsconfig.build.json",
     "test": "node --import tsx --test src/skill-constants.test.ts"
   },
   "devDependencies": {

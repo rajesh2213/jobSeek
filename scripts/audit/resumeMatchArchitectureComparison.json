@@ -1,0 +1,84 @@
+{
+  "measuredAt": "2026-06-09T09:55:13.836Z",
+  "sampleSize": 500,
+  "options": {
+    "A": {
+      "name": "full parsedDescription on every list card",
+      "extraKbPerPage": 87,
+      "firstFitLatencyMs": "0 (no extra fetch)",
+      "mobileImpact": "high egress on scroll-heavy sessions",
+      "cacheability": "low — large list JSON",
+      "complexity": "low server change",
+      "listDetailParity": "94.6%",
+      "listScorablePct": "94.6%",
+      "futurePhase3Support": "good"
+    },
+    "B": {
+      "name": "slim parsed (requirement+responsibility, 8 lines each)",
+      "extraKbPerPage": 25,
+      "firstFitLatencyMs": "0",
+      "mobileImpact": "medium",
+      "cacheability": "medium",
+      "complexity": "medium — slim serializer + client",
+      "listDetailParity": "94.2%",
+      "listScorablePct": "94.2%",
+      "futurePhase3Support": "good"
+    },
+    "C": {
+      "name": "lazy hydration on Check Fit click",
+      "extraKbPerPage": 0,
+      "firstFitLatencyMs": "150–400ms first click (detail fetch), 0ms cached",
+      "mobileImpact": "minimal list egress",
+      "cacheability": "high — session cache per jobId",
+      "complexity": "medium — client fetch + cache",
+      "listDetailParity": "94.6%",
+      "listScorablePct": "list-only unscorable 0.4% of jobs need hydrate → detail after hydrate",
+      "futurePhase3Support": "excellent — reuses detail payload"
+    }
+  },
+  "metricsTable": {
+    "extraKbPerPage": {
+      "A": 87,
+      "B": 25,
+      "C": 0
+    },
+    "firstFitLatency": {
+      "A": "~0ms",
+      "B": "~0ms",
+      "C": "~250ms uncached"
+    },
+    "mobileImpact": {
+      "A": "high",
+      "B": "medium",
+      "C": "low"
+    },
+    "cacheability": {
+      "A": "low",
+      "B": "medium",
+      "C": "high"
+    },
+    "complexity": {
+      "A": "low",
+      "B": "medium",
+      "C": "medium"
+    },
+    "listDetailParity": {
+      "A": "94.6%",
+      "B": "94.2%",
+      "C": "94.6%"
+    },
+    "futurePhase3Support": {
+      "A": "good",
+      "B": "good",
+      "C": "excellent"
+    }
+  },
+  "recommendation": "KEEP_C",
+  "recommendationRationale": [
+    "Lowest egress: 0 extra KB/page on list API",
+    "Resume Fit is user-triggered; one-time fetch latency acceptable",
+    "Achieves detail parity after hydrate for jobs that fail list-only scoring",
+    "Reuses full job detail for Phase 3–6 experience/seniority signals",
+    "Avoids maintaining slim/full parsed serializers on hot list path"
+  ]
+}

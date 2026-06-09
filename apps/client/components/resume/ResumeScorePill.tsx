@@ -17,6 +17,7 @@ import {
 import {
   extractJobKeywords,
   isResumeLegacyKeywordMode,
+  isResumeMatchInsufficientEvidence,
   isResumeMatchScored,
   jobHasMatchSignals,
   jobMatchSignalsForSemantic,
@@ -29,6 +30,7 @@ import { formatUserLocalResetForMessage } from "../../lib/userLocalResetTime";
 import { cn } from "../../lib/cn";
 import { signInWithNext } from "../../lib/signInUrl";
 import { buttonFocusRing } from "../ui/Button";
+import { logResumeFitHydrate, resolveJobForFitScoring } from "../../lib/resumeFitHydrate";
 import { ResumeScorePanel } from "./ResumeScorePanel";
 import { ResumeUploadModal } from "./ResumeUploadModal";
 
@@ -59,15 +61,17 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
   const [result, setResult] = useState<ScoringResult | null>(null);
   const [matchMeta, setMatchMeta] = useState<ResumeSemanticMatchMeta | null>(null);
   const [semanticUnavailable, setSemanticUnavailable] = useState(false);
+  const [scoringJob, setScoringJob] = useState<JobItem>(job);
   const returnPath = `${pathname}${searchParams.size > 0 ? `?${searchParams.toString()}` : ""}`;
   const signInHref = signInWithNext(returnPath || "/jobs");
 
   useEffect(() => {
+    setScoringJob(job);
     setResult(null);
     setPanelOpen(false);
     setMatchMeta(null);
     setSemanticUnavailable(false);
-  }, [job.id]);
+  }, [job]);
 
   useEffect(() => {
     if (!hasResume) setResult(null);
@@ -76,11 +80,16 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
   const runScore = useCallback(async () => {
     const text = resumeText ?? "";
     const bullets = resumeBullets;
-    const keywordStrings = isResumeLegacyKeywordMode()
-      ? extractJobKeywords(job).map((k) => k.keyword)
-      : jobMatchSignalsForSemantic(job);
     const token = await getToken();
     if (!token) return;
+
+    const scoreT0 = performance.now();
+    const { job: fitJob, hydrated, fetchMs } = await resolveJobForFitScoring(job, getToken);
+    setScoringJob(fitJob);
+
+    const keywordStrings = isResumeLegacyKeywordMode()
+      ? extractJobKeywords(fitJob).map((k) => k.keyword)
+      : jobMatchSignalsForSemantic(fitJob);
 
     const canTrySemantic =
       isPro || !resumeMatchAi || resumeMatchAi.remaining > 0;
@@ -90,7 +99,7 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
     let skippedSemantic = false;
 
     if (
-      jobHasMatchSignals(job) &&
+      jobHasMatchSignals(fitJob) &&
       keywordStrings.length &&
       bullets.length &&
       canTrySemantic
@@ -114,7 +123,7 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
         setMatchMeta(null);
       }
     } else if (
-      jobHasMatchSignals(job) &&
+      jobHasMatchSignals(fitJob) &&
       keywordStrings.length &&
       bullets.length &&
       !canTrySemantic
@@ -128,8 +137,17 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
 
     setSemanticUnavailable(skippedSemantic);
 
-    const scored = scoreResume(text, bullets, job, semantic);
+    const scored = scoreResume(text, bullets, fitJob, semantic);
     setResult(scored);
+
+    const scoreMs = Math.round(performance.now() - scoreT0);
+    logResumeFitHydrate({
+      jobId: job.id,
+      fetchMs,
+      scoreMs,
+      confidence: scored.confidenceLevel ?? null,
+      hydrated,
+    });
 
     if (!isResumeMatchScored(scored)) {
       trackResumeFitUnavailable({
@@ -188,7 +206,10 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
   const showResultPill = Boolean(result) && !scoring && isSignedIn && planLoaded && !isLoading;
   const scored = result;
   const isScored = scored ? isResumeMatchScored(scored) : false;
+  const isInsufficientEvidence = scored ? isResumeMatchInsufficientEvidence(scored) : false;
   const isUnscorable = scored ? !isResumeMatchScored(scored) : false;
+  const emphasizeLowConfidence =
+    isScored && scored?.fitTier !== null && (scored.fitTier === 3 || scored.fitTier === 4);
   const c =
     scored && isScored && scored.score !== null
       ? pillColors(scored.score)
@@ -230,7 +251,11 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
               <span aria-hidden className="shrink-0">
                 ●
               </span>
-              <span className="min-w-0 truncate">Fit score: {scored.score}%</span>
+              <span className="min-w-0 truncate">
+                {emphasizeLowConfidence
+                  ? `Low-confidence estimate · ${scored.score}%`
+                  : `Fit score: ${scored.score}%`}
+              </span>
             </span>
             <span className="h-4 w-px shrink-0 bg-current opacity-25" aria-hidden />
             <span className="shrink-0 text-[11px] font-medium opacity-75">
@@ -269,7 +294,11 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
             <span aria-hidden className="shrink-0">
               ○
             </span>
-            <span className="min-w-0 truncate">Fit estimate unavailable</span>
+            <span className="min-w-0 truncate">
+              {isInsufficientEvidence
+                ? "Insufficient evidence for a reliable fit estimate"
+                : "Fit estimate unavailable"}
+            </span>
           </span>
           <span className="h-4 w-px shrink-0 bg-current opacity-25" aria-hidden />
           <span className="shrink-0 text-[11px] font-medium opacity-75">Details →</span>
@@ -313,7 +342,7 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
       <ResumeScorePanel
         open={panelOpen}
         onClose={() => setPanelOpen(false)}
-        job={job}
+        job={scoringJob}
         result={result}
         breakdownAllowed={breakdownAllowed}
         onReuploadResume={() => {

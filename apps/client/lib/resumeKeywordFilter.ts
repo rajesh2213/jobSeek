@@ -251,7 +251,7 @@ export function isScorableResumeKeyword(keyword: string): boolean {
 /** Short tech/abbrev: allow substring (e.g. “sql” inside “MySQL”) */
 const TIGHT_OK_SUBSTRING = new Set(
   `sql api aws gcp cdn sso saml oidc scim etl sre rpc tls idp ldap sftp jdbc grpc nosql
-postgresql postgres nodejs nextjs typescript golang csharp
+postgres postgresql nodejs nextjs typescript golang
 `.toLowerCase()
     .split(/\s+/)
     .filter(Boolean),

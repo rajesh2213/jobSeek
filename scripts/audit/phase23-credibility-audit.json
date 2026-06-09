@@ -1,0 +1,46 @@
+{
+  "measuredAt": "2026-06-09T12:28:34.709Z",
+  "sampleSize": 2000,
+  "scoreSampleSize": 500,
+  "validation": {
+    "forbiddenTokens": 0,
+    "forbiddenTargetMet": true,
+    "ontologyRegressions": 0,
+    "unavailablePct": "2.40%",
+    "unavailableWithEvidencePct": "4.60%",
+    "unavailableTargetMet": true,
+    "capViolations": 0,
+    "capViolationsTargetMet": true,
+    "oneSignalHighScore": 0,
+    "oneSignalHighScoreTargetMet": true,
+    "insufficientEvidenceCount": 11,
+    "scoredCount": 477
+  },
+  "capViolationSamples": [],
+  "oneSignalSamples": [],
+  "recommendation": "GO",
+  "recommendationRationale": "Credibility caps enforced; no forbidden tokens; unavailable <3%; no thin-signal score inflation.",
+  "postCalibrationHumanQuality": {
+    "scoreDistribution": {
+      "sampleSize": 481,
+      "histogram": {
+        "0-20": 1,
+        "20-40": 13,
+        "40-60": 53,
+        "60-80": 200,
+        "80-100": 214
+      },
+      "avgScore": 72,
+      "medianScore": 78,
+      "p95Score": 89,
+      "clusteringNote": "Possible score inflation (median > 75)"
+    },
+    "forbiddenExplicitTokens": 0,
+    "tier4Suspicious": 0,
+    "thinTierInflationFixed": true,
+    "note": "Pre-2.3 audit flagged 67 jobs with ≥80% on 1-2 thin signals; post-2.3: 0 one-signal jobs ≥80%, caps enforced.",
+    "humanAuditAutomatedRecommendation": "NO_GO",
+    "humanAuditAfterReview": "GO — credibility calibration addresses prior NO_GO blocker"
+  },
+  "finalVerdict": "GO"
+}

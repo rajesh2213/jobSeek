@@ -1,152 +1,252 @@
-/**
- * Enrichment: ordered scan — same keys/labels as legacy enrichment.service, plus v1 extension.
- * `canonical` is the stable id used in scoring / semantic map keys.
- */
+// AUTO-GENERATED — DO NOT EDIT
+// Source: packages/skill-constants/src/taxonomyEntries.ts
+// Regenerate: npm run generate -w @jobseek/skill-constants
+
 export const ENRICHMENT_KEYWORDS: readonly {
   key: string;
   label: string;
   canonical: string;
 }[] = [
-  /** Unambiguous keys only — no bare "react", "node", "next" (common English words). */
-  { key: "react.js", label: "React", canonical: "react" },
-  { key: "reactjs", label: "React", canonical: "react" },
+  { key: "aws", label: "AWS", canonical: "aws" },
+  { key: "amazon web services", label: "AWS", canonical: "aws" },
+  { key: "gcp", label: "GCP", canonical: "gcp" },
+  { key: "google cloud", label: "GCP", canonical: "gcp" },
+  { key: "google cloud platform", label: "GCP", canonical: "gcp" },
+  { key: "azure", label: "Azure", canonical: "azure" },
+  { key: "microsoft azure", label: "Azure", canonical: "azure" },
+  { key: "terraform", label: "Terraform", canonical: "terraform" },
+  { key: "cloudformation", label: "Cloudformation", canonical: "cloudformation" },
+  { key: "cloud formation", label: "Cloudformation", canonical: "cloudformation" },
+  { key: "pulumi", label: "Pulumi", canonical: "pulumi" },
   { key: "node.js", label: "Node", canonical: "nodejs" },
   { key: "nodejs", label: "Node", canonical: "nodejs" },
-  { key: "typescript", label: "TypeScript", canonical: "typescript" },
-  { key: "javascript", label: "JavaScript", canonical: "javascript" },
   { key: "python", label: "Python", canonical: "python" },
-  { key: "java", label: "Java", canonical: "java" },
-  { key: "c#", label: "C#", canonical: "csharp" },
-  { key: ".net", label: ".NET", canonical: "dotnet" },
-  { key: "aws", label: "AWS", canonical: "aws" },
-  { key: "docker", label: "Docker", canonical: "docker" },
-  { key: "kubernetes", label: "Kubernetes", canonical: "kubernetes" },
-  { key: "postgresql", label: "PostgreSQL", canonical: "postgresql" },
+  { key: "golang", label: "Go", canonical: "golang" },
+  { key: "scala", label: "Scala", canonical: "scala" },
+  { key: "kotlin", label: "Kotlin", canonical: "kotlin" },
+  { key: "fastapi", label: "FastAPI", canonical: "fastapi" },
+  { key: "fast api", label: "FastAPI", canonical: "fastapi" },
+  { key: "django", label: "Django", canonical: "django" },
+  { key: "spring boot", label: "Spring", canonical: "spring" },
+  { key: "spring framework", label: "Spring", canonical: "spring" },
+  { key: "react.js", label: "React", canonical: "react" },
+  { key: "reactjs", label: "React", canonical: "react" },
+  { key: "vue.js", label: "Vue", canonical: "vue" },
+  { key: "angular", label: "Angular", canonical: "angular" },
+  { key: "nextjs", label: "Next.js", canonical: "nextjs" },
+  { key: "next.js", label: "Next.js", canonical: "nextjs" },
+  { key: "svelte", label: "Svelte", canonical: "svelte" },
+  { key: "tailwind", label: "Tailwind CSS", canonical: "tailwind" },
+  { key: "tailwindcss", label: "Tailwind CSS", canonical: "tailwind" },
+  { key: "graphql", label: "GraphQL", canonical: "graphql" },
+  { key: "graph ql", label: "GraphQL", canonical: "graphql" },
+  { key: "pytorch", label: "PyTorch", canonical: "pytorch" },
+  { key: "py torch", label: "PyTorch", canonical: "pytorch" },
+  { key: "tensorflow", label: "TensorFlow", canonical: "tensorflow" },
+  { key: "apache spark", label: "Spark", canonical: "spark" },
+  { key: "pyspark", label: "Spark", canonical: "spark" },
+  { key: "kafka", label: "Kafka", canonical: "kafka" },
+  { key: "airflow", label: "Airflow", canonical: "airflow" },
+  { key: "apache airflow", label: "Airflow", canonical: "airflow" },
+  { key: "snowflake", label: "Snowflake", canonical: "snowflake" },
+  { key: "databricks", label: "Databricks", canonical: "databricks" },
+  { key: "pandas", label: "Pandas", canonical: "pandas" },
+  { key: "scikit-learn", label: "Scikit-learn", canonical: "scikit-learn" },
+  { key: "sklearn", label: "Scikit-learn", canonical: "scikit-learn" },
+  { key: "huggingface", label: "Hugging Face", canonical: "huggingface" },
+  { key: "hugging face", label: "Hugging Face", canonical: "huggingface" },
+  { key: "postgres", label: "PostgreSQL", canonical: "postgres" },
+  { key: "postgresql", label: "PostgreSQL", canonical: "postgres" },
   { key: "mysql", label: "MySQL", canonical: "mysql" },
   { key: "mongodb", label: "MongoDB", canonical: "mongodb" },
+  { key: "mongo", label: "MongoDB", canonical: "mongodb" },
   { key: "redis", label: "Redis", canonical: "redis" },
-  { key: "graphql", label: "GraphQL", canonical: "graphql" },
-  { key: "golang", label: "Go", canonical: "golang" },
-  { key: "rust", label: "Rust", canonical: "rust" },
-  { key: "next.js", label: "Next.js", canonical: "nextjs" },
-  { key: "nextjs", label: "Next.js", canonical: "nextjs" },
-  { key: "svelte", label: "Svelte", canonical: "svelte" },
-  { key: "terraform", label: "Terraform", canonical: "terraform" },
-  { key: "pulumi", label: "Pulumi", canonical: "pulumi" },
-  { key: "gcp", label: "GCP", canonical: "gcp" },
-  { key: "azure", label: "Azure", canonical: "azure" },
+  { key: "elasticsearch", label: "Elasticsearch", canonical: "elasticsearch" },
+  { key: "dynamodb", label: "DynamoDB", canonical: "dynamodb" },
+  { key: "dynamo db", label: "DynamoDB", canonical: "dynamodb" },
+  { key: "bigquery", label: "BigQuery", canonical: "bigquery" },
+  { key: "big query", label: "BigQuery", canonical: "bigquery" },
+  { key: "kubernetes", label: "Kubernetes", canonical: "kubernetes" },
+  { key: "k8s", label: "Kubernetes", canonical: "kubernetes" },
+  { key: "docker", label: "Docker", canonical: "docker" },
+  { key: "jenkins", label: "Jenkins", canonical: "jenkins" },
+  { key: "github actions", label: "GitHub Actions", canonical: "github-actions" },
+  { key: "github-actions", label: "GitHub Actions", canonical: "github-actions" },
+  { key: "ansible", label: "Ansible", canonical: "ansible" },
+  { key: "prometheus", label: "Prometheus", canonical: "prometheus" },
+  { key: "grafana", label: "Grafana", canonical: "grafana" },
+  { key: "android", label: "Android", canonical: "android" },
+  { key: "react native", label: "React Native", canonical: "react-native" },
+  { key: "react-native", label: "React Native", canonical: "react-native" },
+  { key: "flutter", label: "Flutter", canonical: "flutter" },
+  { key: "figma", label: "Figma", canonical: "figma" },
+  { key: "salesforce", label: "Salesforce", canonical: "salesforce" },
+  { key: "tableau", label: "Tableau", canonical: "tableau" },
+  { key: "powerbi", label: "Power BI", canonical: "powerbi" },
+  { key: "power bi", label: "Power BI", canonical: "powerbi" },
+  { key: "linux", label: "Linux", canonical: "linux" },
+  { key: "typescript", label: "TypeScript", canonical: "typescript" },
+  { key: "excel", label: "Excel", canonical: "excel" },
+  { key: "customer service", label: "Customer Support", canonical: "customer-support" },
+  { key: "customer support", label: "Customer Support", canonical: "customer-support" },
+  { key: "customer-support", label: "Customer Support", canonical: "customer-support" },
+  { key: "recruiting", label: "Recruiting", canonical: "recruiting" },
+  { key: "project management", label: "Project Management", canonical: "project-management" },
+  { key: "project-management", label: "Project Management", canonical: "project-management" },
+  { key: "agile", label: "Agile", canonical: "agile" },
+  { key: "scrum", label: "Scrum", canonical: "scrum" },
+  { key: "negotiation", label: "Negotiation", canonical: "negotiation" },
+  { key: "accounting", label: "Accounting", canonical: "accounting" },
+  { key: "bookkeeping", label: "Bookkeeping", canonical: "bookkeeping" },
+  { key: "nursing", label: "Nursing", canonical: "nursing" },
+  { key: "teaching", label: "Teaching", canonical: "teaching" },
+  { key: "counseling", label: "Counseling", canonical: "counseling" },
 ] as const;
 
-/** Single-word / token aliases → canonical (lowercase keys). */
 export const TOKEN_TO_CANONICAL: Readonly<Record<string, string>> = {
-  postgres: "postgresql",
-  pgsql: "postgresql",
-  postgresql: "postgresql",
-  "node.js": "nodejs",
-  nodejs: "nodejs",
+  "accounting": "accounting",
+  "agile": "agile",
+  "airflow": "airflow",
+  "android": "android",
+  "angular": "angular",
+  "ansible": "ansible",
+  "aws": "aws",
+  "azure": "azure",
+  "bigquery": "bigquery",
+  "bookkeeping": "bookkeeping",
+  "cloudformation": "cloudformation",
+  "counseling": "counseling",
+  "customer-support": "customer-support",
+  "databricks": "databricks",
+  "django": "django",
+  "docker": "docker",
+  "dynamodb": "dynamodb",
+  "elasticsearch": "elasticsearch",
+  "excel": "excel",
+  "fastapi": "fastapi",
+  "figma": "figma",
+  "flutter": "flutter",
+  "gcp": "gcp",
+  "github-actions": "github-actions",
+  "golang": "golang",
+  "grafana": "grafana",
+  "graphql": "graphql",
+  "huggingface": "huggingface",
+  "java": "java",
+  "jenkins": "jenkins",
+  "jira": "jira",
+  "k8s": "kubernetes",
+  "kafka": "kafka",
+  "kotlin": "kotlin",
+  "kubernetes": "kubernetes",
+  "linux": "linux",
+  "mongo": "mongodb",
+  "mongodb": "mongodb",
+  "mysql": "mysql",
+  "negotiation": "negotiation",
   "next.js": "nextjs",
-  nextjs: "nextjs",
-  reactjs: "react",
+  "nextjs": "nextjs",
+  "node.js": "nodejs",
+  "nodejs": "nodejs",
+  "nursing": "nursing",
+  "pandas": "pandas",
+  "php": "php",
+  "postgres": "postgres",
+  "postgresql": "postgres",
+  "powerbi": "powerbi",
+  "project-management": "project-management",
+  "prometheus": "prometheus",
+  "pulumi": "pulumi",
+  "pyspark": "spark",
+  "python": "python",
+  "pytorch": "pytorch",
+  "react-native": "react-native",
   "react.js": "react",
-  typescript: "typescript",
-  javascript: "javascript",
-  python: "python",
-  java: "java",
-  "c#": "csharp",
-  csharp: "csharp",
-  cs: "csharp",
-  dotnet: "dotnet",
-  ".net": "dotnet",
-  golang: "golang",
-  rust: "rust",
-  svelte: "svelte",
-  k8s: "kubernetes",
-  kubernetes: "kubernetes",
-  kuberenetes: "kubernetes",
-  docker: "docker",
-  mysql: "mysql",
-  mongodb: "mongodb",
-  redis: "redis",
-  graphql: "graphql",
-  gcp: "gcp",
-  aws: "aws",
-  azure: "azure",
-  terraform: "terraform",
-  pulumi: "pulumi",
-  elasticsearch: "elasticsearch",
-  opensearch: "opensearch",
-  kafka: "kafka",
-  rabbitmq: "rabbitmq",
-  grpc: "grpc",
-  nosql: "nosql",
-  sql: "sql",
+  "reactjs": "react",
+  "recruiting": "recruiting",
+  "redis": "redis",
+  "ruby": "ruby",
+  "rust": "rust",
+  "salesforce": "salesforce",
+  "scala": "scala",
+  "scikit-learn": "scikit-learn",
+  "scrum": "scrum",
+  "sklearn": "scikit-learn",
+  "snowflake": "snowflake",
+  "sql": "sql",
+  "svelte": "svelte",
+  "tableau": "tableau",
+  "tailwind": "tailwind",
+  "tailwindcss": "tailwind",
+  "teaching": "teaching",
+  "tensorflow": "tensorflow",
+  "terraform": "terraform",
+  "typescript": "typescript",
+  "vue": "vue",
+  "vue.js": "vue",
 } as const;
 
-/**
- * Longest-first for greedy phrase scan (lowercase, single internal spaces, punctuation stripped in lines).
- * Phrases that normalize to the same as multi-token paths should still be listed.
- */
-const PHRASE_RAW: { phrase: string; canonical: string }[] = [
-  { phrase: "amazon web services", canonical: "aws" },
+export const PHRASE_TO_CANONICAL: readonly { phrase: string; canonical: string }[] = [
   { phrase: "google cloud platform", canonical: "gcp" },
+  { phrase: "amazon web services", canonical: "aws" },
+  { phrase: "project management", canonical: "project-management" },
+  { phrase: "spring framework", canonical: "spring" },
+  { phrase: "customer service", canonical: "customer-support" },
+  { phrase: "customer support", canonical: "customer-support" },
+  { phrase: "microsoft azure", canonical: "azure" },
+  { phrase: "cloud formation", canonical: "cloudformation" },
+  { phrase: "apache airflow", canonical: "airflow" },
+  { phrase: "github actions", canonical: "github-actions" },
   { phrase: "google cloud", canonical: "gcp" },
+  { phrase: "apache spark", canonical: "spark" },
+  { phrase: "hugging face", canonical: "huggingface" },
+  { phrase: "react native", canonical: "react-native" },
+  { phrase: "spring boot", canonical: "spring" },
+  { phrase: "dynamo db", canonical: "dynamodb" },
+  { phrase: "big query", canonical: "bigquery" },
+  { phrase: "fast api", canonical: "fastapi" },
+  { phrase: "react js", canonical: "react" },
+  { phrase: "graph ql", canonical: "graphql" },
+  { phrase: "py torch", canonical: "pytorch" },
+  { phrase: "power bi", canonical: "powerbi" },
   { phrase: "node js", canonical: "nodejs" },
-  { phrase: "node.js", canonical: "nodejs" },
   { phrase: "next js", canonical: "nextjs" },
-  { phrase: "next.js", canonical: "nextjs" },
-  { phrase: "c sharp", canonical: "csharp" },
-  { phrase: "c #", canonical: "csharp" },
+  { phrase: "vue js", canonical: "vue" },
 ];
-/** Longest first for non-overlapping phrase scan. */
-export const PHRASE_TO_CANONICAL: readonly { phrase: string; canonical: string }[] = [...PHRASE_RAW].sort(
-  (a, b) => b.phrase.length - a.phrase.length,
-);
 
-function collectCanonicals(): string[] {
-  const s = new Set<string>();
-  for (const e of ENRICHMENT_KEYWORDS) s.add(e.canonical);
-  for (const c of Object.values(TOKEN_TO_CANONICAL)) s.add(c);
-  for (const p of PHRASE_TO_CANONICAL) s.add(p.canonical);
-  return [...s].sort();
-}
-
-export const CANONICAL_IDS: readonly string[] = collectCanonicals();
+export const CANONICAL_IDS: readonly string[] = ["accounting","agile","airflow","android","angular","ansible","aws","azure","bigquery","bookkeeping","cloudformation","counseling","customer-support","databricks","django","docker","dynamodb","elasticsearch","excel","fastapi","figma","flutter","gcp","github-actions","golang","grafana","graphql","huggingface","java","jenkins","jira","kafka","kotlin","kubernetes","linux","mongodb","mysql","negotiation","nextjs","nodejs","nursing","pandas","php","postgres","powerbi","project-management","prometheus","pulumi","python","pytorch","react","react-native","recruiting","redis","ruby","rust","salesforce","scala","scikit-learn","scrum","snowflake","spark","spring","sql","svelte","tableau","tailwind","teaching","tensorflow","terraform","typescript","vue"];
 
 export const CANONICAL_SET: ReadonlySet<string> = new Set(CANONICAL_IDS);
 
-function buildAliasStringsByCanonical(): Readonly<Record<string, string[]>> {
-  const m = new Map<string, Set<string>>();
-
-  const add = (canonical: string, variant: string) => {
-    const v = variant.toLowerCase().trim();
-    if (v.length < 2) return;
-    if (v === canonical) return;
-    if (!m.has(canonical)) m.set(canonical, new Set());
-    m.get(canonical)!.add(v);
-  };
-
-  for (const [token, can] of Object.entries(TOKEN_TO_CANONICAL)) {
-    if (can !== token) add(can, token);
-  }
-
-  for (const { phrase, canonical } of PHRASE_TO_CANONICAL) {
-    const p = phrase.toLowerCase().trim();
-    if (p !== canonical) add(canonical, p);
-  }
-
-  for (const e of ENRICHMENT_KEYWORDS) {
-    if (e.key.toLowerCase() !== e.canonical) add(e.canonical, e.key);
-  }
-
-  const out: Record<string, string[]> = {};
-  for (const [c, set] of m) {
-    out[c] = [...set].sort((a, b) => b.length - a.length);
-  }
-  return out;
-}
-
-/** Match resume text: try canonical first, then these (longer first, already sorted). */
-export const ALIASES_BY_CANONICAL: Readonly<Record<string, string[]>> = buildAliasStringsByCanonical();
+export const ALIASES_BY_CANONICAL: Readonly<Record<string, string[]>> = {
+  "airflow": ["apache airflow"],
+  "aws": ["amazon web services"],
+  "azure": ["microsoft azure"],
+  "bigquery": ["big query"],
+  "cloudformation": ["cloud formation"],
+  "customer-support": ["customer service","customer support"],
+  "dynamodb": ["dynamo db"],
+  "fastapi": ["fast api"],
+  "gcp": ["google cloud platform","google cloud"],
+  "github-actions": ["github actions"],
+  "graphql": ["graph ql"],
+  "huggingface": ["hugging face"],
+  "kubernetes": ["k8s"],
+  "mongodb": ["mongo"],
+  "nextjs": ["next.js","next js"],
+  "nodejs": ["node.js","node js"],
+  "postgres": ["postgresql"],
+  "powerbi": ["power bi"],
+  "project-management": ["project management"],
+  "pytorch": ["py torch"],
+  "react": ["react.js","react js","reactjs"],
+  "react-native": ["react native"],
+  "scikit-learn": ["sklearn"],
+  "spark": ["apache spark","pyspark"],
+  "spring": ["spring framework","spring boot"],
+  "tailwind": ["tailwindcss"],
+  "vue": ["vue.js","vue js"],
+};
 
 export function dictionaryFingerprintPayload(): string {
   return JSON.stringify({

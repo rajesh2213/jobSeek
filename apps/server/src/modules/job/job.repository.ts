@@ -809,6 +809,7 @@ export function buildCanonicalListingJobSelect(includeCompanyJobCount: boolean) 
 type ListingJobJoinRow = {
   id: string;
   title: string;
+  role: string;
   companyId: string;
   country: string;
   locationCountry: string;
@@ -848,6 +849,7 @@ async function hydrateCanonicalListingByIds(
     SELECT
       j.id,
       j.title,
+      j.role,
       j."companyId",
       j.country,
       j."locationCountry",
@@ -879,6 +881,7 @@ async function hydrateCanonicalListingByIds(
   const jobs: JobWithCompany[] = rows.map((r) => ({
     id: r.id,
     title: r.title,
+    role: r.role,
     companyId: r.companyId,
     country: r.country,
     locationCountry: r.locationCountry,

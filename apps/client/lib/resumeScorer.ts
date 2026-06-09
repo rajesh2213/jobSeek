@@ -15,6 +15,7 @@ import {
   computeSofterMissingMass,
   computeSofterScorePercent,
 } from "./resumeScoreSoftening";
+import { applyCredibilityCalibration } from "./resumeFitCalibration";
 import type { FitConfidence, FitTier, FitUnavailableReason } from "./resumeFitConfidence";
 import {
   jobHasResolvableMatchSignals,
@@ -61,7 +62,7 @@ export interface KeywordResult {
   semanticSimilarity?: number; // 0-1, how confident the suggestion is
 }
 
-export type MatchAvailability = "scored" | "insufficient_job_signals";
+export type MatchAvailability = "scored" | "insufficient_job_signals" | "insufficient_evidence";
 
 export type ResumeMatchGrade = "excellent" | "good" | "fair" | "poor"; // ≥75, ≥55, ≥35, <35
 
@@ -92,6 +93,9 @@ export interface ScoringResult {
     adjustedMissingWeight?: number;
     bonus?: number;
     clusters?: string[][];
+    rawScore?: number;
+    calibratedScore?: number | null;
+    appliedCap?: number | null;
   };
 }
 
@@ -106,6 +110,14 @@ function insufficientCacheKey(jobId: string, legacy: boolean): string {
 
 export function isResumeMatchScored(result: ScoringResult): boolean {
   return result.matchAvailability === "scored";
+}
+
+export function isResumeMatchInsufficientEvidence(result: ScoringResult): boolean {
+  return result.matchAvailability === "insufficient_evidence";
+}
+
+function gradeFromScore(score: number): ResumeMatchGrade {
+  return score >= 75 ? "excellent" : score >= 55 ? "good" : score >= 35 ? "fair" : "poor";
 }
 
 /** True when the job exposes at least one scorable signal (dictionary + fallbacks). */
@@ -171,11 +183,16 @@ export function getCachedScore(
   );
 }
 
+function isLowConfidenceTitleSignal(source: JobSkill["source"]): boolean {
+  return source === "title_family_low";
+}
+
 function jobSkillToKeywordResultBase(s: JobSkill): Omit<KeywordResult, "foundIn" | "suggestion"> {
   const isPreferred =
     s.source === "parsed_requirement" ||
     s.source === "sparse_responsibility" ||
-    s.source === "description_fallback";
+    s.source === "description_fallback" ||
+    s.source === "title_family_low";
   return {
     keyword: s.canonical,
     category: isPreferred ? "preferred" : "required",
@@ -300,6 +317,9 @@ function scoreResumeSkills(
       sem && sem.similarity >= 0.45
         ? generateSuggestionFromBullet(s.canonical, sem.bullet)
         : getTemplateSuggestion(s.canonical);
+    if (isLowConfidenceTitleSignal(s.source)) {
+      continue;
+    }
     missingUnsorted.push({
       skill: s,
       kw: {
@@ -328,13 +348,18 @@ function scoreResumeSkills(
     else if (t === "partial") wPartial += s.weight;
   }
   const totalW = skills.reduce((sum, s) => sum + s.weight, 0);
-  const score = computeSofterScorePercent({
+  const rawScore = computeSofterScorePercent({
     wMatched,
     wPartial,
     totalW,
     adjustedMissingWeight,
   });
   const bonus = computeMatchBonus(wMatched, totalW);
+  const calibration = applyCredibilityCalibration({
+    rawScore,
+    signalCount: resolution.signalCount,
+    fitTier: resolution.fitTier,
+  });
 
   const extractedCanonicals = jobSkillCanonicalsForSemantic(skills);
   const missingCanonicals = missing.map((m) => m.keyword);
@@ -343,17 +368,20 @@ function scoreResumeSkills(
     ...partial.map((m) => m.keyword),
   ];
 
+  const isInsufficientEvidence = calibration.outcome === "insufficient_evidence";
+  const finalScore = calibration.score;
+
   const result: ScoringResult = {
-    matchAvailability: "scored",
-    score,
-    grade: score >= 75 ? "excellent" : score >= 55 ? "good" : score >= 35 ? "fair" : "poor",
+    matchAvailability: isInsufficientEvidence ? "insufficient_evidence" : "scored",
+    score: finalScore,
+    grade: finalScore === null ? null : gradeFromScore(finalScore),
     matched,
     missing,
     partial,
     confidenceLevel: resolution.confidence,
     signalCount: resolution.signalCount,
     fitTier: resolution.fitTier,
-    unavailableReason: null,
+    unavailableReason: isInsufficientEvidence ? "insufficient_evidence" : null,
     breakdown: {
       required: {
         matched: matched.filter((k) => k.category === "required").length,
@@ -361,7 +389,8 @@ function scoreResumeSkills(
           (s) =>
             s.source !== "parsed_requirement" &&
             s.source !== "sparse_responsibility" &&
-            s.source !== "description_fallback",
+            s.source !== "description_fallback" &&
+            s.source !== "title_family_low",
         ).length,
       },
       preferred: {
@@ -370,7 +399,8 @@ function scoreResumeSkills(
           (s) =>
             s.source === "parsed_requirement" ||
             s.source === "sparse_responsibility" ||
-            s.source === "description_fallback",
+            s.source === "description_fallback" ||
+            s.source === "title_family_low",
         ).length,
       },
     },
@@ -391,6 +421,9 @@ function scoreResumeSkills(
       adjustedMissingWeight,
       bonus,
       clusters,
+      rawScore,
+      calibratedScore: finalScore,
+      appliedCap: calibration.appliedCap,
     };
   }
 

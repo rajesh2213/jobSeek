@@ -1,0 +1,208 @@
+{
+  "measuredAt": "2026-06-09T10:55:37.728Z",
+  "sampleSize": 2000,
+  "before": {
+    "unavailablePct": "6.40%",
+    "unavailableCount": 128,
+    "note": "Phase 2.1 regression audit before Tier 3.5 low-confidence recovery (2000-job sample)"
+  },
+  "after": {
+    "unavailablePct": "1.40%",
+    "unavailableCount": 28,
+    "recoveredFromBaseline": 100,
+    "lowConfidenceTier4Count": 8,
+    "lowConfidenceTier4Pct": "0.40%"
+  },
+  "validation": {
+    "unavailableTargetMet": true,
+    "ontologyRegressions": 0,
+    "garbageTokensAccepted": 0,
+    "garbageTargetMet": true,
+    "listDetailParityPct": "99.80%",
+    "listDetailParityTargetMet": true
+  },
+  "recoveredSamples": [
+    {
+      "title": "Lead IT Engineer",
+      "company": "TransPerfect",
+      "signals": [
+        "design",
+        "engineering",
+        "operations",
+        "safety"
+      ]
+    },
+    {
+      "title": "Senior Business Analyst",
+      "company": "Keyrus",
+      "signals": [
+        "analytics",
+        "excel",
+        "looker",
+        "python",
+        "sql",
+        "tableau"
+      ]
+    },
+    {
+      "title": "Field Service Engineer",
+      "company": "Our Taap",
+      "signals": [
+        "design",
+        "engineering",
+        "operations",
+        "safety"
+      ]
+    },
+    {
+      "title": "Field Service Engineer",
+      "company": "Our Taap",
+      "signals": [
+        "design",
+        "engineering",
+        "operations",
+        "safety"
+      ]
+    },
+    {
+      "title": "GTM Engineer",
+      "company": "Built",
+      "signals": [
+        "design",
+        "engineering",
+        "operations",
+        "safety"
+      ]
+    },
+    {
+      "title": "Personal Injury Attorney, Massachusetts",
+      "company": "Bush and Bush Law Group",
+      "signals": [
+        "compliance",
+        "documentation",
+        "negotiation",
+        "research"
+      ]
+    },
+    {
+      "title": "Histology Technician – 2nd Shift",
+      "company": "ezyVet",
+      "signals": [
+        "engineering",
+        "operations",
+        "quality control",
+        "safety"
+      ]
+    },
+    {
+      "title": "Field Technician - Tires as a Service",
+      "company": "Goodyear",
+      "signals": [
+        "engineering",
+        "operations",
+        "quality control",
+        "safety"
+      ]
+    }
+  ],
+  "lowConfidenceJobs": [
+    {
+      "jobId": "5728652a-bc31-4d1d-869b-40da46c9e4a3",
+      "title": "Lead IT Engineer",
+      "company": "TransPerfect",
+      "signals": [
+        "design",
+        "engineering",
+        "operations",
+        "safety"
+      ],
+      "family": "title_family_low"
+    },
+    {
+      "jobId": "aa97f2e6-9ce6-457a-8ae2-518fc976aea1",
+      "title": "Senior Business Analyst",
+      "company": "Keyrus",
+      "signals": [
+        "analytics",
+        "excel",
+        "looker",
+        "python",
+        "sql",
+        "tableau"
+      ],
+      "family": "title_family_low"
+    },
+    {
+      "jobId": "f4c2abb6-f346-470e-b879-6f0a69857fb5",
+      "title": "Field Service Engineer",
+      "company": "Our Taap",
+      "signals": [
+        "design",
+        "engineering",
+        "operations",
+        "safety"
+      ],
+      "family": "title_family_low"
+    },
+    {
+      "jobId": "f0b30685-2cd4-4718-b9a3-d70ec29c51fe",
+      "title": "Field Service Engineer",
+      "company": "Our Taap",
+      "signals": [
+        "design",
+        "engineering",
+        "operations",
+        "safety"
+      ],
+      "family": "title_family_low"
+    },
+    {
+      "jobId": "8b50336c-7305-4524-a1c1-2df6cd69d52b",
+      "title": "GTM Engineer",
+      "company": "Built",
+      "signals": [
+        "design",
+        "engineering",
+        "operations",
+        "safety"
+      ],
+      "family": "title_family_low"
+    },
+    {
+      "jobId": "b2a6399a-eb73-420e-a3f7-4ca8058151c7",
+      "title": "Personal Injury Attorney, Massachusetts",
+      "company": "Bush and Bush Law Group",
+      "signals": [
+        "compliance",
+        "documentation",
+        "negotiation",
+        "research"
+      ],
+      "family": "title_family_low"
+    },
+    {
+      "jobId": "8b2a42df-14c5-48b8-bfb2-49dd1cb862fe",
+      "title": "Histology Technician – 2nd Shift",
+      "company": "ezyVet",
+      "signals": [
+        "engineering",
+        "operations",
+        "quality control",
+        "safety"
+      ],
+      "family": "title_family_low"
+    },
+    {
+      "jobId": "db1b44d8-ac30-4b93-a076-df67bd08fe41",
+      "title": "Field Technician - Tires as a Service",
+      "company": "Goodyear",
+      "signals": [
+        "engineering",
+        "operations",
+        "quality control",
+        "safety"
+      ],
+      "family": "title_family_low"
+    }
+  ]
+}

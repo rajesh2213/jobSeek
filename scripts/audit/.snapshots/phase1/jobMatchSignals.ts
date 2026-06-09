@@ -1,27 +1,27 @@
-import type { JobItem } from "./api";
+import type { JobItem } from "../../../../apps/client/lib/api.ts";
 import {
   confidenceForFitTier,
   type FitConfidence,
   type FitSignalMetadata,
   type FitTier,
   type FitUnavailableReason,
-} from "./resumeFitConfidence";
+} from "../../../../apps/client/lib/resumeFitConfidence.ts";
 import {
   getCanonicalsFromRequirementLine,
   getCanonicalsFromTextLine,
   normalizeKeywordForMatch,
-} from "@jobseek/skill-constants";
+} from "./index.ts";
 import {
   isAcceptableResumeBigram,
   isScorableResumeKeyword,
   MAX_RESUME_MATCH_KEYWORDS,
-} from "./resumeKeywordFilter";
+} from "../../../../apps/client/lib/resumeKeywordFilter.ts";
 import {
   extractJobSkills,
   jobSkillCanonicalsForSemantic,
   type JobSkill,
   type JobSkillSource,
-} from "./skillExtractor";
+} from "../../../../apps/client/lib/skillExtractor.ts";
 
 /** Minimum signals before we treat a job as scorable (primary or fallback). */
 export const MIN_JOB_MATCH_SIGNALS = 3;
@@ -34,7 +34,6 @@ const W_SPARSE_RESP = 0.55;
 const W_DESCRIPTION = 0.55;
 const W_ROLE_HINT = 0.6;
 const W_TITLE_FAMILY = 0.55;
-const W_TITLE_FAMILY_LOW = W_TITLE_FAMILY * 0.5;
 
 const PHRASE_STOP = new Set(
   `a an the and or but if in on at to for of as is are was were be been being
@@ -65,23 +64,6 @@ health insurance
 medical billing
 sales pipeline
 quality control
-customer relationship
-talent acquisition
-rehabilitation
-sourcing
-hiring
-therapy
-clinical
-healthcare
-negotiation
-project management
-operations
-safety
-design
-engineering
-patient care
-recruiting
-interviewing
 `
     .toLowerCase()
     .split("\n")
@@ -98,10 +80,8 @@ tableau looker mixpanel amplitude segment
 roadmap okrs kpi kpis seo sem ppc
 salesforce hubspot zendesk intercom
 kubernetes docker aws azure gcp
-react typescript javascript nodejs postgres mongodb redis
+react typescript javascript nodejs postgresql mongodb redis
 recruiting negotiation accounting healthcare compliance
-sales design engineering therapy clinical rehabilitation sourcing hiring
-interviewing safety operations research inventory planning compliance
 `
     .toLowerCase()
     .split(/\s+/)
@@ -109,136 +89,6 @@ interviewing safety operations research inventory planning compliance
 );
 
 type RoleHintPack = { pattern: RegExp; skills: readonly string[] };
-
-type TitleFamilyLowPack = {
-  family: string;
-  pattern: RegExp;
-  skills: readonly string[];
-};
-
-/** Tier 3.5: curated title-only recovery when ontology + parsed signals are empty. */
-const TITLE_FAMILY_LOW_PACKS: TitleFamilyLowPack[] = [
-  {
-    family: "engineering.design",
-    pattern:
-      /\b(mine|industrial|mechanical|structural|civil|graphic|ux|ui|product|interior|landscape)\s*designer\b|\bdesigner\b/i,
-    skills: ["engineering", "project management", "safety", "operations", "design"],
-  },
-  {
-    family: "healthcare.therapy",
-    pattern:
-      /\bphysical\s*therapist\b|\boccupational\s*therapist\b|\bspeech\s*therapist\b|\brespiratory\s*therapist\b/i,
-    skills: ["patient care", "rehabilitation", "therapy", "clinical", "healthcare"],
-  },
-  {
-    family: "hr.recruiting",
-    pattern: /\brecruiter\b|\btalent\s*acquisition\b|\bstaffing\s*coordinator\b/i,
-    skills: ["recruiting", "sourcing", "interviewing", "talent acquisition", "hiring"],
-  },
-  {
-    family: "sales.account_executive",
-    pattern:
-      /\baccount\s*executive\b|\benterprise\s*account\s*executive\b|\bstrategic\s*account\s*executive\b/i,
-    skills: ["sales", "crm", "pipeline", "negotiation", "customer relationship"],
-  },
-  {
-    family: "engineering.software",
-    pattern:
-      /\b(software|backend|frontend|full[\s-]?stack|platform|devops|sre|site\s*reliability|ml|ai|machine\s*learning)\s*(engineer|developer|architect)\b/i,
-    skills: ["python", "sql", "kubernetes", "docker", "typescript", "agile"],
-  },
-  {
-    family: "engineering.generic",
-    pattern: /\b(engineer|engineering)\b/i,
-    skills: ["engineering", "project management", "safety", "operations", "design"],
-  },
-  {
-    family: "healthcare.clinical",
-    pattern:
-      /\b(registered\s*nurse|rn\b|nurse\s*practitioner|clinical|therapist|pharmacist|physician|surgeon|dentist|midwife)\b/i,
-    skills: ["patient care", "clinical", "healthcare", "therapy", "rehabilitation"],
-  },
-  {
-    family: "sales.generic",
-    pattern:
-      /\b(sales\s*(representative|rep|executive|manager|associate)|business\s*development|bdr\b|sdr\b|field\s*sales)\b/i,
-    skills: ["sales", "crm", "pipeline", "negotiation", "customer relationship"],
-  },
-  {
-    family: "manufacturing.operations",
-    pattern:
-      /\b(mine|mining|quarry|smelter|foundry|plant|production|manufacturing|assembler|warehouse|machine\s*operator)\b/i,
-    skills: ["operations", "safety", "quality control", "engineering", "project management"],
-  },
-  {
-    family: "product.management",
-    pattern: /\bproduct\s*(manager|owner|lead)\b|\bpm\b/i,
-    skills: ["analytics", "sql", "agile", "scrum", "roadmap", "user research"],
-  },
-  {
-    family: "data.analytics",
-    pattern: /\b(data\s*analyst|analytics\s*analyst|business\s*analyst|bi\s*analyst)\b/i,
-    skills: ["sql", "python", "tableau", "looker", "analytics", "excel"],
-  },
-  {
-    family: "project.management",
-    pattern: /\b(project|program)\s*manager\b/i,
-    skills: ["agile", "scrum", "jira", "confluence", "roadmap", "kanban"],
-  },
-  {
-    family: "marketing.digital",
-    pattern: /\bmarketing\s*(manager|specialist|coordinator)\b|\bdigital\s*marketing\b/i,
-    skills: ["seo", "sem", "analytics", "hubspot", "salesforce", "ppc"],
-  },
-  {
-    family: "customer.success",
-    pattern: /\bcustomer\s*(success|service|support|experience)\b|\bcall\s*center\b|\bcontact\s*center\b/i,
-    skills: ["customer service", "crm", "communication", "conflict resolution", "zendesk"],
-  },
-  {
-    family: "finance.accounting",
-    pattern:
-      /\b(accountant|accounting|bookkeeper|controller|auditor|financial\s*analyst|finance\s*analyst)\b/i,
-    skills: ["accounting", "excel", "analytics", "compliance", "financial reporting"],
-  },
-  {
-    family: "legal.compliance",
-    pattern: /\b(paralegal|attorney|lawyer|legal\s*(counsel|assistant|analyst))\b/i,
-    skills: ["compliance", "communication", "research", "documentation", "negotiation"],
-  },
-  {
-    family: "education.teaching",
-    pattern: /\b(teacher|professor|instructor|educator|tutor|lecturer)\b/i,
-    skills: ["communication", "planning", "learning agility", "team collaboration", "microsoft office"],
-  },
-  {
-    family: "trades.skilled",
-    pattern:
-      /\b(electrician|plumber|carpenter|welder|hvac|mechanic|technician|installer|maintenance)\b/i,
-    skills: ["safety", "operations", "quality control", "engineering", "project management"],
-  },
-  {
-    family: "logistics.supply",
-    pattern: /\b(logistics|supply\s*chain|warehouse|fulfillment|dispatcher|driver|courier)\b/i,
-    skills: ["operations", "inventory", "safety", "planning", "customer service"],
-  },
-  {
-    family: "research.science",
-    pattern: /\b(scientist|researcher|research\s*associate|laboratory|lab\s*technician)\b/i,
-    skills: ["analytics", "research", "documentation", "communication", "compliance"],
-  },
-  {
-    family: "consulting.advisory",
-    pattern: /\b(consultant|consulting|advisory|advisor|adviser)\b/i,
-    skills: ["client engagement", "stakeholder management", "analytics", "communication", "planning"],
-  },
-  {
-    family: "leadership.management",
-    pattern:
-      /\b(supervisor|team\s*lead|coordinator|specialist|director|manager|executive|officer|head\s*of)\b/i,
-    skills: ["team leadership", "project coordination", "communication", "planning", "operations"],
-  },
-];
 
 const ROLE_HINT_PACKS: RoleHintPack[] = [
   {
@@ -258,7 +108,7 @@ const ROLE_HINT_PACKS: RoleHintPack[] = [
   },
   {
     pattern: /\bdata\s*analyst\b|\banalytics\s*analyst\b/i,
-    skills: ["sql", "python", "tableau", "looker", "analytics", "excel", "postgres"],
+    skills: ["sql", "python", "tableau", "looker", "analytics", "excel", "postgresql"],
   },
   {
     pattern: /\bmarketing\s*manager\b|\bdigital\s*marketing\b/i,
@@ -274,12 +124,12 @@ const ROLE_HINT_PACKS: RoleHintPack[] = [
   },
   {
     pattern:
-      /\b(software|backend|frontend|full[\s-]?stack|platform|devops|sre|site\s*reliability|ml|ai|machine\s*learning)\s*(engineer|developer|architect)\b/i,
-    skills: ["python", "sql", "kubernetes", "docker", "typescript", "agile"],
+      /\b(software|backend|frontend|full[\s-]?stack|platform|devops|sre|site\s*reliability|ml|machine\s*learning)\s*(engineer|developer|architect)\b/i,
+    skills: ["software development", "git", "agile", "testing", "python", "sql"],
   },
   {
     pattern: /\b(data\s*engineer|data\s*scientist|analytics\s*engineer)\b/i,
-    skills: ["python", "sql", "analytics", "machine learning", "postgres"],
+    skills: ["python", "sql", "analytics", "machine learning", "postgresql"],
   },
   {
     pattern:
@@ -521,16 +371,13 @@ function collectSparseFallbackSkills(job: JobItem): JobSkill[] {
   for (const line of job.parsedDescription?.responsibility ?? []) parts.push(line);
 
   const byKey = new Map<string, JobSkill>();
-  for (const s of collectSignalsFromLines(parts, "sparse_requirement", W_SPARSE_REQ, {
-    strictDescription: true,
-  })) {
+  for (const s of collectSignalsFromLines(parts, "sparse_requirement", W_SPARSE_REQ)) {
     byKey.set(s.canonical, s);
   }
   for (const s of collectSignalsFromLines(
     job.parsedDescription?.responsibility ?? [],
     "sparse_responsibility",
     W_SPARSE_RESP,
-    { strictDescription: true },
   )) {
     if (!byKey.has(s.canonical)) byKey.set(s.canonical, s);
   }
@@ -538,7 +385,7 @@ function collectSparseFallbackSkills(job: JobItem): JobSkill[] {
   for (const raw of job.skills ?? []) {
     for (const { canonical } of getCanonicalsFromTextLine(raw)) {
       const key = normalizeKeywordForMatch(canonical);
-      if (isDescriptionFallbackKeyword(key) && !byKey.has(key)) {
+      if (isSparseFallbackKeyword(key) && !byKey.has(key)) {
         byKey.set(key, { canonical: key, source: "sparse_requirement", weight: W_SPARSE_REQ });
       }
     }
@@ -548,19 +395,23 @@ function collectSparseFallbackSkills(job: JobItem): JobSkill[] {
 }
 
 function collectDescriptionFallbackSkills(job: JobItem): JobSkill[] {
-  const corpus = jobDescriptionCorpus(job);
-  if (corpus.length < MIN_DESCRIPTION_CHARS) return [];
-  return collectSignalsFromLines([corpus], "description_fallback", W_DESCRIPTION, {
+  const chunks: string[] = [];
+  const desc = normalizedJobDescription(job.description);
+  if (desc.length >= MIN_DESCRIPTION_CHARS) chunks.push(desc);
+  if (job.previewLines?.length) {
+    chunks.push(...job.previewLines.map((line) => stripHtml(line)).filter(Boolean));
+  }
+  const text = chunks.join("\n").trim();
+  if (text.length < MIN_DESCRIPTION_CHARS) return [];
+  const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) lines.push(text);
+  return collectSignalsFromLines(lines, "description_fallback", W_DESCRIPTION, {
     strictDescription: true,
   });
 }
 
-function titleHaystack(job: JobItem): string {
-  return `${job.title} ${job.role ?? ""}`;
-}
-
 function collectTitleFamilySkills(job: JobItem): JobSkill[] {
-  const haystack = titleHaystack(job);
+  const haystack = `${job.title} ${job.role ?? ""}`;
   const out: JobSkill[] = [];
   const seen = new Set<string>();
 
@@ -574,48 +425,6 @@ function collectTitleFamilySkills(job: JobItem): JobSkill[] {
     }
   }
 
-  return out;
-}
-
-export function matchTitleFamilyLowPack(
-  job: JobItem,
-): { family: string; skills: readonly string[] } | null {
-  const haystack = titleHaystack(job);
-  for (const pack of TITLE_FAMILY_LOW_PACKS) {
-    if (pack.pattern.test(haystack)) {
-      return { family: pack.family, skills: pack.skills };
-    }
-  }
-  return null;
-}
-
-function hasOntologySkills(job: JobItem): boolean {
-  return extractJobSkills(job).some(
-    (s) => s.source === "taxonomy" || s.source === "enriched",
-  );
-}
-
-function hasParsedSkills(job: JobItem): boolean {
-  const structured = extractJobSkills(job).some((s) => s.source === "parsed_requirement");
-  return structured || collectSparseFallbackSkills(job).length > 0;
-}
-
-function collectTitleFamilyLowSkills(job: JobItem): JobSkill[] {
-  const matched = matchTitleFamilyLowPack(job);
-  if (!matched) return [];
-
-  const out: JobSkill[] = [];
-  const seen = new Set<string>();
-  for (const skill of matched.skills) {
-    const key = normalizeKeywordForMatch(skill);
-    if (!isSparseFallbackKeyword(key) || seen.has(key)) continue;
-    seen.add(key);
-    out.push({
-      canonical: key,
-      source: "title_family_low",
-      weight: W_TITLE_FAMILY_LOW,
-    });
-  }
   return out;
 }
 
@@ -642,13 +451,7 @@ function countSourceBreakdown(skills: JobSkill[]): FitSignalMetadata["sourceBrea
     ) {
       breakdown.parsed++;
     } else if (s.source === "description_fallback") breakdown.description++;
-    else if (
-      s.source === "title_family" ||
-      s.source === "title_family_low" ||
-      s.source === "role_hint"
-    ) {
-      breakdown.titleFamily++;
-    }
+    else if (s.source === "title_family" || s.source === "role_hint") breakdown.titleFamily++;
   }
   return breakdown;
 }
@@ -732,21 +535,6 @@ export function resolveJobMatchSkillsWithMeta(job: JobItem): JobMatchResolution 
     };
   }
 
-  const corpusOk = jobDescriptionCorpus(job).length >= MIN_DESCRIPTION_CHARS;
-  if (corpusOk && !hasOntologySkills(job) && !hasParsedSkills(job)) {
-    const lowSkills = sortAndCap(collectTitleFamilyLowSkills(job));
-    if (lowSkills.length >= MIN_JOB_MATCH_SIGNALS) {
-      return {
-        skills: lowSkills,
-        fitTier: 4,
-        confidence: confidenceForFitTier(4),
-        signalCount: lowSkills.length,
-        sourceBreakdown: countSourceBreakdown(lowSkills),
-        unavailableReason: null,
-      };
-    }
-  }
-
   return {
     skills: [],
     fitTier: null,
@@ -758,8 +546,7 @@ export function resolveJobMatchSkillsWithMeta(job: JobItem): JobMatchResolution 
 }
 
 /**
- * Resolve scorable job signals: tier 1 structured, tier 2 description, tier 3 title family,
- * tier 3.5 (fit tier 4) title-only low-confidence recovery.
+ * Resolve scorable job signals: tier 1 structured, tier 2 description, tier 3 title family.
  */
 export function resolveJobMatchSkills(job: JobItem): JobSkill[] {
   return resolveJobMatchSkillsWithMeta(job).skills;

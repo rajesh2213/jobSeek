@@ -8,12 +8,18 @@ import type { JobItem } from "../../lib/api";
 import { trackResumeMatchUpgradeClick } from "../../lib/analytics/resumeMatchFunnel";
 import {
   isResumeMatchInsufficient,
+  isResumeMatchInsufficientEvidence,
+  isResumeMatchUnscorable,
   resumeFitConfidenceLine,
   resumeGradeLabel,
+  resumeLowConfidenceEstimateLabel,
   resumeMatchInsufficientBody,
+  resumeMatchInsufficientEvidenceBody,
+  resumeMatchInsufficientEvidenceTitle,
   resumeMatchInsufficientHint,
   resumeMatchInsufficientPanelNote,
   resumeMatchInsufficientTitle,
+  shouldEmphasizeConfidenceOverScore,
 } from "../../lib/resumeGradeLabel";
 import type { ScoringResult, KeywordResult } from "../../lib/resumeScorer";
 import { ResumeBodyPortal } from "./ResumeBodyPortal";
@@ -146,6 +152,9 @@ export function ResumeScorePanel({
   }, [result]);
 
   const insufficient = result ? isResumeMatchInsufficient(result) : false;
+  const insufficientEvidence = result ? isResumeMatchInsufficientEvidence(result) : false;
+  const unscorable = result ? isResumeMatchUnscorable(result) : false;
+  const emphasizeConfidence = result ? shouldEmphasizeConfidenceOverScore(result) : false;
   const missingCount = result?.missing.length ?? 0;
   const workingCount =
     (result?.matched.length ?? 0) + (result?.partial.length ?? 0);
@@ -212,25 +221,49 @@ export function ResumeScorePanel({
                   </button>
                   <div className="mx-auto mt-3 flex w-full max-w-[300px] flex-col items-center text-center">
                     {result ? (
-                      insufficient ? (
+                      unscorable ? (
                         <UnscorableHeader />
                       ) : result.score !== null ? (
-                        <ScoreCircle score={result.score} />
+                        emphasizeConfidence ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
+                              {resumeLowConfidenceEstimateLabel()}
+                            </p>
+                            {result.confidenceLevel ? (
+                              <p className="max-w-full px-1 text-xs font-semibold leading-relaxed text-ink">
+                                {resumeFitConfidenceLine(result.confidenceLevel, result.fitTier)}
+                              </p>
+                            ) : null}
+                            <ScoreCircle score={result.score} />
+                          </div>
+                        ) : (
+                          <ScoreCircle score={result.score} />
+                        )
                       ) : null
                     ) : null}
-                    <p className="mt-2 text-base font-semibold text-ink">
+                    <p
+                      className={
+                        emphasizeConfidence
+                          ? "mt-2 text-sm font-medium text-ink-muted"
+                          : "mt-2 text-base font-semibold text-ink"
+                      }
+                    >
                       {result
                         ? insufficient
                           ? resumeMatchInsufficientTitle()
-                          : resumeGradeLabel(result.grade)
+                          : insufficientEvidence
+                            ? resumeMatchInsufficientEvidenceTitle()
+                            : emphasizeConfidence
+                              ? `Fit score: ${result.score}%`
+                              : resumeGradeLabel(result.grade)
                         : "—"}
                     </p>
                     <p className="mt-0.5 line-clamp-2 px-2 text-xs leading-snug text-ink-muted">
                       {job.title} · {job.company.name}
                     </p>
-                    {result && !insufficient && result.confidenceLevel ? (
+                    {result && !unscorable && !emphasizeConfidence && result.confidenceLevel ? (
                       <p className="mt-2 max-w-full px-1 text-[11px] leading-relaxed text-ink-muted">
-                        {resumeFitConfidenceLine(result.confidenceLevel)}
+                        {resumeFitConfidenceLine(result.confidenceLevel, result.fitTier)}
                       </p>
                     ) : null}
                   </div>
@@ -246,7 +279,18 @@ export function ResumeScorePanel({
                       <p className="text-xs font-medium text-ink/70">{resumeMatchInsufficientHint()}</p>
                     </section>
                   ) : null}
-                  {result && !insufficient ? (
+                  {result && insufficientEvidence ? (
+                    <section className="flex flex-col gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
+                      <p className="text-sm leading-relaxed text-ink-muted">
+                        {resumeMatchInsufficientEvidenceBody()}
+                      </p>
+                      <p className="text-xs font-medium text-ink/70">
+                        {result.signalCount ?? 0} signal{(result.signalCount ?? 0) === 1 ? "" : "s"} detected — a
+                        percentage would be misleading here.
+                      </p>
+                    </section>
+                  ) : null}
+                  {result && !unscorable ? (
                     <>
                       <section className="relative flex flex-col gap-3">
                         <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold leading-snug text-ink">
@@ -364,7 +408,7 @@ export function ResumeScorePanel({
 
                 <div className="shrink-0 border-t border-ink/10 px-5 py-4">
                   <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:gap-3">
-                    {breakdownAllowed && result && !insufficient && result.missing.length > 0 ? (
+                    {breakdownAllowed && result && !unscorable && result.missing.length > 0 ? (
                       <button
                         type="button"
                         onClick={() => void copyMissing()}
