@@ -1,5 +1,5 @@
 {
-  "measuredAt": "2026-06-09T13:25:36.502Z",
+  "measuredAt": "2026-06-09T16:38:47.512Z",
   "metrics": {
     "jobsCapped": "0/6",
     "averageCapReduction": "0",
@@ -69,14 +69,14 @@
     "forbiddenTargetMet": true,
     "ontologyRegressions": 0,
     "unavailablePct": "2.00%",
-    "unavailableWithEvidencePct": "3.60%",
+    "unavailableWithEvidencePct": "4.80%",
     "unavailableTargetMet": true,
     "capViolations": 0,
     "capViolationsTargetMet": true,
     "oneSignalHighScore": 0,
     "oneSignalHighScoreTargetMet": true,
-    "insufficientEvidenceCount": 8,
-    "scoredCount": 482
+    "insufficientEvidenceCount": 14,
+    "scoredCount": 476
   },
   "recommendation": "GO"
 }

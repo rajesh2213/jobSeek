@@ -1,0 +1,81 @@
+{
+  "measuredAt": "2026-06-09T18:11:24.027Z",
+  "titleFit": {
+    "candidateCoverage": "5/6 (83.3%)",
+    "jobCoverage": "100/100 (100.0%)",
+    "titleFitCoverage": "5/6 (83.3%)",
+    "familyMismatches": "4/5",
+    "falseDetections": [],
+    "p95ScoreMs": 28.62
+  },
+  "humanQuality": {
+    "recommendation": "GO",
+    "reasonablePct": "92.0%",
+    "reasonableCount": 46,
+    "gapViolations": 0,
+    "falseConfidence": 0,
+    "scoreDistribution": {
+      "sampleSize": 101,
+      "histogram": {
+        "0-20": 0,
+        "20-40": 1,
+        "40-60": 10,
+        "60-80": 19,
+        "80-100": 71
+      },
+      "avgScore": 81,
+      "medianScore": 85,
+      "p95Score": 95,
+      "clusteringNote": "Heavy clustering in 80-100 (70.3%)"
+    }
+  },
+  "regression": {
+    "phase23": {
+      "forbiddenTokens": 0,
+      "forbiddenTargetMet": true,
+      "ontologyRegressions": 0,
+      "unavailablePct": "1.80%",
+      "unavailableWithEvidencePct": "10.20%",
+      "unavailableTargetMet": true,
+      "capViolations": 0,
+      "capViolationsTargetMet": true,
+      "oneSignalHighScore": 0,
+      "oneSignalHighScoreTargetMet": true,
+      "insufficientEvidenceCount": 42,
+      "scoredCount": 449
+    },
+    "unavailablePct": "1.80%"
+  },
+  "beforeAfterSamples": [
+    {
+      "case": "Backend Engineer → Sales Engineer",
+      "titleFit": 25,
+      "finalScore": null,
+      "availability": "insufficient_job_signals",
+      "confidence": null
+    },
+    {
+      "case": "Senior Recruiter → Customer Success Manager",
+      "titleFit": 25,
+      "finalScore": null,
+      "availability": "insufficient_job_signals",
+      "confidence": null
+    },
+    {
+      "case": "Product Manager → Software Engineer",
+      "titleFit": 25,
+      "finalScore": null,
+      "availability": "insufficient_job_signals",
+      "confidence": null
+    }
+  ],
+  "successCriteria": {
+    "titleFamilyCoverage80Pct": true,
+    "humanQualityGo": true,
+    "reasonableGte90": true,
+    "falseConfidenceLte2": true,
+    "unavailableUnder3Pct": true,
+    "p95Under150ms": true
+  },
+  "recommendation": "GO"
+}

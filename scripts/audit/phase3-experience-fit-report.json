@@ -1,12 +1,12 @@
 {
-  "measuredAt": "2026-06-09T13:02:27.708Z",
+  "measuredAt": "2026-06-09T18:44:20.187Z",
   "metrics": {
-    "jobsWithYearsDetected": "64/100 (64.0%)",
+    "jobsWithYearsDetected": "76/100 (76.0%)",
     "resumesWithYearsDetected": "5/6 (83.3%)",
     "experienceFitCoverage": "4/6 (66.7%)",
-    "averagePenalty": "2.15",
+    "averagePenalty": "4.05",
     "falseExtractions": [],
-    "avgScoreMs": 5.65
+    "avgScoreMs": 6.35
   },
   "manualTestMatrix": [
     {
@@ -113,57 +113,20 @@
       "pass": true
     }
   ],
-  "beforeAfterSamples": [
-    {
-      "title": "Premium Support Product Specialist II",
-      "skillsOnly": 50,
-      "skillsFitScore": 50,
-      "experienceFitScore": 100,
-      "finalScore": 60,
-      "candidateYears": 3.3,
-      "requiredYears": 3
-    },
-    {
-      "title": "Enterprise Recruitment Representative",
-      "skillsOnly": 0,
-      "skillsFitScore": 0,
-      "experienceFitScore": 100,
-      "finalScore": 20,
-      "candidateYears": 3.9,
-      "requiredYears": 2
-    },
-    {
-      "title": "Senior Associate, Partner Marketing Operations",
-      "skillsOnly": 0,
-      "skillsFitScore": 0,
-      "experienceFitScore": 97.6,
-      "finalScore": 20,
-      "candidateYears": 4.8,
-      "requiredYears": 5
-    },
-    {
-      "title": "Community Experience Lead",
-      "skillsOnly": 0,
-      "skillsFitScore": 0,
-      "experienceFitScore": 50.800000000000004,
-      "finalScore": 10,
-      "candidateYears": 2.9,
-      "requiredYears": 7
-    }
-  ],
+  "beforeAfterSamples": [],
   "phase23Regression": {
     "forbiddenTokens": 0,
     "forbiddenTargetMet": true,
     "ontologyRegressions": 0,
-    "unavailablePct": "2.40%",
-    "unavailableWithEvidencePct": "4.60%",
+    "unavailablePct": "1.80%",
+    "unavailableWithEvidencePct": "10.20%",
     "unavailableTargetMet": true,
     "capViolations": 0,
     "capViolationsTargetMet": true,
     "oneSignalHighScore": 0,
     "oneSignalHighScoreTargetMet": true,
-    "insufficientEvidenceCount": 11,
-    "scoredCount": 477
+    "insufficientEvidenceCount": 42,
+    "scoredCount": 449
   },
   "successCriteria": {
     "jobsYearsTarget70Pct": true,

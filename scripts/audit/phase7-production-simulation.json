@@ -1,0 +1,100 @@
+{
+  "measuredAt": "2026-06-09T19:13:18.662Z",
+  "jobs": 500,
+  "resumes": 6,
+  "totalEvaluations": 3000,
+  "scored": 597,
+  "unavailable": 2403,
+  "unavailablePct": "80.1%",
+  "scoreDistribution": {
+    "count": 597,
+    "avg": 38,
+    "median": 38,
+    "p95": 73,
+    "histogram": {
+      "0-20": 55,
+      "20-40": 274,
+      "40-60": 196,
+      "60-80": 51,
+      "80-100": 21
+    }
+  },
+  "confidenceDistribution": {
+    "high": 394,
+    "medium": 49,
+    "low": 154
+  },
+  "unavailableDistribution": {
+    "insufficient_evidence": 2355,
+    "insufficient_signals": 48
+  },
+  "availabilityDistribution": {
+    "insufficient_evidence": 2355,
+    "insufficient_job_signals": 48,
+    "scored": 597
+  },
+  "topFamilyPairs": [
+    {
+      "pair": "null→other",
+      "count": 254
+    },
+    {
+      "pair": "null→healthcare.clinical",
+      "count": 56
+    },
+    {
+      "pair": "software.engineering→software.engineering",
+      "count": 42
+    },
+    {
+      "pair": "null→sales",
+      "count": 41
+    },
+    {
+      "pair": "software.engineering→engineering.backend",
+      "count": 27
+    },
+    {
+      "pair": "null→customer_success",
+      "count": 20
+    },
+    {
+      "pair": "software.engineering→technical.operations",
+      "count": 15
+    },
+    {
+      "pair": "software.engineering→engineering.frontend",
+      "count": 15
+    },
+    {
+      "pair": "null→software.engineering",
+      "count": 14
+    },
+    {
+      "pair": "design→design",
+      "count": 12
+    },
+    {
+      "pair": "null→design",
+      "count": 12
+    },
+    {
+      "pair": "marketing→marketing",
+      "count": 11
+    },
+    {
+      "pair": "null→marketing",
+      "count": 11
+    },
+    {
+      "pair": "null→hr",
+      "count": 9
+    },
+    {
+      "pair": "null→engineering.backend",
+      "count": 9
+    }
+  ],
+  "anomalies": [],
+  "pass": true
+}

@@ -118,6 +118,24 @@ export function trackResumeFitUnavailable(params: { reason: string; jobId?: stri
   });
 }
 
+/** Phase 6 production monitoring — unavailable breakdown by family and signals. */
+export function trackResumeFitUnavailableReason(params: {
+  reason: string;
+  candidateFamily: string | null;
+  jobFamily: string | null;
+  signalCount: number;
+  jobId?: string;
+}): void {
+  trackMetaCustom("ResumeFitUnavailableReason", {
+    reason: params.reason,
+    candidate_family: params.candidateFamily ?? "",
+    job_family: params.jobFamily ?? "",
+    signal_count: String(params.signalCount),
+    ...(params.jobId ? { job_id: params.jobId } : {}),
+    ...attributionCustomData(),
+  });
+}
+
 export function trackResumeFitConfidence(params: {
   confidence: string;
   signalCount: number;
@@ -143,6 +161,37 @@ export function trackResumeFitExperienceEvaluated(params: {
     required_years: params.requiredYears == null ? "" : String(params.requiredYears),
     experience_fit_score:
       params.experienceFitScore == null ? "" : String(params.experienceFitScore),
+    ...attributionCustomData(),
+  });
+}
+
+export function trackResumeFitTitleEvaluated(params: {
+  jobId?: string;
+  candidateFamily: string | null;
+  jobFamily: string | null;
+  titleFit: number | null;
+}): void {
+  trackMetaCustom("ResumeFitTitleEvaluated", {
+    ...(params.jobId ? { job_id: params.jobId } : {}),
+    candidate_family: params.candidateFamily ?? "",
+    job_family: params.jobFamily ?? "",
+    title_fit: params.titleFit == null ? "" : String(params.titleFit),
+    ...attributionCustomData(),
+  });
+}
+
+export function trackResumeFitSeniorityEvaluated(params: {
+  jobId?: string;
+  candidateLevel: number | null;
+  jobLevel: number | null;
+  seniorityFitScore: number | null;
+}): void {
+  trackMetaCustom("ResumeFitSeniorityEvaluated", {
+    ...(params.jobId ? { job_id: params.jobId } : {}),
+    candidate_level: params.candidateLevel == null ? "" : String(params.candidateLevel),
+    job_level: params.jobLevel == null ? "" : String(params.jobLevel),
+    seniority_fit_score:
+      params.seniorityFitScore == null ? "" : String(params.seniorityFitScore),
     ...attributionCustomData(),
   });
 }

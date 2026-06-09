@@ -1,0 +1,223 @@
+{
+  "measuredAt": "2026-06-09T18:28:52.079Z",
+  "resume": {
+    "resumeId": "d791d8d8-34af-4720-ba0e-c57b1e39d94e",
+    "fileName": "CV Seán O'Shea O'Connor.pdf",
+    "email": "osheaoconnors14@gmail.com",
+    "resumeTextLength": 3592,
+    "resumeTextPreview": "SEÁN O’SHEA O’CONNOR \n0852147803 \nosheaoconnors14@gmail.com \n  \nPersonal Profile  \nI am an honest and diligent person that always strives to better myself. I work well with  \nother people and really enjoy a customer service role. I have excellent computer skills, and I  \nhave a great love for animals. I really enjoy interacting with other people in group settings and have  \ngood teamworking and communication skills.  \n \nEducation Details  \n2023 – Present   University College Dublin, Belfield, Co",
+    "bulletsCount": 8,
+    "bulletsPreview": [
+      "SEÁN O’SHEA O’CONNOR",
+      "osheaoconnors14@gmail.com",
+      "I am an honest and diligent person that always strives to better myself. I work well with",
+      "other people and really enjoy a customer service role. I have excellent computer skills, and I",
+      "have a great love for animals. I really enjoy interacting with other people in group settings and have"
+    ],
+    "structuredExperienceCount": 2,
+    "structuredExperienceRoles": [
+      {
+        "role": "Company Name & Address: Cumiskey’s Bar & Lounge, Blackhorse Avenue, Co. Dublin",
+        "company": "Position Title: Barman, Loungeboy and Stock.",
+        "startDate": "2019",
+        "endDate": "2021"
+      },
+      {
+        "role": "Position Title: Door-to-Door Marketing Consultant",
+        "company": "Responsibilities:",
+        "startDate": "2024-06",
+        "endDate": "2025-01"
+      }
+    ],
+    "currentTitle": null,
+    "yearsOfExperience": null,
+    "applyProfileSummary": {
+      "skills": [
+        "excel",
+        "customer-support"
+      ],
+      "titles": [
+        "Position Title: Door-to-Door Marketing Consultant",
+        "Position: Manager at Green Electric",
+        "Position: Human Relations Manager at Park2Travel"
+      ],
+      "yearsExp": null,
+      "education": [
+        "QQI Level 5 and 6 Animal Care and Animal Science Degree"
+      ],
+      "wordCount": 501,
+      "highlights": [
+        "have a great love for animals. I really enjoy interacting with other people in group settings and have",
+        "other people and really enjoy a customer service role. I have excellent computer skills, and I",
+        "I am an honest and diligent person that always strives to better myself. I work well with",
+        "2023 – Present   University College Dublin, Belfield, Co. Dublin",
+        "QQI Level 8 Explore Multiple Streams - Zoology"
+      ]
+    }
+  },
+  "titleDetection": {
+    "candidateFamily": "marketing",
+    "candidateTitle": "Position Title: Door-to-Door Marketing Consultant",
+    "candidateSource": "structured_resume",
+    "titleLinesFromResumeText": [
+      "SEÁN O’SHEA O’CONNOR",
+      "0852147803",
+      "osheaoconnors14@gmail.com",
+      "Personal Profile",
+      "I am an honest and diligent person that always strives to better myself. I work well with",
+      "good teamworking and communication skills.",
+      "Education Details",
+      "2023 – Present   University College Dublin, Belfield, Co. Dublin",
+      "QQI Level 8 Explore Multiple Streams - Zoology",
+      "2021 – 2023  Dunboyne College of Further Education, Dunboyne, Co. Meath.",
+      "QQI Level 5 and 6 Animal Care and Animal Science Degree",
+      "2020 – 2021    Technological University Dublin, Blanchardstown, Co. Dublin.",
+      "QQI Level 7 Computing Course",
+      "Employment History",
+      "Dates: 2019 - 2021"
+    ]
+  },
+  "experienceExtraction": {
+    "candidateYears": 2.9,
+    "candidateSource": "structured_resume"
+  },
+  "seniorityExtraction": {
+    "candidateLevel": 2,
+    "candidateTitle": "Position Title: Door-to-Door Marketing Consultant"
+  },
+  "jobsSampled": 100,
+  "scoredCount": 0,
+  "unavailableReasonBreakdown": {
+    "insufficient_evidence": 0,
+    "title_unknown": 92,
+    "signal_count": 5,
+    "insufficient_job_signals": 3,
+    "other": 0
+  },
+  "detailCounts": {
+    "mismatch marketing→other": 27,
+    "mismatch marketing→engineering.fullstack": 16,
+    "mismatch marketing→product": 1,
+    "mismatch marketing→legal": 2,
+    "tier3_signals1": 4,
+    "mismatch marketing→healthcare.clinical": 22,
+    "mismatch marketing→finance": 1,
+    "mismatch marketing→recruiting": 1,
+    "mismatch marketing→sales": 8,
+    "mismatch marketing→engineering.ml": 1,
+    "mismatch marketing→research": 1,
+    "mismatch marketing→operations": 3,
+    "mismatch marketing→hr": 1,
+    "tier3_signals2": 1,
+    "mismatch marketing→engineering.frontend": 1,
+    "mismatch marketing→design": 3,
+    "mismatch marketing→customer_success": 4
+  },
+  "sampleUnavailableJobs": [
+    {
+      "jobId": "6d00be78-0cc0-4ec2-aa35-9c3c0ff6be11",
+      "jobTitle": "Account Manager (Travel & Tourism Clients)",
+      "matchAvailability": "insufficient_evidence",
+      "bucket": "title_unknown",
+      "detail": "mismatch marketing→other",
+      "signalCount": 9,
+      "fitTier": 1,
+      "candidateFamily": "marketing",
+      "jobFamily": "other",
+      "candidateTitle": "Position Title: Door-to-Door Marketing Consultant",
+      "candidateSource": "structured_resume"
+    },
+    {
+      "jobId": "606ed7f5-6aab-47c5-bfa0-e088acab5a87",
+      "jobTitle": "Field Office Administrator I/II/III",
+      "matchAvailability": "insufficient_evidence",
+      "bucket": "title_unknown",
+      "detail": "mismatch marketing→other",
+      "signalCount": 5,
+      "fitTier": 2,
+      "candidateFamily": "marketing",
+      "jobFamily": "other",
+      "candidateTitle": "Position Title: Door-to-Door Marketing Consultant",
+      "candidateSource": "structured_resume"
+    },
+    {
+      "jobId": "e120a0e9-1f1f-4e2e-93ce-80cd19257b56",
+      "jobTitle": "Project Engineer (Senior / Staff) – Power & Automation",
+      "matchAvailability": "insufficient_evidence",
+      "bucket": "title_unknown",
+      "detail": "mismatch marketing→engineering.fullstack",
+      "signalCount": 3,
+      "fitTier": 1,
+      "candidateFamily": "marketing",
+      "jobFamily": "engineering.fullstack",
+      "candidateTitle": "Position Title: Door-to-Door Marketing Consultant",
+      "candidateSource": "structured_resume"
+    },
+    {
+      "jobId": "7a900789-e383-48be-a040-0c80f52a26a1",
+      "jobTitle": "Associate Product Manager, Loyalty and Checkout",
+      "matchAvailability": "insufficient_evidence",
+      "bucket": "title_unknown",
+      "detail": "mismatch marketing→product",
+      "signalCount": 14,
+      "fitTier": 3,
+      "candidateFamily": "marketing",
+      "jobFamily": "product",
+      "candidateTitle": "Position Title: Door-to-Door Marketing Consultant",
+      "candidateSource": "structured_resume"
+    },
+    {
+      "jobId": "3caba2d0-4816-4c7e-a90c-a398d2174cad",
+      "jobTitle": "Electrical Engineer (Senior / Staff) – Power Innovation",
+      "matchAvailability": "insufficient_evidence",
+      "bucket": "title_unknown",
+      "detail": "mismatch marketing→engineering.fullstack",
+      "signalCount": 3,
+      "fitTier": 1,
+      "candidateFamily": "marketing",
+      "jobFamily": "engineering.fullstack",
+      "candidateTitle": "Position Title: Door-to-Door Marketing Consultant",
+      "candidateSource": "structured_resume"
+    },
+    {
+      "jobId": "9ff99b8a-90e4-4a39-b8e5-9b6f51355562",
+      "jobTitle": "Project Estimator-Power Generation & Energy Infrastructure",
+      "matchAvailability": "insufficient_evidence",
+      "bucket": "title_unknown",
+      "detail": "mismatch marketing→other",
+      "signalCount": 5,
+      "fitTier": 1,
+      "candidateFamily": "marketing",
+      "jobFamily": "other",
+      "candidateTitle": "Position Title: Door-to-Door Marketing Consultant",
+      "candidateSource": "structured_resume"
+    },
+    {
+      "jobId": "9d9be2c5-cb11-4c04-988f-eb5c480d5c91",
+      "jobTitle": "Sr Counsel",
+      "matchAvailability": "insufficient_evidence",
+      "bucket": "title_unknown",
+      "detail": "mismatch marketing→legal",
+      "signalCount": 4,
+      "fitTier": 2,
+      "candidateFamily": "marketing",
+      "jobFamily": "legal",
+      "candidateTitle": "Position Title: Door-to-Door Marketing Consultant",
+      "candidateSource": "structured_resume"
+    },
+    {
+      "jobId": "766c0898-ae80-45af-a0ed-d985de41522b",
+      "jobTitle": "Senior Security Engineer, AI/ML",
+      "matchAvailability": "insufficient_evidence",
+      "bucket": "title_unknown",
+      "detail": "mismatch marketing→engineering.fullstack",
+      "signalCount": 16,
+      "fitTier": 1,
+      "candidateFamily": "marketing",
+      "jobFamily": "engineering.fullstack",
+      "candidateTitle": "Position Title: Door-to-Door Marketing Consultant",
+      "candidateSource": "structured_resume"
+    }
+  ],
+  "rootCause": "Reliability gate: title family mismatch or unknown candidate family"
+}

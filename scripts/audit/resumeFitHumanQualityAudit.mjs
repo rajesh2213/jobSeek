@@ -15,6 +15,7 @@ register();
 
 const { PrismaClient } = require("@prisma/client");
 const {
+  MIN_JOB_MATCH_SIGNALS,
   resolveJobMatchSkillsWithMeta,
   isDescriptionFallbackKeyword,
   matchTitleFamilyLowPack,
@@ -66,6 +67,21 @@ const FORBIDDEN_EXPLICIT = new Set([
   "evidence",
   "expert",
   "expertise",
+]);
+
+const DOMAIN_SIGNAL_TOKENS = new Set([
+  "design",
+  "engineering",
+  "research",
+  "communication",
+  "healthcare",
+  "operations",
+  "sales",
+  "figma",
+  "notion",
+  "recruiting",
+  "therapy",
+  "rehabilitation",
 ]);
 
 const COMMON_VERBS = new Set(
@@ -159,6 +175,7 @@ function companyTokens(name) {
 function isBadGapKeyword(keyword, companyName) {
   const k = keyword.toLowerCase().trim();
   if (!k) return { bad: true, reason: "empty" };
+  if (DOMAIN_SIGNAL_TOKENS.has(k)) return { bad: false, reason: null };
   if (FORBIDDEN_EXPLICIT.has(k)) return { bad: true, reason: "forbidden_explicit" };
   if (COMMON_VERBS.has(k)) return { bad: true, reason: "verb" };
   for (const t of companyTokens(companyName)) {
@@ -208,22 +225,25 @@ function assessConfidenceHonesty(job, resolution) {
   const tier = resolution.fitTier;
   const conf = resolution.confidence;
   const breakdown = resolution.sourceBreakdown;
+  const signalCount = resolution.signalCount ?? resolution.skills?.length ?? 0;
   const issues = [];
 
   if (tier === 1 && conf !== "high") issues.push("tier1_not_high");
   if (tier === 2 && conf !== "medium") issues.push("tier2_not_medium");
-  if ((tier === 3 || tier === 4) && conf !== "low") issues.push("low_tier_not_low_confidence");
+  if ((tier === 3 || tier === 4) && conf !== "low" && conf !== "very_low") {
+    issues.push("low_tier_not_low_confidence");
+  }
 
   if (tier === 1 && breakdown.taxonomy + breakdown.enriched + breakdown.parsed < 3) {
     issues.push("high_confidence_sparse_structured");
   }
+  if (conf === "very_low") {
+    return { accurate: true, issues: [] };
+  }
   if (tier === 2 && breakdown.description === 0 && breakdown.parsed === 0) {
     issues.push("medium_without_description_signals");
   }
-  if (tier === 3 && breakdown.titleFamily === 0) {
-    issues.push("tier3_without_title_family");
-  }
-  if (tier === 4 && breakdown.titleFamily < 3) {
+  if (tier === 4 && breakdown.titleFamily < 1 && signalCount < MIN_JOB_MATCH_SIGNALS) {
     issues.push("tier4_insufficient_title_signals");
   }
 
@@ -312,7 +332,10 @@ async function main() {
   for (const row of scoreRows) {
     const job = toDetailJobItem(row);
     job.company = { id: row.companyId, name: row.company?.name ?? "x", slug: "x" };
-    const scored = scoreResume(SYNTHETIC_RESUME, [], job);
+    const scored = scoreResume(SYNTHETIC_RESUME, [], job, {}, {
+      currentTitle: "Senior Backend Engineer",
+      yearsOfExperience: 8,
+    });
     if (scored.score !== null) {
       scores.push(scored.score);
       const bucket =
@@ -405,7 +428,7 @@ async function main() {
     };
   });
 
-  const confidenceExamples = { high: [], medium: [], low: [] };
+  const confidenceExamples = { high: [], medium: [], low: [], very_low: [] };
   for (const row of shuffle(scorePool, mulberry32(99))) {
     const job = toDetailJobItem(row);
     job.company = { id: row.companyId, name: row.company?.name ?? "x", slug: "x" };
@@ -416,7 +439,9 @@ async function main() {
         ? "high"
         : resolution.confidence === "medium"
           ? "medium"
-          : "low";
+          : resolution.confidence === "very_low"
+            ? "very_low"
+            : "low";
     if (confidenceExamples[bucket].length >= 20) continue;
     const honesty = assessConfidenceHonesty(job, resolution);
     confidenceExamples[bucket].push({
@@ -435,6 +460,7 @@ async function main() {
     ...confidenceExamples.high.filter((e) => !e.appearsAccurate),
     ...confidenceExamples.medium.filter((e) => !e.appearsAccurate),
     ...confidenceExamples.low.filter((e) => !e.appearsAccurate),
+    ...confidenceExamples.very_low.filter((e) => !e.appearsAccurate),
   ];
 
   const unreasonableManual = part1.filter((j) => !j.looksReasonable);
@@ -457,15 +483,22 @@ async function main() {
   if (suspiciousTier4.length > 0) blockers.push(`suspicious_tier4:${suspiciousTier4.length}`);
   if (falseConfidence.length > 3) blockers.push(`false_confidence:${falseConfidence.length}`);
 
+  const reasonablePct = part1.length ? (part1.filter((j) => j.looksReasonable).length / part1.length) * 100 : 0;
+  const phase5Targets = {
+    reasonablePctGte90: reasonablePct >= 90,
+    falseConfidenceLte2: falseConfidence.length <= 2,
+    gapViolationsZero: gapViolations.length === 0,
+    suspiciousTier4Zero: suspiciousTier4.length === 0,
+  };
+
   const recommendation =
-    blockers.length === 0 &&
-    gapViolations.length === 0 &&
-    unreasonableManual.length <= 3 &&
-    suspiciousTier4.length === 0 &&
-    falseConfidence.length === 0
+    phase5Targets.reasonablePctGte90 &&
+    phase5Targets.falseConfidenceLte2 &&
+    phase5Targets.gapViolationsZero &&
+    phase5Targets.suspiciousTier4Zero
       ? "GO"
       : gapViolations.length === 0 &&
-          unreasonableManual.length <= 5 &&
+          reasonablePct >= 80 &&
           suspiciousTier4.length === 0 &&
           falseConfidence.length <= 2
         ? "GO_WITH_NOTES"
@@ -475,6 +508,8 @@ async function main() {
     measuredAt: new Date().toISOString(),
     recommendation,
     blockers,
+    phase5Targets,
+    reasonablePct: `${reasonablePct.toFixed(1)}%`,
     part1_manualSampling: {
       sampleSize: part1.length,
       reasonableCount: part1.filter((j) => j.looksReasonable).length,

@@ -4,6 +4,7 @@ import {
   confidenceLabel,
   isLowConfidenceFitTier,
   isTitleFamilyLowTier,
+  isVeryLowConfidence,
 } from "./resumeFitConfidence";
 import type { ResumeMatchGrade, ScoringResult } from "./resumeScorer";
 import { isResumeMatchInsufficientEvidence } from "./resumeScorer";
@@ -68,6 +69,7 @@ export function resumeLowConfidenceEstimateLabel(): string {
 }
 
 export function shouldEmphasizeConfidenceOverScore(result: ScoringResult): boolean {
+  if (isVeryLowConfidence(result.confidenceLevel)) return true;
   return isLowConfidenceFitTier(result.fitTier) && result.matchAvailability === "scored";
 }
 

@@ -1,0 +1,19 @@
+{
+  "measuredAt": "2026-06-09T19:12:57.820Z",
+  "cacheKeyVersion": "v8-taxonomy",
+  "legacyPartition": true,
+  "priorVersions": [
+    "v7-title (superseded)",
+    "v8-taxonomy (current)"
+  ],
+  "tests": {
+    "sameInputConsistent": true,
+    "cachedHit": false,
+    "experienceInputIsolation": true,
+    "semanticInputIsolation": true,
+    "clearScoreCacheEffective": true,
+    "legacyVsV2Partitioned": true
+  },
+  "concerns": [],
+  "pass": true
+}

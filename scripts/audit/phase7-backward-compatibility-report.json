@@ -1,0 +1,77 @@
+{
+  "measuredAt": "2026-06-09T19:12:57.736Z",
+  "v2DefaultActive": true,
+  "legacyRollbackEnv": "NEXT_PUBLIC_RESUME_LEGACY_KEYWORDS=true",
+  "apiUnchanged": true,
+  "uploadFlow": {
+    "ok": true,
+    "files": [
+      "apps/client/lib/resumeContext.tsx",
+      "apps/client/components/resume/ResumeUploadModal.tsx",
+      "apps/client/lib/api.ts"
+    ]
+  },
+  "proGating": {
+    "ok": true,
+    "files": [
+      "apps/client/lib/accountPlanContext.tsx",
+      "apps/client/lib/planLimits.ts",
+      "apps/server/src/config/plans.ts",
+      "apps/server/src/modules/account/account.controller.ts"
+    ]
+  },
+  "semanticMatching": {
+    "ok": true,
+    "note": "Scoring path accepts semantic map; network call is UI-layer only"
+  },
+  "sampleComparison": {
+    "jobsTested": 20,
+    "v2Scored": 0,
+    "legacyScored": 18,
+    "v2Unavailable": 20,
+    "legacyAlwaysScoredWhenKeywords": true
+  },
+  "v2Sample": [
+    {
+      "jobId": "04dc1850-2a0f-4040-96c1-330cb6aa8fbf",
+      "title": "Remote Board Certified Behavior Analyst (BCBA)",
+      "availability": "insufficient_evidence",
+      "score": null,
+      "hasBreakdown": true
+    },
+    {
+      "jobId": "6e795b2b-e08e-46ff-9ca6-c9ac7fa330e4",
+      "title": "Data Integration Architect",
+      "availability": "insufficient_evidence",
+      "score": null,
+      "hasBreakdown": true
+    },
+    {
+      "jobId": "436bee92-bda7-41c4-b256-29f2f857b474",
+      "title": "HR Generalist",
+      "availability": "insufficient_evidence",
+      "score": null,
+      "hasBreakdown": true
+    },
+    {
+      "jobId": "0d945002-3ed2-4571-ac73-d06f49e29750",
+      "title": "Visualization Senior Analyst",
+      "availability": "insufficient_evidence",
+      "score": null,
+      "hasBreakdown": true
+    },
+    {
+      "jobId": "6d00be78-0cc0-4ec2-aa35-9c3c0ff6be11",
+      "title": "Account Manager (Travel & Tourism Clients)",
+      "availability": "insufficient_evidence",
+      "score": null,
+      "hasBreakdown": true
+    }
+  ],
+  "concerns": [
+    "V2 introduces insufficient_evidence gating not present in legacy",
+    "Legacy rollback available via env flag; cache keys partition by legacy bit",
+    "getCachedScore() omits experienceInput — stale risk if used without matching sig"
+  ],
+  "pass": true
+}

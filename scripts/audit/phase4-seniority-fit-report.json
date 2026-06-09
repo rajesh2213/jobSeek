@@ -1,0 +1,158 @@
+{
+  "measuredAt": "2026-06-09T18:44:18.157Z",
+  "metrics": {
+    "candidateCoverage": "5/6 (83.3%)",
+    "jobCoverage": "70/100 (70.0%)",
+    "seniorityFitCoverage": "3/6 (50.0%)",
+    "averageGap": "2.67",
+    "falseDetections": [],
+    "p95ScoreMs": 22.79
+  },
+  "manualTestMatrix": [
+    {
+      "case": "Senior → Senior",
+      "candidateLevel": 3,
+      "jobLevel": 3,
+      "rawScore": 92,
+      "experienceScore": null,
+      "seniorityScore": 100,
+      "experienceCap": null,
+      "seniorityCap": null,
+      "finalScore": 92
+    },
+    {
+      "case": "Senior → Principal",
+      "candidateLevel": 3,
+      "jobLevel": 6,
+      "rawScore": 78,
+      "experienceScore": null,
+      "seniorityScore": 40,
+      "experienceCap": null,
+      "seniorityCap": 55,
+      "finalScore": 55
+    },
+    {
+      "case": "Senior → Director",
+      "candidateLevel": 3,
+      "jobLevel": 7,
+      "rawScore": 75,
+      "experienceScore": null,
+      "seniorityScore": 25,
+      "experienceCap": null,
+      "seniorityCap": 40,
+      "finalScore": 40
+    },
+    {
+      "case": "Principal → Senior",
+      "candidateLevel": 6,
+      "jobLevel": 3,
+      "rawScore": 88,
+      "experienceScore": null,
+      "seniorityScore": 80,
+      "experienceCap": null,
+      "seniorityCap": null,
+      "finalScore": 88
+    },
+    {
+      "case": "Director → Senior",
+      "candidateLevel": 7,
+      "jobLevel": 3,
+      "rawScore": 85,
+      "experienceScore": null,
+      "seniorityScore": 70,
+      "experienceCap": null,
+      "seniorityCap": null,
+      "finalScore": 85
+    },
+    {
+      "case": "Junior → Staff",
+      "candidateLevel": 1,
+      "jobLevel": 5,
+      "rawScore": 75,
+      "experienceScore": null,
+      "seniorityScore": 25,
+      "experienceCap": null,
+      "seniorityCap": 40,
+      "finalScore": 40
+    },
+    {
+      "case": "Junior → VP",
+      "candidateLevel": 1,
+      "jobLevel": 8,
+      "rawScore": 75,
+      "experienceScore": null,
+      "seniorityScore": 25,
+      "experienceCap": null,
+      "seniorityCap": 40,
+      "finalScore": 40
+    },
+    {
+      "case": "Unknown title",
+      "candidateLevel": null,
+      "jobLevel": null,
+      "rawScore": 90,
+      "experienceScore": null,
+      "seniorityScore": null,
+      "experienceCap": null,
+      "seniorityCap": null,
+      "finalScore": 90
+    }
+  ],
+  "beforeAfterSamples": [
+    {
+      "scenario": "Senior candidate vs Senior role",
+      "phase3Final": 92,
+      "skillsFitScore": 90,
+      "experienceFitScore": 100,
+      "seniorityFitScore": 100,
+      "blendedBeforeCap": 94,
+      "finalScore": null
+    },
+    {
+      "scenario": "Senior candidate vs Principal role (same years)",
+      "phase3Final": 92,
+      "skillsFitScore": 90,
+      "experienceFitScore": 100,
+      "seniorityFitScore": 40,
+      "blendedBeforeCap": 84,
+      "finalScore": null
+    },
+    {
+      "scenario": "Phase 3 vs 4 principal differentiation",
+      "phase3SeniorityEquivalent": true,
+      "phase4SeniorityScore": 40,
+      "experienceYears": 6
+    }
+  ],
+  "regression": {
+    "phase23": {
+      "forbiddenTokens": 0,
+      "forbiddenTargetMet": true,
+      "ontologyRegressions": 0,
+      "unavailablePct": "1.80%",
+      "unavailableWithEvidencePct": "10.20%",
+      "unavailableTargetMet": true,
+      "capViolations": 0,
+      "capViolationsTargetMet": true,
+      "oneSignalHighScore": 0,
+      "oneSignalHighScoreTargetMet": true,
+      "insufficientEvidenceCount": 42,
+      "scoredCount": 449
+    },
+    "phase31": {
+      "juniorStaffMax65": true,
+      "largeGapMax50": true,
+      "phase23UnavailableUnder3Pct": true,
+      "falsePositiveCount": 0
+    }
+  },
+  "successCriteria": {
+    "candidateCoverage70Pct": true,
+    "jobCoverage70Pct": true,
+    "principalVsSeniorDifferentiated": true,
+    "phase23UnavailableUnder3Pct": true,
+    "juniorStaffMax65": true,
+    "p95Under150ms": true
+  },
+  "recommendation": "GO"
+}

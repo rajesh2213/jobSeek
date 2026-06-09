@@ -15,7 +15,10 @@ import {
   trackResumeFirstMatchViewedOnce,
   trackResumeFitConfidence,
   trackResumeFitExperienceEvaluated,
+  trackResumeFitSeniorityEvaluated,
+  trackResumeFitTitleEvaluated,
   trackResumeFitUnavailable,
+  trackResumeFitUnavailableReason,
   trackResumeFitViewed,
   trackResumeMatchQuotaHit,
   trackResumeMatchUpgradeClick,
@@ -164,9 +167,17 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
     });
 
     if (!isResumeMatchScored(scored)) {
+      const unavailableReason = scored.unavailableReason ?? "insufficient_signals";
       trackResumeFitUnavailable({
         jobId: job.id,
-        reason: scored.unavailableReason ?? "insufficient_signals",
+        reason: unavailableReason,
+      });
+      trackResumeFitUnavailableReason({
+        jobId: job.id,
+        reason: unavailableReason,
+        candidateFamily: scored.candidateRoleFamily ?? null,
+        jobFamily: scored.jobRoleFamily ?? null,
+        signalCount: scored.signalCount ?? 0,
       });
       return;
     }
@@ -195,6 +206,32 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
         candidateYears: scored.experienceYearsCandidate ?? null,
         requiredYears: scored.experienceYearsRequired ?? null,
         experienceFitScore: scored.experienceFitScore ?? null,
+      });
+    }
+
+    if (
+      scored.seniorityFitScore != null ||
+      scored.candidateSeniorityLevel != null ||
+      scored.jobSeniorityLevel != null
+    ) {
+      trackResumeFitSeniorityEvaluated({
+        jobId: job.id,
+        candidateLevel: scored.candidateSeniorityLevel ?? null,
+        jobLevel: scored.jobSeniorityLevel ?? null,
+        seniorityFitScore: scored.seniorityFitScore ?? null,
+      });
+    }
+
+    if (
+      scored.titleFitScore != null ||
+      scored.candidateRoleFamily != null ||
+      scored.jobRoleFamily != null
+    ) {
+      trackResumeFitTitleEvaluated({
+        jobId: job.id,
+        candidateFamily: scored.candidateRoleFamily ?? null,
+        jobFamily: scored.jobRoleFamily ?? null,
+        titleFit: scored.titleFitScore ?? null,
       });
     }
 

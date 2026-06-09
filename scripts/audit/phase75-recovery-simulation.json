@@ -1,0 +1,39 @@
+{
+  "measuredAt": "2026-06-09T19:19:21.637Z",
+  "totalEvaluations": 3000,
+  "scenarios": {
+    "A_current": {
+      "available": 597,
+      "falseHigh": 0,
+      "hqRisk": 0,
+      "availabilityPct": "19.9%",
+      "falseHighPct": "0.00%",
+      "humanQualityRiskPct": "0.00%"
+    },
+    "B_titleMismatchWarning": {
+      "available": 2842,
+      "falseHigh": 0,
+      "hqRisk": 21,
+      "availabilityPct": "94.7%",
+      "falseHighPct": "0.00%",
+      "humanQualityRiskPct": "0.74%"
+    },
+    "C_veryLowConfidence": {
+      "available": 2850,
+      "falseHigh": 0,
+      "hqRisk": 23,
+      "availabilityPct": "95.0%",
+      "falseHighPct": "0.00%",
+      "humanQualityRiskPct": "0.81%"
+    },
+    "D_skillsGte70": {
+      "available": 612,
+      "falseHigh": 0,
+      "hqRisk": 0,
+      "availabilityPct": "20.4%",
+      "falseHighPct": "0.00%",
+      "humanQualityRiskPct": "0.00%"
+    }
+  },
+  "recommendation": "B_titleMismatchWarning — best balance"
+}

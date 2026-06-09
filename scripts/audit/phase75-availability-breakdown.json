@@ -1,0 +1,85 @@
+{
+  "measuredAt": "2026-06-09T19:19:21.638Z",
+  "jobs": 500,
+  "resumes": 6,
+  "totalEvaluations": 3000,
+  "scored": 597,
+  "unavailable": 2403,
+  "availabilityPct": "19.9%",
+  "unavailablePct": "80.1%",
+  "breakdown": {
+    "title_mismatch": 2245,
+    "insufficient_job_signals": 48,
+    "insufficient_candidate_signals": 0,
+    "low_signal_count": 110,
+    "title_unknown": 0,
+    "family_unresolvable": 0,
+    "reliability_gate": 0,
+    "other": 0
+  },
+  "breakdownPct": {
+    "title_mismatch": "93.4%",
+    "insufficient_job_signals": "2.0%",
+    "insufficient_candidate_signals": "0.0%",
+    "low_signal_count": "4.6%",
+    "title_unknown": "0.0%",
+    "family_unresolvable": "0.0%",
+    "reliability_gate": "0.0%",
+    "other": "0.0%"
+  },
+  "dominantReason": "title_mismatch",
+  "dominantCount": 2245,
+  "dominantPct": "93.4%",
+  "breakdownByResume": {
+    "CV Seán O'Shea O'Connor.pdf": {
+      "title_mismatch": 464,
+      "insufficient_job_signals": 8,
+      "insufficient_candidate_signals": 0,
+      "low_signal_count": 17,
+      "title_unknown": 0,
+      "family_unresolvable": 0,
+      "reliability_gate": 0,
+      "other": 0
+    },
+    "Yashraj-Yadav-Resume.pdf": {
+      "title_mismatch": 441,
+      "insufficient_job_signals": 8,
+      "insufficient_candidate_signals": 0,
+      "low_signal_count": 18,
+      "title_unknown": 0,
+      "family_unresolvable": 0,
+      "reliability_gate": 0,
+      "other": 0
+    },
+    "Profile-3.pdf": {
+      "title_mismatch": 458,
+      "insufficient_job_signals": 8,
+      "insufficient_candidate_signals": 0,
+      "low_signal_count": 17,
+      "title_unknown": 0,
+      "family_unresolvable": 0,
+      "reliability_gate": 0,
+      "other": 0
+    },
+    "Raajeshvaran_M_Software_Engineer.pdf": {
+      "title_mismatch": 441,
+      "insufficient_job_signals": 8,
+      "insufficient_candidate_signals": 0,
+      "low_signal_count": 18,
+      "title_unknown": 0,
+      "family_unresolvable": 0,
+      "reliability_gate": 0,
+      "other": 0
+    },
+    "functionalsample.pdf": {
+      "title_mismatch": 0,
+      "insufficient_job_signals": 8,
+      "insufficient_candidate_signals": 0,
+      "low_signal_count": 22,
+      "title_unknown": 0,
+      "family_unresolvable": 0,
+      "reliability_gate": 0,
+      "other": 0
+    }
+  }
+}

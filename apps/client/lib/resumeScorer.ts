@@ -19,10 +19,21 @@ import { applyCredibilityCalibration } from "./resumeFitCalibration";
 import type { FitConfidence, FitTier, FitUnavailableReason } from "./resumeFitConfidence";
 import {
   applyExperienceGapCap,
-  blendSkillsAndExperienceScore,
   computeExperienceFit,
   type CandidateExperienceInput,
 } from "./resumeFitExperience";
+import { sanitizeGapKeyword } from "./resumeFitGapQuality";
+import { applyFitReliability } from "./resumeFitReliability";
+import {
+  applySeniorityGapCap,
+  blendResumeFitScore,
+  computeSeniorityFit,
+} from "./resumeFitSeniority";
+import {
+  applyTitleMismatchCap,
+  computeTitleFit,
+  type CandidateTitleInput,
+} from "./resumeFitTitle";
 import {
   jobHasResolvableMatchSignals,
   resolveJobMatchSkills,
@@ -95,6 +106,20 @@ export interface ScoringResult {
   experienceYearsRequired?: number | null;
   experienceGapCap?: number | null;
   experienceGapCapApplied?: boolean;
+  seniorityFitScore?: number | null;
+  candidateSeniorityLevel?: number | null;
+  jobSeniorityLevel?: number | null;
+  candidateSeniorityTitle?: string | null;
+  jobSeniorityTitle?: string | null;
+  seniorityGapCap?: number | null;
+  seniorityGapCapApplied?: boolean;
+  titleFitScore?: number | null;
+  candidateRoleFamily?: string | null;
+  jobRoleFamily?: string | null;
+  candidateTitleAlignment?: string | null;
+  jobTitleAlignment?: string | null;
+  titleMismatchCap?: number | null;
+  titleMismatchCapApplied?: boolean;
   blendedScoreBeforeCap?: number | null;
   debug?: {
     extractedCanonicals: string[];
@@ -196,7 +221,7 @@ function cacheKey(
   semanticMatches: Record<string, { bullet: string; similarity: number }>,
   experienceInput?: CandidateExperienceInput,
 ): string {
-  return `v5-exp-cap|soft-v1|legacy=${legacy ? "1" : "0"}|d=${DICTIONARY_VERSION}|${jobId}|${semanticSig(semanticMatches)}|${experienceSig(experienceInput)}`;
+  return `v8-taxonomy|soft-v1|legacy=${legacy ? "1" : "0"}|d=${DICTIONARY_VERSION}|${jobId}|${semanticSig(semanticMatches)}|${experienceSig(experienceInput)}`;
 }
 
 export function clearScoreCache(): void {
@@ -296,6 +321,22 @@ function fuzzyMatchExists(text: string, keyword: string): boolean {
 function sortMissingByWeight(a: JobSkill, b: JobSkill): number {
   if (b.weight !== a.weight) return b.weight - a.weight;
   return a.canonical.localeCompare(b.canonical);
+}
+
+function filterGapChips(chips: KeywordResult[], jobTitle: string): KeywordResult[] {
+  return chips.filter((chip) => sanitizeGapKeyword(chip.keyword, jobTitle) != null);
+}
+
+function candidateTitleInput(
+  experienceInput: CandidateExperienceInput | undefined,
+  resumeText: string,
+): CandidateTitleInput {
+  return {
+    currentTitle: experienceInput?.currentTitle,
+    resumeStructuredV1: experienceInput?.resumeStructuredV1,
+    applyProfileSummary: experienceInput?.applyProfileSummary as CandidateTitleInput["applyProfileSummary"],
+    resumeText,
+  };
 }
 
 function scoreResumeSkills(
@@ -398,37 +439,78 @@ function scoreResumeSkills(
     ...partial.map((m) => m.keyword),
   ];
 
-  const isInsufficientEvidence = calibration.outcome === "insufficient_evidence";
+  const calibrationInsufficient = calibration.outcome === "insufficient_evidence";
   const skillsFitScore = calibration.score;
   const experienceFit = computeExperienceFit(job, experienceInput ?? {});
-  const blendedScore = isInsufficientEvidence
+  const seniorityFit = computeSeniorityFit(job, experienceInput ?? {});
+  const titleFit = computeTitleFit(job, candidateTitleInput(experienceInput, resumeText));
+  const blendedScore = calibrationInsufficient
     ? null
-    : blendSkillsAndExperienceScore(skillsFitScore, experienceFit.experienceFitScore);
-  const gapCap = applyExperienceGapCap(
+    : blendResumeFitScore(
+        skillsFitScore,
+        experienceFit.experienceFitScore,
+        seniorityFit.seniorityFitScore,
+        titleFit.titleFitScore,
+      );
+  const experienceCap = applyExperienceGapCap(
     blendedScore,
     experienceFit.candidateYears,
     experienceFit.requiredYears,
   );
-  const finalScore = gapCap.score;
+  const seniorityCap = applySeniorityGapCap(
+    experienceCap.score,
+    seniorityFit.candidateLevel,
+    seniorityFit.jobLevel,
+  );
+  const titleCap = applyTitleMismatchCap(seniorityCap.score, titleFit);
+  const reliability = applyFitReliability({
+    baseConfidence: resolution.confidence,
+    fitTier: resolution.fitTier,
+    signalCount: resolution.signalCount,
+    titleFit,
+  });
+  const reliabilityGate = !calibrationInsufficient && reliability.gateUnavailable;
+  const finalScore = reliabilityGate ? null : titleCap.score;
+  const matchAvailability = calibrationInsufficient || reliabilityGate
+    ? "insufficient_evidence"
+    : "scored";
+  const jobTitle = job.title ?? "";
+  const safeMatched = matchAvailability === "scored" ? filterGapChips(matched, jobTitle) : [];
+  const safeMissing = matchAvailability === "scored" ? filterGapChips(missing, jobTitle) : [];
+  const safePartial = matchAvailability === "scored" ? filterGapChips(partial, jobTitle) : [];
 
   const result: ScoringResult = {
-    matchAvailability: isInsufficientEvidence ? "insufficient_evidence" : "scored",
+    matchAvailability,
     score: finalScore,
     grade: finalScore === null ? null : gradeFromScore(finalScore),
     skillsFitScore,
     experienceFitScore: experienceFit.experienceFitScore,
     experienceYearsCandidate: experienceFit.candidateYears,
     experienceYearsRequired: experienceFit.requiredYears,
-    experienceGapCap: gapCap.cap,
-    experienceGapCapApplied: gapCap.capApplied,
+    experienceGapCap: experienceCap.cap,
+    experienceGapCapApplied: experienceCap.capApplied,
+    seniorityFitScore: seniorityFit.seniorityFitScore,
+    candidateSeniorityLevel: seniorityFit.candidateLevel,
+    jobSeniorityLevel: seniorityFit.jobLevel,
+    candidateSeniorityTitle: seniorityFit.candidateTitle,
+    jobSeniorityTitle: seniorityFit.jobTitle,
+    seniorityGapCap: seniorityCap.cap,
+    seniorityGapCapApplied: seniorityCap.capApplied,
+    titleFitScore: titleFit.titleFitScore,
+    candidateRoleFamily: titleFit.candidateFamily,
+    jobRoleFamily: titleFit.jobFamily,
+    candidateTitleAlignment: titleFit.candidateTitle,
+    jobTitleAlignment: titleFit.jobTitle,
+    titleMismatchCap: titleCap.cap,
+    titleMismatchCapApplied: titleCap.capApplied,
     blendedScoreBeforeCap: blendedScore,
-    matched,
-    missing,
-    partial,
-    confidenceLevel: resolution.confidence,
+    matched: safeMatched,
+    missing: safeMissing,
+    partial: safePartial,
+    confidenceLevel: reliability.confidence ?? resolution.confidence,
     signalCount: resolution.signalCount,
     fitTier: resolution.fitTier,
-    unavailableReason: isInsufficientEvidence ? "insufficient_evidence" : null,
+    unavailableReason: matchAvailability === "insufficient_evidence" ? "insufficient_evidence" : null,
     breakdown: {
       required: {
         matched: matched.filter((k) => k.category === "required").length,

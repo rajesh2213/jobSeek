@@ -1,0 +1,40 @@
+{
+  "measuredAt": "2026-06-09T18:06:31.207Z",
+  "metrics": {
+    "candidateCoverage": "5/6 (83.3%)",
+    "jobCoverage": "100/100 (100.0%)",
+    "titleFitCoverage": "5/6 (83.3%)",
+    "familyMismatches": "4/5",
+    "falseDetections": [],
+    "p95ScoreMs": 28.62
+  },
+  "beforeAfterSamples": [
+    {
+      "case": "Backend Engineer → Sales Engineer",
+      "titleFit": 25,
+      "finalScore": null,
+      "availability": "insufficient_job_signals",
+      "confidence": null
+    },
+    {
+      "case": "Senior Recruiter → Customer Success Manager",
+      "titleFit": 25,
+      "finalScore": null,
+      "availability": "insufficient_job_signals",
+      "confidence": null
+    },
+    {
+      "case": "Product Manager → Software Engineer",
+      "titleFit": 25,
+      "finalScore": null,
+      "availability": "insufficient_job_signals",
+      "confidence": null
+    }
+  ],
+  "successCriteria": {
+    "titleFamilyCoverage80Pct": true,
+    "p95Under150ms": true,
+    "mismatchCasesDetected": true
+  },
+  "recommendation": "GO"
+}

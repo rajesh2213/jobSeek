@@ -205,6 +205,12 @@ export function deriveJobRequiredYears(job: JobItem): {
   const titleYears = deriveTitleHeuristicYears(job.title ?? "");
   if (titleYears != null) return { years: titleYears, source: "title_heuristic" };
 
+  const description = job.description?.trim();
+  if (description) {
+    const descYears = extractExplicitYearsFromText(description);
+    if (descYears != null) return { years: descYears, source: "explicit" };
+  }
+
   const level = job.experienceLevel?.toLowerCase().trim();
   if (level && EXPERIENCE_LEVEL_YEARS[level] != null) {
     return { years: EXPERIENCE_LEVEL_YEARS[level]!, source: "experience_level" };

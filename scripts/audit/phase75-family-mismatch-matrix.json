@@ -1,0 +1,198 @@
+{
+  "measuredAt": "2026-06-09T19:19:21.638Z",
+  "unavailableEvaluations": 2403,
+  "topPairs": [
+    {
+      "pair": "software.engineering→other",
+      "count": 840,
+      "pctOfUnavailable": "35.0%"
+    },
+    {
+      "pair": "marketing→other",
+      "count": 280,
+      "pctOfUnavailable": "11.7%"
+    },
+    {
+      "pair": "design→other",
+      "count": 280,
+      "pctOfUnavailable": "11.7%"
+    },
+    {
+      "pair": "software.engineering→healthcare.clinical",
+      "count": 168,
+      "pctOfUnavailable": "7.0%"
+    },
+    {
+      "pair": "software.engineering→sales",
+      "count": 123,
+      "pctOfUnavailable": "5.1%"
+    },
+    {
+      "pair": "software.engineering→customer_success",
+      "count": 60,
+      "pctOfUnavailable": "2.5%"
+    },
+    {
+      "pair": "marketing→healthcare.clinical",
+      "count": 56,
+      "pctOfUnavailable": "2.3%"
+    },
+    {
+      "pair": "design→healthcare.clinical",
+      "count": 56,
+      "pctOfUnavailable": "2.3%"
+    },
+    {
+      "pair": "marketing→sales",
+      "count": 41,
+      "pctOfUnavailable": "1.7%"
+    },
+    {
+      "pair": "design→sales",
+      "count": 41,
+      "pctOfUnavailable": "1.7%"
+    },
+    {
+      "pair": "software.engineering→design",
+      "count": 39,
+      "pctOfUnavailable": "1.6%"
+    },
+    {
+      "pair": "software.engineering→marketing",
+      "count": 33,
+      "pctOfUnavailable": "1.4%"
+    },
+    {
+      "pair": "software.engineering→hr",
+      "count": 27,
+      "pctOfUnavailable": "1.1%"
+    },
+    {
+      "pair": "null→other",
+      "count": 26,
+      "pctOfUnavailable": "1.1%"
+    },
+    {
+      "pair": "marketing→customer_success",
+      "count": 20,
+      "pctOfUnavailable": "0.8%"
+    },
+    {
+      "pair": "design→customer_success",
+      "count": 20,
+      "pctOfUnavailable": "0.8%"
+    },
+    {
+      "pair": "software.engineering→operations",
+      "count": 18,
+      "pctOfUnavailable": "0.7%"
+    },
+    {
+      "pair": "marketing→software.engineering",
+      "count": 15,
+      "pctOfUnavailable": "0.6%"
+    },
+    {
+      "pair": "software.engineering→product",
+      "count": 15,
+      "pctOfUnavailable": "0.6%"
+    },
+    {
+      "pair": "software.engineering→legal",
+      "count": 15,
+      "pctOfUnavailable": "0.6%"
+    },
+    {
+      "pair": "design→software.engineering",
+      "count": 15,
+      "pctOfUnavailable": "0.6%"
+    },
+    {
+      "pair": "marketing→design",
+      "count": 13,
+      "pctOfUnavailable": "0.5%"
+    },
+    {
+      "pair": "software.engineering→engineering.ml",
+      "count": 12,
+      "pctOfUnavailable": "0.5%"
+    },
+    {
+      "pair": "software.engineering→finance",
+      "count": 12,
+      "pctOfUnavailable": "0.5%"
+    },
+    {
+      "pair": "software.engineering→recruiting",
+      "count": 12,
+      "pctOfUnavailable": "0.5%"
+    }
+  ],
+  "fullMatrix": {
+    "marketing→other": 280,
+    "marketing→hr": 9,
+    "marketing→product": 5,
+    "marketing→legal": 5,
+    "marketing→engineering.ml": 4,
+    "marketing→healthcare.clinical": 56,
+    "marketing→finance": 4,
+    "marketing→recruiting": 4,
+    "marketing→sales": 41,
+    "marketing→software.engineering": 15,
+    "marketing→technical.operations": 7,
+    "marketing→research": 1,
+    "marketing→operations": 6,
+    "marketing→engineering.frontend": 5,
+    "marketing→design": 13,
+    "marketing→customer_success": 20,
+    "marketing→engineering.devops": 2,
+    "marketing→engineering.backend": 9,
+    "marketing→engineering.data": 3,
+    "software.engineering→other": 840,
+    "software.engineering→hr": 27,
+    "software.engineering→product": 15,
+    "software.engineering→legal": 15,
+    "software.engineering→engineering.ml": 12,
+    "software.engineering→healthcare.clinical": 168,
+    "software.engineering→finance": 12,
+    "software.engineering→recruiting": 12,
+    "software.engineering→sales": 123,
+    "software.engineering→technical.operations": 6,
+    "software.engineering→research": 3,
+    "software.engineering→operations": 18,
+    "software.engineering→design": 39,
+    "software.engineering→customer_success": 60,
+    "software.engineering→marketing": 33,
+    "software.engineering→engineering.devops": 6,
+    "software.engineering→software.engineering": 3,
+    "software.engineering→engineering.data": 9,
+    "design→other": 280,
+    "design→hr": 9,
+    "design→legal": 5,
+    "design→engineering.ml": 4,
+    "design→healthcare.clinical": 56,
+    "design→finance": 4,
+    "design→recruiting": 4,
+    "design→sales": 41,
+    "design→software.engineering": 15,
+    "design→technical.operations": 7,
+    "design→research": 1,
+    "design→operations": 6,
+    "design→engineering.frontend": 5,
+    "design→customer_success": 20,
+    "design→marketing": 11,
+    "design→engineering.devops": 2,
+    "design→design": 1,
+    "design→engineering.backend": 9,
+    "design→engineering.data": 3,
+    "null→other": 26,
+    "null→technical.operations": 2,
+    "null→design": 1,
+    "null→software.engineering": 1
+  },
+  "insights": {
+    "crossDomainDominates": true,
+    "nullCandidatePairs": 30,
+    "feedPersonalizationWouldHelp": true
+  }
+}

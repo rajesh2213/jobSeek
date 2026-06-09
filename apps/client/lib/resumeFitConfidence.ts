@@ -1,4 +1,4 @@
-export type FitConfidence = "high" | "medium" | "low";
+export type FitConfidence = "high" | "medium" | "low" | "very_low";
 
 export type FitTier = 1 | 2 | 3 | 4;
 
@@ -41,8 +41,10 @@ export function confidenceLabel(confidence: FitConfidence): string {
       return "High";
     case "medium":
       return "Medium";
-    default:
+    case "low":
       return "Low";
+    default:
+      return "Very Low";
   }
 }
 
@@ -52,7 +54,13 @@ export function confidenceExplanation(confidence: FitConfidence): string {
       return "Based on structured job requirements.";
     case "medium":
       return "Based on description analysis.";
-    default:
+    case "low":
       return "Based on limited job signals.";
+    default:
+      return "Insufficient evidence for a reliable percentage.";
   }
+}
+
+export function isVeryLowConfidence(confidence: FitConfidence | null | undefined): boolean {
+  return confidence === "very_low";
 }

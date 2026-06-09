@@ -1,0 +1,71 @@
+{
+  "measuredAt": "2026-06-09T19:19:21.638Z",
+  "jobsPerFeed": 100,
+  "perResume": {
+    "CV Seán O'Shea O'Connor.pdf": {
+      "resumeId": "d791d8d8-34af-4720-ba0e-c57b1e39d94e",
+      "candidateFamily": "marketing",
+      "candidateTitle": "Position Title: Door-to-Door Marketing Consultant",
+      "jobsInFeed": 100,
+      "same_family": 0,
+      "adjacent_family": 0,
+      "cross_domain": 100,
+      "unclassified": 0,
+      "sameFamilyPct": "0.0%",
+      "crossDomainPct": "100.0%"
+    },
+    "Yashraj-Yadav-Resume.pdf": {
+      "resumeId": "68012998-678f-4f91-9d28-faaba52c39de",
+      "candidateFamily": "software.engineering",
+      "candidateTitle": "Full-Stack Developer",
+      "jobsInFeed": 100,
+      "same_family": 4,
+      "adjacent_family": 5,
+      "cross_domain": 91,
+      "unclassified": 0,
+      "sameFamilyPct": "4.0%",
+      "crossDomainPct": "91.0%"
+    },
+    "Profile-3.pdf": {
+      "resumeId": "c112c6ff-42e8-499e-8a5c-66aa14ee9282",
+      "candidateFamily": "design",
+      "candidateTitle": "I enjoy to code beautiful animations, UI/UX, modern experiences in",
+      "jobsInFeed": 100,
+      "same_family": 3,
+      "adjacent_family": 1,
+      "cross_domain": 96,
+      "unclassified": 0,
+      "sameFamilyPct": "3.0%",
+      "crossDomainPct": "96.0%"
+    },
+    "Raajeshvaran_M_Software_Engineer.pdf": {
+      "resumeId": "4cd5e984-db8e-4bd9-adc5-ca07f2092e75",
+      "candidateFamily": "software.engineering",
+      "candidateTitle": "Software Engineer",
+      "jobsInFeed": 100,
+      "same_family": 4,
+      "adjacent_family": 5,
+      "cross_domain": 91,
+      "unclassified": 0,
+      "sameFamilyPct": "4.0%",
+      "crossDomainPct": "91.0%"
+    },
+    "functionalsample.pdf": {
+      "resumeId": "b8941387-21c3-4592-a6d9-6735dbf9d08c",
+      "candidateFamily": null,
+      "candidateTitle": "",
+      "jobsInFeed": 100,
+      "same_family": 0,
+      "adjacent_family": 0,
+      "cross_domain": 0,
+      "unclassified": 100,
+      "sameFamilyPct": "0.0%",
+      "crossDomainPct": "0.0%"
+    }
+  },
+  "aggregate": {
+    "avgSameFamilyPct": "2.2%",
+    "avgCrossDomainPct": "75.6%"
+  },
+  "conclusion": "Users browse mostly cross-domain jobs — unavailable is largely feed misalignment, not model strictness alone"
+}

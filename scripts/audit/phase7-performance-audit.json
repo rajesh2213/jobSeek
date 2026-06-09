@@ -1,0 +1,24 @@
+{
+  "measuredAt": "2026-06-09T19:13:04.302Z",
+  "iterations": 1000,
+  "uniqueJobs": 50,
+  "metrics": {
+    "averageMs": 6.47,
+    "p95Ms": 21.51,
+    "p99Ms": 28.77,
+    "minMs": 0.27,
+    "maxMs": 33.82
+  },
+  "targets": {
+    "averageLt50": true,
+    "p95Lt150": true,
+    "p99Lt250": true
+  },
+  "targetResults": {
+    "averageLt50": true,
+    "p95Lt150": true,
+    "p99Lt250": true
+  },
+  "noNetworkCallsInScoringPath": true,
+  "pass": true
+}

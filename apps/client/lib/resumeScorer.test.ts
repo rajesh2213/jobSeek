@@ -136,7 +136,9 @@ test("scoreResume: scored when job has skills", () => {
       requirement: ["5+ years experience with React and TypeScript"],
     },
   });
-  const result = scoreResume("React developer with TypeScript", ["Built React UI"], job);
+  const result = scoreResume("React developer with TypeScript", ["Built React UI"], job, {}, {
+    currentTitle: "Senior Product Manager",
+  });
   assert.equal(result.matchAvailability, "scored");
   assert.ok(result.score !== null);
   assert.ok(result.grade !== null);

@@ -1,0 +1,115 @@
+{
+  "measuredAt": "2026-06-09T19:12:57.737Z",
+  "eventDefinitions": {
+    "ResumeFitViewed": {
+      "definedInFunnel": true,
+      "trackerExported": true,
+      "firedFromPill": true,
+      "firedFromSection": true
+    },
+    "ResumeFitConfidence": {
+      "definedInFunnel": true,
+      "trackerExported": true,
+      "firedFromPill": true,
+      "firedFromSection": true
+    },
+    "ResumeFitUnavailable": {
+      "definedInFunnel": true,
+      "trackerExported": true,
+      "firedFromPill": true,
+      "firedFromSection": true
+    },
+    "ResumeFitUnavailableReason": {
+      "definedInFunnel": true,
+      "trackerExported": true,
+      "firedFromPill": true,
+      "firedFromSection": true
+    },
+    "ResumeFitExperienceEvaluated": {
+      "definedInFunnel": true,
+      "trackerExported": true,
+      "firedFromPill": true,
+      "firedFromSection": true
+    },
+    "ResumeFitSeniorityEvaluated": {
+      "definedInFunnel": true,
+      "trackerExported": true,
+      "firedFromPill": true,
+      "firedFromSection": true
+    },
+    "ResumeFitTitleEvaluated": {
+      "definedInFunnel": true,
+      "trackerExported": true,
+      "firedFromPill": true,
+      "firedFromSection": true
+    }
+  },
+  "payloads": {
+    "ResumeFitViewed": [
+      "job_id",
+      "score",
+      "confidence",
+      "fit_tier"
+    ],
+    "ResumeFitConfidence": [
+      "confidence",
+      "signal_count",
+      "job_id"
+    ],
+    "ResumeFitUnavailable": [
+      "reason",
+      "job_id"
+    ],
+    "ResumeFitUnavailableReason": [
+      "reason",
+      "candidate_family",
+      "job_family",
+      "signal_count",
+      "job_id"
+    ],
+    "ResumeFitExperienceEvaluated": [
+      "job_id",
+      "candidate_years",
+      "required_years",
+      "experience_fit_score"
+    ],
+    "ResumeFitSeniorityEvaluated": [
+      "job_id",
+      "candidate_level",
+      "job_level",
+      "seniority_fit_score"
+    ],
+    "ResumeFitTitleEvaluated": [
+      "job_id",
+      "candidate_family",
+      "job_family",
+      "title_fit"
+    ]
+  },
+  "payloadValid": {
+    "ResumeFitViewed": true,
+    "ResumeFitConfidence": true,
+    "ResumeFitUnavailable": true,
+    "ResumeFitUnavailableReason": true,
+    "ResumeFitExperienceEvaluated": true,
+    "ResumeFitSeniorityEvaluated": true,
+    "ResumeFitTitleEvaluated": true
+  },
+  "piiAudit": {
+    "noResumeTextInEvents": true,
+    "noEmailInEvents": true,
+    "familiesNotTitles": true,
+    "candidateTitlesNotSent": true,
+    "pass": true
+  },
+  "duplicateFiring": {
+    "unavailableFiresBothEvents": true,
+    "note": "Unavailable path fires ResumeFitUnavailable + ResumeFitUnavailableReason intentionally (aggregate + breakdown)",
+    "scoredFiresViewedOnce": true,
+    "subDimensionEventsOnlyOnScored": true
+  },
+  "deadCode": {
+    "ResumeMatchUnscorable": true
+  },
+  "pass": true
+}

@@ -1,0 +1,655 @@
+{
+  "measuredAt": "2026-06-09T18:29:13.504Z",
+  "jobsScanned": 17613,
+  "engineeringCategoryFallbackCount": 513,
+  "familyTopTitles": {
+    "engineering.backend": [
+      "devops engineer backend",
+      "senior backend engineer",
+      "backend qa engineer",
+      "backend engineer",
+      "backend developer (.net c#)",
+      "software engineer, backend",
+      "python backend developer",
+      "senior software engineer - backend",
+      "power backend engineer",
+      "backend engineer, berlin",
+      "senior software engineer - backend & infrastructure (f/m/d)",
+      "senior backend engineer (node.js)",
+      "backend developer",
+      "senior software engineer-backend",
+      "senior software engineer (backend)",
+      "staff software engineer - backend",
+      "staff developer - backend",
+      "senior backend software engineer",
+      "senior product engineer [backend]",
+      "staff backend engineer",
+      "backend engineer, integrations & apis",
+      "software engineer (backend) - distributed systems",
+      "senior backend engineer - ai platform (f/m/d)",
+      "product engineer (backend-biased)",
+      "senior backend ai developer",
+      "senior backend engineer - ai team - paradox",
+      "senior backend platform engineer",
+      "backend software engineer (genai)",
+      "software engineer (java backend)",
+      "backend engineer ii"
+    ],
+    "engineering.frontend": [
+      "frontend web developer",
+      "senior frontend engineer",
+      "frontend developer (vue.js or react or angular)",
+      "senior frontend software engineer - devx",
+      "senior software engineer - frontend",
+      "staff software engineer - frontend",
+      "senior product engineer [frontend]",
+      "technical lead, front end technologies",
+      "front end software engineer",
+      "front-end architect",
+      "frontend engineer",
+      "software engineer, frontend",
+      "product engineer (frontend-biased)",
+      "frontend engineer, ads growth",
+      "senior angular front-end engineer",
+      "senior frontend engineer, community builders",
+      "senior frontend engineer – next.js",
+      "senior developer 1 - frontend",
+      "front-end web & cms specialist",
+      "front-end software engineer intern",
+      "software engineer, front-end focus",
+      "frontend ux designer",
+      "it project manager iv - front-end engineering design",
+      "senior frontend software engineer, gkos",
+      "front-end web developer",
+      "software development engineer iii - contacts (frontend)",
+      "senior frontend developer",
+      "software engineer – frontend & mobile",
+      "frontend engineer, early career",
+      "frontend platform engineer"
+    ],
+    "engineering.fullstack": [
+      "senior software engineer",
+      "software engineer",
+      "registered behavior technician (rbt)",
+      "behavior technician (rbt)",
+      "simulator technician",
+      "software architect",
+      "engineering manager",
+      "lead software engineer",
+      "staff software engineer",
+      "security engineer",
+      "behavior technician (bt/rbt)",
+      "software engineering manager",
+      "solutions engineer",
+      "react native engineer",
+      "release engineer",
+      "qa engineer",
+      "qa automation engineer",
+      "react engineer",
+      "ios engineer",
+      "principal software engineer",
+      "technical support engineer",
+      "senior systems engineer",
+      "forward deployed engineer",
+      "optical technician / optician",
+      "software architect - mobile",
+      "senior solutions engineer",
+      "simulator technician i",
+      "sr software engineer",
+      "sr. electrical engineer - space technologies",
+      "software development engineer"
+    ],
+    "engineering.devops": [
+      "devops engineer",
+      "site reliability engineer (sre)",
+      "senior site reliability engineer",
+      "devops engineer mobile",
+      "platform engineer",
+      "senior devops engineer",
+      "site reliability engineer",
+      "senior platform engineer",
+      "data platform engineer",
+      "client partner | enterprise platform sales",
+      "staff devops engineer",
+      "remote devops engineer",
+      "site reliability engineer, cloud platform",
+      "principal ai platform architect",
+      "development engineer, sr (devops)",
+      "software development engineer, devops - lifecycle platform (us federal)",
+      "sr distributed systems engineer (devops)",
+      "manager, software development engineering - ai platform",
+      "sre / devops engineer (golang)",
+      "manager site reliability engineer",
+      "sr site reliability engineer, operations (us federal)",
+      "senior devops engineer, alpaca engineer (us federal)",
+      "senior site reliability engineer (us federal)",
+      "senior sre engineer",
+      "senior site reliability engineer (sre) – flightscape platform",
+      "director of site reliability engineering",
+      "principal software engineer, site reliability",
+      "senior software engineer - sre",
+      "engineering manager - platform",
+      "senior devops/sre engineer with kubernetes and advanced python"
+    ],
+    "engineering.data": [
+      "data engineer",
+      "data analyst",
+      "senior data engineer",
+      "data scientist",
+      "senior data scientist",
+      "data architect",
+      "senior data architect",
+      "supply chain data analyst",
+      "sr. prism analytics consultant - workday success plans",
+      "staff data scientist",
+      "lead, big data engineer",
+      "principal big data engineer",
+      "sr. data engineer",
+      "consultant: private sector demand analytics manager, infectious diseases, india country program",
+      "senior hcm reporting and analytics consultant",
+      "prism reporting & analytics consultant",
+      "senior data scientist - genai/python/aws/sql",
+      "senior data analyst",
+      "clinical data analyst",
+      "data scientist, core data -  phd (2026)",
+      "data engineering manager",
+      "senior staff data scientist, consumer",
+      "principal data scientist",
+      "principal data architect",
+      "lead data scientist",
+      "lead data engineer",
+      "principal java data engineer",
+      "principal data engineer (streaming)",
+      "data engineer internship",
+      "director data engineering"
+    ],
+    "engineering.ml": [
+      "ai engineer",
+      "ai/ml engineer",
+      "machine learning engineer",
+      "senior ai engineer",
+      "senior machine learning engineer",
+      "principal ai/ml architect",
+      "machine learning architect",
+      "senior ai/ml engineer",
+      "machine learning engineer ii",
+      "generative ai engineer",
+      "power ml engineer",
+      "senior machine learning engineer - not an active opening, building talent pipeline",
+      "machine learning engineer iii",
+      "machine learning engineer - evisort",
+      "principal machine learning engineer - evisort ai",
+      "principal machine learning engineer",
+      "lead ai engineer",
+      "staff ai/ml engineer",
+      "staff ai engineer",
+      "senior tactical ml engineer",
+      "applied ai engineer",
+      "software engineer, machine learning",
+      "senior machine learning engineer, gen ai",
+      "senior machine learning engineer (f/m/d)",
+      "support ai engineer",
+      "senior staff machine learning engineer, guest & host",
+      "machine learning engineer ii - autonomous driving performance evaluation",
+      "machine learning engineer ii - autonomous driving & inference runtime",
+      "senior ai engineer - sana",
+      "director of machine learning engineering - agent factory"
+    ]
+  },
+  "familyStats": {
+    "engineering.backend": {
+      "uniqueTitles": 123,
+      "totalMappings": 177,
+      "suspiciousCount": 0
+    },
+    "engineering.frontend": {
+      "uniqueTitles": 41,
+      "totalMappings": 71,
+      "suspiciousCount": 0
+    },
+    "engineering.fullstack": {
+      "uniqueTitles": 2437,
+      "totalMappings": 3647,
+      "suspiciousCount": 678
+    },
+    "engineering.devops": {
+      "uniqueTitles": 181,
+      "totalMappings": 282,
+      "suspiciousCount": 0
+    },
+    "engineering.data": {
+      "uniqueTitles": 177,
+      "totalMappings": 292,
+      "suspiciousCount": 0
+    },
+    "engineering.ml": {
+      "uniqueTitles": 116,
+      "totalMappings": 173,
+      "suspiciousCount": 0
+    }
+  },
+  "suspiciousMembers": {
+    "engineering.backend": [],
+    "engineering.frontend": [],
+    "engineering.fullstack": [
+      {
+        "title": "ABA Behavior Technician",
+        "jobId": "07e16541-290c-4852-a154-0a4042aa6c8a",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "ABA Behavior Technician (RBT)",
+        "jobId": "068ba267-1463-48df-a495-3edc90e35186",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Advanced Step Apprentice/Journeyman Gas Technician - Faribault, MN",
+        "jobId": "1b08be19-55d7-40be-8902-dbe77160c46f",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "AI Trainer - Mechanical Engineers (Remote)",
+        "jobId": "c572d5a2-7e57-4f5e-a29f-f76afbc72b3d",
+        "category": "other",
+        "source": "role_slug",
+        "flags": [
+          "mechanical"
+        ]
+      },
+      {
+        "title": "Aircraft Maintenance Engineer (AME)",
+        "jobId": "232990a3-d1fe-49a9-b339-330fd1bdb33a",
+        "category": "engineering",
+        "source": "title",
+        "flags": [
+          "maintenance"
+        ]
+      },
+      {
+        "title": "Aircraft Maintenance Engineer (AME)",
+        "jobId": "8180f9d6-8560-406c-a530-5b54c334b03c",
+        "category": "engineering",
+        "source": "title",
+        "flags": [
+          "maintenance"
+        ]
+      },
+      {
+        "title": "Aircraft Maintenance Engineer (Avionics)",
+        "jobId": "8d15e66f-3c44-47eb-b9d8-ea3094fb72f8",
+        "category": "engineering",
+        "source": "title",
+        "flags": [
+          "maintenance"
+        ]
+      },
+      {
+        "title": "Aircraft Maintenance Engineer (AVN)",
+        "jobId": "f18af15c-c0fc-4b55-bfb8-0551c615b2ff",
+        "category": "engineering",
+        "source": "title",
+        "flags": [
+          "maintenance"
+        ]
+      },
+      {
+        "title": "Aircraft Maintenance Engineer (AVN)",
+        "jobId": "67ded1a1-31e9-4377-84db-f77db710bb2b",
+        "category": "engineering",
+        "source": "title",
+        "flags": [
+          "maintenance"
+        ]
+      },
+      {
+        "title": "Aircraft Maintenance Engineer (B1/B3, B2)",
+        "jobId": "0f630d6f-d24e-49ad-ac33-9675f2d9512c",
+        "category": "engineering",
+        "source": "title",
+        "flags": [
+          "maintenance"
+        ]
+      },
+      {
+        "title": "Aircraft Maintenance Engineer (B1/B3, B2)",
+        "jobId": "2ac670c2-ddad-403d-b9ef-b14366582847",
+        "category": "engineering",
+        "source": "title",
+        "flags": [
+          "maintenance"
+        ]
+      },
+      {
+        "title": "Aircraft Maintenance Engineer (Structures)",
+        "jobId": "457db5f8-b338-4c84-84e5-42ffadaf5298",
+        "category": "engineering",
+        "source": "title",
+        "flags": [
+          "maintenance"
+        ]
+      },
+      {
+        "title": "Aircraft Maintenance Engineer (Structures)",
+        "jobId": "1835179a-b575-4d93-9dd1-731f813bb49d",
+        "category": "engineering",
+        "source": "title",
+        "flags": [
+          "maintenance"
+        ]
+      },
+      {
+        "title": "Alliances Field Engineer",
+        "jobId": "90fc74b8-70fd-4811-9c99-4a26ad72b3d6",
+        "category": "other",
+        "source": "title",
+        "flags": [
+          "field_ops"
+        ]
+      },
+      {
+        "title": "Analyzer Technician I",
+        "jobId": "d9bc3ca3-6911-40fa-ad43-fadd16389253",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Analyzer Technician I",
+        "jobId": "4a631c17-21fa-4be8-a60c-ea4997fd09e2",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Analyzer Technician II",
+        "jobId": "ae2a481e-8e5d-4cea-a92a-ef62c69b819d",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Apprentice Simulator Technician",
+        "jobId": "2f241a38-3b48-4795-b844-7c5de233e62c",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Apprentice Simulator Technician (M/F/D)",
+        "jobId": "a9aed918-d35d-41d1-afc8-e014924f18c8",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Apprentice/Journeyman Mechanic Technician - Chippewa Falls, WI",
+        "jobId": "1f67dfa3-13ca-43d0-bd96-7ca060c82e52",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Assembly, Integration, and Test Technician",
+        "jobId": "a02d886c-08e3-4b81-96bc-0173c8584f1c",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Associate Field Engineer",
+        "jobId": "6cf66637-8be8-4bc8-b524-95f2fbee0fbf",
+        "category": "engineering",
+        "source": "title",
+        "flags": [
+          "field_ops"
+        ]
+      },
+      {
+        "title": "AV Lead Technician",
+        "jobId": "10ca9952-6ad9-4676-b3e3-73d027e2bbac",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "AV Lead Technician",
+        "jobId": "9adc8602-ee6a-496b-aa20-21dc268f89c6",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Avionics Fabrication & Integration Technician (Flight Simulation) - Skillbridge",
+        "jobId": "29c9f854-899e-4a00-9889-83aca56382f3",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Avionics Fabrication & Integration Technician (Flight Simulation) - Skillbridge",
+        "jobId": "4b0acc38-8c7a-40b8-9ea7-deeabf899e8f",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Avionics Technician",
+        "jobId": "6d30d413-4781-4450-9a05-e3317c3e3370",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Avionics Technician (AVS) - MQ-9B CGCS / SMT (Evergreen)",
+        "jobId": "af60447c-27b3-417c-8c51-c74038718dd4",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Avionics Technician (AVS) - MQ-9B CGCS / SMT (Evergreen)",
+        "jobId": "eee9e2c7-5f2b-4582-897f-043e418118cb",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Behavior Technician",
+        "jobId": "6161d5bc-f2e0-4994-b8ae-313cb09f19cb",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Behavior Technician",
+        "jobId": "43cc4c59-73d7-416d-959b-a37e0793448c",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Behavior Technician (BT)",
+        "jobId": "6e116fe1-1f1a-4d59-b9b2-57a58a3d05bf",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Behavior Technician (BT)",
+        "jobId": "e5e5d827-2918-4f04-94a7-2b7d30b15990",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Behavior Technician (BT)",
+        "jobId": "015ddcbc-28fc-4e24-b14b-095eb34aec06",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Behavior Technician (BT)",
+        "jobId": "ca4d16c6-dede-493d-a6eb-479f0f362cc9",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Behavior Technician (BT)",
+        "jobId": "644aeed2-b3bf-4084-a434-3bb4949c7c75",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Behavior Technician (BT)",
+        "jobId": "986b4b72-9cff-4186-bcae-9d89cd3948d5",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Behavior Technician (BT) - Buffalo, NY",
+        "jobId": "f0ebde43-664b-4495-8a19-1b547c08fb28",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Behavior Technician (BT) - Spokane,  WA",
+        "jobId": "8e8389b0-939e-486f-8c20-78cc6993b3a1",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      },
+      {
+        "title": "Behavior Technician (BT/RBT)",
+        "jobId": "30e93a39-526e-46cb-9b54-b9683fe0cf50",
+        "category": "engineering",
+        "source": "category",
+        "flags": [
+          "technician"
+        ]
+      }
+    ],
+    "engineering.devops": [],
+    "engineering.data": [],
+    "engineering.ml": []
+  },
+  "recommendedSplits": [
+    {
+      "currentFamily": "engineering.fullstack",
+      "issue": "Excessive breadth — catch-all for generic \\bengineer\\b pattern and engineering category fallback",
+      "suspiciousCount": 678,
+      "uniqueTitles": 2437,
+      "totalJobMappings": 3647,
+      "proposedFamilies": [
+        {
+          "id": "software.engineering",
+          "description": "Software developers, SWE, full-stack, application engineers",
+          "patterns": [
+            "software engineer",
+            "developer",
+            "programmer",
+            "full stack",
+            "fullstack"
+          ]
+        },
+        {
+          "id": "technical.operations",
+          "description": "Technicians, field ops, spacecraft/mechanical production roles",
+          "patterns": [
+            "technician",
+            "spacecraft",
+            "mechanical",
+            "assembler",
+            "field engineer",
+            "manufacturing"
+          ]
+        },
+        {
+          "id": "mechanical.engineering",
+          "description": "Mechanical, aerospace hardware, CNC, production engineering (non-software)",
+          "patterns": [
+            "mechanical engineer",
+            "aerospace",
+            "cnc",
+            "manufacturing engineer"
+          ]
+        }
+      ],
+      "priority": "high"
+    }
+  ],
+  "spacecraftTechnician": {
+    "title": "Spacecraft Technician",
+    "jobId": "538962a3-71df-4fce-b36e-f4f0a1562e0f",
+    "category": "engineering",
+    "source": "category",
+    "flags": [
+      "technician",
+      "spacecraft"
+    ]
+  }
+}

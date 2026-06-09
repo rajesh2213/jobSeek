@@ -441,6 +441,66 @@ export function ResumeScorePanel({
                           <p className="text-sm text-ink-muted">Insufficient experience data</p>
                         )}
                       </section>
+
+                      <section className="flex flex-col gap-2 rounded-xl border border-ink/10 bg-ink/[0.02] p-4">
+                        <h3 className="text-sm font-bold text-ink">Seniority Fit</h3>
+                        {result.seniorityFitScore != null &&
+                        result.candidateSeniorityTitle &&
+                        result.jobSeniorityTitle ? (
+                          <div className="space-y-1 text-sm text-ink-muted">
+                            <p>
+                              Candidate:{" "}
+                              <span className="font-semibold text-ink">
+                                {result.candidateSeniorityTitle}
+                              </span>
+                            </p>
+                            <p>
+                              Role:{" "}
+                              <span className="font-semibold text-ink">
+                                {result.jobSeniorityTitle}
+                              </span>
+                            </p>
+                            <p>
+                              Seniority Fit:{" "}
+                              <span className="font-semibold text-ink">
+                                {result.seniorityFitScore}%
+                              </span>
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-ink-muted">Insufficient seniority data</p>
+                        )}
+                      </section>
+
+                      <section className="flex flex-col gap-2 rounded-xl border border-ink/10 bg-ink/[0.02] p-4">
+                        <h3 className="text-sm font-bold text-ink">Title Alignment</h3>
+                        {result.titleFitScore != null &&
+                        result.candidateTitleAlignment &&
+                        result.jobTitleAlignment ? (
+                          <div className="space-y-1 text-sm text-ink-muted">
+                            <p>
+                              Candidate:{" "}
+                              <span className="font-semibold text-ink">
+                                {result.candidateTitleAlignment}
+                              </span>
+                            </p>
+                            <p>
+                              Role:{" "}
+                              <span className="font-semibold text-ink">
+                                {result.jobTitleAlignment}
+                              </span>
+                            </p>
+                            <p>
+                              Title Alignment:{" "}
+                              <span className="font-semibold text-ink">
+                                {result.titleFitScore}%
+                              </span>
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-ink-muted">Insufficient title data</p>
+                        )}
+                      </section>
                     </>
                   ) : null}
                 </div>
