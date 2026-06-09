@@ -21,7 +21,7 @@ import { rememberFitSurface } from "../../lib/analytics/fitSurface";
 import { recommendedJobsSubtitle } from "../../lib/recommendedJobsFamilyLabel";
 import { isResumeFeedPersonalizationEnabled } from "../../lib/resumeFeedPersonalizationFlag";
 import { useResume } from "../../lib/resumeContext";
-import { JobCard } from "./JobCard";
+import { RecommendedJobCard } from "./RecommendedJobCard";
 
 function applyProfileTitleInput(
   profile: Awaited<ReturnType<typeof fetchApplyProfile>>,
@@ -133,24 +133,23 @@ export function RecommendedJobsSection() {
   return (
     <section
       aria-label="Recommended for your background"
-      className="mb-8 rounded-2xl border border-brand/15 bg-brand/[0.03] px-4 py-5 sm:px-5"
+      className="mb-6 rounded-xl border border-ink/8 bg-surface px-3 py-3.5 sm:px-4 sm:py-4"
     >
-      <div className="mb-4">
-        <h2 className="text-lg font-extrabold tracking-tight text-ink sm:text-xl">
+      <div className="mb-3 px-0.5">
+        <h2 className="text-base font-bold tracking-tight text-ink sm:text-[17px]">
           Recommended for your background
         </h2>
-        <p className="mt-1 text-sm text-ink-muted">{recommendedJobsSubtitle(candidateFamily)}</p>
+        <p className="mt-0.5 text-xs text-ink-muted sm:text-[13px]">
+          {recommendedJobsSubtitle(candidateFamily)}
+        </p>
       </div>
       <div
-        className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 pt-1 [scrollbar-width:thin]"
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 pt-0.5 [scrollbar-width:thin]"
         onClick={onCarouselClick}
       >
         {jobs.map((job) => (
-          <div
-            key={job.id}
-            className="w-[min(100%,22rem)] shrink-0 snap-start sm:w-[20rem]"
-          >
-            <JobCard job={job} surface="recommended_carousel" />
+          <div key={job.id} className="w-[15.5rem] shrink-0 snap-start sm:w-[16.5rem]">
+            <RecommendedJobCard job={job} />
           </div>
         ))}
       </div>
