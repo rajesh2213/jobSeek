@@ -1,0 +1,51 @@
+{
+  "measuredAt": "2026-06-09T12:57:22.365Z",
+  "resume": {
+    "sampleSize": 6,
+    "totalUsersWithResume": 6,
+    "yearsOfExperience": {
+      "available": 1,
+      "pct": "16.7%"
+    },
+    "resumeStructuredV1Experience": {
+      "available": 5,
+      "pct": "83.3%"
+    },
+    "applyProfileSummaryYearsExp": {
+      "available": 0,
+      "pct": "0.0%"
+    },
+    "currentTitle": {
+      "available": 1,
+      "pct": "16.7%"
+    }
+  },
+  "job": {
+    "sampleSize": 2000,
+    "totalActivePublishable": 17538,
+    "parsedDescriptionExperienceLines": {
+      "withYearMentions": 253,
+      "pct": "12.7%"
+    },
+    "parsedDescriptionRequirementYears": {
+      "withYearMentions": 329,
+      "pct": "16.4%"
+    },
+    "experienceLevel": {
+      "available": 495,
+      "pct": "24.8%"
+    },
+    "titleSeniorityHeuristic": {
+      "available": 473,
+      "pct": "23.6%"
+    },
+    "anyJobYearsSignal": {
+      "count": 1165,
+      "pct": "58.3%"
+    }
+  },
+  "phase3Readiness": {
+    "resumeYearsResolvableEstimate": "5 / 6",
+    "jobYearsResolvableEstimate": "see job.anyJobYearsSignal"
+  }
+}

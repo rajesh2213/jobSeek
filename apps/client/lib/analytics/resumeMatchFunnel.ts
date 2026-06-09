@@ -130,3 +130,19 @@ export function trackResumeFitConfidence(params: {
     ...attributionCustomData(),
   });
 }
+
+export function trackResumeFitExperienceEvaluated(params: {
+  jobId?: string;
+  candidateYears: number | null;
+  requiredYears: number | null;
+  experienceFitScore: number | null;
+}): void {
+  trackMetaCustom("ResumeFitExperienceEvaluated", {
+    ...(params.jobId ? { job_id: params.jobId } : {}),
+    candidate_years: params.candidateYears == null ? "" : String(params.candidateYears),
+    required_years: params.requiredYears == null ? "" : String(params.requiredYears),
+    experience_fit_score:
+      params.experienceFitScore == null ? "" : String(params.experienceFitScore),
+    ...attributionCustomData(),
+  });
+}

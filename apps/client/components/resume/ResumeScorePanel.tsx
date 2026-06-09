@@ -402,6 +402,45 @@ export function ResumeScorePanel({
                           </div>
                         )}
                       </section>
+
+                      <section className="flex flex-col gap-2 rounded-xl border border-ink/10 bg-ink/[0.02] p-4">
+                        <h3 className="text-sm font-bold text-ink">Experience Fit</h3>
+                        {result.experienceFitScore != null &&
+                        result.experienceYearsCandidate != null &&
+                        result.experienceYearsRequired != null ? (
+                          <div className="space-y-1 text-sm text-ink-muted">
+                            <p>
+                              Candidate:{" "}
+                              <span className="font-semibold text-ink">
+                                {result.experienceYearsCandidate} years
+                              </span>
+                            </p>
+                            <p>
+                              Role requires:{" "}
+                              <span className="font-semibold text-ink">
+                                {result.experienceYearsRequired} years
+                              </span>
+                            </p>
+                            <p>
+                              Experience Fit:{" "}
+                              <span className="font-semibold text-ink">
+                                {result.experienceFitScore}%
+                              </span>
+                            </p>
+                            {result.experienceGapCapApplied ? (
+                              <div className="mt-2 space-y-1 rounded-lg border border-amber-500/20 bg-amber-500/[0.06] p-2.5 text-amber-900">
+                                <p className="font-semibold">Experience gap detected</p>
+                                <p>
+                                  Role requires approximately{" "}
+                                  {Math.round(result.experienceYearsRequired)} years of experience.
+                                </p>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-ink-muted">Insufficient experience data</p>
+                        )}
+                      </section>
                     </>
                   ) : null}
                 </div>

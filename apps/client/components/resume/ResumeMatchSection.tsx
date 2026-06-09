@@ -4,10 +4,11 @@ import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { JobItem, ResumeMatchAiQuotaState, ResumeSemanticMatchMeta } from "../../lib/api";
-import { ApiRequestError, fetchResumeSemanticMatch } from "../../lib/api";
+import { ApiRequestError, fetchApplyProfile, fetchResumeSemanticMatch } from "../../lib/api";
 import {
   trackResumeFirstMatchViewedOnce,
   trackResumeFitConfidence,
+  trackResumeFitExperienceEvaluated,
   trackResumeFitUnavailable,
   trackResumeFitViewed,
   trackResumeMatchQuotaHit,
@@ -32,6 +33,7 @@ import {
   isResumeMatchScored,
   jobHasMatchSignals,
   jobMatchSignalsForSemantic,
+  candidateExperienceFromApplyProfile,
   scoreResume,
   type ScoringResult,
 } from "../../lib/resumeScorer";
@@ -167,7 +169,14 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
 
     setSemanticUnavailable(skippedSemantic);
 
-    const scored = scoreResume(text, bullets, job, semantic);
+    const profile = await fetchApplyProfile(token);
+    const scored = scoreResume(
+      text,
+      bullets,
+      job,
+      semantic,
+      candidateExperienceFromApplyProfile(profile),
+    );
     setResult(scored);
 
     if (!isResumeMatchScored(scored)) {
@@ -189,6 +198,19 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
         jobId: job.id,
         confidence: scored.confidenceLevel,
         signalCount: scored.signalCount ?? 0,
+      });
+    }
+
+    if (
+      scored.experienceFitScore != null ||
+      scored.experienceYearsCandidate != null ||
+      scored.experienceYearsRequired != null
+    ) {
+      trackResumeFitExperienceEvaluated({
+        jobId: job.id,
+        candidateYears: scored.experienceYearsCandidate ?? null,
+        requiredYears: scored.experienceYearsRequired ?? null,
+        experienceFitScore: scored.experienceFitScore ?? null,
       });
     }
 

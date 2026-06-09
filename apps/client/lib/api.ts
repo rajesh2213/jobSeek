@@ -409,6 +409,7 @@ export interface ApplyProfileResponse {
   highestEducation: string | null;
   customQA: ApplyProfileCustomQA[];
   applyProfileSummary: unknown;
+  resumeStructuredV1: unknown;
   smartApplyPreferences: SmartApplyPreferencesClient | null;
   applyProfileExtras: unknown;
   profileExtractLastAt: string | null;

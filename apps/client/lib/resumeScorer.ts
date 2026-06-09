@@ -18,6 +18,12 @@ import {
 import { applyCredibilityCalibration } from "./resumeFitCalibration";
 import type { FitConfidence, FitTier, FitUnavailableReason } from "./resumeFitConfidence";
 import {
+  applyExperienceGapCap,
+  blendSkillsAndExperienceScore,
+  computeExperienceFit,
+  type CandidateExperienceInput,
+} from "./resumeFitExperience";
+import {
   jobHasResolvableMatchSignals,
   resolveJobMatchSkills,
   resolveJobMatchSkillsWithMeta,
@@ -83,6 +89,13 @@ export interface ScoringResult {
   signalCount?: number;
   fitTier?: FitTier | null;
   unavailableReason?: FitUnavailableReason | null;
+  skillsFitScore?: number | null;
+  experienceFitScore?: number | null;
+  experienceYearsCandidate?: number | null;
+  experienceYearsRequired?: number | null;
+  experienceGapCap?: number | null;
+  experienceGapCapApplied?: boolean;
+  blendedScoreBeforeCap?: number | null;
   debug?: {
     extractedCanonicals: string[];
     matchedCanonicals: string[];
@@ -162,12 +175,28 @@ function semanticSig(semanticMatches: Record<string, { bullet: string; similarit
   return entries.map(([k, v]) => `${k}:${v.similarity.toFixed(4)}`).join("|");
 }
 
+function experienceSig(input?: CandidateExperienceInput): string {
+  if (!input) return "exp=none";
+  const cand = deriveCandidateExperienceYearsForCache(input);
+  return `exp=c${cand ?? "u"}`;
+}
+
+function deriveCandidateExperienceYearsForCache(input: CandidateExperienceInput): number | null {
+  if (input.yearsOfExperience != null && input.yearsOfExperience > 0) return input.yearsOfExperience;
+  const summary = input.applyProfileSummary as { yearsExp?: number | null } | null | undefined;
+  if (summary?.yearsExp != null && summary.yearsExp > 0) return summary.yearsExp;
+  const exp = input.resumeStructuredV1?.experience;
+  if (Array.isArray(exp) && exp.length > 0) return exp.length;
+  return null;
+}
+
 function cacheKey(
   jobId: string,
   legacy: boolean,
   semanticMatches: Record<string, { bullet: string; similarity: number }>,
+  experienceInput?: CandidateExperienceInput,
 ): string {
-  return `v3-signals|soft-v1|legacy=${legacy ? "1" : "0"}|d=${DICTIONARY_VERSION}|${jobId}|${semanticSig(semanticMatches)}`;
+  return `v5-exp-cap|soft-v1|legacy=${legacy ? "1" : "0"}|d=${DICTIONARY_VERSION}|${jobId}|${semanticSig(semanticMatches)}|${experienceSig(experienceInput)}`;
 }
 
 export function clearScoreCache(): void {
@@ -274,13 +303,14 @@ function scoreResumeSkills(
   _resumeBullets: string[],
   job: JobItem,
   semanticMatches: Record<string, { bullet: string; similarity: number }>,
+  experienceInput?: CandidateExperienceInput,
 ): ScoringResult {
   const resolution = resolveJobMatchSkillsWithMeta(job);
   if (resolution.skills.length === 0 || resolution.unavailableReason) {
     return buildInsufficientJobSignalsResult(job.id, resolution.unavailableReason);
   }
   const skills = resolution.skills;
-  const ck = cacheKey(job.id, false, semanticMatches);
+  const ck = cacheKey(job.id, false, semanticMatches, experienceInput);
   const cached = scoreCache.get(ck);
   if (cached) return cached;
 
@@ -369,12 +399,29 @@ function scoreResumeSkills(
   ];
 
   const isInsufficientEvidence = calibration.outcome === "insufficient_evidence";
-  const finalScore = calibration.score;
+  const skillsFitScore = calibration.score;
+  const experienceFit = computeExperienceFit(job, experienceInput ?? {});
+  const blendedScore = isInsufficientEvidence
+    ? null
+    : blendSkillsAndExperienceScore(skillsFitScore, experienceFit.experienceFitScore);
+  const gapCap = applyExperienceGapCap(
+    blendedScore,
+    experienceFit.candidateYears,
+    experienceFit.requiredYears,
+  );
+  const finalScore = gapCap.score;
 
   const result: ScoringResult = {
     matchAvailability: isInsufficientEvidence ? "insufficient_evidence" : "scored",
     score: finalScore,
     grade: finalScore === null ? null : gradeFromScore(finalScore),
+    skillsFitScore,
+    experienceFitScore: experienceFit.experienceFitScore,
+    experienceYearsCandidate: experienceFit.candidateYears,
+    experienceYearsRequired: experienceFit.requiredYears,
+    experienceGapCap: gapCap.cap,
+    experienceGapCapApplied: gapCap.capApplied,
+    blendedScoreBeforeCap: blendedScore,
     matched,
     missing,
     partial,
@@ -540,6 +587,7 @@ export function scoreResume(
   resumeBullets: string[],
   job: JobItem,
   semanticMatches: Record<string, { bullet: string; similarity: number }> = {},
+  experienceInput?: CandidateExperienceInput,
 ): ScoringResult {
   if (isLegacyResumeScoring()) {
     if (!jobHasMatchSignalsInternal(job)) {
@@ -547,7 +595,24 @@ export function scoreResume(
     }
     return scoreResumeLegacy(resumeText, resumeBullets, job, semanticMatches);
   }
-  return scoreResumeSkills(resumeText, resumeBullets, job, semanticMatches);
+  return scoreResumeSkills(resumeText, resumeBullets, job, semanticMatches, experienceInput);
+}
+
+export type { CandidateExperienceInput } from "./resumeFitExperience";
+
+export function candidateExperienceFromApplyProfile(profile: {
+  yearsOfExperience?: number | null;
+  currentTitle?: string | null;
+  resumeStructuredV1?: unknown;
+  applyProfileSummary?: unknown;
+} | null | undefined): CandidateExperienceInput {
+  if (!profile) return {};
+  return {
+    yearsOfExperience: profile.yearsOfExperience,
+    currentTitle: profile.currentTitle,
+    resumeStructuredV1: profile.resumeStructuredV1 as CandidateExperienceInput["resumeStructuredV1"],
+    applyProfileSummary: profile.applyProfileSummary as CandidateExperienceInput["applyProfileSummary"],
+  };
 }
 
 const PHRASE_STOP = new Set(

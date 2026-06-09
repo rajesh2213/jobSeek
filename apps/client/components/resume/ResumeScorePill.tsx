@@ -5,10 +5,16 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { JobItem } from "../../lib/api";
-import { ApiRequestError, fetchResumeSemanticMatch, type ResumeSemanticMatchMeta } from "../../lib/api";
+import {
+  ApiRequestError,
+  fetchApplyProfile,
+  fetchResumeSemanticMatch,
+  type ResumeSemanticMatchMeta,
+} from "../../lib/api";
 import {
   trackResumeFirstMatchViewedOnce,
   trackResumeFitConfidence,
+  trackResumeFitExperienceEvaluated,
   trackResumeFitUnavailable,
   trackResumeFitViewed,
   trackResumeMatchQuotaHit,
@@ -21,6 +27,7 @@ import {
   isResumeMatchScored,
   jobHasMatchSignals,
   jobMatchSignalsForSemantic,
+  candidateExperienceFromApplyProfile,
   scoreResume,
   type ScoringResult,
 } from "../../lib/resumeScorer";
@@ -137,7 +144,14 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
 
     setSemanticUnavailable(skippedSemantic);
 
-    const scored = scoreResume(text, bullets, fitJob, semantic);
+    const profile = await fetchApplyProfile(token);
+    const scored = scoreResume(
+      text,
+      bullets,
+      fitJob,
+      semantic,
+      candidateExperienceFromApplyProfile(profile),
+    );
     setResult(scored);
 
     const scoreMs = Math.round(performance.now() - scoreT0);
@@ -168,6 +182,19 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
         jobId: job.id,
         confidence: scored.confidenceLevel,
         signalCount: scored.signalCount ?? 0,
+      });
+    }
+
+    if (
+      scored.experienceFitScore != null ||
+      scored.experienceYearsCandidate != null ||
+      scored.experienceYearsRequired != null
+    ) {
+      trackResumeFitExperienceEvaluated({
+        jobId: job.id,
+        candidateYears: scored.experienceYearsCandidate ?? null,
+        requiredYears: scored.experienceYearsRequired ?? null,
+        experienceFitScore: scored.experienceFitScore ?? null,
       });
     }
 

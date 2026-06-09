@@ -1,0 +1,82 @@
+{
+  "measuredAt": "2026-06-09T13:25:36.502Z",
+  "metrics": {
+    "jobsCapped": "0/6",
+    "averageCapReduction": "0",
+    "falsePositives": [],
+    "juniorToStaffExamples": [],
+    "staffToJuniorExamples": []
+  },
+  "manualTestMatrix": [
+    {
+      "case": "1 year vs 8 year role",
+      "rawScore": 84,
+      "experienceScore": 40,
+      "cap": 50,
+      "finalScore": 50,
+      "capApplied": true
+    },
+    {
+      "case": "2 year vs 5 year role",
+      "rawScore": 85,
+      "experienceScore": 64,
+      "cap": 65,
+      "finalScore": 65,
+      "capApplied": true
+    },
+    {
+      "case": "4 year vs 5 year role",
+      "rawScore": 90,
+      "experienceScore": 88,
+      "cap": null,
+      "finalScore": 90,
+      "capApplied": false
+    },
+    {
+      "case": "8 year vs 5 year role",
+      "rawScore": 92,
+      "experienceScore": 100,
+      "cap": null,
+      "finalScore": 92,
+      "capApplied": false
+    },
+    {
+      "case": "unknown experience",
+      "rawScore": 90,
+      "experienceScore": null,
+      "cap": null,
+      "finalScore": 90,
+      "capApplied": false
+    }
+  ],
+  "syntheticExample": {
+    "candidateYears": 2,
+    "requiredYears": 8,
+    "skillsFitScore": 95,
+    "experienceFitScore": 40,
+    "blendedBeforeCap": 84,
+    "cap": 50,
+    "finalScore": 50
+  },
+  "successCriteria": {
+    "juniorStaffMax65": true,
+    "largeGapMax50": true,
+    "phase23UnavailableUnder3Pct": true,
+    "falsePositiveCount": 0
+  },
+  "phase23Regression": {
+    "forbiddenTokens": 0,
+    "forbiddenTargetMet": true,
+    "ontologyRegressions": 0,
+    "unavailablePct": "2.00%",
+    "unavailableWithEvidencePct": "3.60%",
+    "unavailableTargetMet": true,
+    "capViolations": 0,
+    "capViolationsTargetMet": true,
+    "oneSignalHighScore": 0,
+    "oneSignalHighScoreTargetMet": true,
+    "insufficientEvidenceCount": 8,
+    "scoredCount": 482
+  },
+  "recommendation": "GO"
+}
