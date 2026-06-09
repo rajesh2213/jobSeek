@@ -172,7 +172,7 @@ test("resolveJobMatchSkills: tier 3.5 low-confidence recovery for Mine Designer"
   const resolution = resolveJobMatchSkillsWithMeta(
     minimalJob({
       title: "Mine Designer",
-      role: null,
+      role: undefined,
       description:
         "This position is based in Western Australia. Applicants should review the full posting for scope and expectations.",
       parsedDescription: {
@@ -200,7 +200,7 @@ test("scoreResume: title_family_low signals never appear as missing gaps", async
     [],
     minimalJob({
       title: "Mine Designer",
-      role: null,
+      role: undefined,
       description:
         "This position is based in Western Australia. Applicants should review the full posting for scope and expectations.",
       parsedDescription: emptyParsedDescription,

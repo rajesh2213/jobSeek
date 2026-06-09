@@ -209,7 +209,10 @@ export function ResumeScorePill({ job }: { job: JobItem }) {
   const isInsufficientEvidence = scored ? isResumeMatchInsufficientEvidence(scored) : false;
   const isUnscorable = scored ? !isResumeMatchScored(scored) : false;
   const emphasizeLowConfidence =
-    isScored && scored?.fitTier !== null && (scored.fitTier === 3 || scored.fitTier === 4);
+    scored !== null &&
+    isScored &&
+    scored.fitTier !== null &&
+    (scored.fitTier === 3 || scored.fitTier === 4);
   const c =
     scored && isScored && scored.score !== null
       ? pillColors(scored.score)

@@ -93,7 +93,7 @@ test("scoreResume: tier 3 single signal returns insufficient_evidence", () => {
     minimalJob({
       id: "job-calibration-thin-tier3",
       title: "HR Operations Administrator",
-      role: null,
+      role: undefined,
       skills: [],
       description:
         "This position supports HR operations across regional offices. Applicants should review scope in the posting.",
@@ -115,7 +115,7 @@ test("scoreResume: tier 3 two signals caps inflated score", () => {
     minimalJob({
       id: "job-calibration-tier3-cap",
       title: "Python Developer",
-      role: null,
+      role: undefined,
       skills: [],
       description: "Python developer role building backend services.",
       parsedDescription: emptyParsedDescription,
