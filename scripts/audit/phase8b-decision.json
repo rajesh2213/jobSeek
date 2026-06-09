@@ -1,0 +1,59 @@
+{
+  "auditPhase": "Phase 8B — Decision Framework",
+  "measuredAt": "2026-06-09T21:41:52.120Z",
+  "recommendation": "GO_KEEP_CAROUSEL_ONLY",
+  "criteria": {
+    "carouselCtrGte3Pct": {
+      "threshold": "3%",
+      "production": "unmeasured — feature not deployed",
+      "modeled": "12.0%",
+      "pass": null,
+      "note": "Cannot fail or pass until production data; modeled exceeds threshold"
+    },
+    "fitCheckRateImproves": {
+      "threshold": "must improve vs main feed",
+      "mainFeedAvailability": "0.0%",
+      "recommendedAvailability": "100.0%",
+      "pass": true
+    },
+    "availabilityLiftGte10Pp": {
+      "threshold": "10pp",
+      "measured": "100.0pp",
+      "pass": true
+    },
+    "wrongRecommendations": {
+      "threshold": 0,
+      "measured": 0,
+      "pass": true
+    },
+    "serverRerankReady": {
+      "requiresStrongCarouselCtr": false,
+      "requiresFitCheckLift": true,
+      "requiresAvailabilityLift": true,
+      "pass": false,
+      "reason": "Carousel not validated in production; defer server rerank"
+    }
+  },
+  "options": {
+    "GO_KEEP_CAROUSEL_ONLY": {
+      "selected": true,
+      "summary": "Deploy and measure carousel; fix analytics attribution; defer server rerank"
+    },
+    "GO_BUILD_SERVER_RERANK": {
+      "selected": false,
+      "summary": "Rejected — insufficient production engagement proof"
+    },
+    "NO_GO": {
+      "selected": false,
+      "summary": "Rejected — structural availability lift and quality audit pass decisively"
+    }
+  },
+  "deliverables": {
+    "analyticsAudit": "scripts/audit/phase8b-analytics-audit.json",
+    "funnelReport": "scripts/audit/phase8b-funnel-report.json",
+    "availabilityLift": "scripts/audit/phase8b-availability-lift.json",
+    "qualityAudit": "scripts/audit/phase8b-quality-audit.json",
+    "businessImpact": "scripts/audit/phase8b-business-impact.md",
+    "funnelScript": "scripts/audit/resumeFeedRecommendationFunnel.mjs"
+  }
+}

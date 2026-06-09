@@ -1,0 +1,190 @@
+{
+  "auditPhase": "Phase 8 — Candidate Family Extraction Audit",
+  "measuredAt": "2026-06-09T20:30:00.000Z",
+  "scope": "Verify candidateFamily derivability from existing data sources; no code changes",
+  "verdict": {
+    "canDeriveFor80Pct": true,
+    "measuredRate": "83.3%",
+    "measuredSample": "5/6 uploaded resumes",
+    "confidence": "conditional",
+    "caveat": "N=6 production resumes — passes 80% threshold but not statistically proven at scale"
+  },
+  "derivationLogic": {
+    "module": "apps/client/lib/resumeFitTitle.ts",
+    "function": "deriveCandidateRoleFamily",
+    "outputField": "candidateFamily (RoleFamily enum, 22 values)",
+    "persisted": false,
+    "computedAt": "Resume Fit scoring time (client-side)",
+    "cascadePriority": [
+      {
+        "priority": 1,
+        "source": "currentTitle",
+        "field": "User.currentTitle",
+        "method": "TITLE_FAMILY_PATTERNS regex (~35 ordered patterns)"
+      },
+      {
+        "priority": 2,
+        "source": "structured_resume",
+        "field": "resumeStructuredV1.experience[].role (latest by end date)",
+        "method": "Same regex table"
+      },
+      {
+        "priority": 3,
+        "source": "profile_summary",
+        "field": "applyProfileSummary.titles[0]",
+        "method": "Same regex table"
+      },
+      {
+        "priority": 4,
+        "source": "resume_text",
+        "field": "First 3 resume text lines matching title hints",
+        "method": "Same regex table"
+      },
+      {
+        "priority": 5,
+        "source": "profile_summary",
+        "field": "applyProfileSummary.highlights[0]",
+        "method": "Same regex table"
+      },
+      {
+        "priority": null,
+        "source": null,
+        "result": "candidateFamily = null (no 'other' fallback for candidates)"
+      }
+    ]
+  },
+  "dataSources": {
+    "resumeStructuredV1": {
+      "schema": "apps/server/src/modules/resume/extraction/types.ts",
+      "storage": "User.resumeStructuredV1 JSONB",
+      "extraction": "extractResumeStructured() → experience parser assigns role, company, durationYears",
+      "writtenOn": ["POST /account/resume (upload)", "POST /account/resume/extract-profile"],
+      "availability": {
+        "sampleSize": 6,
+        "withExperience": 5,
+        "rate": "83.3%",
+        "source": "scripts/audit/experience-fit-data-audit.json"
+      },
+      "roleInFamilyDerivation": "Primary path — 4/5 successful derivations used structured_resume source"
+    },
+    "currentTitle": {
+      "storage": "User.currentTitle",
+      "backfillSources": [
+        "Manual Apply Profile form",
+        "applyProfileSummary.titles[0] (resumeProfileExtractor.ts)",
+        "Filename heuristic (inferTitleFromFileName)",
+        "extract-profile from structured experience[0].role (high confidence only)"
+      ],
+      "availability": {
+        "sampleSize": 6,
+        "populated": 1,
+        "rate": "16.7%",
+        "note": "One stored value is malformed (company/location, not role); structured resume overrides"
+      },
+      "roleInFamilyDerivation": "Priority 1 when populated, but rarely available today"
+    },
+    "yearsOfExperience": {
+      "storage": "User.yearsOfExperience",
+      "derivation": "deriveCandidateExperienceYears() in resumeFitExperience.ts",
+      "cascade": ["user_years", "structured_resume date intervals", "profile_summary yearsExp"],
+      "availability": {
+        "dbColumn": "16.7%",
+        "resolvableForFit": "83.3%"
+      },
+      "roleInFamilyDerivation": "Not used for candidateFamily — used for experience fit dimension only"
+    },
+    "titleFamilySystem": {
+      "module": "apps/client/lib/resumeFitTitle.ts",
+      "taxonomySize": 22,
+      "patternCount": 35,
+      "adjacentPairs": ["backend↔software.engineering", "frontend↔software.engineering", "data↔ml", "sales↔customer_success", "recruiting↔hr"],
+      "relatedPairs": ["backend↔devops", "product↔design", "operations↔finance"],
+      "jobSideFallback": "category → other (100% job coverage)",
+      "candidateSideFallback": "none — unmatched returns null"
+    }
+  },
+  "perResumeResults": [
+    {
+      "resume": "CV Seán O'Shea O'Connor.pdf",
+      "candidateFamily": "marketing",
+      "source": "structured_resume",
+      "derived": true,
+      "notes": "Role misparsed from label-prefixed line; still matched /marketing/ pattern"
+    },
+    {
+      "resume": "Yashraj-Yadav-Resume.pdf",
+      "candidateFamily": "software.engineering",
+      "source": "structured_resume",
+      "derived": true,
+      "notes": "Full-Stack Developer → software.engineering"
+    },
+    {
+      "resume": "Profile-3.pdf",
+      "candidateFamily": "design",
+      "source": "structured_resume",
+      "derived": true,
+      "notes": "Noisy match on UI/UX sentence fragment"
+    },
+    {
+      "resume": "Raajeshvaran_M_Software_Engineer.pdf",
+      "candidateFamily": "software.engineering",
+      "source": "structured_resume",
+      "derived": true,
+      "notes": "Clean Software Engineer match"
+    },
+    {
+      "resume": "WiseTech Global resume",
+      "candidateFamily": "software.engineering",
+      "source": "structured_resume",
+      "derived": true,
+      "notes": "Structured role overrides bad currentTitle"
+    },
+    {
+      "resume": "functionalsample.pdf",
+      "candidateFamily": null,
+      "source": null,
+      "derived": false,
+      "notes": "Generic functional template — no role keywords in any cascade step"
+    }
+  ],
+  "failureModes": [
+    {
+      "mode": "No role-bearing content",
+      "example": "functionalsample.pdf",
+      "frequency": "1/6 (16.7%)",
+      "mitigation": "Add candidate 'other' fallback when structured experience exists but no regex match"
+    },
+    {
+      "mode": "Experience parser misparsing",
+      "example": "Label-prefixed lines (Position Title:, Company Name:)",
+      "mitigation": "Fix experience extractor for prefixed labels"
+    },
+    {
+      "mode": "Ambiguous/novel titles",
+      "example": "Project manager, analyst-without-modifier, administrative roles",
+      "mitigation": "Broaden TITLE_FAMILY_PATTERNS"
+    },
+    {
+      "mode": "currentTitle not auto-backfilled on upload",
+      "impact": "16.7% DB availability; system works via structured resume when parser succeeds",
+      "mitigation": "Auto-run extract-profile on upload"
+    }
+  ],
+  "phase75CrossReference": {
+    "title_unknown": 0,
+    "family_unresolvable": 0,
+    "dominantUnavailableReason": "title_mismatch (93.4%) — families ARE derived but jobs in feed are cross-domain",
+    "implication": "Candidate family extraction is sufficient for feed personalization; the gap is feed alignment not derivation"
+  },
+  "successCriteria": {
+    "titleFamilyCoverage80Pct": true,
+    "source": "scripts/audit/phase5-title-fit-report.json",
+    "recommendation": "GO for feed personalization prerequisite"
+  },
+  "recommendations": [
+    "Proceed with feed personalization using deriveCandidateRoleFamily — no new extraction pipeline needed",
+    "Auto-backfill currentTitle/yearsOfExperience on upload to strengthen priority-1 path",
+    "Add candidate 'other' fallback for structured resumes with unmatchable roles",
+    "Re-audit when resume upload volume exceeds N=6"
+  ]
+}

@@ -12,7 +12,7 @@ export function SimilarJobsSection({ jobs }: Props) {
       <h2 className="text-xl font-extrabold tracking-tight text-ink">Similar jobs</h2>
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {jobs.map((job) => (
-          <JobCard key={job.id} job={job} compact />
+          <JobCard key={job.id} job={job} compact surface="similar_jobs" />
         ))}
       </div>
     </section>

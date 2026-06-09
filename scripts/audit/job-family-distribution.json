@@ -1,0 +1,187 @@
+{
+  "measuredAt": "2026-06-09T20:20:17.674Z",
+  "totalActivePublishableJobs": 17639,
+  "simplifiedDistribution": {
+    "other": {
+      "count": 9881,
+      "pct": "56.0%"
+    },
+    "sales": {
+      "count": 1884,
+      "pct": "10.7%"
+    },
+    "software.engineering": {
+      "count": 1685,
+      "pct": "9.6%"
+    },
+    "healthcare": {
+      "count": 1442,
+      "pct": "8.2%"
+    },
+    "operations": {
+      "count": 1260,
+      "pct": "7.1%"
+    },
+    "marketing": {
+      "count": 404,
+      "pct": "2.3%"
+    },
+    "finance": {
+      "count": 383,
+      "pct": "2.2%"
+    },
+    "devops": {
+      "count": 304,
+      "pct": "1.7%"
+    },
+    "backend": {
+      "count": 177,
+      "pct": "1.0%"
+    },
+    "legal": {
+      "count": 148,
+      "pct": "0.8%"
+    },
+    "frontend": {
+      "count": 71,
+      "pct": "0.4%"
+    }
+  },
+  "detailedRoleFamilyDistribution": {
+    "other": {
+      "count": 8651,
+      "pct": "49.0%"
+    },
+    "sales": {
+      "count": 1510,
+      "pct": "8.6%"
+    },
+    "healthcare.clinical": {
+      "count": 1439,
+      "pct": "8.2%"
+    },
+    "software.engineering": {
+      "count": 1180,
+      "pct": "6.7%"
+    },
+    "technical.operations": {
+      "count": 645,
+      "pct": "3.7%"
+    },
+    "design": {
+      "count": 539,
+      "pct": "3.1%"
+    },
+    "operations": {
+      "count": 531,
+      "pct": "3.0%"
+    },
+    "marketing": {
+      "count": 404,
+      "pct": "2.3%"
+    },
+    "finance": {
+      "count": 383,
+      "pct": "2.2%"
+    },
+    "customer_success": {
+      "count": 374,
+      "pct": "2.1%"
+    },
+    "engineering.data": {
+      "count": 324,
+      "pct": "1.8%"
+    },
+    "product": {
+      "count": 309,
+      "pct": "1.8%"
+    },
+    "engineering.devops": {
+      "count": 304,
+      "pct": "1.7%"
+    },
+    "recruiting": {
+      "count": 195,
+      "pct": "1.1%"
+    },
+    "engineering.ml": {
+      "count": 181,
+      "pct": "1.0%"
+    },
+    "engineering.backend": {
+      "count": 177,
+      "pct": "1.0%"
+    },
+    "legal": {
+      "count": 148,
+      "pct": "0.8%"
+    },
+    "research": {
+      "count": 108,
+      "pct": "0.6%"
+    },
+    "mechanical.engineering": {
+      "count": 84,
+      "pct": "0.5%"
+    },
+    "hr": {
+      "count": 79,
+      "pct": "0.4%"
+    },
+    "engineering.frontend": {
+      "count": 71,
+      "pct": "0.4%"
+    },
+    "healthcare.admin": {
+      "count": 3,
+      "pct": "0.0%"
+    }
+  },
+  "taxonomyMapping": {
+    "software_engineering": [
+      "software.engineering",
+      "engineering.ml",
+      "engineering.data"
+    ],
+    "frontend": [
+      "engineering.frontend"
+    ],
+    "backend": [
+      "engineering.backend"
+    ],
+    "devops": [
+      "engineering.devops"
+    ],
+    "sales": [
+      "sales",
+      "customer_success"
+    ],
+    "marketing": [
+      "marketing"
+    ],
+    "healthcare": [
+      "healthcare.clinical",
+      "healthcare.admin"
+    ],
+    "operations": [
+      "operations",
+      "technical.operations",
+      "mechanical.engineering"
+    ],
+    "finance": [
+      "finance"
+    ],
+    "legal": [
+      "legal"
+    ],
+    "other": [
+      "product",
+      "design",
+      "recruiting",
+      "hr",
+      "research",
+      "other",
+      "null"
+    ]
+  }
+}

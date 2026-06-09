@@ -1,0 +1,202 @@
+{
+  "auditPhase": "Phase 8 — Feed Architecture Audit",
+  "measuredAt": "2026-06-09T20:30:00.000Z",
+  "scope": "Read-only audit of job discovery surfaces; no code changes",
+  "architectureSummary": "Single freshness-first SQL listing pipeline shared across all discovery surfaces. Personalization today is limited to client-side similar-job ranking and resume-fit display pills — neither reorders the main feed.",
+  "surfaces": {
+    "homeFeed": {
+      "route": "/jobs",
+      "clientFiles": [
+        "apps/client/app/(app)/jobs/page.tsx",
+        "apps/client/components/job/JobsSearchClient.tsx",
+        "apps/client/components/job/JobList.tsx"
+      ],
+      "description": "De facto home feed — marketing landing has no live job list; /jobs is the primary browse entry with client-side hydration (SSR returns empty list to avoid timeouts)",
+      "rankingLocation": "apps/server/src/modules/job/job.repository.ts → sqlForCanonicalListingIds",
+      "rankingSignals": [
+        "postedAt DESC NULLS LAST",
+        "listingFreshnessAt DESC",
+        "createdAt DESC",
+        "id ASC (stable pagination tie-breaker)"
+      ],
+      "freshnessWeighting": "Deterministic recency stack — not exponential decay. Stored freshnessScore (exp decay λ=0.08) computed at ingest but NOT used for listing ORDER BY",
+      "seoOrdering": "JSON-LD ItemList uses first 10 jobs in API order; root /jobs not SSR-populated",
+      "recommendationLogic": "None on home feed",
+      "personalizationInsertionPoints": [
+        {
+          "location": "apps/server/src/modules/viewCap/jobListCap.ts → runMeteredJobsList",
+          "priority": 1,
+          "scope": "Authenticated users only (capCtx.internalUserId != null, not bypassCap)",
+          "rationale": "Post-fetch re-rank before response; anon/SEO paths unchanged"
+        },
+        {
+          "location": "apps/client/components/job/JobsSearchClient.tsx → post-fetch setListJobs",
+          "priority": 3,
+          "scope": "Client display re-rank behind feature flag",
+          "rationale": "Optional 'Sort by match' toggle; preserves server order for SEO/crawlers"
+        }
+      ]
+    },
+    "jobsPage": {
+      "routes": ["/jobs", "/jobs/browse", "/jobs/[...slug]"],
+      "clientFiles": [
+        "apps/client/app/(app)/jobs/page.tsx",
+        "apps/client/app/(app)/jobs/[...slug]/page.tsx",
+        "apps/client/components/job/JobsSearchPage.tsx"
+      ],
+      "rankingLocation": "Same pipeline as home feed",
+      "rankingSignals": [
+        "latest (default): postedAt → listingFreshnessAt → createdAt → id",
+        "salary_desc: salaryMin DESC NULLS LAST → createdAt → id"
+      ],
+      "freshnessWeighting": "Optional postedWithin filter (24h/3d/1w/1m) narrows result set; does not change relative order within results",
+      "seoOrdering": "Canonical URL enforcement via getCanonicalJobListingUrl; decideJobsListingSeoPolicy controls indexability; SEO slug pages use INTERNAL_SEO_SECRET bypass",
+      "recommendationLogic": "Related SEO slug links ranked by landing-page job count DESC (not job recommendations)",
+      "additionalSignals": [
+        "Filter relevance via buildDiscoveryWhere (hard WHERE, not score)",
+        "ResumeScorePill per card (display only, no reorder)",
+        "Free-tier view cap / discovery preview (top-N in latest order)"
+      ],
+      "personalizationInsertionPoints": [
+        {
+          "location": "apps/server/src/modules/job/job.service.ts → JobService.list",
+          "priority": 2,
+          "scope": "New sort=fit mode behind auth + feature flag",
+          "rationale": "Central hook; keep latest/salary_desc for SEO"
+        },
+        {
+          "location": "apps/server/src/utils/taxonomyQuery.ts → parseJobDiscoveryQuery",
+          "priority": 4,
+          "scope": "Implicit profile filters for authenticated search",
+          "rationale": "Must not affect SEO/cached anon responses"
+        }
+      ]
+    },
+    "searchResults": {
+      "description": "Search IS the jobs listing with query filters — no separate search index",
+      "apiEndpoint": "GET /jobs → apps/server/src/modules/job/job.controller.ts",
+      "clientProxy": "apps/client/app/api/jobs/route.ts",
+      "rankingLocation": "Same SQL pipeline; structured filter matching only",
+      "rankingSignals": [
+        "Taxonomy filters (title, skills, location, category) as hard WHERE",
+        "Sort toggle: latest vs salary_desc only",
+        "No full-text relevance score in production"
+      ],
+      "legacyUnused": {
+        "file": "apps/server/src/services/jobRanking.service.ts",
+        "function": "rankJobs",
+        "weights": "freshness 0.35 + sourceQuality 0.25 + titleRelevance 0.4",
+        "status": "No production callers for listings"
+      },
+      "freshnessWeighting": "postedWithin user filter; otherwise same as jobs page",
+      "seoOrdering": "Slug discovery ranked by job count DESC in seo.service.ts",
+      "recommendationLogic": "Related search slugs in footer (count DESC), not job recommendations",
+      "personalizationInsertionPoints": [
+        {
+          "location": "runMeteredJobsList post-fetch",
+          "scope": "Auth search only",
+          "approach": "Blend resume-fit family boost with freshness for signed-in users"
+        }
+      ]
+    },
+    "recommendations": {
+      "globalFeed": false,
+      "localizedSurfaces": {
+        "similarJobs": {
+          "file": "apps/client/lib/similarJobsRank.ts",
+          "trigger": "JobDetailDeferredSections.tsx → SimilarJobsDeferred",
+          "candidatePool": "fetchJobs({ category, limit: 20 }) — server latest order within category",
+          "ranking": "sameRole×3 + sharedSkills×2 + sameCountry×1; tie-break by effectivePostedAt",
+          "personalizationInsertion": "Add resume family overlap + apply-history boost to rankSimilarJobs"
+        },
+        "companyJobs": {
+          "file": "CompanyJobsPreviewDeferred",
+          "ranking": "First 3 in API latest order after filtering current job",
+          "personalizationInsertion": "Low priority — company context is already narrow"
+        },
+        "seoHubLinks": {
+          "ranking": "fetchSeoLandingPages → count DESC, take 8",
+          "personalizationInsertion": "Not recommended — SEO navigation must stay deterministic"
+        },
+        "savedSearchAlerts": {
+          "file": "apps/server/src/workers/jobAlerts.worker.ts",
+          "ranking": "JobService.list page 1, limit 10, sort latest",
+          "personalizationInsertion": "Email-only: rank alert jobs by resume fit vs recency"
+        },
+        "resumeFitPills": {
+          "files": [
+            "apps/client/lib/resumeScorer.ts",
+            "apps/client/components/resume/ResumeScorePill.tsx"
+          ],
+          "ranking": "Per-card score display only — does NOT reorder feed"
+        }
+      }
+    },
+    "trendingJobs": {
+      "dedicatedFeed": false,
+      "note": "No trending jobs list or API exists",
+      "relatedFeatures": {
+        "trendingSkillsInResults": {
+          "file": "apps/server/src/modules/seo/seoAggregations.service.ts",
+          "ordering": "Top skills by frequency in filtered sample (8000-job cap, listingFreshnessAt DESC)"
+        },
+        "hiringTrendChart": "Daily postedAt counts, last 14 days",
+        "browseTopRoles": "/jobs/browse → listRoleSuggestions ORDER BY count DESC",
+        "featuredHubs": "Static curated list in seoFeaturedHubs.ts"
+      },
+      "futureInsertion": "New /jobs/trending or sort mode would need new velocity signals (views/applies) — not present today"
+    },
+    "savedJobs": {
+      "productFeature": false,
+      "closestEquivalents": {
+        "savedSearches": {
+          "files": [
+            "apps/server/src/modules/saved-search/savedSearch.service.ts",
+            "apps/client/app/(app)/saved-searches/page.tsx"
+          ],
+          "ordering": "Saved search list: createdAt DESC; opening saved search → standard listing pipeline"
+        },
+        "applicationsTracker": {
+          "file": "apps/server/src/modules/applications/applications.controller.ts",
+          "ordering": "lastActivityAt DESC"
+        }
+      },
+      "personalizationInsertion": "jobAlerts.worker email selection; future SavedJob model would default to savedAt DESC + optional fit re-rank"
+    }
+  },
+  "sharedPipeline": {
+    "http": "apps/server/src/modules/job/job.controller.ts → GET /jobs",
+    "metering": "apps/server/src/modules/viewCap/jobListCap.ts → runMeteredJobsList",
+    "service": "apps/server/src/modules/job/job.service.ts → JobService.list",
+    "repository": "apps/server/src/modules/job/job.repository.ts → findManyCanonicalFiltered"
+  },
+  "availableSignalsForPersonalization": [
+    "candidateFamily (derived client-side from resumeStructuredV1, currentTitle, applyProfileSummary)",
+    "jobFamily (derived client-side from job title, role slug, category)",
+    "titleFitRelation (same/adjacent/related/different)",
+    "resume fit score (scoreResume — display only today)",
+    "apply profile (yearsOfExperience, skills, location prefs)",
+    "similar jobs signals (role, skills, country)",
+    "listingFreshnessAt / postedAt (freshness tie-breaker)"
+  ],
+  "personalizationConstraints": {
+    "mustNotPersonalize": [
+      "Anonymous listing Redis cache (jobsListingCache.ts, isSafeToCache)",
+      "SEO SSR with INTERNAL_SEO_SECRET",
+      "Sitemap generation (sqlForCanonicalSitemapRows)",
+      "Anon Next.js /api/jobs proxy cache"
+    ],
+    "safeToPersonalize": [
+      "Authenticated GET /jobs (cache: no-store)",
+      "Client-side re-rank behind NEXT_PUBLIC_RESUME_FEED_PERSONALIZATION",
+      "Similar jobs module",
+      "Job alert email selection"
+    ]
+  },
+  "keyQuestions": {
+    "whereAreJobsRanked": "Server SQL in job.repository.ts sqlForCanonicalListingIds; client re-rank only in similarJobsRank.ts",
+    "whatSignalsExist": "Freshness stack (active), salary sort (active), stored sourceWeight/freshnessScore (ingest only), rankJobs (dead), resume fit (display only), title families (scoring only)",
+    "whereCanPersonalizationBeInsertedSafely": "runMeteredJobsList (auth post-fetch re-rank) is highest-leverage; JobService.list sort=fit is secondary; client toggle is tertiary"
+  },
+  "conclusion": "Feed ranking is freshness-first and identical across home, jobs, and search. Resume Fit V2 scoring is orthogonal to feed order — explaining 93.4% title_mismatch unavailable when users browse cross-domain jobs. Safe personalization insertion is post-fetch re-ranking for authenticated users only."
+}

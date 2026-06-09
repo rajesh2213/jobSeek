@@ -1,0 +1,299 @@
+{
+  "measuredAt": "2026-06-09T20:20:17.674Z",
+  "methodology": "Project availability on top-N feed jobs after ranking boost; Resume Fit scoring and gates unchanged",
+  "currentAvailability": {
+    "evaluations": 3000,
+    "scored": 618,
+    "availabilityPct": "20.6%",
+    "phase75Baseline": "19.9%"
+  },
+  "perResume": {
+    "CV Seán O'Shea O'Connor.pdf": {
+      "candidateFamily": "marketing",
+      "currentEval500": {
+        "scored": 10,
+        "total": 500,
+        "availabilityPct": "2.0%"
+      },
+      "projectedTop100": {
+        "baseline": {
+          "scored": 1,
+          "total": 100,
+          "availabilityPct": "1.0%"
+        },
+        "scenarioA": {
+          "scored": 10,
+          "total": 100,
+          "availabilityPct": "10.0%"
+        },
+        "scenarioB": {
+          "scored": 10,
+          "total": 100,
+          "availabilityPct": "10.0%"
+        },
+        "scenarioC": {
+          "scored": 10,
+          "total": 100,
+          "availabilityPct": "10.0%"
+        }
+      },
+      "projectedTop50": {
+        "baseline": {
+          "scored": 0,
+          "total": 50,
+          "availabilityPct": "0.0%"
+        },
+        "scenarioA": {
+          "scored": 10,
+          "total": 50,
+          "availabilityPct": "20.0%"
+        },
+        "scenarioB": {
+          "scored": 10,
+          "total": 50,
+          "availabilityPct": "20.0%"
+        },
+        "scenarioC": {
+          "scored": 10,
+          "total": 50,
+          "availabilityPct": "20.0%"
+        }
+      }
+    },
+    "Yashraj-Yadav-Resume.pdf": {
+      "candidateFamily": "software.engineering",
+      "currentEval500": {
+        "scored": 39,
+        "total": 500,
+        "availabilityPct": "7.8%"
+      },
+      "projectedTop100": {
+        "baseline": {
+          "scored": 2,
+          "total": 100,
+          "availabilityPct": "2.0%"
+        },
+        "scenarioA": {
+          "scored": 25,
+          "total": 100,
+          "availabilityPct": "25.0%"
+        },
+        "scenarioB": {
+          "scored": 39,
+          "total": 100,
+          "availabilityPct": "39.0%"
+        },
+        "scenarioC": {
+          "scored": 39,
+          "total": 100,
+          "availabilityPct": "39.0%"
+        }
+      },
+      "projectedTop50": {
+        "baseline": {
+          "scored": 1,
+          "total": 50,
+          "availabilityPct": "2.0%"
+        },
+        "scenarioA": {
+          "scored": 24,
+          "total": 50,
+          "availabilityPct": "48.0%"
+        },
+        "scenarioB": {
+          "scored": 39,
+          "total": 50,
+          "availabilityPct": "78.0%"
+        },
+        "scenarioC": {
+          "scored": 39,
+          "total": 50,
+          "availabilityPct": "78.0%"
+        }
+      }
+    },
+    "Profile-3.pdf": {
+      "candidateFamily": "design",
+      "currentEval500": {
+        "scored": 19,
+        "total": 500,
+        "availabilityPct": "3.8%"
+      },
+      "projectedTop100": {
+        "baseline": {
+          "scored": 4,
+          "total": 100,
+          "availabilityPct": "4.0%"
+        },
+        "scenarioA": {
+          "scored": 14,
+          "total": 100,
+          "availabilityPct": "14.0%"
+        },
+        "scenarioB": {
+          "scored": 19,
+          "total": 100,
+          "availabilityPct": "19.0%"
+        },
+        "scenarioC": {
+          "scored": 19,
+          "total": 100,
+          "availabilityPct": "19.0%"
+        }
+      },
+      "projectedTop50": {
+        "baseline": {
+          "scored": 4,
+          "total": 50,
+          "availabilityPct": "8.0%"
+        },
+        "scenarioA": {
+          "scored": 14,
+          "total": 50,
+          "availabilityPct": "28.0%"
+        },
+        "scenarioB": {
+          "scored": 19,
+          "total": 50,
+          "availabilityPct": "38.0%"
+        },
+        "scenarioC": {
+          "scored": 19,
+          "total": 50,
+          "availabilityPct": "38.0%"
+        }
+      }
+    },
+    "Raajeshvaran_M_Software_Engineer.pdf": {
+      "candidateFamily": "software.engineering",
+      "currentEval500": {
+        "scored": 39,
+        "total": 500,
+        "availabilityPct": "7.8%"
+      },
+      "projectedTop100": {
+        "baseline": {
+          "scored": 2,
+          "total": 100,
+          "availabilityPct": "2.0%"
+        },
+        "scenarioA": {
+          "scored": 25,
+          "total": 100,
+          "availabilityPct": "25.0%"
+        },
+        "scenarioB": {
+          "scored": 39,
+          "total": 100,
+          "availabilityPct": "39.0%"
+        },
+        "scenarioC": {
+          "scored": 39,
+          "total": 100,
+          "availabilityPct": "39.0%"
+        }
+      },
+      "projectedTop50": {
+        "baseline": {
+          "scored": 1,
+          "total": 50,
+          "availabilityPct": "2.0%"
+        },
+        "scenarioA": {
+          "scored": 24,
+          "total": 50,
+          "availabilityPct": "48.0%"
+        },
+        "scenarioB": {
+          "scored": 39,
+          "total": 50,
+          "availabilityPct": "78.0%"
+        },
+        "scenarioC": {
+          "scored": 39,
+          "total": 50,
+          "availabilityPct": "78.0%"
+        }
+      }
+    },
+    "functionalsample.pdf": {
+      "candidateFamily": null,
+      "currentEval500": {
+        "scored": 472,
+        "total": 500,
+        "availabilityPct": "94.4%"
+      },
+      "projectedTop100": {
+        "baseline": {
+          "scored": 92,
+          "total": 100,
+          "availabilityPct": "92.0%"
+        },
+        "scenarioA": {
+          "scored": 92,
+          "total": 100,
+          "availabilityPct": "92.0%"
+        },
+        "scenarioB": {
+          "scored": 92,
+          "total": 100,
+          "availabilityPct": "92.0%"
+        },
+        "scenarioC": {
+          "scored": 92,
+          "total": 100,
+          "availabilityPct": "92.0%"
+        }
+      },
+      "projectedTop50": {
+        "baseline": {
+          "scored": 47,
+          "total": 50,
+          "availabilityPct": "94.0%"
+        },
+        "scenarioA": {
+          "scored": 47,
+          "total": 50,
+          "availabilityPct": "94.0%"
+        },
+        "scenarioB": {
+          "scored": 47,
+          "total": 50,
+          "availabilityPct": "94.0%"
+        },
+        "scenarioC": {
+          "scored": 47,
+          "total": 50,
+          "availabilityPct": "94.0%"
+        }
+      }
+    }
+  },
+  "aggregate": {
+    "resumesWithFamily": 4,
+    "currentEval500Avg": "5.4%",
+    "projectedTop100": {
+      "baseline": "2.3%",
+      "scenarioA": "18.5%",
+      "scenarioB": "26.8%",
+      "scenarioC": "26.8%"
+    },
+    "projectedTop50": {
+      "baseline": "3.0%",
+      "scenarioA": "36.0%",
+      "scenarioB": "53.5%",
+      "scenarioC": "53.5%"
+    },
+    "allResumesIncludingNullFamily": {
+      "currentEval500": "20.6%",
+      "note": "functionalsample.pdf (null candidateFamily) scores 94.4% and inflates blended availability; excluded from family-resolvable aggregate"
+    }
+  },
+  "interpretation": {
+    "phase75BlendedAvailability": "19.9%",
+    "familyResolvableBrowsingAvailability": "Top-100 baseline 2.3% → Scenario B 26.8% for users with derived candidateFamily",
+    "targetRange": "Scenario B on top-50 feed (53.5%) approaches 40–60% target for software-engineering resumes (78%); marketing resume caps lower at 20%",
+    "recommendedScenario": "B — same-family +100, adjacent +40; C adds no measurable gain when same-family pool fills top-N"
+  },
+  "successTarget": "20% → 40–60% without changing Resume Fit"
+}

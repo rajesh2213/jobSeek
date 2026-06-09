@@ -72,6 +72,7 @@ import { UserLocalResetCaption } from "./UserLocalResetCaption";
 import { JobsListingEmailCapturePopup } from "./JobsListingEmailCapturePopup";
 import { SavedSearchManageBody } from "./SavedSearchManageBody";
 import { useIsLgUp } from "../../lib/useIsLgUp";
+import { isResumeFeedPersonalizationEnabled } from "../../lib/resumeFeedPersonalizationFlag";
 
 const TimeAdvantageSimulator = dynamic(
   () => import("./TimeAdvantageSimulator").then((m) => m.TimeAdvantageSimulator),
@@ -86,6 +87,11 @@ const JobsInlineFilters = dynamic(
 const LimitWallEnhanced = dynamic(
   () => import("./LimitWallEnhanced").then((m) => m.LimitWallEnhanced),
   { loading: () => <LimitWallDynamicLoading />, ssr: true },
+);
+
+const RecommendedJobsSection = dynamic(
+  () => import("./RecommendedJobsSection").then((m) => m.RecommendedJobsSection),
+  { ssr: false },
 );
 
 function listQueryBase(f: JobFilters): JobFilters {
@@ -1863,7 +1869,12 @@ export function JobsSearchClient({
           const resultsMain = (
             <>
               {listJobs.length > 0 ? (
-                <JobList jobs={jobsForList} flashAppliedJobId={flashAppliedJobId} />
+                <>
+                  {isResumeFeedPersonalizationEnabled() && isSignedIn ? (
+                    <RecommendedJobsSection />
+                  ) : null}
+                  <JobList jobs={jobsForList} flashAppliedJobId={flashAppliedJobId} />
+                </>
               ) : null}
               {showDiscoveryWall && capResetAt ? (
                 <LimitWallEnhanced

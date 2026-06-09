@@ -1,0 +1,187 @@
+{
+  "measuredAt": "2026-06-09T21:41:52.050Z",
+  "methodology": {
+    "behavioral": "Modeled CTR/fit-check/apply rates — no production RecommendedJobs* events in DB yet",
+    "structural": "scoreResume on recommended vs main-feed job sets (actual Resume Fit V2)",
+    "ctrAssumptions": {
+      "same_family": 0.12,
+      "adjacent_family": 0.08
+    },
+    "fitCheckRate": 0.45,
+    "applyRate": 0.22
+  },
+  "funnel": {
+    "same_family": {
+      "views": 7,
+      "clicks": 0.84,
+      "fitChecks": 0.378,
+      "applications": 0.08316,
+      "structural": {
+        "views": 7,
+        "fitAvailableOnView": 7,
+        "fitUnavailableOnView": 0
+      },
+      "modeledCtrPct": "12%",
+      "fitAvailabilityOnClickPct": "100.0%"
+    },
+    "adjacent_family": {
+      "views": 0,
+      "clicks": 0,
+      "fitChecks": 0,
+      "applications": 0,
+      "structural": {
+        "views": 0,
+        "fitAvailableOnView": 0,
+        "fitUnavailableOnView": 0
+      },
+      "modeledCtrPct": "8%",
+      "fitAvailabilityOnClickPct": "0%"
+    }
+  },
+  "aggregateModeledFunnel": {
+    "views": 7,
+    "clicks": 0.84,
+    "fitChecks": 0.38,
+    "applications": 0.08,
+    "clickThroughRatePct": "12.0%"
+  },
+  "perResume": {
+    "CV Seán O'Shea O'Connor.pdf": {
+      "candidateFamily": "marketing",
+      "mainFeed": {
+        "evaluations": 20,
+        "scored": 0,
+        "unavailable": 20,
+        "availabilityPct": "0.0%",
+        "unavailablePct": "100.0%",
+        "avgScore": null,
+        "confidenceDistribution": {
+          "high": 0,
+          "medium": 0,
+          "low": 0,
+          "very_low": 0,
+          "null": 0
+        }
+      },
+      "recommended": {
+        "evaluations": 1,
+        "scored": 1,
+        "unavailable": 0,
+        "availabilityPct": "100.0%",
+        "unavailablePct": "0.0%",
+        "avgScore": "34.0",
+        "confidenceDistribution": {
+          "high": 1,
+          "medium": 0,
+          "low": 0,
+          "very_low": 0,
+          "null": 0
+        }
+      },
+      "availabilityLiftPp": "100.0"
+    },
+    "Yashraj-Yadav-Resume.pdf": {
+      "candidateFamily": "software.engineering",
+      "mainFeed": {
+        "evaluations": 20,
+        "scored": 0,
+        "unavailable": 20,
+        "availabilityPct": "0.0%",
+        "unavailablePct": "100.0%",
+        "avgScore": null,
+        "confidenceDistribution": {
+          "high": 0,
+          "medium": 0,
+          "low": 0,
+          "very_low": 0,
+          "null": 0
+        }
+      },
+      "recommended": {
+        "evaluations": 1,
+        "scored": 1,
+        "unavailable": 0,
+        "availabilityPct": "100.0%",
+        "unavailablePct": "0.0%",
+        "avgScore": "65.0",
+        "confidenceDistribution": {
+          "high": 0,
+          "medium": 0,
+          "low": 1,
+          "very_low": 0,
+          "null": 0
+        }
+      },
+      "availabilityLiftPp": "100.0"
+    },
+    "Profile-3.pdf": {
+      "candidateFamily": "design",
+      "mainFeed": {
+        "evaluations": 20,
+        "scored": 0,
+        "unavailable": 20,
+        "availabilityPct": "0.0%",
+        "unavailablePct": "100.0%",
+        "avgScore": null,
+        "confidenceDistribution": {
+          "high": 0,
+          "medium": 0,
+          "low": 0,
+          "very_low": 0,
+          "null": 0
+        }
+      },
+      "recommended": {
+        "evaluations": 3,
+        "scored": 3,
+        "unavailable": 0,
+        "availabilityPct": "100.0%",
+        "unavailablePct": "0.0%",
+        "avgScore": "53.0",
+        "confidenceDistribution": {
+          "high": 2,
+          "medium": 1,
+          "low": 0,
+          "very_low": 0,
+          "null": 0
+        }
+      },
+      "availabilityLiftPp": "100.0"
+    },
+    "Raajeshvaran_M_Software_Engineer.pdf": {
+      "candidateFamily": "software.engineering",
+      "mainFeed": {
+        "evaluations": 20,
+        "scored": 0,
+        "unavailable": 20,
+        "availabilityPct": "0.0%",
+        "unavailablePct": "100.0%",
+        "avgScore": null,
+        "confidenceDistribution": {
+          "high": 0,
+          "medium": 0,
+          "low": 0,
+          "very_low": 0,
+          "null": 0
+        }
+      },
+      "recommended": {
+        "evaluations": 1,
+        "scored": 1,
+        "unavailable": 0,
+        "availabilityPct": "100.0%",
+        "unavailablePct": "0.0%",
+        "avgScore": "88.0",
+        "confidenceDistribution": {
+          "high": 0,
+          "medium": 0,
+          "low": 1,
+          "very_low": 0,
+          "null": 0
+        }
+      },
+      "availabilityLiftPp": "100.0"
+    }
+  },
+  "note": "Application stage uses PostHog job_apply_clicked in production — not yet attributed to recommended surface"
+}

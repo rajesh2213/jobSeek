@@ -1,0 +1,52 @@
+{
+  "measuredAt": "2026-06-09T21:41:52.120Z",
+  "samplePerFamily": 50,
+  "catalogJobs": 500,
+  "byFamily": {
+    "software.engineering": {
+      "sampleSize": 36,
+      "sameFamilyPct": "69.4%",
+      "adjacentFamilyPct": "30.6%",
+      "crossFamilyPct": "0.0%",
+      "wrongRecommendations": [],
+      "pass": true
+    },
+    "marketing": {
+      "sampleSize": 10,
+      "sameFamilyPct": "100.0%",
+      "adjacentFamilyPct": "0.0%",
+      "crossFamilyPct": "0.0%",
+      "wrongRecommendations": [],
+      "pass": true
+    },
+    "sales": {
+      "sampleSize": 50,
+      "sameFamilyPct": "84.0%",
+      "adjacentFamilyPct": "16.0%",
+      "crossFamilyPct": "0.0%",
+      "wrongRecommendations": [],
+      "pass": true
+    },
+    "design": {
+      "sampleSize": 15,
+      "sameFamilyPct": "100.0%",
+      "adjacentFamilyPct": "0.0%",
+      "crossFamilyPct": "0.0%",
+      "wrongRecommendations": [],
+      "pass": true
+    },
+    "operations": {
+      "sampleSize": 7,
+      "sameFamilyPct": "100.0%",
+      "adjacentFamilyPct": "0.0%",
+      "crossFamilyPct": "0.0%",
+      "wrongRecommendations": [],
+      "pass": true
+    }
+  },
+  "aggregate": {
+    "totalSlots": 118,
+    "wrongCount": 0,
+    "allFamiliesPass": true
+  }
+}

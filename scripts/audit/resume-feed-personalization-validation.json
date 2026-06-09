@@ -1,0 +1,78 @@
+{
+  "measuredAt": "2026-06-09T21:31:17.244Z",
+  "poolJobs": 100,
+  "resumesAudited": 6,
+  "nullFamilySuppressed": 1,
+  "sectionsShown": 5,
+  "aggregate": {
+    "recommendedSlots": 7,
+    "sameFamily": 7,
+    "adjacentFamily": 0,
+    "sameFamilyPct": "100.0%"
+  },
+  "perResume": {
+    "CV Seán O'Shea O'Connor.pdf": {
+      "candidateFamily": "marketing",
+      "sectionVisible": true,
+      "recommendedCount": 1,
+      "sameFamily": 1,
+      "adjacentFamily": 0,
+      "sameFamilyPct": "100.0%",
+      "adjacentFamilyPct": "0.0%",
+      "jobFamilies": [
+        "marketing"
+      ]
+    },
+    "Yashraj-Yadav-Resume.pdf": {
+      "candidateFamily": "software.engineering",
+      "sectionVisible": true,
+      "recommendedCount": 1,
+      "sameFamily": 1,
+      "adjacentFamily": 0,
+      "sameFamilyPct": "100.0%",
+      "adjacentFamilyPct": "0.0%",
+      "jobFamilies": [
+        "software.engineering"
+      ]
+    },
+    "Profile-3.pdf": {
+      "candidateFamily": "design",
+      "sectionVisible": true,
+      "recommendedCount": 3,
+      "sameFamily": 3,
+      "adjacentFamily": 0,
+      "sameFamilyPct": "100.0%",
+      "adjacentFamilyPct": "0.0%",
+      "jobFamilies": [
+        "design",
+        "design",
+        "design"
+      ]
+    },
+    "Raajeshvaran_M_Software_Engineer.pdf": {
+      "candidateFamily": "software.engineering",
+      "sectionVisible": true,
+      "recommendedCount": 1,
+      "sameFamily": 1,
+      "adjacentFamily": 0,
+      "sameFamilyPct": "100.0%",
+      "adjacentFamilyPct": "0.0%",
+      "jobFamilies": [
+        "software.engineering"
+      ]
+    },
+    "functionalsample.pdf": {
+      "candidateFamily": null,
+      "sectionVisible": false,
+      "reason": "null candidateFamily — section hidden"
+    }
+  },
+  "successCriteria": {
+    "sameFamilyGte80Pct": true,
+    "seoChanges": 0,
+    "anonymousUserChanges": 0,
+    "feedRankingChanged": false,
+    "resumeFitScoringChanged": false
+  },
+  "recommendation": "PASS — same-family dominance in recommendations"
+}

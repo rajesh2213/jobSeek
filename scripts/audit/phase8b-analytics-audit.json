@@ -1,0 +1,174 @@
+{
+  "auditPhase": "Phase 8B — Analytics Audit",
+  "measuredAt": "2026-06-09T22:00:00.000Z",
+  "scope": "Static code audit of Meta custom events for recommendation + Resume Fit funnel; no production event warehouse queried",
+  "events": {
+    "RecommendedJobsViewed": {
+      "eventName": "RecommendedJobsViewed",
+      "exported": true,
+      "exportPath": "apps/client/lib/analytics/resumeMatchFunnel.ts",
+      "firedFrom": ["apps/client/components/job/RecommendedJobsSection.tsx"],
+      "transport": "trackMetaCustom only (no server sync)",
+      "payloadSchema": {
+        "candidate_family": { "type": "string", "required": true, "description": "RoleFamily enum value" },
+        "job_count": { "type": "string", "required": true, "description": "Number of jobs shown, stringified" },
+        "utm_source": { "type": "string", "required": false },
+        "utm_medium": { "type": "string", "required": false },
+        "utm_campaign": { "type": "string", "required": false },
+        "fbclid": { "type": "string", "required": false }
+      },
+      "deduplication": {
+        "mechanism": "viewedRef useRef — fires once per component mount when jobs.length > 0",
+        "devStrictModeRisk": "React Strict Mode may double-fire in development only",
+        "pass": true
+      },
+      "candidateFamilyPresent": true,
+      "piiFields": []
+    },
+    "RecommendedJobClicked": {
+      "eventName": "RecommendedJobClicked",
+      "exported": true,
+      "exportPath": "apps/client/lib/analytics/resumeMatchFunnel.ts",
+      "firedFrom": ["apps/client/components/job/RecommendedJobsSection.tsx"],
+      "transport": "trackMetaCustom only",
+      "payloadSchema": {
+        "candidate_family": { "type": "string", "required": true },
+        "job_family": { "type": "string", "required": true, "note": "Empty string when jobFamily null" },
+        "job_id": { "type": "string", "required": true },
+        "utm_*": { "type": "string", "required": false }
+      },
+      "deduplication": {
+        "mechanism": "None — intentional per click",
+        "pass": true
+      },
+      "candidateFamilyPresent": true,
+      "piiFields": []
+    },
+    "ResumeFitViewed": {
+      "eventName": "ResumeFitViewed",
+      "exported": true,
+      "firedFrom": [
+        "apps/client/components/resume/ResumeScorePill.tsx",
+        "apps/client/components/resume/ResumeMatchSection.tsx"
+      ],
+      "payloadSchema": {
+        "job_id": { "type": "string", "required": true },
+        "score": { "type": "string", "required": true },
+        "confidence": { "type": "string", "required": true },
+        "fit_tier": { "type": "string", "required": false }
+      },
+      "gaps": {
+        "noSurfaceAttribute": "Cannot distinguish recommended carousel vs main feed vs job detail",
+        "noCandidateFamily": "Not included on ResumeFitViewed payload"
+      },
+      "deduplication": "Fires once per successful scoreResume invocation per user click",
+      "piiFields": []
+    },
+    "ResumeFitUnavailable": {
+      "eventName": "ResumeFitUnavailable",
+      "exported": true,
+      "firedFrom": ["ResumeScorePill.tsx", "ResumeMatchSection.tsx"],
+      "payloadSchema": {
+        "reason": { "type": "string", "required": true },
+        "job_id": { "type": "string", "required": false }
+      },
+      "deduplication": "Paired with ResumeFitUnavailableReason on same path — intentional dual fire",
+      "piiFields": []
+    },
+    "ResumeFitUnavailableReason": {
+      "eventName": "ResumeFitUnavailableReason",
+      "exported": true,
+      "firedFrom": ["ResumeScorePill.tsx", "ResumeMatchSection.tsx"],
+      "payloadSchema": {
+        "reason": { "type": "string", "required": true },
+        "candidate_family": { "type": "string", "required": true, "note": "Empty string when null" },
+        "job_family": { "type": "string", "required": true },
+        "signal_count": { "type": "string", "required": true },
+        "job_id": { "type": "string", "required": false }
+      },
+      "candidateFamilyPresent": "When unavailable; empty string if null candidate",
+      "piiFields": []
+    },
+    "ResumeUploaded": {
+      "eventName": "ResumeUploaded",
+      "exported": true,
+      "firedFrom": ["apps/client/components/resume/ResumeUploadModal.tsx"],
+      "transport": "trackMetaCustom + postMetaAnalyticsSync",
+      "payloadSchema": {
+        "source": { "type": "string", "required": true, "default": "resume_upload_modal" },
+        "eventID": { "type": "string", "required": true, "via": "options" }
+      },
+      "piiFields": []
+    },
+    "ResumeMatchUpgradeClick": {
+      "eventName": "ResumeMatchUpgradeClick",
+      "exported": true,
+      "firedFrom": [
+        "ResumeScorePill.tsx",
+        "ResumeMatchSection.tsx",
+        "ResumeScorePanel.tsx"
+      ],
+      "payloadSchema": {
+        "surface": { "type": "string", "required": true },
+        "job_id": { "type": "string", "required": false }
+      },
+      "piiFields": []
+    }
+  },
+  "verification": {
+    "eventNamesExportedCorrectly": true,
+    "payloadSchemasDocumented": true,
+    "duplicateFiring": {
+      "intentionalPairs": [
+        "ResumeFitUnavailable + ResumeFitUnavailableReason on unscored path"
+      ],
+      "recommendedViewedDeduped": true,
+      "recommendedClickedPerClick": true,
+      "pass": true
+    },
+    "missingCandidateFamily": {
+      "RecommendedJobsViewed": false,
+      "RecommendedJobClicked": false,
+      "ResumeFitUnavailableReason": "Only empty when candidate unresolvable — expected",
+      "ResumeFitViewed": true,
+      "gapSeverity": "medium — blocks recommended-surface fit attribution"
+    },
+    "piiAudit": {
+      "noResumeText": true,
+      "noEmail": true,
+      "noUserId": true,
+      "noJobTitles": true,
+      "familiesNotRawTitles": true,
+      "pass": true
+    }
+  },
+  "integrationGaps": [
+    {
+      "gap": "No surface on ResumeFitViewed / ResumeFitUnavailable",
+      "impact": "Cannot measure fit-check lift from recommended carousel in production analytics",
+      "fix": "Add optional surface=recommended_carousel|main_feed|job_detail (Phase 8C)"
+    },
+    {
+      "gap": "Application uses PostHog job_apply_clicked, not Meta",
+      "impact": "Funnel stage 4 not joinable with RecommendedJobClicked in Meta",
+      "fix": "Add source=recommended_carousel to ApplyJobButton when in carousel context"
+    },
+    {
+      "gap": "RecommendedJobsViewed has no server sync",
+      "impact": "Meta Pixel only; no backend audit trail",
+      "severity": "low"
+    },
+    {
+      "gap": "Fit check requires explicit ResumeScorePill click",
+      "impact": "RecommendedJobsViewed → ResumeFitViewed is not automatic; user must click Check fit",
+      "severity": "medium — depresses measured fit-check rate"
+    }
+  ],
+  "productionDataStatus": {
+    "recommendedEventsInWarehouse": false,
+    "note": "Feature requires NEXT_PUBLIC_RESUME_FEED_PERSONALIZATION=1 and not yet deployed — behavioral CTR unmeasured",
+    "structuralSimulationAvailable": true
+  },
+  "pass": true,
+  "passWithNotes": true
+}

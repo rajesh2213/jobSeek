@@ -1,0 +1,243 @@
+{
+  "measuredAt": "2026-06-09T20:19:36.433Z",
+  "activeJobs": 17639,
+  "perResume": {
+    "CV Seán O'Shea O'Connor.pdf": {
+      "candidateFamily": "marketing",
+      "candidateTitle": "Position Title: Door-to-Door Marketing Consultant",
+      "scenarios": {
+        "baseline": {
+          "sameFamilyTop20": 0,
+          "sameFamilyTop20Pct": "0.0%",
+          "sameFamilyTop50": 0,
+          "sameFamilyTop50Pct": "0.0%",
+          "sameFamilyTop100": 1,
+          "sameFamilyTop100Pct": "1.0%",
+          "totalSameFamilyInPool": 404,
+          "totalSameFamilyPct": "2.3%"
+        },
+        "A": {
+          "sameFamilyTop20": 20,
+          "sameFamilyTop20Pct": "100.0%",
+          "sameFamilyTop50": 50,
+          "sameFamilyTop50Pct": "100.0%",
+          "sameFamilyTop100": 100,
+          "sameFamilyTop100Pct": "100.0%",
+          "totalSameFamilyInPool": 404,
+          "totalSameFamilyPct": "2.3%"
+        },
+        "B": {
+          "sameFamilyTop20": 20,
+          "sameFamilyTop20Pct": "100.0%",
+          "sameFamilyTop50": 50,
+          "sameFamilyTop50Pct": "100.0%",
+          "sameFamilyTop100": 100,
+          "sameFamilyTop100Pct": "100.0%",
+          "totalSameFamilyInPool": 404,
+          "totalSameFamilyPct": "2.3%"
+        },
+        "C": {
+          "sameFamilyTop20": 20,
+          "sameFamilyTop20Pct": "100.0%",
+          "sameFamilyTop50": 50,
+          "sameFamilyTop50Pct": "100.0%",
+          "sameFamilyTop100": 100,
+          "sameFamilyTop100Pct": "100.0%",
+          "totalSameFamilyInPool": 404,
+          "totalSameFamilyPct": "2.3%"
+        }
+      }
+    },
+    "Yashraj-Yadav-Resume.pdf": {
+      "candidateFamily": "software.engineering",
+      "candidateTitle": "Full-Stack Developer",
+      "scenarios": {
+        "baseline": {
+          "sameFamilyTop20": 0,
+          "sameFamilyTop20Pct": "0.0%",
+          "sameFamilyTop50": 2,
+          "sameFamilyTop50Pct": "4.0%",
+          "sameFamilyTop100": 5,
+          "sameFamilyTop100Pct": "5.0%",
+          "totalSameFamilyInPool": 1180,
+          "totalSameFamilyPct": "6.7%"
+        },
+        "A": {
+          "sameFamilyTop20": 20,
+          "sameFamilyTop20Pct": "100.0%",
+          "sameFamilyTop50": 50,
+          "sameFamilyTop50Pct": "100.0%",
+          "sameFamilyTop100": 100,
+          "sameFamilyTop100Pct": "100.0%",
+          "totalSameFamilyInPool": 1180,
+          "totalSameFamilyPct": "6.7%"
+        },
+        "B": {
+          "sameFamilyTop20": 20,
+          "sameFamilyTop20Pct": "100.0%",
+          "sameFamilyTop50": 50,
+          "sameFamilyTop50Pct": "100.0%",
+          "sameFamilyTop100": 100,
+          "sameFamilyTop100Pct": "100.0%",
+          "totalSameFamilyInPool": 1180,
+          "totalSameFamilyPct": "6.7%"
+        },
+        "C": {
+          "sameFamilyTop20": 20,
+          "sameFamilyTop20Pct": "100.0%",
+          "sameFamilyTop50": 50,
+          "sameFamilyTop50Pct": "100.0%",
+          "sameFamilyTop100": 100,
+          "sameFamilyTop100Pct": "100.0%",
+          "totalSameFamilyInPool": 1180,
+          "totalSameFamilyPct": "6.7%"
+        }
+      }
+    },
+    "Profile-3.pdf": {
+      "candidateFamily": "design",
+      "candidateTitle": "I enjoy to code beautiful animations, UI/UX, modern experiences in",
+      "scenarios": {
+        "baseline": {
+          "sameFamilyTop20": 0,
+          "sameFamilyTop20Pct": "0.0%",
+          "sameFamilyTop50": 0,
+          "sameFamilyTop50Pct": "0.0%",
+          "sameFamilyTop100": 0,
+          "sameFamilyTop100Pct": "0.0%",
+          "totalSameFamilyInPool": 539,
+          "totalSameFamilyPct": "3.1%"
+        },
+        "A": {
+          "sameFamilyTop20": 20,
+          "sameFamilyTop20Pct": "100.0%",
+          "sameFamilyTop50": 50,
+          "sameFamilyTop50Pct": "100.0%",
+          "sameFamilyTop100": 100,
+          "sameFamilyTop100Pct": "100.0%",
+          "totalSameFamilyInPool": 539,
+          "totalSameFamilyPct": "3.1%"
+        },
+        "B": {
+          "sameFamilyTop20": 20,
+          "sameFamilyTop20Pct": "100.0%",
+          "sameFamilyTop50": 50,
+          "sameFamilyTop50Pct": "100.0%",
+          "sameFamilyTop100": 100,
+          "sameFamilyTop100Pct": "100.0%",
+          "totalSameFamilyInPool": 539,
+          "totalSameFamilyPct": "3.1%"
+        },
+        "C": {
+          "sameFamilyTop20": 20,
+          "sameFamilyTop20Pct": "100.0%",
+          "sameFamilyTop50": 50,
+          "sameFamilyTop50Pct": "100.0%",
+          "sameFamilyTop100": 100,
+          "sameFamilyTop100Pct": "100.0%",
+          "totalSameFamilyInPool": 539,
+          "totalSameFamilyPct": "3.1%"
+        }
+      }
+    },
+    "Raajeshvaran_M_Software_Engineer.pdf": {
+      "candidateFamily": "software.engineering",
+      "candidateTitle": "Software Engineer",
+      "scenarios": {
+        "baseline": {
+          "sameFamilyTop20": 0,
+          "sameFamilyTop20Pct": "0.0%",
+          "sameFamilyTop50": 2,
+          "sameFamilyTop50Pct": "4.0%",
+          "sameFamilyTop100": 5,
+          "sameFamilyTop100Pct": "5.0%",
+          "totalSameFamilyInPool": 1180,
+          "totalSameFamilyPct": "6.7%"
+        },
+        "A": {
+          "sameFamilyTop20": 20,
+          "sameFamilyTop20Pct": "100.0%",
+          "sameFamilyTop50": 50,
+          "sameFamilyTop50Pct": "100.0%",
+          "sameFamilyTop100": 100,
+          "sameFamilyTop100Pct": "100.0%",
+          "totalSameFamilyInPool": 1180,
+          "totalSameFamilyPct": "6.7%"
+        },
+        "B": {
+          "sameFamilyTop20": 20,
+          "sameFamilyTop20Pct": "100.0%",
+          "sameFamilyTop50": 50,
+          "sameFamilyTop50Pct": "100.0%",
+          "sameFamilyTop100": 100,
+          "sameFamilyTop100Pct": "100.0%",
+          "totalSameFamilyInPool": 1180,
+          "totalSameFamilyPct": "6.7%"
+        },
+        "C": {
+          "sameFamilyTop20": 20,
+          "sameFamilyTop20Pct": "100.0%",
+          "sameFamilyTop50": 50,
+          "sameFamilyTop50Pct": "100.0%",
+          "sameFamilyTop100": 100,
+          "sameFamilyTop100Pct": "100.0%",
+          "totalSameFamilyInPool": 1180,
+          "totalSameFamilyPct": "6.7%"
+        }
+      }
+    },
+    "functionalsample.pdf": {
+      "candidateFamily": null,
+      "skipped": true
+    }
+  },
+  "aggregate": {
+    "baseline": {
+      "resumesWithFamily": 4,
+      "avgSameFamilyTop20": 0,
+      "avgSameFamilyTop20Pct": "0.0%",
+      "avgSameFamilyTop50": 1,
+      "avgSameFamilyTop50Pct": "2.0%",
+      "avgSameFamilyTop100": 2.75,
+      "avgSameFamilyTop100Pct": "2.8%"
+    },
+    "A": {
+      "resumesWithFamily": 4,
+      "avgSameFamilyTop20": 20,
+      "avgSameFamilyTop20Pct": "100.0%",
+      "avgSameFamilyTop50": 50,
+      "avgSameFamilyTop50Pct": "100.0%",
+      "avgSameFamilyTop100": 100,
+      "avgSameFamilyTop100Pct": "100.0%"
+    },
+    "B": {
+      "resumesWithFamily": 4,
+      "avgSameFamilyTop20": 20,
+      "avgSameFamilyTop20Pct": "100.0%",
+      "avgSameFamilyTop50": 50,
+      "avgSameFamilyTop50Pct": "100.0%",
+      "avgSameFamilyTop100": 100,
+      "avgSameFamilyTop100Pct": "100.0%"
+    },
+    "C": {
+      "resumesWithFamily": 4,
+      "avgSameFamilyTop20": 20,
+      "avgSameFamilyTop20Pct": "100.0%",
+      "avgSameFamilyTop50": 50,
+      "avgSameFamilyTop50Pct": "100.0%",
+      "avgSameFamilyTop100": 100,
+      "avgSameFamilyTop100Pct": "100.0%"
+    }
+  },
+  "notes": {
+    "scenariosABCEquivalentForSameFamily": "Adjacent-family pool is smaller than top-N slots; all four resumes fill top 20/50/100 with same-family jobs under A, B, and C",
+    "baselineVsPhase75": "Phase 7.5 measured 2.2% same-family in top 100 on 100-job feed slice; full-catalog baseline here is 2.8% avg across four resumes",
+    "excludedResume": "functionalsample.pdf has null candidateFamily and is excluded from aggregate"
+  },
+  "scenarioDefinitions": {
+    "baseline": "Current freshness ordering (postedAt → listingFreshnessAt → createdAt)",
+    "A": "same family +100 boost",
+    "B": "same family +100, adjacent family +40",
+    "C": "same family +120, adjacent family +50, cross-domain -50"
+  }
+}

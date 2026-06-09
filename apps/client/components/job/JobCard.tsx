@@ -16,6 +16,7 @@ import { AppliedToggleButton } from "./AppliedToggleButton";
 import { Card } from "../ui/Card";
 import { WorkTypeOutlinePill } from "./WorkTypeOutlinePill";
 import { FreshnessLine, JustPostedBadge, NewBadge } from "./FreshnessIndicator";
+import { rememberFitSurface, type FitSurface } from "../../lib/analytics/fitSurface";
 
 const ResumeScorePill = dynamic(
   () =>
@@ -36,9 +37,15 @@ interface Props {
   /** Dense card for similar-jobs grid (no excerpt, max 3 skill tags). */
   compact?: boolean;
   flashAppliedJobId?: string | null;
+  /** Phase 8C — analytics surface for fit checks and apply actions */
+  surface?: FitSurface;
 }
 
-function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
+function jobNavClick(jobId: string, surface: FitSurface) {
+  return () => rememberFitSurface(jobId, surface);
+}
+
+function JobCardComponent({ job, compact, flashAppliedJobId, surface = "main_feed" }: Props) {
   /** Compact cards skip the global minute ticker to cut re-renders; relative time still correct on mount. */
   const liveTicker = !compact;
   const accent = accentFromId(job.id);
@@ -143,6 +150,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
                 <Link
                   prefetch={false}
                   href={`/job/${job.id}`}
+                  onClick={jobNavClick(job.id, surface)}
                   className={cn(
                     "line-clamp-2 block text-lg font-semibold leading-snug tracking-tight text-ink no-underline transition-colors",
                     titleHover,
@@ -193,6 +201,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
               jobId={job.id}
               company={job.company.name}
               source="job_card"
+              surface={surface}
               applyUrl={applyHref}
               outlineTone={accent}
               size="sm"
@@ -209,6 +218,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
             <Link
               prefetch={false}
               href={`/job/${job.id}`}
+              onClick={jobNavClick(job.id, surface)}
               aria-label="View role"
               className={buttonClassName({
                 variant: "primary",
@@ -294,6 +304,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
               <Link
                 prefetch={false}
                 href={`/job/${job.id}`}
+                onClick={jobNavClick(job.id, surface)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={cn(
@@ -358,7 +369,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
           </p>
 
           <div className="min-w-0 lg:hidden">
-            <ResumeScorePill job={job} />
+            <ResumeScorePill job={job} surface={surface} />
           </div>
 
           <div
@@ -370,6 +381,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
               jobId={job.id}
               company={job.company.name}
               source="job_card"
+              surface={surface}
               applyUrl={applyHref}
               outlineTone={accent}
               size="sm"
@@ -383,23 +395,23 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
               compact
               className="h-10 min-h-10 w-full min-w-0 !px-2 text-[11px] font-bold leading-none"
             />
-            <Link
-              prefetch={false}
-              href={`/job/${job.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="View role (opens in new tab)"
-              className={cn(
-                buttonClassName({
-                  variant: "primary",
-                  size: "sm",
-                  className:
-                    "h-10 min-h-10 w-full min-w-0 !px-2 text-[11px] font-bold leading-none shadow-md ring-1 ring-brand/25",
-                }),
-              )}
-            >
-              View
-            </Link>
+              <Link
+                prefetch={false}
+                href={`/job/${job.id}`}
+                onClick={jobNavClick(job.id, surface)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  buttonClassName({
+                    variant: "primary",
+                    size: "sm",
+                    className:
+                      "h-10 min-h-10 w-full min-w-0 !px-2 text-[11px] font-bold leading-none shadow-md ring-1 ring-brand/25",
+                  }),
+                )}
+              >
+                View
+              </Link>
           </div>
           </div>
 
@@ -409,6 +421,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
                 jobId={job.id}
                 company={job.company.name}
                 source="job_card"
+                surface={surface}
                 applyUrl={applyHref}
                 outlineTone={accent}
                 size="sm"
@@ -424,6 +437,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
               <Link
                 prefetch={false}
                 href={`/job/${job.id}`}
+                onClick={jobNavClick(job.id, surface)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={cn(buttonClassName({ variant: "primary", size: "sm" }), "shrink-0")}
@@ -432,7 +446,7 @@ function JobCardComponent({ job, compact, flashAppliedJobId }: Props) {
               </Link>
             </div>
             <div className="w-full min-w-0">
-              <ResumeScorePill job={job} />
+              <ResumeScorePill job={job} surface={surface} />
             </div>
           </div>
         </div>

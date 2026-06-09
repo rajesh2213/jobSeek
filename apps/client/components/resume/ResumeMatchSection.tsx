@@ -17,6 +17,7 @@ import {
   trackResumeMatchQuotaHit,
   trackResumeMatchUpgradeClick,
 } from "../../lib/analytics/resumeMatchFunnel";
+import { resolveFitSurface } from "../../lib/analytics/fitSurface";
 import {
   isResumeMatchInsufficient,
   isResumeMatchInsufficientEvidence,
@@ -184,9 +185,11 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
 
     if (!isResumeMatchScored(scored)) {
       const unavailableReason = scored.unavailableReason ?? "insufficient_signals";
+      const surface = resolveFitSurface(job.id);
       trackResumeFitUnavailable({
         jobId: job.id,
         reason: unavailableReason,
+        surface,
       });
       trackResumeFitUnavailableReason({
         jobId: job.id,
@@ -194,23 +197,29 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
         candidateFamily: scored.candidateRoleFamily ?? null,
         jobFamily: scored.jobRoleFamily ?? null,
         signalCount: scored.signalCount ?? 0,
+        surface,
       });
       return;
     }
 
     if (scored.score !== null && scored.confidenceLevel) {
+      const surface = resolveFitSurface(job.id);
       trackResumeFitViewed({
         jobId: job.id,
         score: scored.score,
         confidence: scored.confidenceLevel,
         fitTier: scored.fitTier ?? null,
+        surface,
       });
       trackResumeFitConfidence({
         jobId: job.id,
         confidence: scored.confidenceLevel,
         signalCount: scored.signalCount ?? 0,
+        surface,
       });
     }
+
+    const surface = resolveFitSurface(job.id);
 
     if (
       scored.experienceFitScore != null ||
@@ -222,6 +231,7 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
         candidateYears: scored.experienceYearsCandidate ?? null,
         requiredYears: scored.experienceYearsRequired ?? null,
         experienceFitScore: scored.experienceFitScore ?? null,
+        surface,
       });
     }
 
@@ -235,6 +245,7 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
         candidateLevel: scored.candidateSeniorityLevel ?? null,
         jobLevel: scored.jobSeniorityLevel ?? null,
         seniorityFitScore: scored.seniorityFitScore ?? null,
+        surface,
       });
     }
 
@@ -248,6 +259,7 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
         candidateFamily: scored.candidateRoleFamily ?? null,
         jobFamily: scored.jobRoleFamily ?? null,
         titleFit: scored.titleFitScore ?? null,
+        surface,
       });
     }
 

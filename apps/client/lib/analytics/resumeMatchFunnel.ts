@@ -1,6 +1,7 @@
 "use client";
 
 import { getPersistedAttribution } from "./attribution";
+import type { FitSurface } from "./fitSurface";
 import { trackMetaCustom } from "./meta";
 import { postMetaAnalyticsSync } from "./sync";
 
@@ -86,6 +87,49 @@ export function trackResumeMatchUpgradeClick(params: { surface: string; jobId?: 
   });
 }
 
+/** Phase 8A — recommended jobs carousel rendered for signed-in users with resume. */
+export function trackRecommendedJobsViewed(params: {
+  candidateFamily: string;
+  jobCount: number;
+  surface?: FitSurface;
+}): void {
+  trackMetaCustom("RecommendedJobsViewed", {
+    candidate_family: params.candidateFamily,
+    job_count: String(params.jobCount),
+    surface: params.surface ?? "recommended_carousel",
+    ...attributionCustomData(),
+  });
+}
+
+export function trackRecommendedJobClicked(params: {
+  candidateFamily: string;
+  jobFamily: string | null;
+  jobId: string;
+  surface?: FitSurface;
+}): void {
+  trackMetaCustom("RecommendedJobClicked", {
+    candidate_family: params.candidateFamily,
+    job_family: params.jobFamily ?? "",
+    job_id: params.jobId,
+    surface: params.surface ?? "recommended_carousel",
+    ...attributionCustomData(),
+  });
+}
+
+/** Phase 8C — apply CTA clicked (Meta funnel; PostHog job_apply_clicked remains parallel). */
+export function trackJobApplyClicked(params: {
+  jobId: string;
+  surface: FitSurface;
+  source: string;
+}): void {
+  trackMetaCustom("JobApplyClicked", {
+    job_id: params.jobId,
+    surface: params.surface,
+    source: params.source,
+    ...attributionCustomData(),
+  });
+}
+
 /** Job listing had no extractable skills/keywords — match not scored (no quota consumed). */
 export function trackResumeMatchUnscorable(params: { jobId: string }): void {
   trackMetaCustom("ResumeMatchUnscorable", {
@@ -100,19 +144,26 @@ export function trackResumeFitViewed(params: {
   score: number;
   confidence: string;
   fitTier: number | null;
+  surface: FitSurface;
 }): void {
   trackMetaCustom("ResumeFitViewed", {
     job_id: params.jobId,
     score: String(params.score),
     confidence: params.confidence,
     fit_tier: params.fitTier == null ? "" : String(params.fitTier),
+    surface: params.surface,
     ...attributionCustomData(),
   });
 }
 
-export function trackResumeFitUnavailable(params: { reason: string; jobId?: string }): void {
+export function trackResumeFitUnavailable(params: {
+  reason: string;
+  jobId?: string;
+  surface: FitSurface;
+}): void {
   trackMetaCustom("ResumeFitUnavailable", {
     reason: params.reason,
+    surface: params.surface,
     ...(params.jobId ? { job_id: params.jobId } : {}),
     ...attributionCustomData(),
   });
@@ -125,12 +176,14 @@ export function trackResumeFitUnavailableReason(params: {
   jobFamily: string | null;
   signalCount: number;
   jobId?: string;
+  surface: FitSurface;
 }): void {
   trackMetaCustom("ResumeFitUnavailableReason", {
     reason: params.reason,
     candidate_family: params.candidateFamily ?? "",
     job_family: params.jobFamily ?? "",
     signal_count: String(params.signalCount),
+    surface: params.surface,
     ...(params.jobId ? { job_id: params.jobId } : {}),
     ...attributionCustomData(),
   });
@@ -140,10 +193,12 @@ export function trackResumeFitConfidence(params: {
   confidence: string;
   signalCount: number;
   jobId?: string;
+  surface: FitSurface;
 }): void {
   trackMetaCustom("ResumeFitConfidence", {
     confidence: params.confidence,
     signal_count: String(params.signalCount),
+    surface: params.surface,
     ...(params.jobId ? { job_id: params.jobId } : {}),
     ...attributionCustomData(),
   });
@@ -154,6 +209,7 @@ export function trackResumeFitExperienceEvaluated(params: {
   candidateYears: number | null;
   requiredYears: number | null;
   experienceFitScore: number | null;
+  surface: FitSurface;
 }): void {
   trackMetaCustom("ResumeFitExperienceEvaluated", {
     ...(params.jobId ? { job_id: params.jobId } : {}),
@@ -161,6 +217,7 @@ export function trackResumeFitExperienceEvaluated(params: {
     required_years: params.requiredYears == null ? "" : String(params.requiredYears),
     experience_fit_score:
       params.experienceFitScore == null ? "" : String(params.experienceFitScore),
+    surface: params.surface,
     ...attributionCustomData(),
   });
 }
@@ -170,12 +227,14 @@ export function trackResumeFitTitleEvaluated(params: {
   candidateFamily: string | null;
   jobFamily: string | null;
   titleFit: number | null;
+  surface: FitSurface;
 }): void {
   trackMetaCustom("ResumeFitTitleEvaluated", {
     ...(params.jobId ? { job_id: params.jobId } : {}),
     candidate_family: params.candidateFamily ?? "",
     job_family: params.jobFamily ?? "",
     title_fit: params.titleFit == null ? "" : String(params.titleFit),
+    surface: params.surface,
     ...attributionCustomData(),
   });
 }
@@ -185,6 +244,7 @@ export function trackResumeFitSeniorityEvaluated(params: {
   candidateLevel: number | null;
   jobLevel: number | null;
   seniorityFitScore: number | null;
+  surface: FitSurface;
 }): void {
   trackMetaCustom("ResumeFitSeniorityEvaluated", {
     ...(params.jobId ? { job_id: params.jobId } : {}),
@@ -192,6 +252,7 @@ export function trackResumeFitSeniorityEvaluated(params: {
     job_level: params.jobLevel == null ? "" : String(params.jobLevel),
     seniority_fit_score:
       params.seniorityFitScore == null ? "" : String(params.seniorityFitScore),
+    surface: params.surface,
     ...attributionCustomData(),
   });
 }

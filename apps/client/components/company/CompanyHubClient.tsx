@@ -658,7 +658,7 @@ export function CompanyHubClient({
                         key={job.id}
                         className="transition-transform duration-200 hover:-translate-y-0.5"
                       >
-                        <HubJobCard job={job} />
+                        <HubJobCard job={job} surface="company_hub" />
                       </div>
                     ))}
                   </section>

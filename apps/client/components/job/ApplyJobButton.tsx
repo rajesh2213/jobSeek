@@ -3,6 +3,8 @@
 import { useAuth } from "@clerk/nextjs";
 import type { AccentTone } from "../ui/types";
 import { useApplications } from "../../lib/applicationsContext";
+import { trackJobApplyClicked } from "../../lib/analytics/resumeMatchFunnel";
+import { resolveFitSurface, type FitSurface } from "../../lib/analytics/fitSurface";
 import { captureEvent, withPosthogAttribution } from "../../lib/posthog";
 import { buttonClassName } from "../ui/Button";
 import { cn } from "../../lib/cn";
@@ -13,6 +15,8 @@ interface Props {
   company: string;
   /** Where the apply CTA lives, e.g. `job_detail_header` or `job_card` */
   source: string;
+  /** Phase 8C experiment surface for funnel attribution */
+  surface?: FitSurface;
   applyUrl: string;
   /** Card accent for outline Apply button */
   outlineTone?: AccentTone;
@@ -25,6 +29,7 @@ export function ApplyJobButton({
   jobId,
   company,
   source,
+  surface: surfaceProp,
   applyUrl,
   outlineTone = "brand",
   size = "sm",
@@ -38,12 +43,15 @@ export function ApplyJobButton({
   const openApply = () => {
     const url = applyUrl.trim();
     if (!url) return;
+    const surface = resolveFitSurface(jobId, surfaceProp);
+    trackJobApplyClicked({ jobId, surface, source });
     captureEvent(
       "job_apply_clicked",
       withPosthogAttribution({
         jobId,
         company,
         source,
+        surface,
         isAuthenticated: Boolean(isSignedIn),
       }),
     );
