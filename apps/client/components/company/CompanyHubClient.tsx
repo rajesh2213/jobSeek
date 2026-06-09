@@ -32,7 +32,7 @@ import { FREE_DISCOVERY_PREVIEW_JOB_ROWS } from "../../lib/planLimits";
 import { Badge } from "../ui/Badge";
 import { Button, buttonClassName } from "../ui/Button";
 import { JobCard } from "../job/JobCard";
-import { CompanyHubSkeleton } from "./CompanyHubSkeleton";
+import { CompanyHubJobsListSkeleton, CompanyHubSkeleton } from "./CompanyHubSkeleton";
 
 const LimitWallEnhanced = dynamic(
   () => import("../job/LimitWallEnhanced").then((m) => m.LimitWallEnhanced),
@@ -72,7 +72,7 @@ function resolveOpenRoleCount(input: {
   listMeta: NonNullable<JobsApiResponse["meta"]>;
   company: CompanyDetail | null;
   listJobs: JobItem[];
-  initialHydrating: boolean;
+  jobsListLoading: boolean;
 }): number | null {
   const metaTotal =
     typeof input.listMeta.total === "number"
@@ -84,7 +84,7 @@ function resolveOpenRoleCount(input: {
   if (typeof input.company?.jobCount === "number" && input.company.jobCount > 0) {
     return input.company.jobCount;
   }
-  if (input.initialHydrating) return null;
+  if (input.jobsListLoading) return null;
   if (typeof metaTotal === "number") return metaTotal;
   if (input.listJobs.length > 0) return input.listJobs.length;
   return 0;
@@ -162,10 +162,8 @@ export function CompanyHubClient({
   const [relatedCompaniesState, setRelatedCompaniesState] = useState<CompanyListItem[]>(
     relatedCompanies,
   );
-  const [initialHydrating, setInitialHydrating] = useState(
-    initialJobs.length === 0 &&
-      (initialMeta.total ?? 0) === 0 &&
-      !(initialCompany?.jobCount && initialCompany.jobCount > 0),
+  const [jobsListLoading, setJobsListLoading] = useState(
+    () => initialJobs.filter(isJobReady).length === 0,
   );
   const [loadingMore, setLoadingMore] = useState(false);
 
@@ -226,11 +224,12 @@ export function CompanyHubClient({
         listMeta,
         company: resolvedCompany,
         listJobs,
-        initialHydrating,
+        jobsListLoading,
       }),
-    [listMeta, resolvedCompany, listJobs, initialHydrating],
+    [listMeta, resolvedCompany, listJobs, jobsListLoading],
   );
   const openRolesLabel = formatOpenRolesLabel(totalRoles);
+  const showJobsSkeleton = jobsListLoading && listJobs.length === 0;
   const canLoadMore =
     Boolean(listMeta) &&
     (listMeta.hasMore === true ||
@@ -250,6 +249,7 @@ export function CompanyHubClient({
         ? urlFilters.limit
         : DEFAULT_LIMIT;
     void (async () => {
+      if (listJobs.length === 0) setJobsListLoading(true);
       try {
         const token = await getToken();
         const [jobsRes, companiesRes] = await Promise.all([
@@ -275,7 +275,7 @@ export function CompanyHubClient({
       } catch {
         // non-critical
       } finally {
-        if (!cancelled) setInitialHydrating(false);
+        if (!cancelled) setJobsListLoading(false);
       }
     })();
     return () => {
@@ -359,23 +359,28 @@ export function CompanyHubClient({
     let cancelled = false;
     const cleaned = stripProOnlyHubFilters(urlFilters);
     void (async () => {
-      router.replace(buildCompanyHubPath(slug, cleaned));
-      const token = await getToken();
-      const { page: _p, limit: _l, offset: _o, ...filterRest } = cleaned;
-      const res = await fetchCompanyJobs(slug, {
-        page: 1,
-        limit: DEFAULT_LIMIT,
-        filters: {
-          ...filterRest,
-          page: undefined,
-          limit: undefined,
-          offset: undefined,
-        },
-        token,
-      });
-      if (cancelled) return;
-      setListJobs(res.data);
-      if (res.meta) setListMeta(res.meta);
+      setJobsListLoading(true);
+      try {
+        router.replace(buildCompanyHubPath(slug, cleaned));
+        const token = await getToken();
+        const { page: _p, limit: _l, offset: _o, ...filterRest } = cleaned;
+        const res = await fetchCompanyJobs(slug, {
+          page: 1,
+          limit: DEFAULT_LIMIT,
+          filters: {
+            ...filterRest,
+            page: undefined,
+            limit: undefined,
+            offset: undefined,
+          },
+          token,
+        });
+        if (cancelled) return;
+        setListJobs(res.data);
+        if (res.meta) setListMeta(res.meta);
+      } finally {
+        if (!cancelled) setJobsListLoading(false);
+      }
     })();
     return () => {
       cancelled = true;
@@ -383,10 +388,16 @@ export function CompanyHubClient({
   }, [planLoaded, isPro, slug, urlFilters, router, getToken]);
 
   const emptyFiltered =
-    listJobs.length === 0 && (totalRoles ?? 0) === 0 && filtersActive;
+    !showJobsSkeleton &&
+    listJobs.length === 0 &&
+    (totalRoles ?? 0) === 0 &&
+    filtersActive;
 
   const emptyNoRoles =
-    listJobs.length === 0 && (totalRoles ?? 0) === 0 && !filtersActive;
+    !showJobsSkeleton &&
+    listJobs.length === 0 &&
+    (totalRoles ?? 0) === 0 &&
+    !filtersActive;
 
   const jobsLinkAll = useMemo(() => {
     if (!resolvedCompany) return "/jobs";
@@ -578,15 +589,8 @@ export function CompanyHubClient({
           </div>
         ) : null}
 
-        {initialHydrating ? (
-          <section className="mt-8 flex flex-col gap-5" aria-label="Loading company roles">
-            {Array.from({ length: 4 }).map((_, idx) => (
-              <div
-                key={`hub-skeleton-${idx}`}
-                className="h-28 animate-pulse rounded-xl border border-ink/10 bg-surface/80"
-              />
-            ))}
-          </section>
+        {showJobsSkeleton ? (
+          <CompanyHubJobsListSkeleton count={5} />
         ) : emptyFiltered ? (
           <div
             className="mt-8 rounded-2xl border border-dashed border-ink/15 bg-surface px-6 py-12 text-center"
