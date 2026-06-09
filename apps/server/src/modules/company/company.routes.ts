@@ -19,12 +19,16 @@ import {
 } from "./company.schema.js";
 import type { CompaniesListingSort, CompanyListingRow } from "./companyListing.types.js";
 import { isListingDegradedDbError } from "../../infrastructure/db/listingDegradedResponse.js";
-import { readListingStale } from "../../infrastructure/cache/listingRedisCache.js";
+import { readListingStale, LISTING_STALE_TTL_SEC } from "../../infrastructure/cache/listingRedisCache.js";
 
 const COMPANY_AGG_CACHE_ENABLED = process.env.COMPANY_AGG_CACHE_ENABLED !== "0";
 const COMPANY_AGG_CACHE_TTL_SECONDS = Math.max(
+  120,
+  Number(process.env.COMPANY_AGG_CACHE_TTL_SECONDS ?? "300") || 300,
+);
+const COMPANY_AGG_HTTP_S_MAXAGE_SECONDS = Math.max(
   60,
-  Number(process.env.COMPANY_AGG_CACHE_TTL_SECONDS ?? "120") || 120,
+  Number(process.env.COMPANY_AGG_HTTP_S_MAXAGE_SECONDS ?? "300") || 300,
 );
 const DEBUG_COMPANY_CONCURRENCY = process.env.DEBUG_COMPANY_CONCURRENCY === "1";
 
@@ -63,7 +67,7 @@ function setApiCacheHeader(
   input: { route: string; cacheable: boolean; reason: string },
 ): void {
   const value = input.cacheable
-    ? "public, max-age=30, s-maxage=30"
+    ? `public, max-age=60, s-maxage=${COMPANY_AGG_HTTP_S_MAXAGE_SECONDS}, stale-while-revalidate=600`
     : "private, no-store";
   reply.header("Cache-Control", value);
   request.log.info(
@@ -148,7 +152,7 @@ export function registerCompanyRoutes(
       const hiring = parseQueryBool(q.hiring);
       const remote = parseQueryBool(q.remote);
       const cacheKey = [
-        "companies:agg:v2",
+        "companies:agg:v3",
         page,
         limit,
         search.trim().toLowerCase(),
@@ -165,46 +169,45 @@ export function registerCompanyRoutes(
         typeof request.headers["x-ssr-page"] === "string"
           ? request.headers["x-ssr-page"]
           : null;
-      if (!hasAuthHeader && COMPANY_AGG_CACHE_ENABLED) {
-        const hit = await redis.get(cacheKey);
-        if (hit) {
-          const parsed = JSON.parse(hit) as CompaniesAggResponseBody;
-          return reply.send(parsed);
-        }
 
+      const fetchCompaniesAggBody = async (): Promise<CompaniesAggResponseBody> => {
+        const stats = await companyService.getListingStatsCached(redis);
+        const result = await companyService.listCompaniesDiscovery(
+          {
+            q: search,
+            sort,
+            hiring,
+            remote,
+            page,
+            limit,
+          },
+          { stats },
+        );
+        const body: CompaniesAggResponseBody = {
+          data: result.items.map(toCompanyListingPublicJson),
+          meta: {
+            page: result.page,
+            limit: result.limit,
+            total: result.total,
+            totalPages: result.totalPages,
+            hasMore: result.hasMore,
+            stats: result.stats,
+          },
+        };
+        await redis
+          .multi()
+          .set(cacheKey, JSON.stringify(body), "EX", COMPANY_AGG_CACHE_TTL_SECONDS)
+          .set(`${cacheKey}:stale`, JSON.stringify(body), "EX", LISTING_STALE_TTL_SEC)
+          .exec();
+        return body;
+      };
+
+      const startInflightFetch = (): Promise<CompaniesAggResponseBody> => {
         let inflight = inflightAnonymousCompanyAgg.get(cacheKey);
         if (!inflight) {
           inflight = (async (): Promise<CompaniesAggResponseBody> => {
             try {
-              const stats = await companyService.getListingStatsCached(redis);
-              const result = await companyService.listCompaniesDiscovery(
-                {
-                  q: search,
-                  sort,
-                  hiring,
-                  remote,
-                  page,
-                  limit,
-                },
-                { stats },
-              );
-              const body: CompaniesAggResponseBody = {
-                data: result.items.map(toCompanyListingPublicJson),
-                meta: {
-                  page: result.page,
-                  limit: result.limit,
-                  total: result.total,
-                  totalPages: result.totalPages,
-                  hasMore: result.hasMore,
-                  stats: result.stats,
-                },
-              };
-              await redis
-                .multi()
-                .set(cacheKey, JSON.stringify(body), "EX", COMPANY_AGG_CACHE_TTL_SECONDS)
-                .set(`${cacheKey}:stale`, JSON.stringify(body), "EX", 3600)
-                .exec();
-              return body;
+              return await fetchCompaniesAggBody();
             } finally {
               inflightAnonymousCompanyAgg.delete(cacheKey);
             }
@@ -223,34 +226,32 @@ export function registerCompanyRoutes(
             "COMPANY_AGG_INFLIGHT_JOIN",
           );
         }
+        return inflight;
+      };
 
-        const responsePayload = await inflight;
-        return reply.send(responsePayload);
+      if (!hasAuthHeader && COMPANY_AGG_CACHE_ENABLED) {
+        const hit = await redis.get(cacheKey);
+        if (hit) {
+          const parsed = JSON.parse(hit) as CompaniesAggResponseBody;
+          return reply.header("X-Listing-Cache", "fresh").send(parsed);
+        }
+
+        const stale = await readListingStale<CompaniesAggResponseBody>(redis, cacheKey);
+        if (stale?.data?.length) {
+          void startInflightFetch().catch((err) => {
+            request.log.warn(
+              { event: "company_agg_stale_refresh_failed", cacheKey, err },
+              "company_agg_stale_refresh_failed",
+            );
+          });
+          return reply.header("X-Listing-Cache", "stale").send(stale);
+        }
+
+        const responsePayload = await startInflightFetch();
+        return reply.header("X-Listing-Cache", "miss").send(responsePayload);
       }
 
-      const stats = await companyService.getListingStatsCached(redis);
-      const result = await companyService.listCompaniesDiscovery(
-        {
-          q: search,
-          sort,
-          hiring,
-          remote,
-          page,
-          limit,
-        },
-        { stats },
-      );
-      const responsePayload: CompaniesAggResponseBody = {
-        data: result.items.map(toCompanyListingPublicJson),
-        meta: {
-          page: result.page,
-          limit: result.limit,
-          total: result.total,
-          totalPages: result.totalPages,
-          hasMore: result.hasMore,
-          stats: result.stats,
-        },
-      };
+      const responsePayload = await fetchCompaniesAggBody();
       return reply.send(responsePayload);
       } catch (err) {
         if (isListingDegradedDbError(err)) {

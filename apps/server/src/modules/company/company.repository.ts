@@ -37,27 +37,25 @@ function nameSearchCondition(q: string): Prisma.Sql {
   return Prisma.sql`AND c.name ILIKE ${"%" + trimmed + "%"}`;
 }
 
-function listingHavingClause(hiring: boolean, remote: boolean): Prisma.Sql {
+function listingPostAggFilter(hiring: boolean, remote: boolean): Prisma.Sql {
   const parts: Prisma.Sql[] = [];
-  if (hiring) parts.push(Prisma.sql`COUNT(j.id) >= 1`);
+  if (hiring) parts.push(Prisma.sql`COALESCE(cj."jobCount", 0) >= 1`);
   if (remote) {
-    parts.push(
-      Prisma.sql`COALESCE(BOOL_OR(j."isRemote" OR j."workType" = 'remote'), false) = true`,
-    );
+    parts.push(Prisma.sql`COALESCE(cj."hasRemoteJobs", false) = true`);
   }
   if (parts.length === 0) return Prisma.empty;
-  return Prisma.sql`HAVING ${Prisma.join(parts, " AND ")}`;
+  return Prisma.sql`AND ${Prisma.join(parts, " AND ")}`;
 }
 
 function listingOrderBy(sort: CompaniesListingSort): Prisma.Sql {
   switch (sort) {
     case "recent":
-      return Prisma.sql`sub."lastCrawledAt" DESC NULLS LAST, sub."updatedAt" DESC`;
+      return Prisma.sql`"lastCrawledAt" DESC NULLS LAST, "updatedAt" DESC`;
     case "name":
-      return Prisma.sql`sub.name ASC`;
+      return Prisma.sql`name ASC`;
     case "jobs":
     default:
-      return Prisma.sql`sub."jobCount" DESC, sub.name ASC`;
+      return Prisma.sql`"jobCount" DESC, name ASC`;
   }
 }
 
@@ -431,19 +429,24 @@ export function createCompanyRepository(prisma: PrismaClient) {
 
     async countCompaniesListing(input: CompaniesListingInput): Promise<number> {
       const nameCond = nameSearchCondition(input.q);
-      const havingSql = listingHavingClause(input.hiring, input.remote);
-      const discoveryJoin = buildDiscoveryWhereSql();
+      const postAggFilter = listingPostAggFilter(input.hiring, input.remote);
+      const discoveryWhere = buildDiscoveryWhereSql();
       const rows = await prisma.$queryRaw<[{ count: bigint }]>`
+        WITH company_jobs AS (
+          SELECT
+            j."companyId",
+            COUNT(*)::int AS "jobCount",
+            COALESCE(BOOL_OR(j."isRemote" OR j."workType" = 'remote'), false) AS "hasRemoteJobs"
+          FROM "Job" j
+          WHERE ${discoveryWhere}
+          GROUP BY j."companyId"
+        )
         SELECT COUNT(*)::bigint AS count
-        FROM (
-          SELECT c.id
-          FROM "Company" c
-          LEFT JOIN "Job" j ON j."companyId" = c.id AND (${discoveryJoin})
-          WHERE 1 = 1
-          ${nameCond}
-          GROUP BY c.id
-          ${havingSql}
-        ) AS t
+        FROM "Company" c
+        LEFT JOIN company_jobs cj ON cj."companyId" = c.id
+        WHERE 1 = 1
+        ${nameCond}
+        ${postAggFilter}
       `;
       return Number(rows[0]?.count ?? 0);
     },
@@ -458,13 +461,22 @@ export function createCompanyRepository(prisma: PrismaClient) {
       input: CompaniesListingInput,
     ): Promise<import("./companyListing.types.js").CompanyListingRowWithTotal[]> {
       const nameCond = nameSearchCondition(input.q);
-      const havingSql = listingHavingClause(input.hiring, input.remote);
+      const postAggFilter = listingPostAggFilter(input.hiring, input.remote);
       const orderSql = listingOrderBy(input.sort);
-      const discoveryJoin = buildDiscoveryWhereSql();
+      const discoveryWhere = buildDiscoveryWhereSql();
       const limit = input.limit;
       const offset = input.offset;
       return prisma.$queryRaw<CompanyListingRowWithTotal[]>`
-        SELECT * FROM (
+        WITH company_jobs AS (
+          SELECT
+            j."companyId",
+            COUNT(*)::int AS "jobCount",
+            COALESCE(BOOL_OR(j."isRemote" OR j."workType" = 'remote'), false) AS "hasRemoteJobs"
+          FROM "Job" j
+          WHERE ${discoveryWhere}
+          GROUP BY j."companyId"
+        ),
+        filtered AS (
           SELECT
             c.id,
             c.name,
@@ -475,16 +487,29 @@ export function createCompanyRepository(prisma: PrismaClient) {
             c."createdAt",
             c."lastCrawledAt",
             c."updatedAt",
-            COUNT(j.id)::int AS "jobCount",
-            COALESCE(BOOL_OR(j."isRemote" OR j."workType" = 'remote'), false) AS "hasRemoteJobs",
+            COALESCE(cj."jobCount", 0)::int AS "jobCount",
+            COALESCE(cj."hasRemoteJobs", false) AS "hasRemoteJobs",
             COUNT(*) OVER()::int AS "_listingTotal"
           FROM "Company" c
-          LEFT JOIN "Job" j ON j."companyId" = c.id AND (${discoveryJoin})
+          LEFT JOIN company_jobs cj ON cj."companyId" = c.id
           WHERE 1 = 1
           ${nameCond}
-          GROUP BY c.id
-          ${havingSql}
-        ) AS sub
+          ${postAggFilter}
+        )
+        SELECT
+          id,
+          name,
+          slug,
+          domain,
+          "logoUrl",
+          "careersUrl",
+          "createdAt",
+          "lastCrawledAt",
+          "updatedAt",
+          "jobCount",
+          "hasRemoteJobs",
+          "_listingTotal"
+        FROM filtered AS f
         ORDER BY ${orderSql}
         LIMIT ${limit}
         OFFSET ${offset}

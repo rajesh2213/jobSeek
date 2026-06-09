@@ -43,7 +43,6 @@ export type JobStatus = "processing" | "ready" | "failed";
 const JOB_STATUS_PROCESSING: JobStatus = "processing";
 const JOB_STATUS_READY: JobStatus = "ready";
 const JOB_STATUS_FAILED: JobStatus = "failed";
-const WORKDAY_ROOT_JOB_PATH_SNIPPET = "myworkdayjobs.com/job/";
 
 /**
  * Single derived value for `Job.effectivePostedAt` (matches SQL COALESCE(postedAt, createdAt)).
@@ -246,44 +245,12 @@ function publicVisibilityGuardEnabled(): boolean {
  * Keeps ingestion/canonicalization untouched and is reversible via env flag.
  */
 function discoveryVisibilityQualityWhere(): Prisma.JobWhereInput {
-  return {
-    AND: [
-      { description: { not: null } },
-      { NOT: { description: "" } },
-      {
-        NOT: {
-          AND: [
-            { source: "workday" },
-            { sourceUrl: { contains: WORKDAY_ROOT_JOB_PATH_SNIPPET, mode: "insensitive" } },
-          ],
-        },
-      },
-    ],
-  };
+  return { isPublishable: true };
 }
 
-/** SQL equivalent of {@link discoveryVisibilityQualityWhere}. */
+/** SQL equivalent of {@link discoveryVisibilityQualityWhere}. Uses indexed `isPublishable`. */
 function discoveryVisibilityQualitySql(): Prisma.Sql {
-  return Prisma.sql`(
-    j.description IS NOT NULL
-    AND BTRIM(j.description) <> ''
-    AND NOT (
-      j.source = 'workday'
-      AND LOWER(j."sourceUrl") LIKE ${`%${WORKDAY_ROOT_JOB_PATH_SNIPPET}%`}
-    )
-    AND (
-      j."parsedDescription" IS NULL
-      OR NOT (
-        COALESCE(jsonb_array_length(j."parsedDescription"->'position'), 0) = 0
-        AND COALESCE(jsonb_array_length(j."parsedDescription"->'responsibility'), 0) = 0
-        AND COALESCE(jsonb_array_length(j."parsedDescription"->'requirement'), 0) = 0
-        AND COALESCE(jsonb_array_length(j."parsedDescription"->'experience'), 0) = 0
-        AND COALESCE(jsonb_array_length(j."parsedDescription"->'benefit'), 0) = 0
-        AND COALESCE(jsonb_array_length(j."parsedDescription"->'contact'), 0) = 0
-        AND COALESCE(jsonb_array_length(j."parsedDescription"->'other'), 0) = 0
-      )
-    )
-  )`;
+  return Prisma.sql`j."isPublishable" = true`;
 }
 
 /** Match stored country when legacy `country` was populated before `locationCountry`. */
