@@ -1,3 +1,13 @@
+import { isKnownSkillSlug } from "./taxonomy";
+
+function toSkillSlug(token: string): string {
+  return token
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 /** Noise tokens when mining requirement lines for browse links. */
 const STOP = new Set(
   [
@@ -78,10 +88,12 @@ export function mergeBrowseSkillQueries(
   for (const s of [...dynamic, ...fallback]) {
     const t = s.trim();
     if (!t) continue;
-    const k = t.toLowerCase();
+    const slug = toSkillSlug(t);
+    if (!slug || !isKnownSkillSlug(slug)) continue;
+    const k = slug.toLowerCase();
     if (seen.has(k)) continue;
     seen.add(k);
-    out.push(t);
+    out.push(slug);
     if (out.length >= cap) break;
   }
   return out;

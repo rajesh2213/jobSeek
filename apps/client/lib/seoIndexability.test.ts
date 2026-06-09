@@ -183,6 +183,18 @@ test("skill-only slug gets allow_jobs_skill_leaf reason", () => {
   assert.equal(decision.reason, "allow_jobs_skill_leaf");
 });
 
+test("unknown skill slug is noindex", () => {
+  const decision = decideJobsListingSeoPolicy({
+    routeKind: "jobs-slug",
+    filters: { skills: ["visual-standards"] },
+    searchParamKeys: [],
+    canonicalPath: "/jobs/skill/visual-standards",
+    validCanonicalSlugPath: true,
+  });
+  assert.equal(decision.index, false);
+  assert.equal(decision.reason, "noindex_unknown_skill");
+});
+
 test("category-only slug gets allow_jobs_category_leaf reason", () => {
   const decision = decideJobsListingSeoPolicy({
     routeKind: "jobs-slug",

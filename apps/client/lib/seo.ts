@@ -8,6 +8,7 @@ import {
   type SeoPolicyDecision,
   type SeoPolicyReason,
 } from "./seoIndexability";
+import { isKnownSkillSlug } from "./taxonomy";
 
 function toTitleCase(value: string): string {
   return value
@@ -313,6 +314,13 @@ function hasDuplicateLikeFilters(filters: JobFilters): boolean {
   return false;
 }
 
+function hasUnknownSkillFilter(filters: JobFilters): boolean {
+  const skills = filters.skills ?? [];
+  if (skills.length !== 1) return false;
+  const slug = skills[0]?.trim().toLowerCase() ?? "";
+  return slug.length > 0 && !isKnownSkillSlug(slug);
+}
+
 export function formatJobDiscoveryBreadcrumbLabel(filters: JobFilters): string {
   const { title } = buildJobsSeo(filters);
   return title
@@ -352,7 +360,10 @@ export function jobsRouteMetadata(
     const min = getSeoMinJobsIndex();
     const indexable =
       options.total === undefined ||
-      (options.total >= min && options.total > 0 && !hasDuplicateLikeFilters(filters));
+      (options.total >= min &&
+        options.total > 0 &&
+        !hasDuplicateLikeFilters(filters) &&
+        !hasUnknownSkillFilter(filters));
     decision = {
       index: indexable,
       follow: true,

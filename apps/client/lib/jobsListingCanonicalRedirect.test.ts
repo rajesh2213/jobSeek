@@ -47,6 +47,24 @@ test("no redirect when canonical matches incoming", () => {
   assert.equal(dest, null);
 });
 
+test("redirects wrong-order skill/location slug to canonical segment order", () => {
+  const dest = resolveJobsListingCanonicalRedirectUrl(
+    ORIGIN,
+    "/jobs/location/gb/skill/typescript",
+    {},
+  );
+  assert.equal(dest, `${ORIGIN}/jobs/skill/typescript/location/gb`);
+});
+
+test("redirects wrong-order location/skill slug for legacy-valid paths", () => {
+  const dest = resolveJobsListingCanonicalRedirectUrl(
+    ORIGIN,
+    "/jobs/location/us/skill/communication",
+    {},
+  );
+  assert.equal(dest, `${ORIGIN}/jobs/skill/communication/location/us`);
+});
+
 test("no redirect for /jobs/browse path", () => {
   const dest = resolveJobsListingCanonicalRedirectUrl(ORIGIN, "/jobs/browse", {});
   assert.equal(dest, null);

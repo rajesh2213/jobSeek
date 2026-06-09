@@ -67,23 +67,9 @@ export function resolveJobsListingCanonicalRedirect(req: NextRequest): URL | nul
 
   if (!isJobsListingRedirectPath(url.pathname)) return null;
 
-  const sp = searchParamsRecord(url);
-
-  if (url.search.length === 0 && url.pathname !== "/jobs") {
-    const segments = url.pathname.replace(/^\/jobs\/?/, "").split("/").filter(Boolean);
-    if (segments.length === 0) return null;
-    const parsed = parseSlugWithMeta(segments);
-    if (parsed.validCanonical) return null;
-    const canonicalPath = getCanonicalJobListingUrl(parsed.filters);
-    const canonicalPathname = canonicalPath.split("?")[0] ?? "/jobs";
-    if (canonicalPathname !== url.pathname) {
-      return new URL(canonicalPath, url.origin);
-    }
-    return null;
-  }
-
   if (url.pathname === "/jobs" && url.search.length === 0) return null;
 
+  const sp = searchParamsRecord(url);
   const destination = resolveJobsListingCanonicalRedirectUrl(url.origin, url.pathname, sp);
   return destination ? new URL(destination) : null;
 }

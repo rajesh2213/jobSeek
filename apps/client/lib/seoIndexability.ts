@@ -1,3 +1,4 @@
+import { isKnownSkillSlug } from "./taxonomy";
 import type { JobFilters } from "./slug-parser";
 
 export type SeoPolicyReason =
@@ -15,6 +16,7 @@ export type SeoPolicyReason =
   | "noindex_deep_refinement"
   | "noindex_experience_refinement"
   | "noindex_disallowed_param"
+  | "noindex_unknown_skill"
   | "noindex_company_broken"
   | "exclude_sitemap_noncanonical"
   | "exclude_sitemap_refinement"
@@ -88,6 +90,13 @@ function canonicalize(reason: SeoPolicyReason, canonicalTarget: string): SeoPoli
   };
 }
 
+function hasUnknownSkillSlug(filters: JobFilters): boolean {
+  const skills = filters.skills ?? [];
+  if (skills.length !== 1) return false;
+  const slug = skills[0]?.trim().toLowerCase() ?? "";
+  return slug.length > 0 && !isKnownSkillSlug(slug);
+}
+
 export function hasUnknownJobQueryParams(searchParamKeys: string[]): boolean {
   for (const k of searchParamKeys) {
     if (!KNOWN_JOB_QUERY_KEYS.has(k)) return true;
@@ -152,6 +161,7 @@ export function decideJobsListingSeoPolicy(input: {
   if (!validCanonicalSlugPath) {
     return canonicalize("canonicalize_noncanonical_slug", canonicalPath);
   }
+  if (hasUnknownSkillSlug(filters)) return noindex("noindex_unknown_skill");
   if (hasPagination) return noindex("noindex_pagination");
   if (hasDisallowedParam) return noindex("noindex_disallowed_param");
   if (hasDeepRefinement) {
@@ -237,6 +247,7 @@ export function isSitemapEligibleJobsPath(input: {
   filters: JobFilters;
 }): SeoPolicyDecision {
   if (!input.validCanonicalSlugPath) return noindex("exclude_sitemap_noncanonical");
+  if (hasUnknownSkillSlug(input.filters)) return noindex("exclude_sitemap_noindex");
   const { hasPagination, hasDeepRefinement, hasDisallowedParam } = classifyJobRefinement(input.filters);
   if (hasPagination) return noindex("exclude_sitemap_pagination");
   if (hasDisallowedParam || hasDeepRefinement) return noindex("exclude_sitemap_refinement");
