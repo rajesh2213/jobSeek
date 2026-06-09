@@ -148,7 +148,7 @@ export function registerCompanyRoutes(
       const hiring = parseQueryBool(q.hiring);
       const remote = parseQueryBool(q.remote);
       const cacheKey = [
-        "companies:agg:v1",
+        "companies:agg:v2",
         page,
         limit,
         search.trim().toLowerCase(),

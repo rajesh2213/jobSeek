@@ -8,20 +8,15 @@ import type {
 } from "./companyListing.types.js";
 import { slugifyCompanyName } from "../../utils/slugify.js";
 import { getDomainFromUrl, normalizeDomain } from "../../utils/common.js";
-import type { JobWithCompany } from "../job/job.repository.js";
+import {
+  buildDiscoveryWhereSql,
+  type JobWithCompany,
+} from "../job/job.repository.js";
 import { computeCompanyQualityFlags } from "../../services/qualityFlags.service.js";
 const WORKDAY_ROOT_JOB_PATH_SNIPPET = "myworkdayjobs.com/job/";
 
 function publicVisibilityGuardEnabled(): boolean {
   return process.env.PUBLIC_JOB_VISIBILITY_GUARD_ENABLED !== "0";
-}
-
-function publicVisibilityJobJoinGuardSql(): Prisma.Sql {
-  if (!publicVisibilityGuardEnabled()) return Prisma.empty;
-  return Prisma.sql`
-    AND j.description IS NOT NULL
-    AND j.description <> ''
-  `;
 }
 
 export interface CreateCompanyInput {
@@ -437,16 +432,13 @@ export function createCompanyRepository(prisma: PrismaClient) {
     async countCompaniesListing(input: CompaniesListingInput): Promise<number> {
       const nameCond = nameSearchCondition(input.q);
       const havingSql = listingHavingClause(input.hiring, input.remote);
-      const visibilityGuard = publicVisibilityJobJoinGuardSql();
+      const discoveryJoin = buildDiscoveryWhereSql();
       const rows = await prisma.$queryRaw<[{ count: bigint }]>`
         SELECT COUNT(*)::bigint AS count
         FROM (
           SELECT c.id
           FROM "Company" c
-          LEFT JOIN "Job" j ON j."companyId" = c.id
-            AND j."canonicalJobId" IS NULL
-            AND (j."status" = 'ready' OR j."status" IS NULL)
-            ${visibilityGuard}
+          LEFT JOIN "Job" j ON j."companyId" = c.id AND (${discoveryJoin})
           WHERE 1 = 1
           ${nameCond}
           GROUP BY c.id
@@ -468,7 +460,7 @@ export function createCompanyRepository(prisma: PrismaClient) {
       const nameCond = nameSearchCondition(input.q);
       const havingSql = listingHavingClause(input.hiring, input.remote);
       const orderSql = listingOrderBy(input.sort);
-      const visibilityGuard = publicVisibilityJobJoinGuardSql();
+      const discoveryJoin = buildDiscoveryWhereSql();
       const limit = input.limit;
       const offset = input.offset;
       return prisma.$queryRaw<CompanyListingRowWithTotal[]>`
@@ -487,10 +479,7 @@ export function createCompanyRepository(prisma: PrismaClient) {
             COALESCE(BOOL_OR(j."isRemote" OR j."workType" = 'remote'), false) AS "hasRemoteJobs",
             COUNT(*) OVER()::int AS "_listingTotal"
           FROM "Company" c
-          LEFT JOIN "Job" j ON j."companyId" = c.id
-            AND j."canonicalJobId" IS NULL
-            AND (j."status" = 'ready' OR j."status" IS NULL)
-            ${visibilityGuard}
+          LEFT JOIN "Job" j ON j."companyId" = c.id AND (${discoveryJoin})
           WHERE 1 = 1
           ${nameCond}
           GROUP BY c.id
