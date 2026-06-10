@@ -9,6 +9,7 @@ import type {
 import { slugifyCompanyName } from "../../utils/slugify.js";
 import { getDomainFromUrl, normalizeDomain } from "../../utils/common.js";
 import {
+  buildDiscoveryWhere,
   buildDiscoveryWhereSql,
   type JobWithCompany,
 } from "../job/job.repository.js";
@@ -249,29 +250,8 @@ export function createCompanyRepository(prisma: PrismaClient) {
       companyId: string,
       options: { limit: number; offset: number },
     ): Promise<JobWithCompany[]> {
-      const whereGuard = publicVisibilityGuardEnabled()
-        ? {
-            description: { not: null as string | null },
-            NOT: {
-              OR: [
-                { description: "" },
-                {
-                  AND: [
-                    { source: "workday" },
-                    { sourceUrl: { contains: WORKDAY_ROOT_JOB_PATH_SNIPPET, mode: "insensitive" as const } },
-                  ],
-                },
-              ],
-            },
-          }
-        : {};
       const rows = await prisma.job.findMany({
-        where: {
-          companyId,
-          canonicalJobId: null,
-          status: "ready",
-          ...whereGuard,
-        },
+        where: buildDiscoveryWhere({ companyId }),
         include: {
           company: { select: { id: true, name: true, slug: true } },
         },
@@ -286,29 +266,8 @@ export function createCompanyRepository(prisma: PrismaClient) {
     },
 
     async countCanonicalJobsByCompanyId(companyId: string): Promise<number> {
-      const whereGuard = publicVisibilityGuardEnabled()
-        ? {
-            description: { not: null as string | null },
-            NOT: {
-              OR: [
-                { description: "" },
-                {
-                  AND: [
-                    { source: "workday" },
-                    { sourceUrl: { contains: WORKDAY_ROOT_JOB_PATH_SNIPPET, mode: "insensitive" as const } },
-                  ],
-                },
-              ],
-            },
-          }
-        : {};
       return prisma.job.count({
-        where: {
-          companyId,
-          canonicalJobId: null,
-          status: "ready",
-          ...whereGuard,
-        },
+        where: buildDiscoveryWhere({ companyId }),
       });
     },
 
