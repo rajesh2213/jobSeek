@@ -3,9 +3,14 @@ import Link from "next/link";
 import {
   loadCompanyBySlug,
   loadCompanyHubInitialJobs,
+  loadRelatedCompanies,
   stableJobFiltersKey,
 } from "../../../../lib/jobsPageData";
-import { buildBreadcrumbListJsonLd } from "../../../../lib/seo";
+import {
+  buildBreadcrumbListJsonLd,
+  buildCompanyOrganizationJsonLd,
+  buildJobListingItemListJsonLd,
+} from "../../../../lib/seo";
 import { absoluteUrl } from "../../../../lib/seoSite";
 import { decideCompanySeoPolicy } from "../../../../lib/seoIndexability";
 import { CompanyHubDiscoveryLinks } from "../../../../components/company/CompanyHubDiscoveryLinks";
@@ -15,10 +20,19 @@ import { SeoBreadcrumbs } from "../../../../components/seo/SeoBreadcrumbs";
 import { parseJobFiltersFromSearch } from "../../../../lib/slug-parser";
 
 const HUB_LIMIT = 20;
+const ITEM_LIST_SCHEMA_JOBS = 10;
 
 interface Props {
   params: Promise<{ slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+function companyVisibleJobCount(
+  company: Awaited<ReturnType<typeof loadCompanyBySlug>>,
+): number | null {
+  if (typeof company?.visibleJobCount === "number") return company.visibleJobCount;
+  if (typeof company?.jobCount === "number") return company.jobCount;
+  return null;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -27,16 +41,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!company) {
     return { title: "Company not found | JobLoom" };
   }
-  const open = typeof company.jobCount === "number" && company.jobCount > 0 ? company.jobCount : null;
+  const visible = companyVisibleJobCount(company);
+  const open = visible != null && visible > 0 ? visible : null;
   const title =
     open != null
-      ? `${open.toLocaleString()} open roles at ${company.name} · Apply early | JobLoom`
-      : `${company.name} careers & jobs · Apply early | JobLoom`;
-  const remoteClause = company.hasRemoteJobs ? " Includes remote-friendly roles." : "";
+      ? `${open.toLocaleString()} open jobs at ${company.name} | JobLoom`
+      : `${company.name} careers & jobs | JobLoom`;
   const description =
     open != null
-      ? `${open.toLocaleString()} ${company.name} careers and open roles—apply directly on employer career sites.${remoteClause} Listings refresh daily.`
-      : `Explore ${company.name} careers on JobLoom. Browse engineering, product, and remote jobs—verified listings with early apply links.${remoteClause}`;
+      ? `Explore ${open.toLocaleString()} open roles at ${company.name}. Apply early.`
+      : `Explore careers at ${company.name} on JobLoom. Apply early when new roles are posted.`;
   const canonical = absoluteUrl(`/company/${slug}`);
   const companyGateEnabled = process.env.SEO_COMPANY_QUALITY_GATE_ENABLED === "true";
   const forceNoindexAll = process.env.SEO_FORCE_NOINDEX_ALL === "true";
@@ -45,6 +59,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     gateEnabled: companyGateEnabled,
     company: { id: company.id, name: company.name, slug: company.slug },
     requestedSlug: slug,
+    visibleJobCount: visible,
   });
   if (forceNoindexAll) {
     decision = { ...decision, index: false, follow: true, sitemapEligible: false };
@@ -90,19 +105,29 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
       : HUB_LIMIT;
 
   const hubFiltersKey = stableJobFiltersKey(hubFilters);
-  const initialListing = await loadCompanyHubInitialJobs(slug, hubFiltersKey, limit);
+  const [initialListing, relatedCompanies] = await Promise.all([
+    loadCompanyHubInitialJobs(slug, hubFiltersKey, limit),
+    loadRelatedCompanies(slug),
+  ]);
   const metaFromListing = initialListing.meta;
+  const visibleCount = companyVisibleJobCount(company);
   const meta = {
     ...metaFromListing,
     total:
       (metaFromListing.total ?? 0) > 0
         ? metaFromListing.total
-        : company?.jobCount ?? metaFromListing.total ?? 0,
+        : visibleCount ?? metaFromListing.total ?? 0,
     totalCount:
       (metaFromListing.totalCount ?? metaFromListing.total ?? 0) > 0
         ? (metaFromListing.totalCount ?? metaFromListing.total)
-        : company?.jobCount ?? metaFromListing.totalCount ?? metaFromListing.total ?? 0,
+        : visibleCount ?? metaFromListing.totalCount ?? metaFromListing.total ?? 0,
   };
+
+  const schemaJobs = initialListing.jobs.slice(0, ITEM_LIST_SCHEMA_JOBS);
+  const listTotal =
+    typeof meta.total === "number" && meta.total > 0
+      ? meta.total
+      : visibleCount ?? schemaJobs.length;
 
   return (
     <>
@@ -113,6 +138,21 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
           { name: company?.name ?? slug, path: `/company/${slug}` },
         ])}
       />
+      {company ? (
+        <JsonLdScript
+          data={buildCompanyOrganizationJsonLd({
+            name: company.name,
+            slug: company.slug,
+            domain: company.domain,
+            logoUrl: company.logoUrl,
+            careersUrl: company.careersUrl,
+            visibleJobCount: visibleCount,
+          })}
+        />
+      ) : null}
+      {schemaJobs.length > 0 ? (
+        <JsonLdScript data={buildJobListingItemListJsonLd(schemaJobs, listTotal)} />
+      ) : null}
       <div className="mx-auto w-[92%] max-w-6xl px-2 pt-6 sm:px-4">
         <SeoBreadcrumbs
           items={[
@@ -136,7 +176,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
         slug={slug}
         initialJobs={initialListing.jobs}
         initialMeta={meta}
-        relatedCompanies={[]}
+        relatedCompanies={relatedCompanies}
       />
     </>
   );

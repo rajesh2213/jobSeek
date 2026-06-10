@@ -18,6 +18,7 @@ export type SeoPolicyReason =
   | "noindex_disallowed_param"
   | "noindex_unknown_skill"
   | "noindex_company_broken"
+  | "noindex_company_no_visible_jobs"
   | "exclude_sitemap_noncanonical"
   | "exclude_sitemap_refinement"
   | "exclude_sitemap_pagination"
@@ -226,15 +227,24 @@ export function decideCompanySeoPolicy(input: {
   gateEnabled: boolean;
   company: { id?: string | null; name?: string | null; slug?: string | null } | null;
   requestedSlug: string;
+  /** Publishable roles visible on the company hub (same guard as job discovery). */
+  visibleJobCount?: number | null;
 }): SeoPolicyDecision {
   if (!input.company) return noindex("noindex_company_broken");
-  if (!input.gateEnabled) return allow("allow_company_default");
 
   const id = input.company.id?.trim() ?? "";
   const name = input.company.name?.trim() ?? "";
   const slug = input.company.slug?.trim() ?? "";
   if (!id || !name || !slug) return noindex("noindex_company_broken");
   if (slug !== input.requestedSlug) return noindex("noindex_company_broken");
+
+  const visible =
+    typeof input.visibleJobCount === "number" ? input.visibleJobCount : null;
+  if (visible !== null && visible < 1) {
+    return noindex("noindex_company_no_visible_jobs");
+  }
+
+  if (!input.gateEnabled) return allow("allow_company_default");
   return allow("allow_company_default");
 }
 

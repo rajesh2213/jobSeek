@@ -273,18 +273,26 @@ export class CompanyService {
 
   async getCompanyPublicDetail(
     slug: string,
-  ): Promise<(Company & { jobCount: number; hasRemoteJobs: boolean }) | null> {
+  ): Promise<
+    | (Company & {
+        visibleJobCount: number;
+        remoteJobCount: number;
+        hasRemoteJobs: boolean;
+      })
+    | null
+  > {
     const company = await this.companyRepository.findBySlug(slug);
     if (!company) return null;
     const filters: JobDiscoveryFilters = { companyId: company.id };
-    const [jobCount, remoteCount] = await Promise.all([
+    const [visibleJobCount, remoteJobCount] = await Promise.all([
       this.jobRepository.countCanonicalFiltered(filters),
       this.jobRepository.countCanonicalFiltered({ ...filters, isRemote: true }),
     ]);
     return {
       ...company,
-      jobCount,
-      hasRemoteJobs: remoteCount > 0,
+      visibleJobCount,
+      remoteJobCount,
+      hasRemoteJobs: remoteJobCount > 0,
     };
   }
 

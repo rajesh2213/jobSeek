@@ -21,7 +21,6 @@ import { cn } from "../../lib/cn";
 import { signalProgrammaticNavigation } from "../layout/RouteLoader";
 import {
   filtersToCompanyHubSearchParams,
-  filtersToSearchParams,
   hasActiveJobFilters,
   parseJobFiltersFromSearch,
   type JobFilters,
@@ -81,6 +80,9 @@ function resolveOpenRoleCount(input: {
         ? input.listMeta.totalCount
         : null;
   if (typeof metaTotal === "number" && metaTotal > 0) return metaTotal;
+  if (typeof input.company?.visibleJobCount === "number" && input.company.visibleJobCount > 0) {
+    return input.company.visibleJobCount;
+  }
   if (typeof input.company?.jobCount === "number" && input.company.jobCount > 0) {
     return input.company.jobCount;
   }
@@ -399,25 +401,10 @@ export function CompanyHubClient({
     (totalRoles ?? 0) === 0 &&
     !filtersActive;
 
-  const jobsLinkAll = useMemo(() => {
-    if (!resolvedCompany) return "/jobs";
-    const p = filtersToSearchParams({ companyId: resolvedCompany.id });
-    const qs = p.toString();
-    return qs ? `/jobs?${qs}` : "/jobs";
-  }, [resolvedCompany]);
+  const jobsLinkAll = `/company/${slug}`;
 
-  const jobsLinkEngineering = resolvedCompany
-    ? `/jobs?${filtersToSearchParams({
-        companyId: resolvedCompany.id,
-        role: "engineering",
-      }).toString()}`
-    : "/jobs";
-  const jobsLinkReact = resolvedCompany
-    ? `/jobs?${filtersToSearchParams({
-        companyId: resolvedCompany.id,
-        skills: ["react"],
-      }).toString()}`
-    : "/jobs";
+  const jobsLinkEngineering = buildCompanyHubPath(slug, { role: "engineering" });
+  const jobsLinkReact = buildCompanyHubPath(slug, { skills: ["react"] });
 
   if (companyHydrating) {
     return <CompanyHubSkeleton />;
@@ -480,7 +467,11 @@ export function CompanyHubClient({
             size="lg"
           />
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-semibold text-ink">{company.name}</h1>
+            <h1 className="text-2xl font-semibold text-ink">
+              {openRolesLabel
+                ? `${company.name} — ${openRolesLabel}`
+                : company.name}
+            </h1>
             <div className="mt-1 text-sm">
               {company.domain?.trim() ? (
                 <a

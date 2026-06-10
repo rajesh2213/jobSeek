@@ -498,6 +498,41 @@ function extractTopCompanies(jobs: JobItem[], max: number): string[] {
     .map(([name]) => name);
 }
 
+export function buildCompanyOrganizationJsonLd(input: {
+  name: string;
+  slug: string;
+  domain?: string | null;
+  logoUrl?: string | null;
+  careersUrl?: string | null;
+  visibleJobCount?: number | null;
+}): Record<string, unknown> {
+  const base = getSiteBaseUrl();
+  const pageUrl = `${base}/company/${input.slug}`;
+  const domain = input.domain?.trim();
+  const org: Record<string, unknown> = {
+    "@type": "Organization",
+    name: input.name,
+    url: pageUrl,
+  };
+  if (domain) {
+    const site = domain.startsWith("http") ? domain : `https://${domain}`;
+    org.sameAs = [site];
+  }
+  if (input.logoUrl?.trim()) {
+    org.logo = input.logoUrl.trim();
+  }
+  if (input.careersUrl?.trim()) {
+    org.subjectOf = {
+      "@type": "WebPage",
+      url: input.careersUrl.trim(),
+    };
+  }
+  return {
+    "@context": "https://schema.org",
+    ...org,
+  };
+}
+
 export function buildJobListingItemListJsonLd(
   jobs: JobItem[],
   listTotal?: number,

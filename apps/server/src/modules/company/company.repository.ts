@@ -13,11 +13,6 @@ import {
   type JobWithCompany,
 } from "../job/job.repository.js";
 import { computeCompanyQualityFlags } from "../../services/qualityFlags.service.js";
-const WORKDAY_ROOT_JOB_PATH_SNIPPET = "myworkdayjobs.com/job/";
-
-function publicVisibilityGuardEnabled(): boolean {
-  return process.env.PUBLIC_JOB_VISIBILITY_GUARD_ENABLED !== "0";
-}
 
 export interface CreateCompanyInput {
   name: string;
@@ -523,26 +518,20 @@ export function createCompanyRepository(prisma: PrismaClient) {
     }> {
       const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
+      const discoveryWhere = buildDiscoveryWhereSql();
       const countDistinctActiveHiringSql = () =>
         prisma.$queryRaw<[{ c: bigint }]>`
-          SELECT COUNT(DISTINCT "companyId")::bigint AS c
-          FROM "Job"
-          WHERE "canonicalJobId" IS NULL
-            AND "status" = 'ready'
-            AND "isActive" = true
-            AND description IS NOT NULL
-            AND description <> ''
+          SELECT COUNT(DISTINCT j."companyId")::bigint AS c
+          FROM "Job" j
+          WHERE ${discoveryWhere}
         `;
 
       const countDistinctHiringThisWeekSql = () =>
         prisma.$queryRaw<[{ c: bigint }]>`
-          SELECT COUNT(DISTINCT "companyId")::bigint AS c
-          FROM "Job"
-          WHERE "canonicalJobId" IS NULL
-            AND "status" = 'ready'
-            AND description IS NOT NULL
-            AND description <> ''
-            AND "lastSeenAt" >= ${weekAgo}
+          SELECT COUNT(DISTINCT j."companyId")::bigint AS c
+          FROM "Job" j
+          WHERE ${discoveryWhere}
+            AND j."lastSeenAt" >= ${weekAgo}
         `;
 
       const [totalTracked, activeRows, weekRows] = await Promise.all([

@@ -22,9 +22,12 @@ export interface CompanyListItem {
   logoUrl?: string | null;
   careersUrl: string | null;
   createdAt: string;
-  /** Canonical open roles (listing API only). */
+  /** Canonical open roles (listing API; same discovery guard as visible jobs). */
   jobCount?: number;
   hasRemoteJobs?: boolean;
+  /** Publishable roles on the company hub (`GET /company/:slug`). */
+  visibleJobCount?: number;
+  remoteJobCount?: number;
   lastCrawledAt?: string | null;
 }
 
@@ -1314,6 +1317,7 @@ export async function fetchCompanies(options: {
   remote?: boolean;
   /** Server-side callsite label for SSR attribution. */
   ssrPage?: string;
+  signal?: AbortSignal | null;
 } = {}): Promise<CompaniesApiResponse> {
   const params = new URLSearchParams();
   const coPage =
@@ -1349,6 +1353,14 @@ export async function fetchCompanies(options: {
   for (let attempt = 0; attempt < browserRetries; attempt++) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 22_000);
+    const externalSignal = options.signal ?? undefined;
+    if (externalSignal) {
+      if (externalSignal.aborted) {
+        clearTimeout(timeout);
+        break;
+      }
+      externalSignal.addEventListener("abort", () => controller.abort(), { once: true });
+    }
     try {
       const res = await fetch(url, { ...reqInit, signal: controller.signal });
       clearTimeout(timeout);

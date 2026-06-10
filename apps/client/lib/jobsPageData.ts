@@ -2,11 +2,13 @@ import { cache } from "react";
 import { auth } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
 import {
+  fetchCompanies,
   fetchCompanyBySlug,
   fetchCompanyJobs,
   fetchJobById,
   fetchJobs,
   type CompanyDetail,
+  type CompanyListItem,
   type JobDetailFetchResult,
   type JobItem,
   type JobsApiResponse,
@@ -231,6 +233,28 @@ export const loadCompanyBySlug = cache(async (slug: string): Promise<CompanyDeta
     return null;
   }
 });
+
+/** Related employers for company hub SSR (excludes current slug, requires open roles). */
+export const loadRelatedCompanies = cache(
+  async (slug: string): Promise<CompanyListItem[]> => {
+    try {
+      const res = await withSsrUpstreamTimeout((signal) =>
+        fetchCompanies({
+          limit: 12,
+          sort: "jobs",
+          hiring: true,
+          ssrPage: "company-related",
+          signal,
+        }),
+      );
+      return res.data
+        .filter((c) => c.slug !== slug && (c.jobCount ?? 0) > 0)
+        .slice(0, 6);
+    } catch {
+      return [];
+    }
+  },
+);
 
 export interface CompanyHubInitialListing {
   jobs: JobItem[];

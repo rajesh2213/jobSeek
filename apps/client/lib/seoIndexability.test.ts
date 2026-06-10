@@ -110,6 +110,18 @@ test("company policy only noindexes obviously broken states", () => {
   assert.equal(broken.reason, "noindex_company_broken");
 });
 
+test("company policy noindexes when no publishable roles are visible", () => {
+  const empty = decideCompanySeoPolicy({
+    gateEnabled: false,
+    company: { id: "c1", name: "Acme", slug: "acme" },
+    requestedSlug: "acme",
+    visibleJobCount: 0,
+  });
+  assert.equal(empty.index, false);
+  assert.equal(empty.reason, "noindex_company_no_visible_jobs");
+  assert.equal(empty.sitemapEligible, false);
+});
+
 test("sitemap eligibility excludes non-canonical and refinement-heavy", () => {
   const parsedOk = parseSlugWithMeta(["role", "backend-developer"]);
   const ok = isSitemapEligibleJobsPath({

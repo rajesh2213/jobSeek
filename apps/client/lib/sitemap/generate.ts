@@ -118,7 +118,6 @@ export async function generateCompanyEntries(): Promise<{
 }> {
   const base = getSiteBaseUrl();
   const now = new Date();
-  const sitemapPruningEnabled = process.env.SEO_SITEMAP_PRUNING_ENABLED === "true";
   const companyGateEnabled = process.env.SEO_COMPANY_QUALITY_GATE_ENABLED === "true";
   const forceNoindexAll = process.env.SEO_FORCE_NOINDEX_ALL === "true";
   const disableAllNoindex = process.env.SEO_DISABLE_ALL_NOINDEX === "true";
@@ -145,17 +144,16 @@ export async function generateCompanyEntries(): Promise<{
         "companies_fetch",
       );
       for (const c of res.data) {
-        if ((c.jobCount ?? 0) < 1) continue;
-        if (sitemapPruningEnabled) {
-          let decision = decideCompanySeoPolicy({
-            gateEnabled: companyGateEnabled,
-            company: { id: c.id, name: c.name, slug: c.slug },
-            requestedSlug: c.slug,
-          });
-          if (forceNoindexAll) decision = { ...decision, sitemapEligible: false };
-          if (disableAllNoindex) decision = { ...decision, sitemapEligible: true };
-          if (!decision.sitemapEligible) continue;
-        }
+        const visibleJobCount = c.jobCount ?? 0;
+        let decision = decideCompanySeoPolicy({
+          gateEnabled: companyGateEnabled,
+          company: { id: c.id, name: c.name, slug: c.slug },
+          requestedSlug: c.slug,
+          visibleJobCount,
+        });
+        if (forceNoindexAll) decision = { ...decision, sitemapEligible: false };
+        if (disableAllNoindex) decision = { ...decision, sitemapEligible: true };
+        if (!decision.sitemapEligible || visibleJobCount < 1) continue;
         companyEntries.push({
           url: `${base}/company/${c.slug}`,
           lastModified: now,
