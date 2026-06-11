@@ -4,6 +4,8 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { SignInButton, useUser } from "@clerk/nextjs";
 import { cn } from "../../lib/cn";
+import { WORKFLOW_ACCOUNT_ENDPOINT_ID } from "../../lib/headerWorkflowGlow";
+import { WorkflowEndpointGlow } from "./WorkflowEndpointGlow";
 
 /** Do not add `position: relative` here — it overrides `fixed` when classes are concatenated (cn has no tailwind-merge). */
 const shellClass =
@@ -22,6 +24,7 @@ const fixedFrame: CSSProperties = {
  */
 export function FixedAccountAvatar() {
   const { user, isLoaded } = useUser();
+
   if (!isLoaded) {
     return (
       <div
@@ -42,45 +45,68 @@ export function FixedAccountAvatar() {
       (user.firstName?.[0] || user.primaryEmailAddress?.emailAddress?.[0] || "?").toUpperCase();
 
     return (
-      <Link
-        href="/account"
-        prefetch={false}
-        style={fixedFrame}
-        className={cn(shellClass, "hidden lg:flex")}
-        aria-label={`Account (${label})`}
-      >
-        {user.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- Clerk avatar URLs are external; avoid image domain config.
-          <img
-            src={user.imageUrl}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <span className="text-sm font-bold text-ink/70">{initial}</span>
-        )}
-      </Link>
+      <div style={fixedFrame} className={cn("relative z-[100]", "hidden lg:block")}>
+        <WorkflowEndpointGlow>
+          {(glow) => (
+            <Link
+              id={WORKFLOW_ACCOUNT_ENDPOINT_ID}
+              href="/account"
+              prefetch={false}
+              className={cn(
+                shellClass,
+                glow
+                  ? "scale-[1.02] border-brand shadow-[0_0_0_1px_rgba(255,255,255,0.2),0_4px_16px_rgba(232,83,58,0.2)]"
+                  : "",
+              )}
+              aria-label={`Account (${label})`}
+            >
+              {user.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- Clerk avatar URLs are external; avoid image domain config.
+                <img src={user.imageUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-sm font-bold text-ink/70">{initial}</span>
+              )}
+            </Link>
+          )}
+        </WorkflowEndpointGlow>
+      </div>
     );
   }
 
   return (
-    <SignInButton mode="modal">
-      <button type="button" style={fixedFrame} className={cn(shellClass, "hidden lg:flex")} aria-label="Sign in">
-        <svg
-          className="h-5 w-5 text-ink/60 transition-colors group-hover:text-brand"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={1.8}
-          aria-hidden
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
-          />
-        </svg>
-      </button>
-    </SignInButton>
+    <div style={fixedFrame} className={cn("relative z-[100]", "hidden lg:block")}>
+      <WorkflowEndpointGlow>
+        {(glow) => (
+          <SignInButton mode="modal">
+            <button
+              type="button"
+              id={WORKFLOW_ACCOUNT_ENDPOINT_ID}
+              className={cn(
+                shellClass,
+                glow
+                  ? "scale-[1.02] border-brand shadow-[0_0_0_1px_rgba(255,255,255,0.2),0_4px_16px_rgba(232,83,58,0.2)]"
+                  : "",
+              )}
+              aria-label="Sign in"
+            >
+              <svg
+                className="h-5 w-5 text-ink/60 transition-colors group-hover:text-brand"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
+                />
+              </svg>
+            </button>
+          </SignInButton>
+        )}
+      </WorkflowEndpointGlow>
+    </div>
   );
 }

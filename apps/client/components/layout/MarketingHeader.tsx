@@ -68,7 +68,7 @@ export function MarketingHeader() {
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
-          <HeaderPricingLink surface="header_nav" />
+          <HeaderPricingLink surface="header_nav" className="hidden sm:inline-flex" />
           {!isLoaded ? (
             <div className={cn(avatarShell, "cursor-default opacity-60")} aria-hidden />
           ) : user ? (

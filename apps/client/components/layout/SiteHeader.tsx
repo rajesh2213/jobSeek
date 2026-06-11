@@ -103,7 +103,6 @@ export function SiteHeader() {
         </div>
 
         <div className="flex shrink-0 items-center gap-3 lg:hidden">
-          <HeaderPricingLink surface="header_nav" />
           {!userLoaded ? (
             <div className={cn(avatarShell, "cursor-default opacity-60")} aria-hidden />
           ) : user ? (
