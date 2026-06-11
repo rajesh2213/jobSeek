@@ -1,0 +1,290 @@
+{
+  "auditPhase": "Growth Activation Sprint — Implementation Plan",
+  "generatedAt": "2026-06-10T14:00:00.000Z",
+  "status": "plan_only",
+  "deployPolicy": "manual_staged_no_auto_deploy",
+  "sprintObjective": {
+    "maximize": [
+      "resume_uploads",
+      "signed_in_users",
+      "saved_searches",
+      "job_alert_adoption",
+      "paid_conversions"
+    ],
+    "collectProductionDataBefore": ["ATS Checker", "major_new_features"]
+  },
+  "nonGoals": [
+    "ATS Checker",
+    "ATS SEO pages",
+    "Resume rewriter",
+    "Cover letter generator",
+    "Server-side feed reranking",
+    "Resume Match scoring changes"
+  ],
+  "workstreams": {
+    "feedPersonalization": {
+      "goal": "Validate production engagement and recommendation quality",
+      "buildStatus": "code_complete_flag_off",
+      "estimatedEffortDays": [3, 4],
+      "shipTarget": "week1",
+      "tasks": {
+        "enableRollout": {
+          "env": "NEXT_PUBLIC_RESUME_FEED_PERSONALIZATION=1",
+          "optionalEnv": "NEXT_PUBLIC_RESUME_FEED_PERSONALIZATION_THRESHOLD",
+          "files": [
+            "apps/client/lib/resumeFeedPersonalizationFlag.ts",
+            "apps/client/components/job/RecommendedJobsSection.tsx",
+            "apps/client/components/job/JobsSearchClient.tsx",
+            "apps/client/.env.example"
+          ]
+        },
+        "analyticsVerification": {
+          "events": [
+            "RecommendedJobsViewed",
+            "RecommendedJobClicked",
+            "ResumeFitViewed",
+            "ResumeFitUnavailable",
+            "JobApplyClicked"
+          ],
+          "validateFields": [
+            "surface",
+            "job_id",
+            "candidate_family",
+            "job_family"
+          ],
+          "gapsToFix": [
+            "experiment_variant on events",
+            "upgrade_rate surface attribution"
+          ],
+          "files": [
+            "apps/client/lib/analytics/resumeMatchFunnel.ts",
+            "apps/client/components/resume/ResumeScorePill.tsx"
+          ]
+        },
+        "dashboard": {
+          "spec": "scripts/audit/phase8c-dashboard-spec.md",
+          "kpis": [
+            "recommendation_ctr",
+            "fit_check_rate",
+            "fit_availability",
+            "application_rate",
+            "upgrade_rate"
+          ],
+          "deliverable": "scripts/audit/feed-personalization-dashboard-runbook.md"
+        },
+        "monitoring": {
+          "cadence": "daily",
+          "deliverable": "scripts/audit/growth-activation-daily-kpi.md"
+        }
+      },
+      "successCriteria": {
+        "recommendation_ctr": { "target": ">= 3%", "gate": ">= 500 RecommendedJobsViewed" },
+        "fit_check_lift": { "target": ">= 15%" },
+        "error_rate": { "target": "no_increase" },
+        "cross_family_recommendations": { "target": "< 5%" }
+      },
+      "rollback": "Set NEXT_PUBLIC_RESUME_FEED_PERSONALIZATION=0"
+    },
+    "savedSearchPhase1": {
+      "goal": "Increase alert adoption and repeat visits",
+      "buildStatus": "backend_shipped_ux_gaps",
+      "estimatedEffortDays": [4, 5],
+      "shipTarget": "week1-2",
+      "tasks": {
+        "analytics": {
+          "newEvents": [
+            "save_search_clicked",
+            "alert_toggle_clicked",
+            "alert_enabled",
+            "alert_disabled",
+            "post_save_modal_shown",
+            "post_save_modal_completed"
+          ],
+          "retainExisting": ["saved_search_created"],
+          "files": [
+            "apps/client/lib/posthog.ts",
+            "apps/client/components/job/JobsSearchClient.tsx",
+            "apps/client/components/job/SavedSearchManageBody.tsx",
+            "apps/client/app/(app)/saved-searches/page.tsx"
+          ]
+        },
+        "postSaveOnboarding": {
+          "replaces": "Saved ✓",
+          "newCopy": "Search saved. Get notified when new matching jobs are posted.",
+          "cta": "Enable alerts",
+          "newFile": "apps/client/components/job/PostSaveAlertPrompt.tsx"
+        },
+        "emailFix": {
+          "campaign": "event_saved_search_suggestions",
+          "problem": "Sends generic latest jobs, ignores saved query",
+          "fix": "Pass savedSearchId; use discoveryFiltersFromSavedSearchQuery",
+          "files": [
+            "apps/server/src/modules/growthEmail/growthEmail.service.ts",
+            "apps/server/src/modules/saved-search/savedSearch.routes.ts",
+            "apps/server/src/queues/growthEmail.queue.ts"
+          ]
+        },
+        "navigation": {
+          "label": "Saved Searches",
+          "route": "/saved-searches",
+          "files": [
+            "apps/client/components/layout/SiteSideRail.tsx",
+            "apps/client/components/layout/MobileSectionsMenu.tsx"
+          ]
+        }
+      },
+      "successCriteria": {
+        "save_rate": { "target": "+25%" },
+        "alert_enable_rate": { "target": "+50%" },
+        "return_visits": { "target": "increase" },
+        "alert_emails": { "target": "within_24h_of_threshold" }
+      }
+    },
+    "companySeoWave1": {
+      "goal": "Convert company pages into acquisition and signup surfaces",
+      "buildStatus": "foundation_shipped_ctas_missing",
+      "estimatedEffortDays": [4, 5],
+      "shipTarget": "week2-3",
+      "tasks": {
+        "faqSchema": {
+          "pattern": "apps/client/components/seo/JobsListingFaq.tsx",
+          "newFile": "apps/client/components/seo/CompanyHubFaq.tsx",
+          "faqs": [
+            "How many jobs does {company} have?",
+            "Are remote jobs available at {company}?",
+            "How do I apply to jobs at {company}?"
+          ],
+          "wireIn": "apps/client/app/(app)/company/[slug]/page.tsx"
+        },
+        "companyAlertCta": {
+          "copy": "Get alerts for new jobs at {company}",
+          "savedSearchQuery": "/jobs?companyId={company.id}",
+          "newFile": "apps/client/components/company/CompanyAlertCta.tsx"
+        },
+        "companyFollowCta": {
+          "copy": "Follow {company}",
+          "reuses": "saved_search_infrastructure"
+        },
+        "relatedCompanies": {
+          "status": "shipped_validate_ssr",
+          "files": [
+            "apps/client/lib/jobsPageData.ts",
+            "apps/client/components/company/CompanyHubClient.tsx"
+          ],
+          "fix": "Align client refetch with SSR hiring:true filter"
+        },
+        "searchConsole": {
+          "submit": ["sitemap.xml", "sitemap-companies.xml"],
+          "docs": "docs/monitoring-seo.md",
+          "checklist": "scripts/audit/company-seo-wave1-gsc-checklist.md"
+        }
+      },
+      "successCriteria": {
+        "company_page_engagement": "increase",
+        "signups_from_company_pages": "increase",
+        "saved_search_from_company": "increase"
+      }
+    }
+  },
+  "schedule": {
+    "week1": {
+      "theme": "Ship activation core",
+      "deliverables": [
+        "Feed flag on staging then production",
+        "Saved search analytics + post-save prompt + nav",
+        "Growth email query fix",
+        "KPI baseline dashboard"
+      ],
+      "expectedKpiDelta": {
+        "resumeUploads": [20, 60],
+        "signups": [30, 80],
+        "paid": [5, 15],
+        "visitors": [200, 800]
+      }
+    },
+    "week2": {
+      "theme": "Company SEO Wave 1 build",
+      "deliverables": [
+        "Company FAQ schema",
+        "Company alert + follow CTAs",
+        "GSC sitemap submitted",
+        "First feed weekly report"
+      ],
+      "expectedKpiDeltaCumulative": {
+        "resumeUploads": [60, 150],
+        "signups": [120, 300],
+        "paid": [20, 45],
+        "visitors": [1500, 4000]
+      }
+    },
+    "week3": {
+      "theme": "Measure and iterate",
+      "focus": ["Feed CTR gate", "Saved search copy iteration", "Company internal links", "Mid-sprint KPI review"]
+    },
+    "week4": {
+      "theme": "Harden and document",
+      "deliverable": "Rollout summary with KPI movement and next sprint recommendation"
+    }
+  },
+  "backlog": {
+    "P0": [
+      { "id": "P0-1", "item": "Enable feed personalization flag", "workstream": "feed" },
+      { "id": "P0-2", "item": "Sprint KPI baseline + dashboard runbook", "workstream": "all" },
+      { "id": "P0-3", "item": "Saved search analytics (6 events)", "workstream": "savedSearch" },
+      { "id": "P0-4", "item": "Post-save alert onboarding prompt", "workstream": "savedSearch" },
+      { "id": "P0-5", "item": "Growth email saved-query fix", "workstream": "savedSearch" },
+      { "id": "P0-6", "item": "GSC sitemap submit", "workstream": "companySeo" }
+    ],
+    "P1": [
+      { "id": "P1-1", "item": "experiment_variant + bucketing on feed events", "workstream": "feed" },
+      { "id": "P1-2", "item": "Saved Searches nav entry", "workstream": "savedSearch" },
+      { "id": "P1-3", "item": "Company FAQ schema + UI", "workstream": "companySeo" },
+      { "id": "P1-4", "item": "Company alert + follow CTAs", "workstream": "companySeo" },
+      { "id": "P1-5", "item": "Related companies SSR validation/fix", "workstream": "companySeo" },
+      { "id": "P1-6", "item": "source=company_hub on company saves", "workstream": "companySeo" }
+    ],
+    "P2": [
+      { "id": "P2-1", "item": "Upgrade click surface attribution fix", "workstream": "feed" },
+      { "id": "P2-2", "item": "saved-searches upgrade band", "workstream": "savedSearch" },
+      { "id": "P2-3", "item": "Alert email UTM click tracking", "workstream": "savedSearch" },
+      { "id": "P2-4", "item": "Carousel/main-feed dedupe", "workstream": "feed" },
+      { "id": "P2-5", "item": "Automated daily KPI script", "workstream": "all" }
+    ],
+    "P3": [
+      { "id": "P3-1", "item": "ATS Checker MVP" },
+      { "id": "P3-2", "item": "Server-side feed rerank" },
+      { "id": "P3-3", "item": "ATS programmatic SEO" },
+      { "id": "P3-4", "item": "AI resume rewrite" }
+    ]
+  },
+  "goNoGo": {
+    "feedPersonalizationRollout": { "decision": "GO", "notes": "Code complete; enable Week 1 with monitoring" },
+    "savedSearchPhase1": { "decision": "GO", "notes": "Instrumentation + UX on shipped product" },
+    "companySeoWave1": { "decision": "GO", "notes": "FAQ + CTAs; Week 2 ship" },
+    "atsCheckerMvp": { "decision": "NO_GO", "notes": "Explicit non-goal this sprint" }
+  },
+  "deliverables": [
+    "Feed rollout live",
+    "Saved Search Phase 1 live",
+    "Company SEO Wave 1 live",
+    "Analytics dashboards",
+    "Daily KPI report",
+    "Rollout summary (Day 30)"
+  ],
+  "deploymentSequence": [
+    "Merge PRs — no auto-deploy",
+    "Deploy server (email fix) to staging",
+    "Deploy client (flag OFF) to staging",
+    "Run staging verification",
+    "Enable flag on staging",
+    "Validate events 24h",
+    "Deploy server to production",
+    "Deploy client to production with flag ON",
+    "Submit sitemap in GSC",
+    "Begin daily KPI report"
+  ],
+  "planDocuments": {
+    "markdown": "scripts/audit/growth-activation-sprint-plan.md",
+    "json": "scripts/audit/growth-activation-sprint-plan.json"
+  }
+}

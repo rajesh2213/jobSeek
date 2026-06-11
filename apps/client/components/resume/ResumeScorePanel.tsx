@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { JobItem } from "../../lib/api";
 import { trackResumeMatchUpgradeClick } from "../../lib/analytics/resumeMatchFunnel";
+import type { FitSurface } from "../../lib/analytics/fitSurface";
 import {
   isResumeMatchInsufficient,
   isResumeMatchInsufficientEvidence,
@@ -120,6 +121,7 @@ export function ResumeScorePanel({
   job,
   result,
   breakdownAllowed,
+  fitSurface,
   onReuploadResume,
 }: {
   open: boolean;
@@ -128,6 +130,7 @@ export function ResumeScorePanel({
   result: ScoringResult | null;
   /** Pro (or entitled): full keyword-level breakdown and gap copy. */
   breakdownAllowed: boolean;
+  fitSurface?: FitSurface;
   onReuploadResume: () => void;
 }) {
   const [toast, setToast] = useState<string | null>(null);
@@ -348,6 +351,7 @@ export function ResumeScorePanel({
                                 onClick={() =>
                                   trackResumeMatchUpgradeClick({
                                     surface: "resume_score_panel_working",
+                                    fitSurface,
                                     jobId: job.id,
                                   })
                                 }
@@ -392,6 +396,7 @@ export function ResumeScorePanel({
                               onClick={() =>
                                 trackResumeMatchUpgradeClick({
                                   surface: "resume_score_panel_gaps",
+                                  fitSurface,
                                   jobId: job.id,
                                 })
                               }

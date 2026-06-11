@@ -13,6 +13,7 @@ export interface GrowthEmailTemplateJob {
 export function getGrowthEmailSubject(input: {
   campaignType: GrowthEmailCampaignType;
   jobCount: number;
+  searchName?: string;
 }): string {
   const n = Math.max(0, input.jobCount);
   switch (input.campaignType) {
@@ -27,7 +28,11 @@ export function getGrowthEmailSubject(input: {
     case "event_followup":
       return "More jobs similar to what you viewed";
     case "event_saved_search_suggestions":
-      return "More suggestions for your new search";
+      return input.searchName
+        ? `${n} jobs matching “${input.searchName}”`
+        : n > 0
+          ? `${n} jobs matching your saved search`
+          : "Jobs matching your saved search";
     case "personalized":
     default:
       return "Jobs matching your profile";

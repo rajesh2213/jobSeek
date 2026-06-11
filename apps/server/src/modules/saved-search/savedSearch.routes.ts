@@ -151,6 +151,7 @@ export function registerSavedSearchRoutes(server: FastifyInstance): void {
       userId: ctx.internalUserId,
       email: ctx.email ?? undefined,
       campaignType: "event_saved_search_suggestions",
+      savedSearchId: created.id,
       source: "saved_search_create",
     });
 

@@ -9,6 +9,8 @@ import { sendEmail } from "../../utils/sendEmail.js";
 import { signGrowthEmailUnsubscribeToken } from "../../utils/growthEmailToken.js";
 import { getGrowthEmailSubject, renderGrowthEmailHtml, type GrowthEmailTemplateJob } from "./growthEmail.templates.js";
 import type { GrowthEmailCampaignType, GrowthEmailFrequency } from "./growthEmail.types.js";
+import { discoveryFiltersFromSavedSearchQuery } from "../saved-search/savedSearch.service.js";
+import type { JobDiscoveryFilters } from "../job/job.repository.js";
 
 const DEFAULT_PAGE_SIZE = 500;
 const GLOBAL_THROTTLE_MS = 24 * 60 * 60 * 1000;
@@ -95,22 +97,28 @@ export async function enqueueGrowthEmailEvent(
     campaignType: GrowthEmailCampaignType;
     email?: string;
     jobId?: string;
+    savedSearchId?: string;
     source?: string;
   },
 ): Promise<void> {
   if (!process.env.REDIS_URL?.trim()) return;
   try {
     const queue = getGrowthEmailQueue();
+    const dedupeKey =
+      input.savedSearchId ??
+      input.jobId ??
+      "none";
     await queue.add(
       campaignToJobName(input.campaignType),
       {
         userId: input.userId,
         email: input.email,
         jobId: input.jobId,
+        savedSearchId: input.savedSearchId,
         source: input.source,
       },
       {
-        jobId: `${input.campaignType}:${input.userId}:${input.jobId ?? "none"}`,
+        jobId: `${input.campaignType}:${input.userId}:${dedupeKey}`,
       },
     );
   } catch (err) {
@@ -118,10 +126,24 @@ export async function enqueueGrowthEmailEvent(
   }
 }
 
+const SAVED_SEARCH_SUGGESTIONS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Filters for event_saved_search_suggestions — matches saved query, recent postings only. */
+export function savedSearchSuggestionsFilters(
+  normalizedQuery: string,
+  now: Date,
+): JobDiscoveryFilters {
+  return {
+    ...discoveryFiltersFromSavedSearchQuery(normalizedQuery),
+    postedAfter: new Date(now.getTime() - SAVED_SEARCH_SUGGESTIONS_WINDOW_MS),
+  };
+}
+
 export async function runGrowthEmailCampaign(params: {
   prisma: PrismaClient;
   campaignType: GrowthEmailCampaignType;
   userId?: string;
+  savedSearchId?: string;
   page?: number;
   pageSize?: number;
 }): Promise<{ processed: number; sent: number; skipped: number }> {
@@ -222,15 +244,67 @@ export async function runGrowthEmailCampaign(params: {
     });
     const excludedJobIds = new Set(recentSent.map((x) => x.jobId));
 
+    let listingFilters: JobDiscoveryFilters;
+    let ctaUrl = `${clientPublicUrl().replace(/\/$/, "")}/jobs`;
+    let emailCampaignLabel = campaignLabel(campaignType);
+    let subjectSearchName: string | undefined;
+
+    if (campaignType === "event_saved_search_suggestions") {
+      const savedSearchId = params.savedSearchId?.trim();
+      if (!savedSearchId) {
+        skipped += 1;
+        await prisma.growthEmailSend.create({
+          data: {
+            userId: recipient.id,
+            campaignType,
+            periodKey: pKey,
+            status: "skipped",
+            jobCountSent: 0,
+            error: "Missing savedSearchId for saved search suggestions",
+          },
+        });
+        continue;
+      }
+
+      const savedRow = await prisma.savedSearch.findFirst({
+        where: { id: savedSearchId, userId: recipient.id },
+      });
+      if (!savedRow) {
+        skipped += 1;
+        await prisma.growthEmailSend.create({
+          data: {
+            userId: recipient.id,
+            campaignType,
+            periodKey: pKey,
+            status: "skipped",
+            jobCountSent: 0,
+            error: "Saved search not found for suggestions email",
+          },
+        });
+        continue;
+      }
+
+      listingFilters = savedSearchSuggestionsFilters(savedRow.query, now);
+      const searchPath = savedRow.query.startsWith("/") ? savedRow.query : `/${savedRow.query}`;
+      ctaUrl = `${clientPublicUrl().replace(/\/$/, "")}${searchPath}`;
+      subjectSearchName = savedRow.name?.trim() || undefined;
+      emailCampaignLabel = subjectSearchName
+        ? `Recent jobs matching your saved search “${subjectSearchName}”`
+        : "Recent jobs matching your saved search";
+    } else {
+      listingFilters = {
+        postedAfter:
+          campaignType === "weekly_digest"
+            ? new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+            : new Date(now.getTime() - 24 * 60 * 60 * 1000),
+      };
+    }
+
     const listing = await jobService.list({
       page: 1,
       limit: 40,
       sort: "latest",
-      filters: {
-        postedAfter: campaignType === "weekly_digest"
-          ? new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-          : new Date(now.getTime() - 24 * 60 * 60 * 1000),
-      },
+      filters: listingFilters,
     });
     const selected = listing.items
       .filter((j) => !excludedJobIds.has(j.id))
@@ -244,7 +318,10 @@ export async function runGrowthEmailCampaign(params: {
           periodKey: pKey,
           status: "skipped",
           jobCountSent: 0,
-          error: "No eligible jobs after dedupe",
+          error:
+            campaignType === "event_saved_search_suggestions"
+              ? "No jobs matching saved search filters"
+              : "No eligible jobs after dedupe",
         },
       });
       continue;
@@ -259,7 +336,11 @@ export async function runGrowthEmailCampaign(params: {
       postedAt: j.postedAt ? j.postedAt.toISOString().slice(0, 10) : "Recently posted",
       category: j.category || "other",
     }));
-    const subject = getGrowthEmailSubject({ campaignType, jobCount: jobsPayload.length });
+    const subject = getGrowthEmailSubject({
+      campaignType,
+      jobCount: jobsPayload.length,
+      searchName: subjectSearchName,
+    });
     const secret = process.env.JOB_ALERT_HMAC_SECRET?.trim();
     if (!secret) {
       skipped += 1;
@@ -273,9 +354,9 @@ export async function runGrowthEmailCampaign(params: {
     );
     const html = renderGrowthEmailHtml({
       userName: recipient.email.split("@")[0] ?? "there",
-      campaignLabel: campaignLabel(campaignType),
+      campaignLabel: emailCampaignLabel,
       jobs: jobsPayload,
-      ctaUrl: `${clientPublicUrl().replace(/\/$/, "")}/jobs`,
+      ctaUrl,
       upgradeToProUrl: `${clientPublicUrl().replace(/\/$/, "")}/pricing`,
       managePreferencesUrl: `${clientPublicUrl().replace(/\/$/, "")}/saved-searches`,
       unsubscribeUrl: `${apiPublicUrl().replace(/\/$/, "")}/growth-email/unsubscribe?token=${encodeURIComponent(token)}`,

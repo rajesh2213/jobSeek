@@ -39,11 +39,17 @@ async function main(): Promise<void> {
     async (job) => {
       const campaignType = JOB_TO_CAMPAIGN[job.name];
       if (!campaignType) return;
-      const data = (job.data ?? {}) as { userId?: string; page?: number; pageSize?: number };
+      const data = (job.data ?? {}) as {
+        userId?: string;
+        savedSearchId?: string;
+        page?: number;
+        pageSize?: number;
+      };
       const result = await runGrowthEmailCampaign({
         prisma,
         campaignType,
         userId: data.userId,
+        savedSearchId: data.savedSearchId,
         page: data.page,
         pageSize: data.pageSize,
       });

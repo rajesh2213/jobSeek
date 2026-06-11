@@ -311,9 +311,15 @@ export function ResumeScorePill({
         : `${resumeMatchAi.remaining} free AI enhancement${resumeMatchAi.remaining === 1 ? "" : "s"} left`
       : null;
 
+  const fitSurface = resolveFitSurface(job.id, surfaceProp);
+
   const onPillOpen = () => {
     if (!breakdownAllowed) {
-      trackResumeMatchUpgradeClick({ surface: "resume_score_pill_drawer", jobId: job.id });
+      trackResumeMatchUpgradeClick({
+        surface: "resume_score_pill_drawer",
+        fitSurface,
+        jobId: job.id,
+      });
     }
     setPanelOpen(true);
   };
@@ -353,7 +359,11 @@ export function ResumeScorePill({
               <Link
                 href="/pricing"
                 onClick={() =>
-                  trackResumeMatchUpgradeClick({ surface: "resume_score_pill_semantic", jobId: job.id })
+                  trackResumeMatchUpgradeClick({
+                    surface: "resume_score_pill_semantic",
+                    fitSurface,
+                    jobId: job.id,
+                  })
                 }
                 className="font-bold underline"
               >
@@ -430,6 +440,7 @@ export function ResumeScorePill({
         job={scoringJob}
         result={result}
         breakdownAllowed={breakdownAllowed}
+        fitSurface={fitSurface}
         onReuploadResume={() => {
           setPanelOpen(false);
           setUploadOpen(true);

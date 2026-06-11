@@ -30,6 +30,7 @@ export interface GrowthEmailEventPayload {
   userId: string;
   email?: string;
   jobId?: string;
+  savedSearchId?: string;
   source?: string;
 }
 

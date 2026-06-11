@@ -3,7 +3,12 @@
 import { getPersistedAttribution } from "./attribution";
 import type { FitSurface } from "./fitSurface";
 import { trackMetaCustom } from "./meta";
+import { getFeedPersonalizationVariant } from "../resumeFeedPersonalizationFlag";
 import { postMetaAnalyticsSync } from "./sync";
+
+function feedExperimentFields(): Record<string, string> {
+  return { experiment_variant: getFeedPersonalizationVariant() };
+}
 
 function attributionCustomData(): Record<string, string> {
   const a = getPersistedAttribution();
@@ -79,10 +84,16 @@ export function trackResumeMatchQuotaHit(params: { remaining: number; jobId?: st
   });
 }
 
-export function trackResumeMatchUpgradeClick(params: { surface: string; jobId?: string }): void {
+export function trackResumeMatchUpgradeClick(params: {
+  surface: string;
+  fitSurface?: FitSurface;
+  jobId?: string;
+}): void {
   trackMetaCustom("ResumeMatchUpgradeClick", {
     surface: params.surface,
+    ...(params.fitSurface ? { fit_surface: params.fitSurface } : {}),
     ...(params.jobId ? { job_id: params.jobId } : {}),
+    ...feedExperimentFields(),
     ...attributionCustomData(),
   });
 }
@@ -97,6 +108,7 @@ export function trackRecommendedJobsViewed(params: {
     candidate_family: params.candidateFamily,
     job_count: String(params.jobCount),
     surface: params.surface ?? "recommended_carousel",
+    ...feedExperimentFields(),
     ...attributionCustomData(),
   });
 }
@@ -112,6 +124,7 @@ export function trackRecommendedJobClicked(params: {
     job_family: params.jobFamily ?? "",
     job_id: params.jobId,
     surface: params.surface ?? "recommended_carousel",
+    ...feedExperimentFields(),
     ...attributionCustomData(),
   });
 }
@@ -126,6 +139,7 @@ export function trackJobApplyClicked(params: {
     job_id: params.jobId,
     surface: params.surface,
     source: params.source,
+    ...feedExperimentFields(),
     ...attributionCustomData(),
   });
 }
@@ -152,6 +166,7 @@ export function trackResumeFitViewed(params: {
     confidence: params.confidence,
     fit_tier: params.fitTier == null ? "" : String(params.fitTier),
     surface: params.surface,
+    ...feedExperimentFields(),
     ...attributionCustomData(),
   });
 }
@@ -165,6 +180,7 @@ export function trackResumeFitUnavailable(params: {
     reason: params.reason,
     surface: params.surface,
     ...(params.jobId ? { job_id: params.jobId } : {}),
+    ...feedExperimentFields(),
     ...attributionCustomData(),
   });
 }
