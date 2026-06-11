@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { SignInButton, useAuth } from "@clerk/nextjs";
+import { useAuth } from "@clerk/nextjs";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { trackUpgradePromptClick } from "../../lib/analytics/upgradeFunnel";
 import { cn } from "../../lib/cn";
@@ -38,40 +39,23 @@ function ResetLine({ resetAt }: { resetAt: string }) {
 }
 
 /**
- * Free-tier browse meter fixed under the desktop side rail — links to upgrade.
+ * Free-tier browse meter under the desktop side rail on non-jobs routes.
+ * `/jobs` uses `FreeDiscoveryQuotaStrip` (live list meta) — avoid duplicating it here.
  */
 export function SidebarBrowseQuotaCard() {
+  const pathname = usePathname();
   const { isSignedIn } = useAuth();
   const { isPro, isLoaded, browseQuota } = useAccountPlan();
 
-  if (!isLoaded || isPro) return null;
+  if (pathname.startsWith("/jobs") || !isLoaded || isPro || !isSignedIn || !browseQuota) {
+    return null;
+  }
 
   const shell = cn(
     "pointer-events-auto fixed bottom-6 left-2 z-[66] hidden w-[104px] flex-col gap-2 rounded-xl border border-ink/[0.08]",
     "bg-gradient-to-br from-white via-[#fffaf8] to-[#f3f0ea] p-2.5 shadow-md ring-1 ring-black/[0.04] lg:flex",
     "transition-[width] duration-200 hover:w-[148px]",
   );
-
-  if (!isSignedIn) {
-    return (
-      <div className={shell}>
-        <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-ink/40">Free</p>
-        <p className="text-[10px] font-medium leading-snug text-ink/65">
-          Sign in to see your daily browse quota.
-        </p>
-        <SignInButton mode="modal" forceRedirectUrl="/jobs">
-          <button
-            type="button"
-            className="mt-0.5 w-full rounded-lg bg-brand/10 px-2 py-1.5 text-[10px] font-bold text-brand hover:bg-brand/15"
-          >
-            Sign in
-          </button>
-        </SignInButton>
-      </div>
-    );
-  }
-
-  if (!browseQuota) return null;
 
   const { remaining, limit, resetAt } = browseQuota;
 
