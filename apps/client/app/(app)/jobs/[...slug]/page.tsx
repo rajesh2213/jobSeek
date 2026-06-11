@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { redirectCompanyIdToHubIfNeeded } from "../../../../lib/companyIdHubRedirect";
 import {
   loadJobsDiscoveryPage,
   stableJobFiltersKey,
@@ -60,6 +61,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     ...parseJobFiltersFromSearch(sp),
     surface: "seo" as const,
   };
+  await redirectCompanyIdToHubIfNeeded(filters);
   let response: Awaited<ReturnType<typeof loadJobsDiscoveryPage>>;
   try {
     response = await loadJobsDiscoveryPage(stableJobFiltersKey(filters));
@@ -85,6 +87,7 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
     ...parseJobFiltersFromSearch(sp),
     surface: "seo" as const,
   };
+  await redirectCompanyIdToHubIfNeeded(filters);
   const canonicalPath = getCanonicalJobListingUrl(filters);
   const canonicalSlugPath = canonicalPath.split("?")[0] ?? "/jobs";
   const incomingPath = `/jobs/${slug.join("/")}`;

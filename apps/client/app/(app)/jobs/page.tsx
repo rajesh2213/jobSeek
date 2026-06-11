@@ -11,6 +11,7 @@ import {
 } from "../../../lib/seo";
 import { JobsSearchPage } from "../../../components/job/JobsSearchPage";
 import { redirect } from "next/navigation";
+import { redirectCompanyIdToHubIfNeeded } from "../../../lib/companyIdHubRedirect";
 import { getCanonicalJobListingUrl, parseJobFiltersFromSearch } from "../../../lib/slug-parser";
 import { decideJobsListingSeoPolicy } from "../../../lib/seoIndexability";
 import { JsonLdScript } from "../../../components/seo/JsonLdScript";
@@ -32,6 +33,7 @@ interface Props {
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const sp = await searchParams;
   const filters = parseJobFiltersFromSearch(sp);
+  await redirectCompanyIdToHubIfNeeded(filters);
   const searchParamKeys = Object.keys(sp).filter(Boolean).sort();
   return jobsRouteMetadata(filters, {
     routeKind: "jobs-root",
@@ -43,6 +45,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 export default async function JobsPage({ searchParams }: Props) {
   const sp = await searchParams;
   const filters = parseJobFiltersFromSearch(sp);
+  await redirectCompanyIdToHubIfNeeded(filters);
   const searchParamKeys = Object.keys(sp).filter(Boolean).sort();
   if (searchParamKeys.length > 0) {
     const canonical = getCanonicalJobListingUrl(filters);
