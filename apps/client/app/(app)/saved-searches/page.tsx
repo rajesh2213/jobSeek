@@ -188,7 +188,7 @@ export default function SavedSearchesPage() {
                         </span>
                         Get notified when new jobs match this search
                       </p>
-                      <Link href="/pricing" className="font-semibold text-brand hover:underline">
+                      <Link href="/pricing?from=job_alerts" className="font-semibold text-brand hover:underline">
                         Upgrade to unlock →
                       </Link>
                     </div>

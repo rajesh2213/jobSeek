@@ -4,8 +4,8 @@ import Link from "next/link";
 import { SignInButton, useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { useAccountPlan } from "../../lib/useAccountPlan";
 import { cn } from "../../lib/cn";
+import { HeaderPricingLink } from "./HeaderPricingLink";
 import { MobileSectionsMenu } from "./MobileSectionsMenu";
 
 const avatarShell =
@@ -31,8 +31,6 @@ export function MarketingHeader() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const pathname = usePathname();
   const { user, isLoaded } = useUser();
-  const { isPro, isLoaded: planLoaded, pendingUpgrade } = useAccountPlan();
-  const showGetPro = !(planLoaded && (isPro || pendingUpgrade));
   const initial =
     (user?.firstName?.[0] || user?.primaryEmailAddress?.emailAddress?.[0] || "A").toUpperCase();
 
@@ -69,20 +67,8 @@ export function MarketingHeader() {
           </Link>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          {showGetPro ? (
-            <Link
-              href="/pricing"
-              prefetch={false}
-              className={cn(
-                "relative z-[2] inline-flex h-11 min-h-11 shrink-0 items-center rounded-full bg-brand px-4 text-sm font-bold !text-white no-underline shadow-sm",
-                "visited:!text-white hover:bg-brand-hover hover:!text-white active:!text-white",
-                "transition-[box-shadow,transform,filter] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
-              )}
-            >
-              Get Pro
-            </Link>
-          ) : null}
+        <div className="flex shrink-0 items-center gap-3">
+          <HeaderPricingLink surface="header_nav" />
           {!isLoaded ? (
             <div className={cn(avatarShell, "cursor-default opacity-60")} aria-hidden />
           ) : user ? (

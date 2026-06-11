@@ -1,2 +1,2 @@
-/** Shared ref for the JobLoom logo brand dot — used by `HeaderWorkflow` for path start alignment. */
+/** Shared ref for the JobLoom logo brand dot. */
 export const siteLogoBrandDotRef: { current: HTMLSpanElement | null } = { current: null };

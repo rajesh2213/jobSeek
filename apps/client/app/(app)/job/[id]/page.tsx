@@ -156,7 +156,7 @@ export default async function JobDetailPage({ params }: Props) {
                       Upgrade to read the full description and apply to this role.
                     </p>
                     <Link
-                      href="/pricing"
+                      href="/pricing?from=job_apply"
                       className="mt-4 inline-block text-sm font-semibold text-brand underline underline-offset-2 hover:text-brand-hover"
                     >
                       View Pro plans

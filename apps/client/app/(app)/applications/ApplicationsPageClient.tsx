@@ -300,7 +300,7 @@ export function ApplicationsPageClient() {
                           Pro
                         </span>
                         Email alerts when new jobs match your searches —{" "}
-                        <Link href="/pricing" className="font-medium text-brand hover:underline">
+                        <Link href="/pricing?from=job_alerts" className="font-medium text-brand hover:underline">
                           Upgrade
                         </Link>
                       </>

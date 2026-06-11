@@ -13,7 +13,7 @@ Capture **7-day trailing** and **prior-day** values from:
 | Source | Metrics |
 |--------|---------|
 | PostHog | `signup_completed`, `saved_search_created`, `ResumeUploaded` |
-| Meta Events Manager | `RecommendedJobsViewed` (will be 0 until flag on), `ResumeFitViewed`, `ResumeMatchUpgradeClick` |
+| Meta Events Manager | `RecommendedJobsViewed` (will be 0 until flag on), `ResumeFitViewed`, `ResumeMatchUpgradeClick`, `UpgradePromptShown`, `UpgradePromptClick`, `CheckoutStarted`, `SubscriptionActivated` |
 | Clerk Dashboard | Total users, new sign-ups |
 | Billing (PayPal/Dodo) | Active Pro subscriptions, new subs in period |
 | Google Analytics / server logs | Unique visitors (if available) |
@@ -47,6 +47,9 @@ Capture **7-day trailing** and **prior-day** values from:
 | `fit_availability` | `ResumeFitViewed / (ResumeFitViewed + ResumeFitUnavailable)` on carousel | N/A |
 | `application_rate` | `JobApplyClicked (carousel) / ResumeFitViewed (carousel)` | N/A |
 | `upgrade_rate` | `ResumeMatchUpgradeClick / ResumeFitViewed` | _fill_ |
+| `header_pricing_ctr` | `UpgradePromptClick (surface=header_nav) / unique visitors` | _fill_ |
+| `drawer_conversion` | `SubscriptionActivated (browse_limit\|resume_match_quota) / UpgradePromptShown (same)` | _fill_ |
+| `overall_upgrade_rate` | `SubscriptionActivated / UpgradePromptClick (all surfaces)` | _fill_ |
 
 ---
 

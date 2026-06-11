@@ -347,7 +347,7 @@ export function ResumeScorePanel({
                                 matches, and line-level context.
                               </p>
                               <Link
-                                href="/pricing"
+                                href="/pricing?from=resume_keywords"
                                 onClick={() =>
                                   trackResumeMatchUpgradeClick({
                                     surface: "resume_score_panel_working",
@@ -392,7 +392,7 @@ export function ResumeScorePanel({
                               Detailed gap analysis and AI-tailored recommendations are included with Pro.
                             </p>
                             <Link
-                              href="/pricing"
+                              href="/pricing?from=resume_keywords"
                               onClick={() =>
                                 trackResumeMatchUpgradeClick({
                                   surface: "resume_score_panel_gaps",

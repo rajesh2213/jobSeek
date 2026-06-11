@@ -7,6 +7,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -17,7 +18,12 @@ import {
   type ResumeMatchAiQuotaState,
 } from "./api";
 import { isBillingSubscriptionEntitled } from "./billingEntitlement";
+import { trackSubscriptionActivated } from "./analytics/upgradeFunnel";
 import { isPro as planIsPro } from "./planLimits";
+import {
+  clearCheckoutAttribution,
+  readCheckoutAttribution,
+} from "./upgradeTriggers";
 
 export const PENDING_UPGRADE_STORAGE_KEY = "jobloom.pendingUpgrade";
 
@@ -92,6 +98,22 @@ export function AccountPlanProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const prevPlanRef = useRef<"free" | "pro" | null>(null);
+  useEffect(() => {
+    if (!loaded) return;
+    const plan = summary?.plan ?? "free";
+    const prev = prevPlanRef.current;
+    prevPlanRef.current = plan;
+    if (prev !== "free" || plan !== "pro") return;
+    const attribution = readCheckoutAttribution();
+    if (!attribution) return;
+    trackSubscriptionActivated({
+      trigger: attribution.trigger,
+      time_to_activate_ms: Date.now() - attribution.startedAt,
+    });
+    clearCheckoutAttribution();
+  }, [loaded, summary?.plan]);
 
   useEffect(() => {
     if (!authLoaded) return;

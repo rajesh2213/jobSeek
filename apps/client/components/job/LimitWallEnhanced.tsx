@@ -1,9 +1,10 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { SignInButton, useAuth } from "@clerk/nextjs";
+import { trackUpgradePromptClick } from "../../lib/analytics/upgradeFunnel";
+import { useUpgradeDrawer } from "../upgrade/UpgradeDrawerProvider";
 import type { JobItem } from "../../lib/api";
 import { cn } from "../../lib/cn";
 import { motionEase } from "../../lib/motion";
@@ -218,6 +219,7 @@ export function LimitWallEnhanced({
   scrollRevealSubcopy = true,
 }: Props) {
   const { isSignedIn } = useAuth();
+  const { openUpgradeDrawer } = useUpgradeDrawer();
   const reduceMotion = useReducedMotion();
   const countActive = !reduceMotion;
   const blurSlots = phase === "preview" ? SLOT_COUNT_PREVIEW : SLOT_COUNT_FULL;
@@ -382,9 +384,20 @@ export function LimitWallEnhanced({
             </motion.ul>
 
             <div className="mt-8 flex flex-col gap-3">
-              <Link
-                href="/pricing"
-                className="block w-full text-center font-bold text-white no-underline transition-opacity hover:opacity-95"
+              <button
+                type="button"
+                onClick={() => {
+                  trackUpgradePromptClick({
+                    trigger: "browse_limit",
+                    surface: "limit_wall",
+                    cta_type: "inline",
+                  });
+                  openUpgradeDrawer({
+                    trigger: "browse_limit",
+                    context: { nHidden: Math.max(0, count) },
+                  });
+                }}
+                className="block w-full text-center font-bold text-white transition-opacity hover:opacity-95"
                 style={{
                   backgroundColor: CORAL,
                   borderRadius: 10,
@@ -394,7 +407,7 @@ export function LimitWallEnhanced({
                 }}
               >
                 See what you&apos;re missing →
-              </Link>
+              </button>
               {!isSignedIn ? (
                 <SignInButton mode="modal">
                   <button

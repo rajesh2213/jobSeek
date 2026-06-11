@@ -5,8 +5,8 @@ import { SignInButton, useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { siteLogoBrandDotRef } from "../../lib/siteLogoBrandDotRef";
-import { useAccountPlan } from "../../lib/useAccountPlan";
 import { cn } from "../../lib/cn";
+import { HeaderPricingLink } from "./HeaderPricingLink";
 import { MobileSectionsMenu } from "./MobileSectionsMenu";
 
 const avatarShell =
@@ -37,20 +37,18 @@ function MenuIcon({ open }: { open: boolean }) {
 }
 
 /**
- * Sticky top bar. Account + Get Pro use `FixedAccountAvatar` / `FixedGetProButton` from `lg` up;
- * below `lg` they render inline here so nothing collides with the wordmark or mobile menu.
+ * Sticky top bar. Account uses `FixedAccountAvatar` from `lg` up;
+ * below `lg` account renders inline here.
  */
 export function SiteHeader() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const pathname = usePathname();
   const { user, isLoaded: userLoaded } = useUser();
-  const { isPro, isLoaded: planLoaded, pendingUpgrade } = useAccountPlan();
 
   useEffect(() => {
     setMobileNavOpen(false);
   }, [pathname]);
 
-  const showGetPro = !(planLoaded && (isPro || pendingUpgrade));
   const initial =
     (user?.firstName?.[0] || user?.primaryEmailAddress?.emailAddress?.[0] || "?").toUpperCase();
 
@@ -88,7 +86,7 @@ export function SiteHeader() {
             />
           </Link>
           <nav
-            className="hidden min-w-0 items-center gap-3 text-xs font-bold uppercase tracking-wide text-ink/50"
+            className="hidden min-w-0 items-center gap-4 text-xs font-bold uppercase tracking-wide text-ink/50 sm:flex"
             aria-label="Sections"
           >
             <Link href="/jobs" prefetch={false} className="no-underline hover:text-brand">
@@ -100,23 +98,12 @@ export function SiteHeader() {
             <Link href="/about" prefetch={false} className="no-underline hover:text-brand">
               About
             </Link>
+            <HeaderPricingLink surface="header_nav" className="normal-case tracking-normal" />
           </nav>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 lg:hidden">
-          {showGetPro ? (
-            <Link
-              href="/pricing"
-              prefetch={false}
-              className={cn(
-                "relative z-[2] inline-flex h-11 min-h-11 shrink-0 items-center rounded-full bg-brand px-4 text-sm font-bold !text-white no-underline shadow-sm",
-                "visited:!text-white hover:bg-brand-hover hover:!text-white active:!text-white",
-                "transition-[box-shadow,transform,filter] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
-              )}
-            >
-              Get Pro
-            </Link>
-          ) : null}
+        <div className="flex shrink-0 items-center gap-3 lg:hidden">
+          <HeaderPricingLink surface="header_nav" />
           {!userLoaded ? (
             <div className={cn(avatarShell, "cursor-default opacity-60")} aria-hidden />
           ) : user ? (
@@ -155,8 +142,7 @@ export function SiteHeader() {
           )}
         </div>
 
-        {/* Balances fixed Get Pro + avatar cluster from `lg` so the wordmark stays left-aligned */}
-        <div className="pointer-events-none invisible hidden w-[132px] shrink-0 justify-end lg:flex" aria-hidden>
+        <div className="pointer-events-none invisible hidden w-[88px] shrink-0 justify-end lg:flex" aria-hidden>
           <span className="inline-block h-11 w-11 opacity-0" />
         </div>
       </div>

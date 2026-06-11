@@ -11,6 +11,8 @@ import {
   SMART_APPLY_APP_PATH,
   SMART_APPLY_FEATURE_PATH,
 } from "../../lib/signInUrl";
+import { trackUpgradePromptClick } from "../../lib/analytics/upgradeFunnel";
+import { useAccountPlan } from "../../lib/useAccountPlan";
 import { signalProgrammaticNavigation } from "./RouteLoader";
 
 type Props = {
@@ -64,6 +66,8 @@ export function MobileSectionsMenu({ open, onClose }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const { isSignedIn, isLoaded: authLoaded } = useAuth();
+  const { isPro, isLoaded: planLoaded, pendingUpgrade } = useAccountPlan();
+  const showPricing = !(planLoaded && (isPro || pendingUpgrade));
 
   const jobs = pathname.startsWith("/jobs");
   const companies = pathname.startsWith("/companies") || pathname.startsWith("/company");
@@ -156,6 +160,25 @@ export function MobileSectionsMenu({ open, onClose }: Props) {
             <span className={labelClass}>Applications</span>
             {applications ? <ActiveDot /> : null}
           </button>
+          {showPricing ? (
+            <button
+              type="button"
+              className="flex min-h-[44px] w-full items-center justify-between rounded-xl border border-ink/10 bg-surface px-4 py-3 text-left text-sm font-semibold text-ink/70 shadow-sm touch-manipulation hover:bg-ink/[0.03]"
+              onClick={() => {
+                trackUpgradePromptClick({
+                  trigger: "header_nav",
+                  surface: "mobile_menu",
+                  cta_type: "nav_link",
+                });
+                navigateAndClose("/pricing");
+              }}
+            >
+              <span>Pricing</span>
+              <span className="text-ink/40" aria-hidden>
+                →
+              </span>
+            </button>
+          ) : null}
         </div>
       </nav>
     </>

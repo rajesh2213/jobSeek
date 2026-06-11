@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { trackUpgradePromptClick } from "../../lib/analytics/upgradeFunnel";
+import { pricingUrl } from "../../lib/upgradeTriggers";
 import { useAccountPlan } from "../../lib/useAccountPlan";
 
 const copy: Record<string, string> = {
@@ -36,7 +38,14 @@ export function ProGate({
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl bg-surface/80 p-4 text-center backdrop-blur-[2px]">
         <p className="max-w-[260px] text-sm font-medium text-ink">{message}</p>
         <Link
-          href="/pricing"
+          href={pricingUrl("resume_keywords")}
+          onClick={() =>
+            trackUpgradePromptClick({
+              trigger: "resume_keywords",
+              surface: "pro_gate",
+              cta_type: "inline",
+            })
+          }
           className="pointer-events-auto rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white no-underline hover:bg-brand-hover"
         >
           Upgrade to Pro →

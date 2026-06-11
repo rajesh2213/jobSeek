@@ -5,6 +5,7 @@ import { MetaAnalyticsProvider } from "../../lib/analytics/provider";
 import { AccountPlanProvider } from "../../lib/accountPlanContext";
 import { ApplicationsProvider } from "../../lib/applicationsContext";
 import { PosthogAuthLifecycle } from "../analytics/PosthogAuthLifecycle";
+import { UpgradeDrawerProvider } from "../upgrade/UpgradeDrawerProvider";
 import { ToastProvider } from "../ui/Toast";
 
 export function AppProviders({ children }: { children: ReactNode }) {
@@ -13,7 +14,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
       <ToastProvider>
         <AccountPlanProvider>
           <PosthogAuthLifecycle />
-          <ApplicationsProvider>{children}</ApplicationsProvider>
+          <UpgradeDrawerProvider>
+            <ApplicationsProvider>{children}</ApplicationsProvider>
+          </UpgradeDrawerProvider>
         </AccountPlanProvider>
       </ToastProvider>
     </MetaAnalyticsProvider>

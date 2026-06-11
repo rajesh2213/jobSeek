@@ -54,7 +54,7 @@ export function JobHeader({ job, applyHref, applyUrlLocked }: Props) {
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:shrink-0 sm:items-center">
           {applyUrlLocked ? (
             <Link
-              href="/pricing"
+              href="/pricing?from=job_apply"
               className={buttonClassName({
                 variant: "primary",
                 size: "md",

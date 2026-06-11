@@ -1,7 +1,6 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { JobItem } from "../../lib/api";
@@ -42,6 +41,8 @@ import { cn } from "../../lib/cn";
 import { signInWithNext } from "../../lib/signInUrl";
 import { buttonFocusRing } from "../ui/Button";
 import { logResumeFitHydrate, resolveJobForFitScoring } from "../../lib/resumeFitHydrate";
+import { trackUpgradePromptClick } from "../../lib/analytics/upgradeFunnel";
+import { useUpgradeDrawer } from "../upgrade/UpgradeDrawerProvider";
 import { ResumeScorePanel } from "./ResumeScorePanel";
 import { ResumeUploadModal } from "./ResumeUploadModal";
 
@@ -71,6 +72,7 @@ export function ResumeScorePill({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { isPro, isLoaded: planLoaded, resumeMatchAi, refresh } = useAccountPlan();
+  const { openUpgradeDrawer } = useUpgradeDrawer();
   const { hasResume, resumeText, resumeBullets, isLoading } = useResume();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -313,8 +315,28 @@ export function ResumeScorePill({
 
   const fitSurface = resolveFitSurface(job.id, surfaceProp);
 
+  const openResumeQuotaDrawer = () => {
+    trackResumeMatchUpgradeClick({
+      surface: "resume_score_pill_drawer",
+      fitSurface,
+      jobId: job.id,
+    });
+    trackUpgradePromptClick({
+      trigger: "resume_match_quota",
+      surface: "resume_score_pill",
+      cta_type: "inline",
+    });
+    openUpgradeDrawer({ trigger: "resume_match_quota" });
+  };
+
   const onPillOpen = () => {
+    const quotaExhausted =
+      !isPro && resumeMatchAi != null && resumeMatchAi.remaining <= 0;
     if (!breakdownAllowed) {
+      if (quotaExhausted) {
+        openResumeQuotaDrawer();
+        return;
+      }
       trackResumeMatchUpgradeClick({
         surface: "resume_score_pill_drawer",
         fitSurface,
@@ -356,22 +378,38 @@ export function ResumeScorePill({
           {semanticUnavailable ? (
             <p className="mt-1 text-center text-[10px] font-medium leading-tight text-brand">
               AI enhancement unavailable —{" "}
-              <Link
-                href="/pricing"
-                onClick={() =>
+              <button
+                type="button"
+                onClick={() => {
                   trackResumeMatchUpgradeClick({
                     surface: "resume_score_pill_semantic",
                     fitSurface,
                     jobId: job.id,
-                  })
-                }
+                  });
+                  openResumeQuotaDrawer();
+                }}
                 className="font-bold underline"
               >
                 Upgrade for semantic matching
-              </Link>
+              </button>
             </p>
           ) : quotaHint ? (
-            <p className="mt-1 text-center text-[10px] font-medium leading-tight text-ink-muted">{quotaHint}</p>
+            <p className="mt-1 text-center text-[10px] font-medium leading-tight text-ink-muted">
+              {resumeMatchAi?.remaining === 0 ? (
+                <>
+                  AI enhancement unavailable ·{" "}
+                  <button
+                    type="button"
+                    onClick={openResumeQuotaDrawer}
+                    className="font-bold text-brand underline"
+                  >
+                    Upgrade for unlimited matching
+                  </button>
+                </>
+              ) : (
+                quotaHint
+              )}
+            </p>
           ) : null}
         </div>
       ) : showResultPill && c && scored && isUnscorable ? (

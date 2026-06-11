@@ -567,7 +567,7 @@ export function CompanyHubClient({
         ) : (
           <div id="company-jobs" className="mt-6">
             <p className="text-sm text-ink/65">
-              <Link href="/pricing" className="font-semibold text-brand no-underline hover:underline">
+              <Link href="/pricing?from=browse_nearing" className="font-semibold text-brand no-underline hover:underline">
                 Upgrade to Pro
               </Link>{" "}
               to sort and filter roles by work type and salary.

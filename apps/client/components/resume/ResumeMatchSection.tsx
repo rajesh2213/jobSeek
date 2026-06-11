@@ -415,7 +415,7 @@ export function ResumeMatchSection({ job }: { job: JobItem }) {
               {semanticUnavailable && !isPro ? (
                 <p className="mt-2 text-xs font-semibold text-brand/90">
                   <Link
-                    href="/pricing"
+                    href="/pricing?from=resume_keywords"
                     onClick={() =>
                       trackResumeMatchUpgradeClick({
                         surface: "resume_match_section_semantic",

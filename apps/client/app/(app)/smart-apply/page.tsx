@@ -607,7 +607,7 @@ export default function SmartApplyPage() {
               {jobsToday}/{jobsLimit} used today
             </p>
             {!isPaid ? (
-              <Link href="/pricing" className="mt-2 inline-block text-xs font-semibold text-brand hover:underline">
+              <Link href="/pricing?from=smart_apply" className="mt-2 inline-block text-xs font-semibold text-brand hover:underline">
                 Upgrade plan
               </Link>
             ) : null}

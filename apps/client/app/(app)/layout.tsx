@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
 import { FixedAccountAvatar } from "../../components/layout/FixedAccountAvatar";
-import { FixedGetProButton } from "../../components/layout/FixedGetProButton";
-import { HeaderWorkflow } from "../../components/layout/HeaderWorkflow";
 import { LegalFooter } from "../../components/layout/LegalFooter";
 import { PageTransition } from "../../components/layout/PageTransition";
 import { RailMainSurface } from "../../components/layout/RailMainSurface";
@@ -15,8 +13,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     <AppResumeProvider>
       <SiteSideRailProvider>
         <SiteHeader />
-        <HeaderWorkflow />
-        <FixedGetProButton />
         <FixedAccountAvatar />
         {/* `overflow-x-hidden` breaks `position:sticky` for descendants; `clip` trims overflow without that issue */}
         <div className="relative flex min-h-screen flex-col overflow-x-clip pb-20">

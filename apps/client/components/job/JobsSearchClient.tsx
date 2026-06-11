@@ -1582,7 +1582,7 @@ export function JobsSearchClient({
                   Get notified when new jobs match your saved searches
                 </span>
                 <Link
-                  href="/pricing"
+                  href="/pricing?from=job_alerts"
                   className="shrink-0 font-semibold text-brand hover:underline"
                 >
                   Enable job alerts →
@@ -1635,7 +1635,7 @@ export function JobsSearchClient({
                 ) : null}
               </div>
               <Link
-                href="/pricing"
+                href="/pricing?from=browse_nearing"
                 className="shrink-0 rounded-lg bg-brand px-4 py-2 text-center text-sm font-semibold text-white no-underline shadow-sm transition-colors hover:bg-brand-hover"
               >
                 Upgrade to view all

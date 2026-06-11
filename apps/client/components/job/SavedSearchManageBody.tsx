@@ -193,7 +193,7 @@ export function SavedSearchManageBody({
               Get notified when new jobs match this search
             </p>
             <Link
-              href="/pricing"
+              href="/pricing?from=job_alerts"
               className="inline-block text-sm font-semibold text-brand underline underline-offset-2 hover:text-brand-hover"
               onClick={(e) => e.stopPropagation()}
             >

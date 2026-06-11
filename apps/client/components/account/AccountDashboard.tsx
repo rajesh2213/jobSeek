@@ -23,6 +23,9 @@ import {
 } from "../../lib/userLocalResetTime";
 import { clearExtensionAuth } from "../../lib/extensionAuthBridge";
 import { isBillingSubscriptionEntitled } from "../../lib/billingEntitlement";
+import { pricingUrl } from "../../lib/upgradeTriggers";
+import { useAccountPlan } from "../../lib/useAccountPlan";
+import { FREE_RESUME_MATCH_AI_PER_24H } from "../../lib/planLimits";
 import { resetPosthog } from "../../lib/posthog";
 
 function formatRelativeTime(iso: string): string {
@@ -87,6 +90,7 @@ export function AccountDashboard() {
   const { user, isLoaded } = useUser();
   const { hasResume, fileName, wordCount, resumeUpdatedAt, deleteResume, refreshStatus } =
     useResume();
+  const { resumeMatchAi } = useAccountPlan();
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
   const [me, setMe] = useState<UserMeResponse | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -269,6 +273,46 @@ export function AccountDashboard() {
   return (
     <div className="box-border mx-auto grid w-full max-w-[1320px] grid-cols-1 gap-5 px-4 py-5 sm:gap-6 sm:px-6 sm:py-6 xl:grid-cols-[260px_minmax(0,1fr)] xl:gap-7 xl:px-6 xl:py-8 2xl:grid-cols-[300px_minmax(0,1fr)] 2xl:gap-8 2xl:px-8">
       <aside className="self-start rounded-2xl border border-line bg-surface p-5 shadow-card ring-1 ring-ink/5 sm:p-6 xl:sticky xl:top-20 xl:p-6 2xl:p-7">
+        {!isPro ? (
+          <div className="mb-6 rounded-xl border border-brand/20 bg-brand/5 p-4">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-ink/45">Your plan</p>
+            <p className="mt-1 font-sans text-lg font-bold text-ink">Free</p>
+            <div className="mt-3 space-y-3">
+              <div>
+                <p className="text-xs font-semibold text-ink/70">Daily job views</p>
+                <div
+                  className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-ink/10"
+                  role="progressbar"
+                  aria-valuenow={usedDisplay}
+                  aria-valuemin={0}
+                  aria-valuemax={limit}
+                >
+                  <div
+                    className="h-full rounded-full bg-brand transition-[width] duration-300"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-ink-muted">
+                  {usedDisplay} of {limit} used today
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-ink/70">AI resume matches (24h)</p>
+                <p className="mt-1 text-xs text-ink-muted">
+                  {resumeMatchAi
+                    ? `${Math.max(0, resumeMatchAi.remaining)} of ${FREE_RESUME_MATCH_AI_PER_24H} remaining`
+                    : `Up to ${FREE_RESUME_MATCH_AI_PER_24H} per rolling 24h`}
+                </p>
+              </div>
+            </div>
+            <Link
+              href={pricingUrl("account")}
+              className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white no-underline hover:bg-brand-hover"
+            >
+              Upgrade to Pro
+            </Link>
+          </div>
+        ) : null}
         <div className="flex flex-col items-center text-center">
           {user?.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -351,7 +395,7 @@ export function AccountDashboard() {
                   →
                 </span>
                 <Link
-                  href="/pricing"
+                  href={pricingUrl("account")}
                   className="text-sm font-semibold text-brand hover:text-brand-hover hover:underline"
                 >
                   Upgrade to Pro
@@ -431,7 +475,7 @@ export function AccountDashboard() {
             <>
               <p className="mt-2 text-sm text-ink-muted">⚡ Pro feature</p>
               <Link
-                href="/pricing"
+                href={pricingUrl("smart_apply")}
                 className="mt-2 inline-block text-sm font-semibold text-brand hover:underline"
               >
                 Upgrade to unlock →
