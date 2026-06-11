@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ["@jobseek/skill-constants"],
+  serverExternalPackages: ["@prisma/client", "prisma"],
 
   async rewrites() {
     return [
