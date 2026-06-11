@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
 import { loadJobDetailPage } from "../../../../lib/jobsPageData";
+import { resolveJobAliasRedirectPath } from "../../../../lib/jobCanonicalRedirect";
 import {
   buildJobPostingJsonLd,
   shouldEmitJobPostingJsonLd,
@@ -32,6 +33,7 @@ import { UserLocalResetCaption } from "../../../../components/job/UserLocalReset
 import { EmailCaptureCard } from "../../../../components/email/EmailCaptureCard";
 import { JobDetailPosthogTracker } from "../../../../components/analytics/JobDetailPosthogTracker";
 import { buildJobDetailSeo } from "../../../../lib/seoJobDetail";
+import { shouldIndexJob } from "../../../../lib/jobLifecycle";
 
 /** Anonymous crawlers and repeat views share ISR; authenticated path stays dynamic via loader. */
 export const revalidate = 300;
@@ -46,17 +48,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!fetched) {
     return { title: "Job not found | JobLoom" };
   }
+  const aliasPath = resolveJobAliasRedirectPath(id, fetched.data.id);
+  if (aliasPath) permanentRedirect(aliasPath);
+
   const job = fetched.data;
   const sections = refineSectionsForDisplay(resolveJobDetailSections(job));
   const structured = sectionsPlainTextForSeo(sections);
   const { title, description } = buildJobDetailSeo(job, {
     plainDescriptionForSeo: structured,
   });
-  const canonical = absoluteUrl(`/job/${id}`);
+  const canonical = absoluteUrl(`/job/${job.id}`);
+  // Expired/inactive jobs remain accessible but should not be indexed by search engines.
+  const indexable = shouldIndexJob(job);
   return {
     title,
     description,
     alternates: { canonical },
+    robots: indexable
+      ? { index: true, follow: true }
+      : { index: false, follow: true },
     openGraph: {
       title,
       description,
@@ -74,6 +84,9 @@ export default async function JobDetailPage({ params }: Props) {
   const { id } = await params;
   const fetched = await loadJobDetailPage(id);
   if (!fetched?.data?.company) notFound();
+
+  const aliasPath = resolveJobAliasRedirectPath(id, fetched.data.id);
+  if (aliasPath) permanentRedirect(aliasPath);
 
   const job = fetched.data;
   const detailCap = fetched.meta;

@@ -46,7 +46,9 @@ import {
   jobsListingRawCacheKey,
 } from "./jobsListingCache.js";
 import { isListingDegradedDbError } from "../../infrastructure/db/listingDegradedResponse.js";
-import { getCachedJobDetailJson, setCachedJobDetailJson } from "./jobDetailCache.js";
+import { getCachedJobDetailJson, setCachedJobDetailJson, deleteCachedJobDetailJson } from "./jobDetailCache.js";
+import { isJobSeoActive } from "../../services/jobSeoLifecycle.service.js";
+import { invalidateJobDetailSeoCachesOnRead } from "../../services/jobSeoCacheInvalidation.service.js";
 
 interface GetJobParams {
   id: string;
@@ -339,7 +341,10 @@ export function registerJobRoutes(
           jobId,
         );
         if (cachedDetail) {
-          return reply.header("X-Job-Detail-Cache", "hit").send({ data: cachedDetail });
+          if (isJobSeoActive(cachedDetail as { isActive?: boolean; expiresAt?: string | null })) {
+            return reply.header("X-Job-Detail-Cache", "hit").send({ data: cachedDetail });
+          }
+          await deleteCachedJobDetailJson(redis, jobId);
         }
       }
       const job = await jobService.getById(jobId, { includeProcessing });
@@ -358,13 +363,25 @@ export function registerJobRoutes(
         } satisfies ApiError);
       }
 
+      if (
+        !includeProcessing &&
+        !hasAuthHeader &&
+        !isJobSeoActive(job as { isActive: boolean; expiresAt: Date | null })
+      ) {
+        void invalidateJobDetailSeoCachesOnRead(redis, jobId);
+      }
+
       const capCtx = await buildCapContextFromRequest(server.prisma, request);
       const capState = await getJobViewCapState(server.prisma, redis, capCtx);
 
       if (capState.unlimited) {
         const resetAt = capState.resetAt.toISOString();
         const detailJson = toJobDetailJson(job as unknown as JobWithCompanyRow);
-        if (!includeProcessing && !hasAuthHeader) {
+        if (
+          !includeProcessing &&
+          !hasAuthHeader &&
+          isJobSeoActive(job as { isActive: boolean; expiresAt: Date | null })
+        ) {
           void setCachedJobDetailJson(redis, jobId, detailJson);
         }
         return reply.send({

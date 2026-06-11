@@ -1,5 +1,6 @@
 import type { JobFilters } from "./slug-parser";
 import { resolveApiBaseUrl } from "./apiBaseUrl";
+import { jobDetailCacheTag } from "./jobDetailCacheTags";
 import { formatUserLocalResetForMessage } from "./userLocalResetTime";
 
 export interface JobCompany {
@@ -126,6 +127,10 @@ export interface JobItem {
   /** Backend-owned freshness contract — Phase 7 of the freshness-integrity overhaul. */
   freshness?: JobFreshness;
   status?: "processing" | "ready" | "failed" | null;
+  /** Discovery lifecycle flag from Prisma (`Job.isActive`). False after expiry purge. */
+  isActive?: boolean;
+  /** ISO expiry from retention policy (`Job.expiresAt`). Omitted when null in DB. */
+  expiresAt?: string | null;
   companyId: string;
   company: JobCompany;
 }
@@ -1542,7 +1547,7 @@ export async function fetchJobById(
       headers.set("x-internal-seo", "true");
       headers.set("x-internal-seo-secret", internalSeoSecret);
     }
-    fetchOptions = { headers, next: { revalidate: 300 } };
+    fetchOptions = { headers, next: { revalidate: 300, tags: [jobDetailCacheTag(id)] } };
   }
   if (opts?.signal) fetchOptions.signal = opts.signal;
 

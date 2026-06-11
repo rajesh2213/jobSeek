@@ -10,7 +10,8 @@ import {
   JOB_PURGE_QUEUE_NAME,
   JOB_PURGE_TICK,
 } from "../queues/jobPurge.queue.js";
-import { getRedisConnection } from "../queues/job.queue.js";
+import { getIoredis, getRedisConnection } from "../queues/job.queue.js";
+import { invalidateJobDetailSeoCaches } from "../services/jobSeoCacheInvalidation.service.js";
 
 const DEFAULT_BATCH_SIZE = 1000;
 const DEFAULT_MAX_ROWS_PER_RUN = 5000;
@@ -37,7 +38,7 @@ async function currentDbSizeBytes(): Promise<number> {
   return Number(rows[0]?.size_bytes ?? 0n);
 }
 
-async function markExpiredInactiveBatch(limit: number): Promise<number> {
+async function markExpiredInactiveBatch(limit: number): Promise<string[]> {
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
     WITH target AS (
       SELECT id
@@ -54,12 +55,12 @@ async function markExpiredInactiveBatch(limit: number): Promise<number> {
     WHERE j.id = target.id
     RETURNING j.id
   `;
-  return rows.length;
+  return rows.map((row) => row.id);
 }
 
-async function duplicateDeleteBatch(dryRun: boolean, limit: number): Promise<number> {
+async function duplicateDeleteBatch(dryRun: boolean, limit: number): Promise<string[]> {
   if (dryRun) {
-    const rows = await prisma.$queryRaw<Array<{ c: bigint }>>`
+    await prisma.$queryRaw<Array<{ c: bigint }>>`
       WITH target AS (
         SELECT id
         FROM "Job"
@@ -74,7 +75,7 @@ async function duplicateDeleteBatch(dryRun: boolean, limit: number): Promise<num
       )
       SELECT COUNT(*)::bigint AS c FROM target
     `;
-    return Number(rows[0]?.c ?? 0n);
+    return [];
   }
 
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
@@ -95,12 +96,12 @@ async function duplicateDeleteBatch(dryRun: boolean, limit: number): Promise<num
     WHERE j.id = target.id
     RETURNING j.id
   `;
-  return rows.length;
+  return rows.map((row) => row.id);
 }
 
-async function canonicalDeleteBatch(dryRun: boolean, limit: number): Promise<number> {
+async function canonicalDeleteBatch(dryRun: boolean, limit: number): Promise<string[]> {
   if (dryRun) {
-    const rows = await prisma.$queryRaw<Array<{ c: bigint }>>`
+    await prisma.$queryRaw<Array<{ c: bigint }>>`
       WITH target AS (
         SELECT id
         FROM "Job"
@@ -121,7 +122,7 @@ async function canonicalDeleteBatch(dryRun: boolean, limit: number): Promise<num
       )
       SELECT COUNT(*)::bigint AS c FROM target
     `;
-    return Number(rows[0]?.c ?? 0n);
+    return [];
   }
 
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
@@ -148,7 +149,7 @@ async function canonicalDeleteBatch(dryRun: boolean, limit: number): Promise<num
     WHERE j.id = target.id
     RETURNING j.id
   `;
-  return rows.length;
+  return rows.map((row) => row.id);
 }
 
 async function runPurge(): Promise<{
@@ -157,6 +158,7 @@ async function runPurge(): Promise<{
   deletedDuplicates: number;
   deletedCanonicals: number;
   totalDeleted: number;
+  invalidatedJobIds: number;
   dbBeforeBytes: number;
   dbAfterBytes: number;
 }> {
@@ -165,29 +167,39 @@ async function runPurge(): Promise<{
   let deletedDuplicates = 0;
   let deletedCanonicals = 0;
   let totalDeleted = 0;
+  const invalidatedIds = new Set<string>();
 
   while (!DRY_RUN && totalDeleted < MAX_ROWS_PER_RUN) {
-    const marked = await markExpiredInactiveBatch(Math.min(BATCH_SIZE, MAX_ROWS_PER_RUN - totalDeleted));
-    markedInactive += marked;
-    if (marked === 0) break;
+    const markedIds = await markExpiredInactiveBatch(
+      Math.min(BATCH_SIZE, MAX_ROWS_PER_RUN - totalDeleted),
+    );
+    markedInactive += markedIds.length;
+    for (const id of markedIds) invalidatedIds.add(id);
+    if (markedIds.length === 0) break;
   }
 
   while (totalDeleted < MAX_ROWS_PER_RUN) {
     const remaining = MAX_ROWS_PER_RUN - totalDeleted;
     if (remaining <= 0) break;
     const dupDeleted = await duplicateDeleteBatch(DRY_RUN, Math.min(BATCH_SIZE, remaining));
-    deletedDuplicates += dupDeleted;
-    totalDeleted += dupDeleted;
-    if (dupDeleted === 0 || totalDeleted >= MAX_ROWS_PER_RUN) break;
+    deletedDuplicates += dupDeleted.length;
+    totalDeleted += dupDeleted.length;
+    for (const id of dupDeleted) invalidatedIds.add(id);
+    if (dupDeleted.length === 0 || totalDeleted >= MAX_ROWS_PER_RUN) break;
   }
 
   while (totalDeleted < MAX_ROWS_PER_RUN) {
     const remaining = MAX_ROWS_PER_RUN - totalDeleted;
     if (remaining <= 0) break;
     const canonicalDeleted = await canonicalDeleteBatch(DRY_RUN, Math.min(BATCH_SIZE, remaining));
-    deletedCanonicals += canonicalDeleted;
-    totalDeleted += canonicalDeleted;
-    if (canonicalDeleted === 0 || totalDeleted >= MAX_ROWS_PER_RUN) break;
+    deletedCanonicals += canonicalDeleted.length;
+    totalDeleted += canonicalDeleted.length;
+    for (const id of canonicalDeleted) invalidatedIds.add(id);
+    if (canonicalDeleted.length === 0 || totalDeleted >= MAX_ROWS_PER_RUN) break;
+  }
+
+  if (!DRY_RUN && invalidatedIds.size > 0) {
+    await invalidateJobDetailSeoCaches(getIoredis(), [...invalidatedIds]);
   }
 
   const dbAfterBytes = await currentDbSizeBytes();
@@ -197,6 +209,7 @@ async function runPurge(): Promise<{
     deletedDuplicates,
     deletedCanonicals,
     totalDeleted,
+    invalidatedJobIds: invalidatedIds.size,
     dbBeforeBytes,
     dbAfterBytes,
   };
@@ -227,6 +240,7 @@ async function main(): Promise<void> {
           deletedDuplicates: out.deletedDuplicates,
           deletedCanonicals: out.deletedCanonicals,
           totalDeleted: out.totalDeleted,
+          invalidatedJobIds: out.invalidatedJobIds,
           dbBeforeBytes: out.dbBeforeBytes,
           dbAfterBytes: out.dbAfterBytes,
           dbCapacityPctBefore: Number(capacityPctBefore.toFixed(2)),

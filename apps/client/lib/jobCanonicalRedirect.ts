@@ -36,6 +36,21 @@ export function resolveJobDetailCanonicalRedirectUrl(
   return new URL(`/job/${id}`, origin).toString();
 }
 
+/**
+ * Duplicate job rows resolve to the canonical job in the API payload (`data.id`).
+ * When the URL id differs, redirect to the canonical job detail path.
+ */
+export function resolveJobAliasRedirectPath(
+  requestedId: string,
+  resolvedJobId: string,
+): string | null {
+  const requested = requestedId.trim();
+  const resolved = resolvedJobId.trim();
+  if (!requested || !resolved) return null;
+  if (requested.toLowerCase() === resolved.toLowerCase()) return null;
+  return `/job/${resolved}`;
+}
+
 export function resolveJobDetailCanonicalRedirect(req: NextRequest): URL | null {
   const url = req.nextUrl;
   const sp: Record<string, string> = {};

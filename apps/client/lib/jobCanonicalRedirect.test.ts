@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   isJobUuidSegment,
+  resolveJobAliasRedirectPath,
   resolveJobDetailCanonicalRedirectUrl,
   resolveJobsUuidMispathRedirectUrl,
 } from "./jobCanonicalRedirect";
@@ -36,4 +37,18 @@ test("strips query params from job detail canonical", () => {
 test("no redirect when job detail has no query", () => {
   const dest = resolveJobDetailCanonicalRedirectUrl(ORIGIN, `/job/${SAMPLE_UUID}`, {});
   assert.equal(dest, null);
+});
+
+test("resolveJobAliasRedirectPath redirects duplicate id to canonical id", () => {
+  const canonical = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+  const duplicate = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+  assert.equal(resolveJobAliasRedirectPath(canonical, canonical), null);
+  assert.equal(resolveJobAliasRedirectPath(duplicate, canonical), `/job/${canonical}`);
+});
+
+test("resolveJobAliasRedirectPath is case-insensitive for UUIDs", () => {
+  const upper = "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA";
+  const lower = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+  assert.equal(resolveJobAliasRedirectPath(upper, lower), null);
+  assert.equal(resolveJobAliasRedirectPath(lower, upper), null);
 });

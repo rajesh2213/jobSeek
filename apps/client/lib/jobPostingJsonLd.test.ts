@@ -61,6 +61,8 @@ test("DISCOVERED-only jobs omit JobPosting JSON-LD", () => {
 
 test("POSTED jobs emit datePosted and validThrough", () => {
   const job = sampleJob({
+    isActive: true,
+    expiresAt: "2026-12-31T00:00:00.000Z",
     postedAt: "2026-04-15T00:00:00.000Z",
     freshness: {
       source: "POSTED",
@@ -73,6 +75,36 @@ test("POSTED jobs emit datePosted and validThrough", () => {
   const jsonLd = buildJobPostingJsonLd(job, undefined);
   assert.equal(jsonLd.datePosted, "2026-04-15T00:00:00.000Z");
   assert.equal(jsonLd.validThrough, "2026-05-30T00:00:00.000Z");
+});
+
+test("inactive jobs omit JobPosting JSON-LD", () => {
+  const job = sampleJob({
+    isActive: false,
+    expiresAt: "2026-12-31T00:00:00.000Z",
+    postedAt: "2026-04-15T00:00:00.000Z",
+    freshness: {
+      source: "POSTED",
+      label: "Posted",
+      timestamp: "2026-04-15T00:00:00.000Z",
+      relative: "Posted 1 day ago",
+    },
+  });
+  assert.equal(shouldEmitJobPostingJsonLd(job, "Readable role details."), false);
+});
+
+test("expired jobs omit JobPosting JSON-LD", () => {
+  const job = sampleJob({
+    isActive: true,
+    expiresAt: "2020-01-01T00:00:00.000Z",
+    postedAt: "2026-04-15T00:00:00.000Z",
+    freshness: {
+      source: "POSTED",
+      label: "Posted",
+      timestamp: "2026-04-15T00:00:00.000Z",
+      relative: "Posted 1 day ago",
+    },
+  });
+  assert.equal(shouldEmitJobPostingJsonLd(job, "Readable role details."), false);
 });
 
 test("capped path still emits description via structuredDataDescription fallback", () => {

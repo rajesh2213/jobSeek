@@ -5,8 +5,12 @@ const TTL_SEC = Math.max(
   Number(process.env.JOB_DETAIL_CACHE_TTL_SECONDS ?? "180") || 180,
 );
 
+export function jobDetailCacheKey(jobId: string): string {
+  return `job:detail:v1:${jobId.trim()}`;
+}
+
 function detailKey(jobId: string): string {
-  return `job:detail:v1:${jobId}`;
+  return jobDetailCacheKey(jobId);
 }
 
 export async function getCachedJobDetailJson<T>(
@@ -28,4 +32,17 @@ export async function setCachedJobDetailJson(
   body: unknown,
 ): Promise<void> {
   await redis.set(detailKey(jobId), JSON.stringify(body), "EX", TTL_SEC);
+}
+
+export async function deleteCachedJobDetailJson(redis: Redis, jobId: string): Promise<void> {
+  await redis.del(detailKey(jobId));
+}
+
+export async function deleteCachedJobDetailJsonMany(
+  redis: Redis,
+  jobIds: string[],
+): Promise<void> {
+  const keys = [...new Set(jobIds.map((id) => detailKey(id)).filter(Boolean))];
+  if (keys.length === 0) return;
+  await redis.del(...keys);
 }

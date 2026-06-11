@@ -1,4 +1,5 @@
 import type { JobItem } from "./api";
+import { shouldIndexJob } from "./jobLifecycle";
 import { absoluteUrl } from "./seoSite";
 
 /** ISO 3166-1 alpha-2 → ISO 4217; fallback USD when unknown. */
@@ -26,11 +27,13 @@ export function resolveJobPostingDatePosted(job: JobItem): string | undefined {
   return firstValidPostedIso(job.postedAt);
 }
 
-/** True when JobPosting JSON-LD should be emitted (has description + valid datePosted). */
+/** True when JobPosting JSON-LD should be emitted (indexable + description + valid datePosted). */
 export function shouldEmitJobPostingJsonLd(
   job: JobItem,
   description: string | undefined,
 ): boolean {
+  // Expired/inactive jobs remain accessible but should not be indexed by search engines.
+  if (!shouldIndexJob(job)) return false;
   const resolved = resolveDescription(job, description);
   if (!resolved) return false;
   return resolveJobPostingDatePosted(job) != null;
