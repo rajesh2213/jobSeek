@@ -5,7 +5,6 @@ import { SignInButton, useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { cn } from "../../lib/cn";
-import { HeaderPricingLink } from "./HeaderPricingLink";
 import { MobileSectionsMenu } from "./MobileSectionsMenu";
 
 const avatarShell =
@@ -68,7 +67,6 @@ export function MarketingHeader() {
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
-          <HeaderPricingLink surface="header_nav" className="hidden sm:inline-flex" />
           {!isLoaded ? (
             <div className={cn(avatarShell, "cursor-default opacity-60")} aria-hidden />
           ) : user ? (
