@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { siteLogoBrandDotRef } from "../../lib/siteLogoBrandDotRef";
 import { cn } from "../../lib/cn";
-import { HeaderPricingLink } from "./HeaderPricingLink";
 import { MobileSectionsMenu } from "./MobileSectionsMenu";
 
 const avatarShell =
@@ -85,21 +84,6 @@ export function SiteHeader() {
               aria-hidden
             />
           </Link>
-          <nav
-            className="hidden min-w-0 items-center gap-4 text-xs font-bold uppercase tracking-wide text-ink/50 sm:flex"
-            aria-label="Sections"
-          >
-            <Link href="/jobs" prefetch={false} className="no-underline hover:text-brand">
-              Jobs
-            </Link>
-            <Link href="/companies" prefetch={false} className="no-underline hover:text-brand">
-              Companies
-            </Link>
-            <Link href="/about" prefetch={false} className="no-underline hover:text-brand">
-              About
-            </Link>
-            <HeaderPricingLink surface="header_nav" className="normal-case tracking-normal" />
-          </nav>
         </div>
 
         <div className="flex shrink-0 items-center gap-3 lg:hidden">

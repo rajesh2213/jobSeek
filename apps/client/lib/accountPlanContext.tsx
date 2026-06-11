@@ -19,7 +19,7 @@ import {
 } from "./api";
 import { isBillingSubscriptionEntitled } from "./billingEntitlement";
 import { trackSubscriptionActivated } from "./analytics/upgradeFunnel";
-import { isPro as planIsPro } from "./planLimits";
+import { isPro as planIsPro, PLAN_LIMITS } from "./planLimits";
 import {
   clearCheckoutAttribution,
   readCheckoutAttribution,
@@ -27,11 +27,19 @@ import {
 
 export const PENDING_UPGRADE_STORAGE_KEY = "jobloom.pendingUpgrade";
 
+export interface BrowseQuotaState {
+  remaining: number;
+  limit: number;
+  resetAt: string;
+}
+
 export interface AccountPlanContextValue {
   plan: "free" | "pro";
   isPro: boolean;
   isLoaded: boolean;
   pendingUpgrade: boolean;
+  /** Free-tier daily browse meter from `/account/summary`; null when Pro or unavailable. */
+  browseQuota: BrowseQuotaState | null;
   /** Free-tier AI resume match quota from `/account/summary`; null when Pro or unavailable. */
   resumeMatchAi: ResumeMatchAiQuotaState | null;
   refresh: () => Promise<AccountSummary | null>;
@@ -164,11 +172,23 @@ export function AccountPlanProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AccountPlanContextValue>(() => {
     const plan = summary?.plan ?? "free";
     const pro = planIsPro(plan);
+    const limit = summary?.jobViewsLimit ?? PLAN_LIMITS.free.dailyJobViews;
+    const used =
+      summary && !pro ? Math.min(summary.jobViewsToday ?? 0, limit) : 0;
+    const browseQuota: BrowseQuotaState | null =
+      !pro && summary?.resetAt
+        ? {
+            remaining: Math.max(0, limit - used),
+            limit,
+            resetAt: summary.resetAt,
+          }
+        : null;
     return {
       plan,
       isPro: pro,
       isLoaded: authLoaded && loaded,
       pendingUpgrade,
+      browseQuota,
       resumeMatchAi: pro ? null : (summary?.resumeMatchAi ?? null),
       refresh,
       markPendingUpgrade,

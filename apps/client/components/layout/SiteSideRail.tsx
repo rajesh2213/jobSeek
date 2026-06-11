@@ -22,6 +22,7 @@ import {
   SMART_APPLY_FEATURE_PATH,
 } from "../../lib/signInUrl";
 import { signalProgrammaticNavigation } from "./RouteLoader";
+import { SidebarBrowseQuotaCard } from "./SidebarBrowseQuotaCard";
 
 /** Collapsed width (desktop rail); expands on hover/focus/active. */
 const W_COLLAPSED = "w-[112px]";
@@ -310,26 +311,24 @@ function DesktopRailNav() {
     goProtected,
   } = ctx;
 
-  const applicationsTrailingDesktop = (
-    <span className="pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
-      {actionCount > 0 ? (
-        <span
-          className="inline-flex items-center gap-0.5 rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-1 ring-white/40"
-          title={`${actionCount} need attention`}
-        >
-          <svg className="h-2.5 w-2.5 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-            <path
-              fillRule="evenodd"
-              d="M14.615 1.595a.75.75 0 01.359.852L12.982 9.75h7.268a.75.75 0 01.548 1.262l-10.5 11.25a.75.75 0 01-1.272-.71l1.992-7.302H3.75a.75.75 0 01-.548-1.262l10.5-11.25a.75.75 0 011.272-.71z"
-              clipRule="evenodd"
-            />
-          </svg>
-          {actionCount}
-        </span>
-      ) : null}
-      {applications ? <span className="h-1.5 w-1.5 rounded-full bg-white/60" /> : null}
-    </span>
-  );
+  const applicationsTrailingDesktop =
+    actionCount > 0 ? (
+      <span
+        className="pointer-events-none absolute right-1.5 top-2 z-[4] inline-flex items-center gap-0.5 rounded-full bg-white/25 px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-1 ring-white/40"
+        title={`${actionCount} need attention`}
+      >
+        <svg className="h-2.5 w-2.5 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <path
+            fillRule="evenodd"
+            d="M14.615 1.595a.75.75 0 01.359.852L12.982 9.75h7.268a.75.75 0 01.548 1.262l-10.5 11.25a.75.75 0 01-1.272-.71l1.992-7.302H3.75a.75.75 0 01-.548-1.262l10.5-11.25a.75.75 0 011.272-.71z"
+            clipRule="evenodd"
+          />
+        </svg>
+        {actionCount}
+      </span>
+    ) : applications ? (
+      <span className="pointer-events-none absolute right-2 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-white/60" />
+    ) : null;
 
   return (
     <nav
@@ -392,7 +391,7 @@ function DesktopRailNav() {
         expanded={expandedKey === "applications"}
         active={applications}
         variant="amber"
-        label="Applications"
+        label={expandedKey === "applications" ? "Applications" : "Apps"}
         titleAttr="Applications"
         icon={<IconApplications />}
         showActiveDot={false}
@@ -571,6 +570,7 @@ export function SiteSideRailProvider({ children }: { children: ReactNode }) {
   return (
     <RailContext.Provider value={ctxValue}>
       <DesktopRailNav />
+      <SidebarBrowseQuotaCard />
       {children}
     </RailContext.Provider>
   );

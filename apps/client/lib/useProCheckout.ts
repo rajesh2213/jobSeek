@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useClerk } from "@clerk/nextjs";
 import { DodoPayments } from "dodopayments-checkout";
 import { useCallback, useEffect, useState } from "react";
 import { API_BASE_URL } from "./api";
@@ -29,8 +29,19 @@ export type UseProCheckoutOptions = {
 
 export function useProCheckout(options: UseProCheckoutOptions = {}) {
   const { trigger = "unknown", surface } = options;
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn } = useAuth();
+  const { openSignIn } = useClerk();
   const { markPendingUpgrade, clearPendingUpgrade } = useAccountPlan();
+
+  const ensureSignedInForCheckout = useCallback((): boolean => {
+    if (isSignedIn) return true;
+    if (typeof window === "undefined") return false;
+    const returnUrl = `${window.location.pathname}${window.location.search}`;
+    openSignIn({
+      forceRedirectUrl: returnUrl.includes("/pricing") ? returnUrl : `/pricing?from=${trigger}`,
+    });
+    return false;
+  }, [isSignedIn, openSignIn, trigger]);
   const [busyPayPal, setBusyPayPal] = useState<null | CheckoutKey>(null);
   const [busyDodo, setBusyDodo] = useState<null | CheckoutKey>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,12 +72,18 @@ export function useProCheckout(options: UseProCheckoutOptions = {}) {
 
   const startPayPalCheckout = useCallback(
     async (which: CheckoutKey) => {
+      if (!ensureSignedInForCheckout()) return;
       setError(null);
       setBusyPayPal(which);
       try {
         const token = await getToken();
         if (!token) {
-          setError("Sign in to continue.");
+          openSignIn({
+            forceRedirectUrl:
+              typeof window !== "undefined"
+                ? `${window.location.pathname}${window.location.search}`
+                : "/pricing",
+          });
           return;
         }
         const planType = PLAN_TYPE_BY_KEY[which];
@@ -102,17 +119,23 @@ export function useProCheckout(options: UseProCheckoutOptions = {}) {
         setBusyPayPal(null);
       }
     },
-    [getToken, markPendingUpgrade, surface, trigger],
+    [ensureSignedInForCheckout, getToken, markPendingUpgrade, openSignIn, surface, trigger],
   );
 
   const startDodoCheckout = useCallback(
     async (which: CheckoutKey) => {
+      if (!ensureSignedInForCheckout()) return;
       setError(null);
       setBusyDodo(which);
       try {
         const token = await getToken();
         if (!token) {
-          setError("Sign in to continue.");
+          openSignIn({
+            forceRedirectUrl:
+              typeof window !== "undefined"
+                ? `${window.location.pathname}${window.location.search}`
+                : "/pricing",
+          });
           return;
         }
         const planType = PLAN_TYPE_BY_KEY[which];
@@ -150,7 +173,7 @@ export function useProCheckout(options: UseProCheckoutOptions = {}) {
         setBusyDodo(null);
       }
     },
-    [getToken, markPendingUpgrade, surface, trigger],
+    [ensureSignedInForCheckout, getToken, markPendingUpgrade, openSignIn, surface, trigger],
   );
 
   return {

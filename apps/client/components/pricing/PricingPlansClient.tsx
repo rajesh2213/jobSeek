@@ -8,6 +8,7 @@ import { useAccountPlan } from "../../lib/useAccountPlan";
 import { useProCheckout, type CheckoutKey } from "../../lib/useProCheckout";
 import {
   parseUpgradeFromParam,
+  pricingUrl,
   UPGRADE_TRIGGER_COPY,
 } from "../../lib/upgradeTriggers";
 import {
