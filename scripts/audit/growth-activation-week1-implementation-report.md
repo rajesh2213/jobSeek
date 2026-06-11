@@ -2,7 +2,7 @@
 
 **Generated:** 2026-06-10  
 **Scope:** P0.1 (Saved Search Email Fix) · P0.2 (Feed Personalization Analytics) · P0.5 (KPI Baseline)  
-**Deployed:** Not deployed — awaiting staging validation
+**Deployed:** 2026-06-11 — commit `71e43b1` (production)
 
 ---
 
@@ -13,7 +13,7 @@
 | P0.1 Saved-search email relevance fix | **Implemented** |
 | P0.2 Feed personalization analytics + flag ready | **Implemented** |
 | P0.5 KPI baseline document | **Created** (fill before prod) |
-| Production deploy | **Pending** staging sign-off |
+| Production deploy | **Complete** — server restarted + Vercel production Ready |
 
 ---
 
