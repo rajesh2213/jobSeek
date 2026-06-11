@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidateJobDetailCaches } from "../../../../lib/revalidateJobDetail";
+import { revalidateJobDetailCaches } from "../../../../../lib/revalidateJobDetail";
 
 export const runtime = "nodejs";
 
