@@ -56,6 +56,7 @@ import {
   finalizeIngestChunked,
   jobHashCacheConditionalUpdateEnabled,
 } from "../utils/jobWriteOptimization.js";
+import { recoverWorkdayPostedAtOnHashCacheHit } from "../utils/workdayPostedAtHashHitRecovery.js";
 
 // Avoid back-to-back fetches when lastCrawledAt was just set.
 const MIN_MS_SINCE_LAST_CRAWL_FOR_INGEST = Math.floor(2.5 * 60 * 1000);
@@ -551,6 +552,11 @@ async function start(): Promise<void> {
                   data: { lastProcessedAt: seenAt, contentHash: newContentHash },
                 });
               }
+              await recoverWorkdayPostedAtOnHashCacheHit(prisma, {
+                sourceUrl: normalizedJob.sourceUrl,
+                source: normalizedJob.source,
+                candidate: normalizedJob.postedAt,
+              });
               unchangedSkipped += 1;
               return null;
             }
