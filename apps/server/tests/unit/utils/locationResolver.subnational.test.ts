@@ -4,6 +4,7 @@ import {
   expandLocationFilter,
   getRegions,
   GLOBAL_REGION_LABEL,
+  isCountryLevelLocation,
   resolveLocation,
 } from "../../../src/utils/locationResolver.js";
 
@@ -71,5 +72,35 @@ describe("expandLocationFilter Global region", () => {
   it('expands "global" / GLOBAL case-insensitively', () => {
     assert.deepEqual(expandLocationFilter("global"), ["GLOBAL"]);
     assert.deepEqual(expandLocationFilter("GLOBAL"), ["GLOBAL"]);
+  });
+});
+
+describe("country-level location noise", () => {
+  it("detects country-only ATS strings", () => {
+    assert.equal(isCountryLevelLocation("Canada"), true);
+    assert.equal(isCountryLevelLocation("Canada ()"), true);
+    assert.equal(isCountryLevelLocation("(canada)"), true);
+    assert.equal(isCountryLevelLocation("US & Canada"), true);
+    assert.equal(isCountryLevelLocation("Us & Canada"), true);
+    assert.equal(isCountryLevelLocation("Toronto"), false);
+    assert.equal(isCountryLevelLocation("Singapore"), false);
+    assert.equal(isCountryLevelLocation("India (Hyderabad)"), false);
+    assert.equal(isCountryLevelLocation("Australia (Sydney)"), false);
+  });
+
+  it("does not store country-only strings as city", () => {
+    for (const raw of ["Canada", "Canada ()", "(canada)", "US & Canada"]) {
+      const r = resolveLocation(raw);
+      assert.equal(r.country, "CA", raw);
+      assert.equal(r.city, null, raw);
+    }
+  });
+
+  it("expands messy country filter tokens to ISO codes", () => {
+    assert.deepEqual(expandLocationFilter("Canada ()"), ["CA"]);
+    assert.deepEqual(expandLocationFilter("(canada)"), ["CA"]);
+    const usCa = expandLocationFilter("US & Canada");
+    assert.ok(usCa.includes("US"));
+    assert.ok(usCa.includes("CA"));
   });
 });

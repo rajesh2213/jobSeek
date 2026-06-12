@@ -5,6 +5,7 @@ import {
   CITY_TO_COUNTRY,
   getRegions,
   GLOBAL_REGION_LABEL,
+  isCountryLevelLocation,
   REGION_MAP,
 } from "../../utils/locationResolver.js";
 import {
@@ -14,6 +15,51 @@ import {
 } from "../job/job.schema.js";
 
 const CITIES_SUGGEST_LIMIT = 10;
+/** Fetch extra rows from DB so filtering country-level junk still fills the limit. */
+const CITIES_SUGGEST_FETCH = 50;
+
+type CitySuggestionRow = {
+  city: string;
+  country: string;
+  region: string;
+  count: number;
+};
+
+function citySuggestionKey(row: Pick<CitySuggestionRow, "city" | "country">): string {
+  if (isCountryLevelLocation(row.city)) {
+    return `country:${row.country.toUpperCase()}`;
+  }
+  return `${row.city.toLowerCase().replace(/\s+/g, " ").trim()}|${row.country.toUpperCase()}`;
+}
+
+/** Drop country-only junk, merge casing variants, keep highest job count per place. */
+function mergeCitySuggestions(rows: CitySuggestionRow[]): CitySuggestionRow[] {
+  const map = new Map<string, CitySuggestionRow>();
+  for (const row of rows) {
+    if (isCountryLevelLocation(row.city)) continue;
+    const key = citySuggestionKey(row);
+    const existing = map.get(key);
+    if (!existing || row.count > existing.count) {
+      map.set(key, row);
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.count - a.count);
+}
+
+function appendUniqueSuggestions(
+  out: CitySuggestionRow[],
+  seen: Set<string>,
+  extra: CitySuggestionRow[],
+  limit: number,
+): void {
+  for (const row of extra) {
+    if (out.length >= limit) break;
+    const key = citySuggestionKey(row);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+}
 
 /**
  * Full ISO country list grouped by resolver region (not only countries that
@@ -51,10 +97,10 @@ function countryNameSuggestions(
   rows: Array<{ locationCountry: string; _count: { id: number } }>,
   q: string,
   take: number,
-): Array<{ city: string; country: string; region: string; count: number }> {
+): CitySuggestionRow[] {
   if (take <= 0) return [];
   const qLower = q.toLowerCase();
-  const matches: Array<{ city: string; country: string; region: string; count: number }> = [];
+  const matches: CitySuggestionRow[] = [];
   for (const r of rows) {
     const code = r.locationCountry;
     if (!code || code === "UNKNOWN") continue;
@@ -75,10 +121,10 @@ function cityAliasPlaceSuggestions(
   codeToCount: Map<string, number>,
   q: string,
   take: number,
-): Array<{ city: string; country: string; region: string; count: number }> {
+): CitySuggestionRow[] {
   if (take <= 0) return [];
   const qLower = q.toLowerCase();
-  const hits: Array<{ city: string; country: string; region: string; count: number }> = [];
+  const hits: CitySuggestionRow[] = [];
   for (const [cityKey, code] of Object.entries(CITY_TO_COUNTRY)) {
     const parts = cityKey.split(/[\s-]+/);
     if (!parts.some((p) => p.startsWith(qLower))) continue;
@@ -150,7 +196,7 @@ export function registerLocationRoutes(server: FastifyInstance): void {
         },
         _count: { id: true },
         orderBy: { _count: { id: "desc" } },
-        take: CITIES_SUGGEST_LIMIT,
+        take: CITIES_SUGGEST_FETCH,
       } as never)) as Array<{
         locationCity: string | null;
         locationCountry: string | null;
@@ -158,20 +204,21 @@ export function registerLocationRoutes(server: FastifyInstance): void {
         _count: { id: number };
       }>;
 
-      const out: Array<{ city: string; country: string; region: string; count: number }> = rows.map(
-        (r) => {
-          const code = r.locationCountry ?? "";
-          const region =
-            r.locationRegion?.trim() ||
-            (code ? (REGION_MAP[code] ?? "Unknown") : "Unknown");
-          return {
-            city: r.locationCity!,
-            country: code.length > 0 ? code : "UNKNOWN",
-            region,
-            count: r._count.id,
-          };
-        },
-      );
+      const mapped: CitySuggestionRow[] = rows.map((r) => {
+        const code = r.locationCountry ?? "";
+        const region =
+          r.locationRegion?.trim() ||
+          (code ? (REGION_MAP[code] ?? "Unknown") : "Unknown");
+        return {
+          city: r.locationCity!,
+          country: code.length > 0 ? code : "UNKNOWN",
+          region,
+          count: r._count.id,
+        };
+      });
+
+      const out = mergeCitySuggestions(mapped).slice(0, CITIES_SUGGEST_LIMIT);
+      const seen = new Set(out.map((o) => citySuggestionKey(o)));
 
       if (out.length < CITIES_SUGGEST_LIMIT) {
         const byCountry = (await server.prisma.job.groupBy({
@@ -188,34 +235,25 @@ export function registerLocationRoutes(server: FastifyInstance): void {
         const codeToCount = new Map(
           byCountry.map((r) => [r.locationCountry, r._count.id] as const),
         );
-        const seen = new Set(out.map((o) => o.city.toLowerCase()));
 
-        const countryExtra = countryNameSuggestions(
-          byCountry,
-          q,
-          CITIES_SUGGEST_LIMIT - out.length,
+        appendUniqueSuggestions(
+          out,
+          seen,
+          countryNameSuggestions(byCountry, q, CITIES_SUGGEST_LIMIT - out.length),
+          CITIES_SUGGEST_LIMIT,
         );
-        for (const row of countryExtra) {
-          if (out.length >= CITIES_SUGGEST_LIMIT) break;
-          const k = row.city.toLowerCase();
-          if (seen.has(k)) continue;
-          seen.add(k);
-          out.push(row);
-        }
 
         if (out.length < CITIES_SUGGEST_LIMIT) {
-          const aliasExtra = cityAliasPlaceSuggestions(
-            codeToCount,
-            q,
-            CITIES_SUGGEST_LIMIT - out.length,
+          appendUniqueSuggestions(
+            out,
+            seen,
+            cityAliasPlaceSuggestions(
+              codeToCount,
+              q,
+              CITIES_SUGGEST_LIMIT - out.length,
+            ),
+            CITIES_SUGGEST_LIMIT,
           );
-          for (const row of aliasExtra) {
-            if (out.length >= CITIES_SUGGEST_LIMIT) break;
-            const k = row.city.toLowerCase();
-            if (seen.has(k)) continue;
-            seen.add(k);
-            out.push(row);
-          }
         }
       }
 

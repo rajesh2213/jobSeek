@@ -603,6 +603,89 @@ function tryIsoCodeToken(t: string): string | undefined {
   return undefined;
 }
 
+/** Strip punctuation/parentheses so country-only ATS strings can be recognized. */
+export function stripLocationNoise(s: string): string {
+  let t = s.trim();
+  const wrapped = t.match(/^\(([^)]+)\)$/);
+  if (wrapped) t = wrapped[1]!.trim();
+  return t
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^\p{L}\p{N}\s&/|-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Resolve a single token (country name, alias, or ISO code) to alpha-2, if possible. */
+export function lookupCountryFromToken(token: string): string | null {
+  const t = token.trim();
+  if (!t) return null;
+  const iso = tryIsoCodeToken(t);
+  if (iso) return iso;
+  const key = t.toLowerCase().replace(/-/g, " ");
+  if (COUNTRY_NAME_TO_CODE[key]) return COUNTRY_NAME_TO_CODE[key]!;
+  const g = countries.getAlpha2Code(t, "en");
+  if (g && VALID_COUNTRY_CODES.has(g)) return g;
+  for (const c of COUNTRY_LIST) {
+    const nl = c.name.toLowerCase();
+    if (nl === key || c.slug === key) return c.code;
+  }
+  return null;
+}
+
+const COUNTRY_LEVEL_SEP =
+  /\s*(?:&|\/|,|\||\band\b)\s*|\s+-\s+/i;
+
+/**
+ * True when `text` names only country/countries (e.g. "Canada", "Canada ()", "US & Canada").
+ * City-states and known major cities (Singapore, Dubai, …) are excluded.
+ * Strings with a non-country place in parentheses (e.g. "India (Hyderabad)") are not country-only.
+ */
+export function isCountryLevelLocation(text: string): boolean {
+  for (const m of text.matchAll(/\(([^)]*)\)/g)) {
+    const inner = m[1]!.trim();
+    if (!inner) continue;
+    if (!lookupCountryFromToken(inner)) return false;
+  }
+
+  const cleaned = stripLocationNoise(text);
+  if (!cleaned) return true;
+
+  const cityKey = cleaned.toLowerCase().replace(/-/g, " ");
+  if (CITY_TO_COUNTRY[cityKey]) return false;
+
+  const parts = cleaned
+    .split(COUNTRY_LEVEL_SEP)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return true;
+
+  for (const part of parts) {
+    if (!lookupCountryFromToken(part)) return false;
+  }
+  return true;
+}
+
+/** Expand a country-only filter string to ISO codes (e.g. "US & Canada" → ["US","CA"]). */
+function expandCountryLevelFilter(text: string): string[] {
+  if (!isCountryLevelLocation(text)) return [];
+  const cleaned = stripLocationNoise(text) || text.trim();
+  const parts = cleaned
+    .split(COUNTRY_LEVEL_SEP)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const out = new Set<string>();
+  for (const part of parts) {
+    const code = lookupCountryFromToken(part);
+    if (code) out.add(code);
+  }
+  return Array.from(out);
+}
+
+function normalizeFilterQuery(query: string): string {
+  const stripped = stripLocationNoise(query);
+  return (stripped || query.trim()).toLowerCase();
+}
+
 /** US state full name (lowercase) → official full name string (same as US_STATES values). */
 const US_STATE_FULL_NAME_BY_LOWER: Map<string, string> = new Map(
   Object.values(US_STATES).map((name) => [name.toLowerCase(), name]),
@@ -909,12 +992,21 @@ export function resolveLocation(raw: string): ResolvedLocation {
 
   if (city === null && segments.length === 1 && country !== "UNKNOWN") {
     const only = segments[0]!;
-    if (!tryIsoCodeToken(only) && !US_STATES[only.toUpperCase()] && !IN_STATES[only.toUpperCase()]) {
+    if (
+      !tryIsoCodeToken(only) &&
+      !US_STATES[only.toUpperCase()] &&
+      !IN_STATES[only.toUpperCase()] &&
+      !isCountryLevelLocation(only)
+    ) {
       const ck = only.toLowerCase().replace(/-/g, " ");
       if (!COUNTRY_NAME_TO_CODE[ck] && !countries.getAlpha2Code(only, "en")) {
         city = titleCaseWords(only.replace(/-/g, " "));
       }
     }
+  }
+
+  if (city && isCountryLevelLocation(city)) {
+    city = null;
   }
 
   if (isRemote && lowerFull.includes("europe") && country === "UNKNOWN") {
@@ -942,7 +1034,13 @@ export function getRegions(): string[] {
 
 /** Expand a user filter string to ISO country codes for OR queries. */
 export function expandLocationFilter(query: string): string[] {
-  const q = query.trim().toLowerCase();
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  const countryLevel = expandCountryLevelFilter(trimmed);
+  if (countryLevel.length > 0) return countryLevel;
+
+  const q = normalizeFilterQuery(trimmed);
   if (!q) return [];
 
   const regions = getRegions();
@@ -963,7 +1061,7 @@ export function expandLocationFilter(query: string): string[] {
     if (c.name.toLowerCase() === q || c.slug === q) return [c.code];
   }
 
-  const g = countries.getAlpha2Code(query, "en");
+  const g = countries.getAlpha2Code(trimmed, "en");
   if (g && VALID_COUNTRY_CODES.has(g)) return [g];
 
   const out = new Set<string>();
