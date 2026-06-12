@@ -21,6 +21,8 @@ export interface WorkdayJob {
   externalUrl?: string;
   locationsText?: string;
   postedOn?: string;
+  /** CXS detail `jobPostingInfo.startDate` — ISO publish date (merged from detail fetch). */
+  startDate?: string;
   title?: string;
   jobDescription?: string;
   jobDescriptionHtml?: string;
@@ -40,6 +42,8 @@ export interface WorkdayJobPostingInfo {
   location?: string;
   locationsText?: string;
   postedOn?: string;
+  /** Provider-supplied first-publish date (`YYYY-MM-DD` or ISO). */
+  startDate?: string;
   externalUrl?: string;
 }
 

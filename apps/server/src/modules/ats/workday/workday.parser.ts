@@ -82,11 +82,112 @@ export function resolveWorkdayApplyUrl(
   return listingUrl;
 }
 
-function parsePostedAt(job: WorkdayRawJob["job"]): Date | undefined {
-  const raw = job.postedOn;
-  if (!raw || typeof raw !== "string") return undefined;
-  const d = new Date(raw);
-  return Number.isNaN(d.getTime()) ? undefined : d;
+/** Mirrors JSON-LD postedAt guardrails in `jobDetailHtml.ts` — trusted publish dates only. */
+const MAX_POSTEDAT_AGE_MS = 10 * 365.25 * 24 * 60 * 60 * 1000;
+const MAX_POSTEDAT_FUTURE_MS = 24 * 60 * 60 * 1000;
+
+/** Workday list/detail `postedOn` is often a relative label, not a machine date. */
+const WORKDAY_HUMAN_POSTED_ON =
+  /^Posted\s+(?:Today|Yesterday|\d+\s+Days?\s+Ago)$/i;
+
+export type WorkdayPostedAtSource = "startDate" | "postedOn";
+
+export type WorkdayPostedAtRejectReason =
+  | "human_label"
+  | "unparseable"
+  | "future_date"
+  | "ancient_date";
+
+function isWorkdayHumanPostedOnLabel(raw: string): boolean {
+  return WORKDAY_HUMAN_POSTED_ON.test(raw.trim());
+}
+
+function acceptWorkdayPostedAtCandidate(
+  raw: string,
+  companyId: string,
+  source: WorkdayPostedAtSource,
+): Date | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+
+  if (source === "postedOn" && isWorkdayHumanPostedOnLabel(trimmed)) {
+    // Relative labels ("Posted Today") must not be coerced into a publish instant.
+    return undefined;
+  }
+
+  const d = new Date(trimmed);
+  if (Number.isNaN(d.getTime())) {
+    logger.info(
+      {
+        event: "workday_postedat_rejected",
+        company: companyId,
+        source,
+        reason: "unparseable" satisfies WorkdayPostedAtRejectReason,
+        raw: trimmed,
+      },
+      "workday_postedat_rejected",
+    );
+    return undefined;
+  }
+
+  const now = Date.now();
+  if (d.getTime() > now + MAX_POSTEDAT_FUTURE_MS) {
+    logger.info(
+      {
+        event: "workday_postedat_rejected",
+        company: companyId,
+        source,
+        reason: "future_date" satisfies WorkdayPostedAtRejectReason,
+        raw: trimmed,
+      },
+      "workday_postedat_rejected",
+    );
+    return undefined;
+  }
+  if (d.getTime() < now - MAX_POSTEDAT_AGE_MS) {
+    logger.info(
+      {
+        event: "workday_postedat_rejected",
+        company: companyId,
+        source,
+        reason: "ancient_date" satisfies WorkdayPostedAtRejectReason,
+        raw: trimmed,
+      },
+      "workday_postedat_rejected",
+    );
+    return undefined;
+  }
+
+  logger.info(
+    { event: "workday_postedat_extracted", company: companyId, source },
+    "workday_postedat_extracted",
+  );
+  return d;
+}
+
+/**
+ * Resolve Workday publish date from merged list/detail fields.
+ * Priority: `startDate` (CXS detail) → ISO `postedOn` → undefined.
+ */
+export function parseWorkdayPostedAt(
+  job: WorkdayRawJob["job"],
+  companyId: string,
+): Date | undefined {
+  const startRaw = job.startDate;
+  if (typeof startRaw === "string" && startRaw.trim()) {
+    const fromStart = acceptWorkdayPostedAtCandidate(startRaw, companyId, "startDate");
+    if (fromStart) return fromStart;
+  }
+
+  const postedOnRaw = job.postedOn;
+  if (typeof postedOnRaw === "string" && postedOnRaw.trim()) {
+    if (isWorkdayHumanPostedOnLabel(postedOnRaw)) {
+      return undefined;
+    }
+    return acceptWorkdayPostedAtCandidate(postedOnRaw, companyId, "postedOn");
+  }
+
+  return undefined;
 }
 
 function extractDescription(job: WorkdayRawJob["job"]): string {
@@ -320,7 +421,7 @@ export function parseWorkdayJob(
 
   const title = (job.title ?? "").trim() || "Untitled role";
   const description = extractDescription(job);
-  const postedAt = parsePostedAt(job);
+  const postedAt = parseWorkdayPostedAt(job, companyId);
   const locationLine = buildWorkdayLocationLine(job, listingUrl);
   const isRemote =
     inferRemote(locationLine) ||

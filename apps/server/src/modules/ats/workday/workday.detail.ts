@@ -107,6 +107,7 @@ export async function enrichWorkdayRawJobWithDetail(raw: WorkdayRawJob): Promise
       jobDescriptionHtml: info.jobDescriptionHtml?.trim() || undefined,
       locationsText: info.locationsText ?? info.location ?? job.locationsText,
       postedOn: info.postedOn ?? job.postedOn,
+      startDate: info.startDate ?? job.startDate,
       externalUrl: info.externalUrl ?? job.externalUrl,
     };
 
