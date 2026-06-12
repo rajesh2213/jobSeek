@@ -80,6 +80,15 @@ function locationsTriggerLabel(locs: string[]): string {
   return `${locs.length} locations`;
 }
 
+function citySuggestionCountryLabel(
+  code: string | undefined,
+  catalog: LocationsCatalogResponse | null,
+): string {
+  const c = code?.trim();
+  if (!c || c === "UNKNOWN") return "Unknown";
+  return catalog?.countries.find((x) => x.code === c)?.name ?? c;
+}
+
 /** Pinned category shortcuts inside the Role dropdown (?category=…). Order matches product spec. */
 const BROWSE_BY_CATEGORY = [
   { slug: "engineering", label: "Engineering" },
@@ -450,7 +459,7 @@ export function JobsInlineFilters({
   const panelClass = "absolute left-0 top-full z-50 mt-2 rounded-xl border border-ink/10 bg-surface p-3 shadow-lg overflow-hidden";
   /** `overflow-visible` so the city typeahead list (absolute below the input) is not clipped. */
   const locationsPanelClass =
-    "absolute left-0 top-full z-[100] mt-2 max-w-[min(100vw-2rem,380px)] rounded-xl border border-ink/10 bg-surface p-3 shadow-lg overflow-visible";
+    "absolute left-0 top-full z-[100] mt-2 w-[min(100vw-2rem,400px)] min-w-[min(100vw-2rem,400px)] max-w-[min(100vw-2rem,400px)] rounded-xl border border-ink/10 bg-surface p-3 shadow-lg overflow-visible";
   /** Mobile: full-width triggers; desktop (`lg:`): fixed-width toolbar chips in one wrapping row. */
   const triggerClass =
     "flex h-10 w-full min-w-0 shrink-0 items-center whitespace-nowrap rounded-xl border border-ink/15 bg-surface px-3 text-left text-xs font-bold uppercase tracking-wide text-ink shadow-sm transition-colors hover:border-ink/30 focus:outline-none focus:ring-2 focus:ring-brand/20 sm:px-4 lg:w-auto lg:min-w-[140px] lg:max-w-[220px]";
@@ -469,6 +478,12 @@ export function JobsInlineFilters({
     initial: { opacity: 0, scaleY: 0.72, width: "100%", y: -10 },
     animate: { opacity: 1, scaleY: 1, width: 220, y: 0 },
     exit: { opacity: 0, scaleY: 0.82, width: "92%", y: -6 },
+    transition: { type: "spring" as const, stiffness: 420, damping: 18, mass: 0.55 },
+  };
+  const locationsDropdownMotion = {
+    initial: { opacity: 0, scaleY: 0.72, y: -10 },
+    animate: { opacity: 1, scaleY: 1, y: 0 },
+    exit: { opacity: 0, scaleY: 0.82, y: -6 },
     transition: { type: "spring" as const, stiffness: 420, damping: 18, mass: 0.55 },
   };
   const roleDropdownMotion = {
@@ -803,10 +818,10 @@ export function JobsInlineFilters({
           {openMenu === "locations" ? (
             <motion.div
               className={locationsPanelClass}
-              initial={dropdownMotion.initial}
-              animate={dropdownMotion.animate}
-              exit={dropdownMotion.exit}
-              transition={dropdownMotion.transition}
+              initial={locationsDropdownMotion.initial}
+              animate={locationsDropdownMotion.animate}
+              exit={locationsDropdownMotion.exit}
+              transition={locationsDropdownMotion.transition}
               style={{ originY: 0 }}
             >
               <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-ink/45">Region</p>
@@ -934,6 +949,7 @@ export function JobsInlineFilters({
                       ) : (
                         citySuggestions.map((s, i) => {
                           const active = i === cityHighlightIndex;
+                          const countryLabel = citySuggestionCountryLabel(s.country, locCatalog);
                           return (
                             <li
                               key={`${s.city}|${s.country ?? ""}|${s.region}|${i}`}
@@ -943,29 +959,30 @@ export function JobsInlineFilters({
                             >
                               <button
                                 type="button"
+                                title={s.city}
                                 className={cn(
-                                  "flex w-full items-start gap-2 border-0 px-3 py-2.5 text-left outline-none transition-colors",
+                                  "flex w-full items-start gap-3 border-0 px-3 py-2.5 text-left outline-none transition-colors",
                                   active ? "bg-[rgba(232,83,58,0.07)]" : "hover:bg-black/[0.03]",
                                 )}
                                 onMouseEnter={() => setCityHighlightIndex(i)}
                                 onMouseDown={(ev) => ev.preventDefault()}
                                 onClick={() => toggleLocationToken(s.city)}
                               >
-                                <div className="min-w-0 flex-1 overflow-hidden">
+                                <div className="min-w-0 flex-1">
                                   <div
                                     className={cn(
-                                      "truncate text-sm font-semibold leading-tight tracking-tight",
+                                      "break-words text-sm font-semibold leading-snug tracking-tight [overflow-wrap:anywhere]",
                                       active ? "text-[#E8533A]" : "text-ink",
                                     )}
                                   >
                                     {s.city}
                                   </div>
-                                  <div className="mt-0.5 truncate text-xs leading-tight text-black/50">
-                                    {s.country?.trim() || "?"} · {s.region}
+                                  <div className="mt-0.5 break-words text-xs leading-snug text-black/50 [overflow-wrap:anywhere]">
+                                    {countryLabel} · {s.region}
                                   </div>
                                 </div>
-                                <span className="mt-0.5 shrink-0 rounded-full bg-black/[0.05] px-1.5 py-0.5 text-[11px] font-medium leading-none text-ink/65">
-                                  {s.region}
+                                <span className="shrink-0 pt-0.5 text-[11px] font-medium tabular-nums leading-none text-ink/45">
+                                  {s.count.toLocaleString()}
                                 </span>
                               </button>
                             </li>
