@@ -6,9 +6,9 @@ import { registerSchedulerShutdown } from "../../utils/schedulerShutdown.js";
 import {
   getIngestAtsEndpointQueue,
   closeIngestAtsEndpointQueue,
-  INGEST_ATS_ENDPOINT_JOB,
   INGEST_ATS_ENDPOINT_QUEUE_NAME,
 } from "../../queues/ats-endpoint.queue.js";
+import { enqueueAtsEndpointIngest } from "../../queues/atsEndpointEnqueue.js";
 import { getEndpointPriority } from "./atsEndpointPriority.js";
 import {
   applyOpenClawActiveScoreFloor,
@@ -247,17 +247,8 @@ async function enqueuePrioritizedIngests(): Promise<void> {
     );
   }
 
-  const enqueueMs = Date.now();
-  for (let i = 0; i < top.length; i++) {
-    const ep = top[i]!;
-    await queue.add(
-      INGEST_ATS_ENDPOINT_JOB,
-      { endpointId: ep.id },
-      {
-        // Unique jobId per tick — a failed `sched-ingest-{id}` must not block future crawls.
-        jobId: `sched-ingest-${ep.id}-${enqueueMs}-${i}`,
-      },
-    );
+  for (const ep of top) {
+    await enqueueAtsEndpointIngest(queue, ep.id);
   }
 
   const tierCounts = { hot: 0, warm: 0, cold: 0 };
