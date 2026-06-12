@@ -19,7 +19,9 @@ coverage
 !.env.example
 
 # Monorepo apps not deployed to this Vercel project
-apps/server
+apps/server/**
+!apps/server/prisma/
+!apps/server/prisma/**
 apps/inference
 apps/extension
 
