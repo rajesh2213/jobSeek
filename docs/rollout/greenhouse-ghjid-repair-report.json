@@ -1,0 +1,113 @@
+{
+  "repairedAt": "2026-06-14T10:30:59.347Z",
+  "report": [
+    {
+      "company": "Navan",
+      "slug": "tripactions",
+      "endpointId": "40e31090-2110-4b18-991d-45efccba9bc7",
+      "companyId": "280b44d7-3f67-4c82-ac1d-865666a1a508",
+      "liveJobCount": 197,
+      "jobsBefore": 1,
+      "collapsedDeleted": 1,
+      "inlineIngest": {
+        "fetched": 197,
+        "inserted": 197,
+        "skipped": 0
+      },
+      "jobsAfter": 197,
+      "capturePct": 100,
+      "enqueueAction": "enqueued",
+      "verified": true
+    },
+    {
+      "company": "Sendbird",
+      "slug": "sendbird",
+      "endpointId": "d4a84296-5c16-43dc-a5c1-ce0d69ec7018",
+      "companyId": "98159f29-572b-438e-8fea-b661946ec76b",
+      "liveJobCount": 18,
+      "jobsBefore": 1,
+      "collapsedDeleted": 1,
+      "inlineIngest": {
+        "fetched": 18,
+        "inserted": 18,
+        "skipped": 0
+      },
+      "jobsAfter": 18,
+      "capturePct": 100,
+      "enqueueAction": "enqueued",
+      "verified": true
+    },
+    {
+      "company": "Lattice",
+      "slug": "lattice",
+      "endpointId": "0098bf83-b5c6-4a1c-959b-ae0315889b52",
+      "companyId": "a2420013-29ee-47a2-96be-9a4059cf41d8",
+      "liveJobCount": 11,
+      "jobsBefore": 1,
+      "collapsedDeleted": 1,
+      "inlineIngest": {
+        "fetched": 11,
+        "inserted": 11,
+        "skipped": 0
+      },
+      "jobsAfter": 11,
+      "capturePct": 100,
+      "enqueueAction": "enqueued",
+      "verified": true
+    },
+    {
+      "company": "Wayve",
+      "slug": "wayve",
+      "endpointId": "7574da04-a570-4d80-a7a8-10a03002aece",
+      "companyId": "18ae8328-62ad-4d90-bc90-45406927dd61",
+      "liveJobCount": 118,
+      "jobsBefore": 1,
+      "collapsedDeleted": 1,
+      "inlineIngest": {
+        "fetched": 118,
+        "inserted": 118,
+        "skipped": 0
+      },
+      "jobsAfter": 118,
+      "capturePct": 100,
+      "enqueueAction": "enqueued",
+      "verified": true
+    },
+    {
+      "company": "Plume",
+      "slug": "plume",
+      "endpointId": "cd8e305b-76a6-405d-8007-328909fde91f",
+      "companyId": "67704f17-c68a-4226-b1cd-b65f8e621e63",
+      "liveJobCount": 20,
+      "jobsBefore": 1,
+      "collapsedDeleted": 1,
+      "inlineIngest": {
+        "fetched": 20,
+        "inserted": 20,
+        "skipped": 0
+      },
+      "jobsAfter": 20,
+      "capturePct": 100,
+      "enqueueAction": "enqueued",
+      "verified": true
+    },
+    {
+      "company": "Symphony",
+      "slug": "symphony",
+      "endpointId": "9280b298-2ddd-4298-8c50-45c3c101987c",
+      "companyId": "58774409-286a-44cf-baa5-c2bcf5226435",
+      "liveJobCount": 17,
+      "jobsBefore": 1,
+      "collapsedDeleted": 1,
+      "inlineIngest": {
+        "fetched": 17,
+        "inserted": 17,
+        "skipped": 0
+      },
+      "jobsAfter": 17,
+      "capturePct": 100,
+      "enqueueAction": "enqueued",
+      "verified": true
+    }
+  ]
+}

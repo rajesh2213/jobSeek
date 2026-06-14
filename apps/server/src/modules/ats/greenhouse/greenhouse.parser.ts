@@ -33,6 +33,7 @@ export function parseGreenhouseJobList(
       applyUrl: sourceUrl,
       postedAt: parseDate(job.updated_at),
       companyId,
+      atsJobId: job.id != null ? String(job.id) : undefined,
     });
   }
 

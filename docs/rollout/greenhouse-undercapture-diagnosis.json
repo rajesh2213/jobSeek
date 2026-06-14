@@ -1,0 +1,191 @@
+{
+  "generatedAt": "2026-06-14T09:05:01.257Z",
+  "report": [
+    {
+      "company": "Navan",
+      "slug": "tripactions",
+      "companyId": "280b44d7-3f67-4c82-ac1d-865666a1a508",
+      "endpointId": "40e31090-2110-4b18-991d-45efccba9bc7",
+      "validatedAtAudit": 197,
+      "jobsUnderCompanyId": 1,
+      "jobsFetchedNow": 197,
+      "fetchError": null,
+      "sourceUrlAnalysis": {
+        "totalFetchedUrls": 197,
+        "urlsWithJobRow": 0,
+        "urlsOwnedByThisCompany": 0,
+        "urlsOwnedByOtherCompany": 0,
+        "urlsNotInDb": 197,
+        "otherCompanyOwners": {}
+      },
+      "companyJobSample": [
+        {
+          "id": "7bfaf106-ba81-46b0-8cc5-b6cce5f7af25",
+          "title": "Account Executive DACH",
+          "sourceUrl": "https://navan.com/careers/openings",
+          "source": "greenhouse",
+          "createdAt": "2026-06-13T07:11:13.051Z"
+        }
+      ],
+      "crossCompanySamples": [],
+      "metadata": {
+        "crawlToken": "tripactions"
+      }
+    },
+    {
+      "company": "Sendbird",
+      "slug": "sendbird",
+      "companyId": "98159f29-572b-438e-8fea-b661946ec76b",
+      "endpointId": "d4a84296-5c16-43dc-a5c1-ce0d69ec7018",
+      "validatedAtAudit": 18,
+      "jobsUnderCompanyId": 1,
+      "jobsFetchedNow": 18,
+      "fetchError": null,
+      "sourceUrlAnalysis": {
+        "totalFetchedUrls": 18,
+        "urlsWithJobRow": 0,
+        "urlsOwnedByThisCompany": 0,
+        "urlsOwnedByOtherCompany": 0,
+        "urlsNotInDb": 18,
+        "otherCompanyOwners": {}
+      },
+      "companyJobSample": [
+        {
+          "id": "cb898130-f361-4a26-bb98-dc0dd3afa4ed",
+          "title": "AI Agent Engineer, Intern",
+          "sourceUrl": "https://sendbird.com/careers",
+          "source": "greenhouse",
+          "createdAt": "2026-06-13T07:54:51.507Z"
+        }
+      ],
+      "crossCompanySamples": [],
+      "metadata": {
+        "crawlToken": "sendbird"
+      }
+    },
+    {
+      "company": "Lattice",
+      "slug": "lattice",
+      "companyId": "a2420013-29ee-47a2-96be-9a4059cf41d8",
+      "endpointId": "0098bf83-b5c6-4a1c-959b-ae0315889b52",
+      "validatedAtAudit": 13,
+      "jobsUnderCompanyId": 1,
+      "jobsFetchedNow": 11,
+      "fetchError": null,
+      "sourceUrlAnalysis": {
+        "totalFetchedUrls": 11,
+        "urlsWithJobRow": 0,
+        "urlsOwnedByThisCompany": 0,
+        "urlsOwnedByOtherCompany": 0,
+        "urlsNotInDb": 11,
+        "otherCompanyOwners": {}
+      },
+      "companyJobSample": [
+        {
+          "id": "e8f4bcd0-9075-4653-8378-bae5d3694340",
+          "title": "Account Executive, Mid Market",
+          "sourceUrl": "https://lattice.com/job",
+          "source": "greenhouse",
+          "createdAt": "2026-06-13T12:50:22.522Z"
+        }
+      ],
+      "crossCompanySamples": [],
+      "metadata": {
+        "crawlToken": "lattice"
+      }
+    },
+    {
+      "company": "Wayve",
+      "slug": "wayve",
+      "companyId": "18ae8328-62ad-4d90-bc90-45406927dd61",
+      "endpointId": "7574da04-a570-4d80-a7a8-10a03002aece",
+      "validatedAtAudit": 118,
+      "jobsUnderCompanyId": 1,
+      "jobsFetchedNow": 118,
+      "fetchError": null,
+      "sourceUrlAnalysis": {
+        "totalFetchedUrls": 118,
+        "urlsWithJobRow": 0,
+        "urlsOwnedByThisCompany": 0,
+        "urlsOwnedByOtherCompany": 0,
+        "urlsNotInDb": 118,
+        "otherCompanyOwners": {}
+      },
+      "companyJobSample": [
+        {
+          "id": "1f30e24b-8f00-4257-aae4-0e20c923d14e",
+          "title": "ADAS Feature Engineer",
+          "sourceUrl": "https://wayve.firststage.co/jobs",
+          "source": "greenhouse",
+          "createdAt": "2026-06-13T17:16:05.355Z"
+        }
+      ],
+      "crossCompanySamples": [],
+      "metadata": {
+        "crawlToken": "wayve"
+      }
+    },
+    {
+      "company": "Plume",
+      "slug": "plume",
+      "companyId": "67704f17-c68a-4226-b1cd-b65f8e621e63",
+      "endpointId": "cd8e305b-76a6-405d-8007-328909fde91f",
+      "validatedAtAudit": 20,
+      "jobsUnderCompanyId": 1,
+      "jobsFetchedNow": 20,
+      "fetchError": null,
+      "sourceUrlAnalysis": {
+        "totalFetchedUrls": 20,
+        "urlsWithJobRow": 0,
+        "urlsOwnedByThisCompany": 0,
+        "urlsOwnedByOtherCompany": 0,
+        "urlsNotInDb": 20,
+        "otherCompanyOwners": {}
+      },
+      "companyJobSample": [
+        {
+          "id": "69d80bad-290d-4d84-a111-1c65cc424b77",
+          "title": "Customer Success Director",
+          "sourceUrl": "https://www.plume.com/career-opportunities",
+          "source": "greenhouse",
+          "createdAt": "2026-06-13T21:33:45.396Z"
+        }
+      ],
+      "crossCompanySamples": [],
+      "metadata": {
+        "crawlToken": "plume"
+      }
+    },
+    {
+      "company": "Symphony",
+      "slug": "symphony",
+      "companyId": "58774409-286a-44cf-baa5-c2bcf5226435",
+      "endpointId": "9280b298-2ddd-4298-8c50-45c3c101987c",
+      "validatedAtAudit": 17,
+      "jobsUnderCompanyId": 1,
+      "jobsFetchedNow": 17,
+      "fetchError": null,
+      "sourceUrlAnalysis": {
+        "totalFetchedUrls": 17,
+        "urlsWithJobRow": 0,
+        "urlsOwnedByThisCompany": 0,
+        "urlsOwnedByOtherCompany": 0,
+        "urlsNotInDb": 17,
+        "otherCompanyOwners": {}
+      },
+      "companyJobSample": [
+        {
+          "id": "92b48a61-3935-41dd-926a-ba3bd143496b",
+          "title": "Chief Technology Officer, Cloud9",
+          "sourceUrl": "https://symphony.com/company/apply",
+          "source": "greenhouse",
+          "createdAt": "2026-06-13T22:30:04.649Z"
+        }
+      ],
+      "crossCompanySamples": [],
+      "metadata": {
+        "crawlToken": "symphony"
+      }
+    }
+  ]
+}
