@@ -46,10 +46,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const fetched = await loadJobDetailPage(id);
   if (!fetched) {
-    return {
-      title: "Job not found | JobLoom",
-      robots: { index: false, follow: true },
-    };
+    notFound();
   }
   const aliasPath = resolveJobAliasRedirectPath(id, fetched.data.id);
   if (aliasPath) permanentRedirect(aliasPath);

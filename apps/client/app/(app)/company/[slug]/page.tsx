@@ -40,10 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const company = await loadCompanyBySlug(slug);
   if (!company) {
-    return {
-      title: "Company not found | JobLoom",
-      robots: { index: false, follow: true },
-    };
+    notFound();
   }
   const visible = companyVisibleJobCount(company);
   const open = visible != null && visible > 0 ? visible : null;
