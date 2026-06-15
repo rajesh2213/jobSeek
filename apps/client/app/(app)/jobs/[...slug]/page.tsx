@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 import { redirectCompanyIdToHubIfNeeded } from "../../../../lib/companyIdHubRedirect";
 import {
   loadJobsDiscoveryPage,
@@ -93,7 +93,7 @@ export default async function JobsSeoPage({ params, searchParams }: Props) {
   const incomingPath = `/jobs/${slug.join("/")}`;
   const incomingFull = buildIncomingJobListingUrl(incomingPath, sp);
   if (!parsed.validCanonical || incomingFull !== canonicalPath) {
-    redirect(canonicalPath);
+    permanentRedirect(canonicalPath);
   }
   const filtersKey = stableJobFiltersKey(filters);
   /**

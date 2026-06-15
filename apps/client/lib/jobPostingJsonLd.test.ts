@@ -45,7 +45,7 @@ test("resolveJobPostingDatePosted uses freshness POSTED timestamp", () => {
   assert.equal(resolveJobPostingDatePosted(job), "2026-04-15T00:00:00.000Z");
 });
 
-test("DISCOVERED-only jobs omit JobPosting JSON-LD", () => {
+test("DISCOVERED-only jobs emit JobPosting JSON-LD via effectivePostedAt fallback", () => {
   const job = sampleJob({
     postedAt: null,
     freshness: {
@@ -54,9 +54,10 @@ test("DISCOVERED-only jobs omit JobPosting JSON-LD", () => {
       timestamp: "2026-05-12T06:57:21.746Z",
       relative: "Added 1 day ago",
     },
+    effectivePostedAt: "2026-05-12T06:57:21.746Z",
   });
-  assert.equal(shouldEmitJobPostingJsonLd(job, "Readable role details."), false);
-  assert.equal(resolveJobPostingDatePosted(job), undefined);
+  assert.equal(shouldEmitJobPostingJsonLd(job, "Readable role details."), true);
+  assert.equal(resolveJobPostingDatePosted(job), "2026-05-12T06:57:21.746Z");
 });
 
 test("POSTED jobs emit datePosted and validThrough", () => {
@@ -121,6 +122,28 @@ test("capped path still emits description via structuredDataDescription fallback
   });
   const jsonLd = buildJobPostingJsonLd(job, job.structuredDataDescription ?? undefined);
   assert.equal(jsonLd.description, "Capped-safe structured data description.");
+});
+
+test("remote jobs without country still emit applicantLocationRequirements", () => {
+  const job = sampleJob({
+    country: null,
+    locationCountry: null,
+    isRemote: true,
+    workType: "remote",
+    postedAt: "2026-04-15T00:00:00.000Z",
+    freshness: {
+      source: "POSTED",
+      label: "Posted",
+      timestamp: "2026-04-15T00:00:00.000Z",
+      relative: "Posted 1 day ago",
+    },
+  });
+  const jsonLd = buildJobPostingJsonLd(job, "Role details.");
+  assert.equal(jsonLd.jobLocationType, "TELECOMMUTE");
+  assert.deepEqual(jsonLd.applicantLocationRequirements, {
+    "@type": "Country",
+    name: "US",
+  });
 });
 
 test("buildJobPostingJsonLd includes address and salary range when present", () => {

@@ -434,6 +434,20 @@ export function buildJobsListingUrl(filters: JobFilters): string {
 
 const DEFAULT_LISTING_LIMIT = 20;
 
+/** True when every work type is already represented in the canonical slug path. */
+function workTypesEncodedInSlug(
+  slug: string,
+  workTypes: Array<"remote" | "onsite" | "hybrid"> | undefined,
+): boolean {
+  if (!workTypes?.length) return false;
+  if (workTypes.length === 1) {
+    const wt = workTypes[0];
+    if (wt === "remote" && slug.includes("location/remote")) return true;
+    if (slug.includes(`work-type/${wt}`)) return true;
+  }
+  return false;
+}
+
 /**
  * Canonical job listing URL: path slug for slottable facets; query only for refinements
  * (pagination, experience, posted, salary, sort, multi-location, multi-type, etc.).
@@ -476,7 +490,7 @@ export function getCanonicalJobListingUrl(filters: JobFilters): string {
   } else if (filters.location?.trim()) {
     // Single location token is represented in canonical slug path.
   }
-  if (filters.workTypes?.length) {
+  if (filters.workTypes?.length && !workTypesEncodedInSlug(slug, filters.workTypes)) {
     p.set("types", filters.workTypes.map((t) => t.toUpperCase()).join(","));
   }
   if (filters.roles && filters.roles.length > 1) {

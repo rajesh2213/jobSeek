@@ -77,6 +77,20 @@ test("no redirect for browse path", () => {
   assert.equal(dest, null);
 });
 
+test("no redirect adding types query when location/remote slug already encodes remote", () => {
+  const dest = resolveJobsListingCanonicalRedirectUrl(ORIGIN, "/jobs/location/remote", {});
+  assert.equal(dest, null);
+});
+
+test("no redirect adding types query when category+location/remote slug encodes remote", () => {
+  const dest = resolveJobsListingCanonicalRedirectUrl(
+    ORIGIN,
+    "/jobs/category/data/location/remote",
+    {},
+  );
+  assert.equal(dest, null);
+});
+
 test("redirects mistaken /jobs/{uuid} to /job/{uuid}", () => {
   const uuid = "4409fb0f-a1b2-4c3d-9e8f-123456789abc";
   const dest = resolveJobsListingCanonicalRedirectUrl(ORIGIN, `/jobs/${uuid}`, {});

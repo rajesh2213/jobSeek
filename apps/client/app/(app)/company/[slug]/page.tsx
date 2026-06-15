@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import {
   loadCompanyBySlug,
   loadCompanyHubInitialJobs,
@@ -39,7 +40,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const company = await loadCompanyBySlug(slug);
   if (!company) {
-    return { title: "Company not found | JobLoom" };
+    return {
+      title: "Company not found | JobLoom",
+      robots: { index: false, follow: true },
+    };
   }
   const visible = companyVisibleJobCount(company);
   const open = visible != null && visible > 0 ? visible : null;
@@ -96,6 +100,7 @@ export default async function CompanyDetailPage({ params, searchParams }: Props)
   const { slug } = await params;
   const sp = await searchParams;
   const company = await loadCompanyBySlug(slug);
+  if (!company) notFound();
 
   const parsed = parseJobFiltersFromSearch(searchRecord(sp));
   const { companyId: _cid, ...hubFilters } = parsed;

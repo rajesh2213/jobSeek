@@ -10,7 +10,7 @@ import {
   jobsRouteMetadata,
 } from "../../../lib/seo";
 import { JobsSearchPage } from "../../../components/job/JobsSearchPage";
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 import { redirectCompanyIdToHubIfNeeded } from "../../../lib/companyIdHubRedirect";
 import { getCanonicalJobListingUrl, parseJobFiltersFromSearch } from "../../../lib/slug-parser";
 import { decideJobsListingSeoPolicy } from "../../../lib/seoIndexability";
@@ -56,7 +56,7 @@ export default async function JobsPage({ searchParams }: Props) {
     }
     const incoming = incomingQs.toString() ? `/jobs?${incomingQs.toString()}` : "/jobs";
     if (incoming !== canonical) {
-      redirect(canonical);
+      permanentRedirect(canonical);
     }
   }
 

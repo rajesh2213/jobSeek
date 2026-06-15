@@ -18,13 +18,16 @@ const COUNTRY_CURRENCY: Record<string, string> = {
 
 /**
  * Google Job Posting requires `datePosted` for valid rich results.
- * Only emit when the backend freshness contract says POSTED (real publish date).
+ * Prefer POSTED freshness / postedAt; fall back to effectivePostedAt (listing discovery date).
  */
 export function resolveJobPostingDatePosted(job: JobItem): string | undefined {
   if (job.freshness?.source === "POSTED" && job.freshness.timestamp) {
     return firstValidPostedIso(job.freshness.timestamp);
   }
-  return firstValidPostedIso(job.postedAt);
+  return (
+    firstValidPostedIso(job.postedAt) ??
+    firstValidPostedIso(job.effectivePostedAt ?? undefined)
+  );
 }
 
 /** True when JobPosting JSON-LD should be emitted (indexable + description + valid datePosted). */
@@ -34,7 +37,7 @@ export function shouldEmitJobPostingJsonLd(
 ): boolean {
   // Expired/inactive jobs remain accessible but should not be indexed by search engines.
   if (!shouldIndexJob(job)) return false;
-  const resolved = resolveDescription(job, description);
+  const resolved = resolveDescriptionOrFallback(job, description);
   if (!resolved) return false;
   return resolveJobPostingDatePosted(job) != null;
 }
@@ -49,7 +52,7 @@ export function buildJobPostingJsonLd(
   const currency = cc ? (COUNTRY_CURRENCY[cc] ?? "USD") : "USD";
   const datePosted = resolveJobPostingDatePosted(job);
   const validThrough = computeValidThrough(datePosted);
-  const resolvedDescription = resolveDescription(job, description);
+  const resolvedDescription = resolveDescriptionOrFallback(job, description);
 
   const org: Record<string, unknown> = {
     "@type": "Organization",
@@ -79,12 +82,11 @@ export function buildJobPostingJsonLd(
 
   if (job.isRemote || job.workType === "remote") {
     base.jobLocationType = "TELECOMMUTE";
-    if (cc || country) {
-      base.applicantLocationRequirements = {
-        "@type": "Country",
-        name: cc || country,
-      };
-    }
+    const locName = cc || country || "US";
+    base.applicantLocationRequirements = {
+      "@type": "Country",
+      name: locName,
+    };
   }
 
   const salary = buildBaseSalary(job, currency);
@@ -164,6 +166,16 @@ function firstValidPostedIso(value: string | null | undefined): string | undefin
   if (!value) return undefined;
   if (Number.isNaN(Date.parse(value))) return undefined;
   return value;
+}
+
+function resolveDescriptionOrFallback(
+  job: JobItem,
+  preferred: string | undefined,
+): string | undefined {
+  return (
+    resolveDescription(job, preferred) ??
+    `${job.title.trim()} at ${job.company.name.trim()}. View role details and apply via the employer career page.`
+  );
 }
 
 function resolveDescription(job: JobItem, preferred: string | undefined): string | undefined {
