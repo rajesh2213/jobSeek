@@ -191,6 +191,7 @@ export function FeatureCtaBand({
   primaryLabel,
   secondaryHref,
   secondaryLabel,
+  railBleed = true,
 }: {
   title: string;
   body: string;
@@ -198,16 +199,22 @@ export function FeatureCtaBand({
   primaryLabel: string;
   secondaryHref?: string;
   secondaryLabel?: string;
+  /** Break out of `DESKTOP_RAIL_INSET_CLASS` on lg+ (feature pages). Pass false when the parent is already full width (home). */
+  railBleed?: boolean;
 }) {
   return (
     <motion.section
       {...featureSectionReveal}
-      className="mx-auto mt-16 w-full max-w-6xl px-4 sm:px-6"
+      className={
+        railBleed
+          ? "relative mt-16 w-full lg:-ml-[112px] lg:w-[calc(100%+112px)]"
+          : "mt-16 w-full"
+      }
     >
       <motion.div
         whileHover={{ scale: 1.005 }}
         transition={{ type: "spring", stiffness: 280, damping: 28 }}
-        className="rounded-2xl border border-ink/10 bg-[linear-gradient(135deg,#1a1a1a_0%,#111_100%)] px-6 py-10 text-center sm:px-10"
+        className="w-full bg-[linear-gradient(135deg,#1a1a1a_0%,#111_100%)] px-4 py-10 text-center sm:px-6 sm:py-12"
       >
         <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand/80">Ready when you are</p>
         <h2 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">{title}</h2>

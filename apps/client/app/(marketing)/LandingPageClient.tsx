@@ -633,8 +633,9 @@ export default function LandingPageClient() {
         </div>
       </div>
       {SHOW_LANDING_TESTIMONIALS ? <SocialProofSection /> : null}
-      <div className={`${DESKTOP_RAIL_INSET_CLASS} pb-16`}>
+      <div className="pb-16">
         <FeatureCtaBand
+          railBleed={false}
           title="Your next shortlist starts here"
           body={`Search ${HERO_JOB_INDEX_TOTAL.toLocaleString()}+ roles from company career sites and boards in one feed, filter by fit, compare against your resume, get email alerts on saved searches and keep every save in one workspace.`}
           primaryHref="/jobs"
