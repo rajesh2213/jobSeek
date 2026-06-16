@@ -31,9 +31,9 @@ export const BLOG_POSTS: BlogPostMeta[] = [
       "Compare timing, competition, and visibility when you apply on a company careers page versus a major job board.",
     description:
       "Should you apply on a company career site or wait for LinkedIn? Learn where roles appear first and how to prioritize your applications.",
-    publishedAt: "2026-06-16",
+    publishedAt: "2026-06-17",
     readingTimeMinutes: 5,
-    status: "coming_soon",
+    status: "published",
     relatedSlugs: ["why-youre-probably-finding-jobs-too-late", "how-to-find-jobs-before-linkedin"],
   },
   {
@@ -43,9 +43,9 @@ export const BLOG_POSTS: BlogPostMeta[] = [
       "Practical ways to monitor company career pages and ATS feeds so you discover roles before the crowd.",
     description:
       "Learn how to find jobs before they reach LinkedIn by monitoring company career sites, ATS pages, and early-ingestion job search tools.",
-    publishedAt: "2026-06-16",
-    readingTimeMinutes: 6,
-    status: "coming_soon",
+    publishedAt: "2026-06-18",
+    readingTimeMinutes: 5,
+    status: "published",
     relatedSlugs: ["why-youre-probably-finding-jobs-too-late", "company-career-sites-vs-linkedin"],
   },
 ];
