@@ -133,6 +133,7 @@ if (existsSync(dist)) {
   for (const r of [
     { path: "manifest.json", isDir: false },
     { path: "background.js", isDir: false },
+    { path: "background-main.js", isDir: false },
     { path: "content.js", isDir: false },
     { path: "assets", isDir: true },
   ]) {
@@ -146,6 +147,31 @@ if (existsSync(dist)) {
     } else {
       pass(`dist/${r.path} present`);
     }
+  }
+}
+
+const bootstrapPath = join(dist, "background.js");
+if (existsSync(bootstrapPath)) {
+  const bootstrap = read(bootstrapPath);
+  if (!bootstrap.includes('importScripts("background-main.js")')) {
+    fail("background.js must importScripts background-main.js");
+  } else {
+    pass("background.js bootstrap imports background-main.js");
+  }
+  if (/^\s*import\s/m.test(bootstrap) || /^\s*export\s/m.test(bootstrap)) {
+    fail("background.js bootstrap must not use ES module syntax");
+  }
+}
+
+const bgMainPath = join(dist, "background-main.js");
+if (existsSync(bgMainPath)) {
+  const bgMain = read(bgMainPath);
+  if (bgMain.length < 500) fail("background-main.js suspiciously small");
+  else pass("background-main.js has content");
+  if (/^\s*import\s/m.test(bgMain) || /^\s*export\s/m.test(bgMain)) {
+    fail("background-main.js must not use top-level ES module syntax");
+  } else {
+    pass("background-main.js has no top-level import/export");
   }
 }
 

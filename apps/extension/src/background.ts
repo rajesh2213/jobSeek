@@ -2,13 +2,8 @@ import { compositeFieldId, parseCompositeFieldId } from "./lib/frameIds";
 import { OPTIONAL_GENERIC_CAREER_ORIGINS, matchesOptionalGenericCareerPath } from "./lib/careerPathPatterns";
 import { syncOptionalCareerContentScripts } from "./lib/optionalCareerScripts";
 import { isSmartApplyEligibleSurface } from "./lib/smartApplySurface";
-import { isAllowedApiPath } from "./lib/allowedApiPaths";
-import {
-  getDefaultApiBase,
-  isLoopbackHttpUrl,
-  isProductionExtensionBuild,
-  resolveApiBaseFromStorage,
-} from "./config";
+import { executeAllowedApiRequest } from "./lib/extensionApiRequest";
+import { isProductionExtensionBuild } from "./config";
 import { isTrustedExtensionWebOrigin } from "./trustedWebOrigins";
 
 const EXT_AUTH_TOKEN_MAX_CHARS = 16_384;
@@ -52,12 +47,6 @@ type FillFieldResultPayload = {
   source?: string;
   confidence?: string;
 };
-
-async function getStorage(keys: string[]): Promise<Record<string, unknown>> {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(keys, (result) => resolve(result as Record<string, unknown>));
-  });
-}
 
 function mergeDetectedFields(frameId: number, fields: DetectedFieldPayload[]) {
   return fields.map((f) => ({
@@ -355,118 +344,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === "API_REQUEST") {
-    void (async () => {
-      try {
-        const req = msg as ApiRequestMessage;
-        if (!isAllowedApiPath(req.path)) {
-          sendResponse({ ok: false, status: 0, error: "Invalid API path" });
-          return;
-        }
-        const storage = await getStorage(["apiBase", "authToken"]);
-        const apiBase = resolveApiBaseFromStorage(
-          storage.apiBase as string | undefined,
-          getDefaultApiBase(),
-        );
-        const baseTrim = apiBase.replace(/\/+$/, "");
-        let requestUrl: string;
-        let u: URL;
-        try {
-          const baseUrl = new URL(baseTrim);
-          u = new URL(req.path, baseUrl);
-          if (u.origin !== baseUrl.origin) {
-            sendResponse({ ok: false, status: 0, error: "Invalid API URL" });
-            return;
-          }
-          requestUrl = u.toString();
-        } catch {
-          sendResponse({ ok: false, status: 0, error: "Invalid API URL" });
-          return;
-        }
-        const canFetch =
-          u.protocol === "https:" ||
-          isLoopbackHttpUrl(u) ||
-          (u.protocol === "http:" && !isProductionExtensionBuild());
-        if (!canFetch) {
-          sendResponse({ ok: false, status: 0, error: "API requests must use HTTPS" });
-          return;
-        }
-        const authToken = (storage.authToken as string | undefined) ?? null;
-        if (req.auth !== false && !authToken) {
-          sendResponse({ ok: false, status: 401, error: "Not authenticated" });
-          return;
-        }
-        const headers: Record<string, string> = {
-          ...(req.headers ?? {}),
-        };
-        if (req.auth !== false && authToken) {
-          headers.Authorization = `Bearer ${authToken}`;
-        }
-        const res = await fetch(requestUrl, {
-          method: req.method ?? "GET",
-          headers,
-          body: req.body,
-        });
-        const contentType = res.headers.get("content-type") ?? "";
-        const contentDisposition = res.headers.get("content-disposition") ?? "";
-        if (req.responseType === "arrayBuffer") {
-          const buffer = await res.arrayBuffer();
-          const bytes = new Uint8Array(buffer);
-          let binary = "";
-          const chunk = 8192;
-          for (let i = 0; i < bytes.length; i += chunk) {
-            binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-          }
-          const dataBase64 = btoa(binary);
-          sendResponse({
-            ok: res.ok,
-            status: res.status,
-            dataBase64,
-            headers: {
-              "content-type": contentType,
-              "content-disposition": contentDisposition,
-            },
-          });
-          return;
-        }
-        if (req.responseType === "text") {
-          const text = await res.text();
-          sendResponse({
-            ok: res.ok,
-            status: res.status,
-            data: text,
-            headers: {
-              "content-type": contentType,
-              "content-disposition": contentDisposition,
-            },
-          });
-          return;
-        }
-        const text = await res.text();
-        let json: unknown = null;
-        if (text) {
-          try {
-            json = JSON.parse(text);
-          } catch {
-            json = { raw: text };
-          }
-        }
-        sendResponse({
-          ok: res.ok,
-          status: res.status,
-          data: json,
-          headers: {
-            "content-type": contentType,
-            "content-disposition": contentDisposition,
-          },
-        });
-      } catch (error) {
-        sendResponse({
-          ok: false,
-          status: 500,
-          error: error instanceof Error ? error.message : "Extension API proxy failed",
-        });
-      }
-    })();
+    void executeAllowedApiRequest(msg as ApiRequestMessage).then(sendResponse);
     return true;
   }
 
@@ -539,4 +417,3 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 chrome.permissions.onAdded.addListener(() => void syncOptionalCareerContentScripts());
 chrome.permissions.onRemoved.addListener(() => void syncOptionalCareerContentScripts());
-void syncOptionalCareerContentScripts();

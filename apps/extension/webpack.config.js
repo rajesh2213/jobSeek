@@ -22,7 +22,7 @@ module.exports = (env, argv) => {
 
   return {
     entry: {
-      background: "./src/background.ts",
+      "background-main": "./src/background.ts",
       content: "./src/content.ts",
       presenceBeacon: "./src/presenceBeacon.ts",
       popup: "./src/popup/popup.tsx",
@@ -45,6 +45,8 @@ module.exports = (env, argv) => {
     output: {
       path: path.resolve(__dirname, "dist"),
       filename: "[name].js",
+      /** MV3 service workers: avoid webpack IIFE wrapper on the bootstrap + main bundle. */
+      iife: false,
     },
     optimization: {
       /** Avoid minification/mangling to keep code readable for manual review. */
@@ -70,6 +72,7 @@ module.exports = (env, argv) => {
       new CopyPlugin({
         patterns: [
           { from: "manifest.json", to: "." },
+          { from: "src/background-entry.js", to: "background.js" },
           { from: "src/popup/popup.html", to: "popup.html" },
           { from: "icons", to: "assets", noErrorOnMissing: true },
         ],

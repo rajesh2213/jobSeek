@@ -71,6 +71,10 @@ function toArrayBuffer(input: unknown): ArrayBuffer | null {
   return null;
 }
 
+import { executeAllowedApiRequest } from "./extensionApiRequest";
+
+const PROXY_TIMEOUT_MS = 6000;
+
 async function proxyApiRequest<T = unknown>(params: {
   path: string;
   method?: string;
@@ -79,25 +83,41 @@ async function proxyApiRequest<T = unknown>(params: {
   auth?: boolean;
   responseType?: "json" | "text" | "arrayBuffer";
 }): Promise<ProxyResponse<T>> {
-  return new Promise((resolve) => {
+  const viaBackground = await new Promise<ProxyResponse<T>>((resolve) => {
+    let settled = false;
+    const finish = (res: ProxyResponse<T>) => {
+      if (settled) return;
+      settled = true;
+      resolve(res);
+    };
+    const timer = window.setTimeout(() => {
+      finish({ ok: false, status: 0, error: "Background API proxy timed out" });
+    }, PROXY_TIMEOUT_MS);
     chrome.runtime.sendMessage(
       {
         type: "API_REQUEST",
         ...params,
       },
       (res: ProxyResponse<T>) => {
+        window.clearTimeout(timer);
         if (chrome.runtime.lastError) {
-          resolve({
+          finish({
             ok: false,
             status: 0,
             error: chrome.runtime.lastError.message ?? "API proxy unavailable",
           });
           return;
         }
-        resolve(res);
+        finish(res);
       },
     );
   });
+
+  if (viaBackground.ok || viaBackground.status > 0) {
+    return viaBackground;
+  }
+
+  return executeAllowedApiRequest<T>(params);
 }
 
 export type ExtensionApiFetchMeta = {

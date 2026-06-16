@@ -201,13 +201,19 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
     patchSidebarState({ atsDetected: props.isAtsPage, isVisible: props.isAtsPage });
     if (!props.isAtsPage) return;
     const refresh = async () => {
+      const accountPromise = loadAccountSnapshotIntoSidebar().catch(() => {
+        patchSidebarState({
+          accountDataLoaded: true,
+          accountSyncHint: "Could not load account. Check connection or sign in on jobloom.tech.",
+        });
+      });
       try {
         const fields = await scanAllPageFields(sendRuntime);
         setDetectedFields(fields);
       } catch {
         // ignore
       }
-      await loadAccountSnapshotIntoSidebar();
+      await accountPromise;
     };
     void refresh();
     const delayedRescan = window.setTimeout(() => {
