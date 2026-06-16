@@ -117,7 +117,9 @@ async function fillTabStandard(
   tabId: number,
   profile: unknown,
   resumeFile: unknown,
+  options?: { skipFrameIds?: number[] },
 ): Promise<Record<string, unknown>> {
+  const skipFrameIds = new Set(options?.skipFrameIds ?? []);
   const frames = await chrome.webNavigation.getAllFrames({ tabId });
   const fieldResults: FillFieldResultPayload[] = [];
   const openEnded: DetectedFieldPayload[] = [];
@@ -126,6 +128,7 @@ async function fillTabStandard(
   let resumeAttached = false;
 
   for (const { frameId, url } of frames) {
+    if (skipFrameIds.has(frameId)) continue;
     if (!url || url.startsWith("chrome-extension:")) continue;
     try {
       const res = (await chrome.tabs.sendMessage(
@@ -179,7 +182,12 @@ type AiAnswerPayload = {
   forceReplace?: boolean;
 };
 
-async function fillTabAiAnswers(tabId: number, answers: AiAnswerPayload[]) {
+async function fillTabAiAnswers(
+  tabId: number,
+  answers: AiAnswerPayload[],
+  options?: { skipFrameIds?: number[] },
+) {
+  const skipFrameIds = new Set(options?.skipFrameIds ?? []);
   const byFrame = new Map<number, AiAnswerPayload[]>();
   for (const a of answers) {
     const parsed = parseCompositeFieldId(a.id);
@@ -194,6 +202,7 @@ async function fillTabAiAnswers(tabId: number, answers: AiAnswerPayload[]) {
   const failedIds: string[] = [];
 
   for (const [frameId, payload] of byFrame) {
+    if (skipFrameIds.has(frameId)) continue;
     if (!payload.length) continue;
     try {
       const res = (await chrome.tabs.sendMessage(
@@ -301,22 +310,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const tabId = (msg as { tabId?: number }).tabId ?? sender.tab?.id;
     const profile = (msg as { profile?: unknown }).profile;
     const resumeFile = (msg as { resumeFile?: unknown }).resumeFile;
+    const skipFrameIds = (msg as { skipFrameIds?: number[] }).skipFrameIds ?? [];
     if (tabId === undefined) {
       sendResponse({ success: false, error: "No tab id" });
       return false;
     }
-    void fillTabStandard(tabId, profile, resumeFile).then(sendResponse);
+    void fillTabStandard(tabId, profile, resumeFile, { skipFrameIds }).then(sendResponse);
     return true;
   }
 
   if (msg.type === "FILL_TAB_AI_ANSWERS") {
     const tabId = (msg as { tabId?: number }).tabId ?? sender.tab?.id;
     const answers = (msg as { answers?: AiAnswerPayload[] }).answers ?? [];
+    const skipFrameIds = (msg as { skipFrameIds?: number[] }).skipFrameIds ?? [];
     if (tabId === undefined) {
       sendResponse({ success: false, error: "No tab id" });
       return false;
     }
-    void fillTabAiAnswers(tabId, answers).then(sendResponse);
+    void fillTabAiAnswers(tabId, answers, { skipFrameIds }).then(sendResponse);
     return true;
   }
 

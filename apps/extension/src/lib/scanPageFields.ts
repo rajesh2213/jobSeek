@@ -11,6 +11,36 @@ export function scanTopFrameFields(frameId = 0): DetectedField[] {
   }));
 }
 
+async function scanTopFrameFieldsWithReveal(frameId = 0): Promise<DetectedField[]> {
+  const bySelector = new Map<string, DetectedField>();
+  const snap = () => {
+    for (const field of detectFormFields()) {
+      const row: DetectedField = {
+        ...field,
+        localId: field.id,
+        frameId,
+        id: compositeFieldId(frameId, field.id),
+      };
+      bySelector.set(row.elementSelector, row);
+    }
+  };
+
+  snap();
+  const root = document.scrollingElement ?? document.documentElement;
+  const startY = root.scrollTop;
+  const maxY = Math.max(0, root.scrollHeight - window.innerHeight);
+  if (maxY > 80) {
+    const stops = [0.5, 1].map((p) => Math.round(maxY * p));
+    for (const y of stops) {
+      root.scrollTo({ top: y, behavior: "instant" });
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 120));
+      snap();
+    }
+    root.scrollTo({ top: startY, behavior: "instant" });
+  }
+  return Array.from(bySelector.values());
+}
+
 type ScanTabFieldsResponse = {
   success?: boolean;
   fields?: DetectedField[];
@@ -40,8 +70,13 @@ function getCurrentTabId(): Promise<number | undefined> {
  * because a content-script → background → same content-script `SCAN_FIELDS` loop
  * can deadlock and return zero fields on ATS pages (e.g. Ashby).
  */
-export async function scanAllPageFields(sendRuntime: RuntimeMessenger): Promise<DetectedField[]> {
-  const topFields = scanTopFrameFields(0);
+export async function scanAllPageFields(
+  sendRuntime: RuntimeMessenger,
+  options?: { revealHidden?: boolean },
+): Promise<DetectedField[]> {
+  const topFields = options?.revealHidden
+    ? await scanTopFrameFieldsWithReveal(0)
+    : scanTopFrameFields(0);
   try {
     const tabId = await getCurrentTabId();
     const timeoutMs = 2500;

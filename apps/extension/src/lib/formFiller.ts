@@ -1,4 +1,5 @@
 import type { DetectedField } from "./fieldDetector";
+import { shouldAutoFillWithAi } from "./aiNarrativeFields";
 import { mapDeterministicValue } from "./autofill/mapping";
 import { extractIntent } from "./autofill/intent";
 import { resolveFactualField } from "./autofill/factualResolver";
@@ -145,9 +146,41 @@ function findRichTextSurface(control: HTMLElement): HTMLElement | null {
   return null;
 }
 
+function findRichTextCompanion(surface: HTMLElement): HTMLTextAreaElement | HTMLInputElement | null {
+  let root: HTMLElement | null = surface.parentElement;
+  for (let depth = 0; depth < 10 && root; depth++) {
+    for (const ta of Array.from(root.querySelectorAll("textarea"))) {
+      if (!(ta instanceof HTMLTextAreaElement)) continue;
+      const r = ta.getBoundingClientRect();
+      if (r.width <= 6 || r.height <= 6 || ta.getAttribute("aria-hidden") === "true") return ta;
+    }
+    for (const inp of Array.from(root.querySelectorAll('input[type="text"], input:not([type])'))) {
+      if (!(inp instanceof HTMLInputElement) || inp === surface) continue;
+      const r = inp.getBoundingClientRect();
+      if (r.width <= 6 || r.height <= 6) return inp;
+    }
+    root = root.parentElement;
+  }
+  return null;
+}
+
+function readSurfaceText(surface: HTMLElement): string {
+  return (surface.innerText ?? surface.textContent ?? "").trim();
+}
+
 function verificationProbe(expectedRaw: string): string {
   const e = expectedRaw.trim().toLowerCase();
   return e.slice(0, Math.min(260, e.length));
+}
+
+function verifyFilledText(expectedRaw: string, ...surfaces: Array<string | HTMLElement | null | undefined>): boolean {
+  const probe = verificationProbe(expectedRaw);
+  if (!probe) return false;
+  for (const surface of surfaces) {
+    const got = typeof surface === "string" ? surface : surface ? readSurfaceText(surface) : "";
+    if (got.trim().toLowerCase().includes(probe)) return true;
+  }
+  return false;
 }
 
 function readFilledText(
@@ -164,8 +197,8 @@ function readFilledText(
 
 async function fillRichTextSurface(surface: HTMLElement, text: string): Promise<void> {
   const doc = surface.ownerDocument ?? document;
-  surface.focus({ preventScroll: false });
-  surface.scrollIntoView({ block: "center", behavior: "instant" });
+  const companion = findRichTextCompanion(surface);
+  surface.focus({ preventScroll: true });
   await sleep(30);
   try {
     const sel = doc.getSelection();
@@ -173,10 +206,28 @@ async function fillRichTextSurface(surface: HTMLElement, text: string): Promise<
     range.selectNodeContents(surface);
     sel?.removeAllRanges();
     sel?.addRange(range);
+    doc.execCommand("selectAll", false);
+    doc.execCommand("delete", false);
     doc.execCommand("insertText", false, text);
   } catch {
     surface.textContent = text;
   }
+  if (companion) {
+    const proto =
+      companion instanceof HTMLTextAreaElement
+        ? window.HTMLTextAreaElement.prototype
+        : window.HTMLInputElement.prototype;
+    const nativeSetter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+    if (nativeSetter) nativeSetter.call(companion, text);
+  }
+  surface.dispatchEvent(
+    new InputEvent("beforeinput", {
+      bubbles: true,
+      cancelable: true,
+      inputType: "insertText",
+      data: text.slice(0, Math.min(256, text.length)),
+    }),
+  );
   surface.dispatchEvent(
     new InputEvent("input", {
       bubbles: true,
@@ -186,6 +237,8 @@ async function fillRichTextSurface(surface: HTMLElement, text: string): Promise<
     }),
   );
   surface.dispatchEvent(new Event("change", { bubbles: true }));
+  companion?.dispatchEvent(new Event("input", { bubbles: true }));
+  companion?.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
 function snapshotIfNeeded(
@@ -215,11 +268,24 @@ async function fillElement(selector: string, value: string, seen: Set<string>): 
   const valueTrim = value.trim();
   if (!valueTrim) return false;
 
-  const el = queryElement(selector) as
-    | HTMLInputElement
-    | HTMLTextAreaElement
-    | HTMLSelectElement
-    | null;
+  const raw = queryElement(selector);
+  if (
+    raw instanceof HTMLElement &&
+    raw.getAttribute("contenteditable") === "true" &&
+    !(raw instanceof HTMLInputElement) &&
+    !(raw instanceof HTMLTextAreaElement) &&
+    !(raw instanceof HTMLSelectElement)
+  ) {
+    const companion = findRichTextCompanion(raw);
+    await fillRichTextSurface(raw, valueTrim);
+    await sleep(80 + Math.random() * 100);
+    const ok = verifyFilledText(valueTrim, raw, companion?.value ?? companion);
+    if (!ok) seen.delete(selector);
+    else seen.add(selector);
+    return ok;
+  }
+
+  const el = raw as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
   if (!el) return false;
   snapshotIfNeeded(selector, el, seen);
 
@@ -313,21 +379,32 @@ async function fillElement(selector: string, value: string, seen: Set<string>): 
       }
     }
     await sleep(70);
-    if (!verifySelectOrNative()) return false;
+    if (!verifySelectOrNative()) {
+      seen.delete(selector);
+      return false;
+    }
   }
 
   el.blur();
   findRichTextSurface(el)?.blur();
   await sleep(90);
-  return verifySelectOrNative();
+  const ok = verifySelectOrNative();
+  if (!ok) seen.delete(selector);
+  return ok;
 }
 
 function getCurrentTextValue(selector: string): string {
-  const el = queryElement(selector) as
-    | HTMLInputElement
-    | HTMLTextAreaElement
-    | HTMLSelectElement
-    | null;
+  const raw = queryElement(selector);
+  if (
+    raw instanceof HTMLElement &&
+    raw.getAttribute("contenteditable") === "true" &&
+    !(raw instanceof HTMLInputElement) &&
+    !(raw instanceof HTMLTextAreaElement) &&
+    !(raw instanceof HTMLSelectElement)
+  ) {
+    return (raw.innerText ?? raw.textContent ?? "").trim();
+  }
+  const el = raw as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
   if (!el) return "";
   if (el instanceof HTMLSelectElement) {
     return (el.options[el.selectedIndex]?.text ?? el.value ?? "").trim();
@@ -412,7 +489,7 @@ export async function fillStandardFields(
   let hearAboutHandled = false;
 
   for (const field of fields) {
-    if (field.isOpenEnded) {
+    if (field.isOpenEnded || shouldAutoFillWithAi(field)) {
       openEnded.push(field);
       continue;
     }
@@ -675,20 +752,51 @@ function overlapScore(a: Set<string>, b: Set<string>): number {
   return inter / Math.max(1, a.size);
 }
 
+function isAiTextField(field: DetectedField): boolean {
+  return field.isOpenEnded || shouldAutoFillWithAi(field);
+}
+
+function resolveFieldForAnswer(
+  input: ApplyAiAnswerInput,
+  detectedFields: DetectedField[],
+): DetectedField | null {
+  if (input.questionHash) {
+    const byHash = detectedFields.find((f) => f.questionHash === input.questionHash);
+    if (byHash) return byHash;
+  }
+  if (input.question) {
+    const q = normalizeForMatch(input.question);
+    if (q) {
+      let best: { field: DetectedField; score: number } | null = null;
+      const qTokens = tokenSet(input.question);
+      for (const f of detectedFields) {
+        if (!isAiTextField(f)) continue;
+        const hay = normalizeForMatch(
+          [f.questionText, f.groupLabel, f.label, f.hintText].filter(Boolean).join(" "),
+        );
+        if (!hay) continue;
+        if (hay.includes(q) || q.includes(hay)) return f;
+        const score = overlapScore(qTokens, tokenSet(hay));
+        if (score >= 0.35 && (!best || score > best.score)) {
+          best = { field: f, score };
+        }
+      }
+      if (best) return best.field;
+    }
+  }
+  if (input.groupKey) {
+    const byGroup = detectedFields.find((f) => f.groupKey === input.groupKey);
+    if (byGroup) return byGroup;
+  }
+  return detectedFields.find((f) => f.id === input.id) ?? null;
+}
+
 function findFallbackSelector(
   input: ApplyAiAnswerInput,
   detectedFields: DetectedField[],
 ): string | null {
-  const byId = detectedFields.find((f) => f.id === input.id);
-  if (byId?.elementSelector) return byId.elementSelector;
-  if (input.groupKey) {
-    const byGroup = detectedFields.find((f) => f.groupKey && f.groupKey === input.groupKey);
-    if (byGroup?.elementSelector) return byGroup.elementSelector;
-  }
-  if (input.questionHash) {
-    const byHash = detectedFields.find((f) => f.questionHash && f.questionHash === input.questionHash);
-    if (byHash?.elementSelector) return byHash.elementSelector;
-  }
+  const matched = resolveFieldForAnswer(input, detectedFields);
+  if (matched?.elementSelector) return matched.elementSelector;
   if (!input.question) return null;
   const q = normalizeForMatch(input.question);
   if (!q) return null;
@@ -697,7 +805,7 @@ function findFallbackSelector(
   const intentTokens = new Set(intent.keywords);
   let best: { selector: string; score: number } | null = null;
   for (const f of detectedFields) {
-    if (!f.isOpenEnded) continue;
+    if (!isAiTextField(f)) continue;
     const l = normalizeForMatch([f.label, f.questionText, f.groupLabel].filter(Boolean).join(" "));
     if (!l) continue;
     if (l.includes(q) || q.includes(l)) return f.elementSelector;
@@ -707,6 +815,21 @@ function findFallbackSelector(
     }
   }
   return best?.selector ?? null;
+}
+
+function selectorCandidatesForAnswer(
+  input: ApplyAiAnswerInput,
+  detectedFields: DetectedField[],
+): string[] {
+  const matched = resolveFieldForAnswer(input, detectedFields);
+  const selById = `[data-jsa-id="${CSS.escape(matched?.id ?? input.id)}"]`;
+  const byIdEl = matched ? queryElement<HTMLElement>(matched.elementSelector) : null;
+  return uniqueSelectors([
+    matched?.elementSelector,
+    byIdEl ? selById : null,
+    input.selector,
+    findFallbackSelector(input, detectedFields),
+  ]);
 }
 
 function uniqueSelectors(selectors: Array<string | null | undefined>): string[] {
@@ -721,14 +844,6 @@ function uniqueSelectors(selectors: Array<string | null | undefined>): string[] 
   return out;
 }
 
-function unresolvedTextAnswerSelectors(usedSelectors: Set<string>, detectedFields: DetectedField[]): string[] {
-  const list = detectedFields
-    .filter((f) => f.isOpenEnded)
-    .map((f) => f.elementSelector)
-    .filter(Boolean);
-  return list.filter((s) => !usedSelectors.has(s));
-}
-
 export async function fillAIAnswersWithFallback(
   answers: ApplyAiAnswerInput[],
   detectedFields: DetectedField[],
@@ -740,15 +855,13 @@ export async function fillAIAnswersWithFallback(
   const unresolved: ApplyAiAnswerInput[] = [];
 
   for (const input of answers) {
-    const selById = `[data-jsa-id="${CSS.escape(input.id)}"]`;
-    const byIdEl = queryElement<HTMLElement>(selById);
-    const selectorCandidates = uniqueSelectors([
-      input.selector,
-      byIdEl ? selById : null,
-      findFallbackSelector(input, detectedFields),
-    ]);
+    const selectorCandidates = selectorCandidatesForAnswer(input, detectedFields);
     let success = false;
     for (const selector of selectorCandidates) {
+      const el = queryElement(selector);
+      if (el instanceof HTMLElement) {
+        el.scrollIntoView({ block: "center", behavior: "instant" });
+      }
       const existing = getCurrentTextValue(selector);
       if (
         !input.forceReplace &&
@@ -770,14 +883,16 @@ export async function fillAIAnswersWithFallback(
   }
 
   if (unresolved.length > 0) {
-    const fallbackSelectors = unresolvedTextAnswerSelectors(usedSelectors, detectedFields);
-    let idx = 0;
     for (const input of unresolved) {
-      const fromId = detectedFields.find((f) => f.id === input.id)?.elementSelector;
-      const selector = fromId ?? fallbackSelectors[idx++];
+      const matched = resolveFieldForAnswer(input, detectedFields);
+      const selector = matched?.elementSelector ?? findFallbackSelector(input, detectedFields);
       if (!selector) {
         failedIds.push(input.id);
         continue;
+      }
+      const el = queryElement(selector);
+      if (el instanceof HTMLElement) {
+        el.scrollIntoView({ block: "center", behavior: "instant" });
       }
       const ok = await fillElement(selector, input.answer, seen);
       if (ok) {

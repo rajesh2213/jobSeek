@@ -75,7 +75,7 @@ function buildRelevantResumeContext(resumeExcerpt: string | undefined, intents: 
     if (picked.length >= 45) break;
   }
 
-  if (!picked.length) return lines.slice(0, 30).join("\n");
+  if (!picked.length) return lines.slice(0, intents.length > 4 ? 18 : 30).join("\n");
   return picked.join("\n");
 }
 
@@ -163,7 +163,7 @@ Respond in valid JSON only, no markdown:
 
   const response = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 4096,
+    max_tokens: Math.min(4096, 180 + req.questions.length * 280),
     messages: [{ role: "user", content: prompt }],
   });
 

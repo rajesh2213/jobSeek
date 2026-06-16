@@ -1,7 +1,7 @@
 import type { DetectedField } from "../fieldDetector";
 import type { ApplyProfile, ResumeFilePayload } from "../formFiller";
 import { fillAIAnswersWithFallback, fillStandardFields } from "../formFiller";
-import { batchAnswer } from "../api";
+import { batchAnswer, consumeSmartApplyUse } from "../api";
 
 export async function runSequentialAutofill(params: {
   fields: DetectedField[];
@@ -81,6 +81,11 @@ export async function runSequentialAutofill(params: {
     companyName: params.companyName || "Company",
   });
 
+  let appliedTotal = 0;
+  const usedLlm =
+    (answerResult.tokensUsed ?? 0) > 0 ||
+    answerResult.answerMeta?.some((m) => m.source === "llm") === true;
+
   for (const field of openEnded) {
     params.onFieldStatus(field.id, { status: "loading", source: "ai" });
     const answer = answerResult.answers.find((row) => row.id === field.id)?.answer ?? "";
@@ -102,9 +107,14 @@ export async function runSequentialAutofill(params: {
       source: "ai",
       reason: apply.applied > 0 ? undefined : "AI answer did not apply",
     });
+    appliedTotal += apply.applied;
     completed++;
     params.onProgress(completed, total);
     await new Promise((resolve) => window.setTimeout(resolve, 220));
+  }
+
+  if (appliedTotal > 0 && usedLlm) {
+    await consumeSmartApplyUse();
   }
 }
 

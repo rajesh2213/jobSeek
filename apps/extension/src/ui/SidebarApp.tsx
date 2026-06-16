@@ -5,8 +5,9 @@ import {
   fetchResumeFile,
   fetchSmartApplyStatusDetailed,
 } from "../lib/api";
-import { batchAnswer } from "../lib/api";
+import { batchAnswer, consumeSmartApplyUse } from "../lib/api";
 import { highlightField } from "../lib/autofill/highlight";
+import { clearAllAiFieldChrome, setAiFieldGenerating } from "../lib/autofill/aiFieldChrome";
 import { FloatingTrigger } from "./FloatingTrigger";
 import { Sidebar } from "./Sidebar";
 import {
@@ -22,6 +23,8 @@ import {
 import { shouldShowGenerateWithAiButton } from "./fieldGenerateAi";
 import type { DetectedField } from "../lib/fieldDetector";
 import { scanAllPageFields } from "../lib/scanPageFields";
+import { fillAllTabAiAnswers, fillAllTabStandard } from "../lib/fillPageFields";
+import { collectAiAutofillFields } from "../lib/aiNarrativeFields";
 import { SIDEBAR_PANEL_WIDTH_PX, SIDEBAR_TRANSITION } from "./uiMotion";
 import { isProductionExtensionBuild } from "../config";
 
@@ -80,10 +83,21 @@ function mapProfile(raw: Record<string, unknown> | null): ApplyProfile | null {
   };
 }
 
+const SIGN_IN_HINT =
+  "Use Open website account below or visit jobloom.tech to sign in.";
+
 function buildAccountSyncHint(
   p: Awaited<ReturnType<typeof fetchApplyProfileDetailed>>,
   s: Awaited<ReturnType<typeof fetchSmartApplyStatusDetailed>>,
+  hasAuthToken?: boolean | null,
 ): string | null {
+  if (hasAuthToken === false) return null;
+
+  const noStoredToken =
+    p.error === "No auth token in extension storage" ||
+    s.error === "No auth token in extension storage";
+  if (noStoredToken) return null;
+
   const profileOk = Boolean(p.ok && p.profile);
   const statusOk = Boolean(s.ok && s.snapshot);
   if (profileOk && statusOk) return null;
@@ -156,18 +170,37 @@ function buildAccountSyncHint(
   return parts.join(" ");
 }
 
+async function refreshSmartApplyStatus(): Promise<void> {
+  const sd = await fetchSmartApplyStatusDetailed();
+  patchSidebarState({ smartApplyStatus: sd.snapshot });
+}
+
 async function loadAccountSnapshotIntoSidebar(): Promise<void> {
+  const hasAuthToken = await new Promise<boolean>((resolve) => {
+    chrome.storage.local.get(["authToken"], (r) => {
+      resolve(Boolean(r.authToken as string | undefined));
+    });
+  });
   const [pd, resumeFile, sd] = await Promise.all([
     fetchApplyProfileDetailed(),
     fetchResumeFile(),
     fetchSmartApplyStatusDetailed(),
   ]);
+  const profileFileName =
+    pd.profile && typeof pd.profile.resumeFileName === "string"
+      ? pd.profile.resumeFileName.trim()
+      : "";
+  const resolvedResume =
+    resumeFile && profileFileName && (!resumeFile.fileName || resumeFile.fileName === "resume.pdf")
+      ? { ...resumeFile, fileName: profileFileName }
+      : resumeFile;
   patchSidebarState({
     profile: mapProfile(pd.profile),
-    resumeFile,
+    resumeFile: resolvedResume,
     smartApplyStatus: sd.snapshot,
     accountDataLoaded: true,
-    accountSyncHint: buildAccountSyncHint(pd, sd),
+    hasAuthToken,
+    accountSyncHint: buildAccountSyncHint(pd, sd, hasAuthToken),
   });
 }
 
@@ -182,7 +215,25 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
   useEffect(() => {
     const syncAuth = () => {
       chrome.storage.local.get(["authToken"], (r) => {
-        patchSidebarState({ hasAuthToken: Boolean(r.authToken as string | undefined) });
+        const has = Boolean(r.authToken as string | undefined);
+        const prev = getSidebarState().hasAuthToken;
+        patchSidebarState({
+          hasAuthToken: has,
+          ...(has ? { error: null } : {}),
+        });
+        if (!has) {
+          patchSidebarState({
+            profile: null,
+            smartApplyStatus: null,
+            resumeFile: null,
+            accountSyncHint: null,
+            accountDataLoaded: true,
+          });
+          return;
+        }
+        if (prev !== true && getSidebarState().atsDetected) {
+          void loadAccountSnapshotIntoSidebar().catch(() => undefined);
+        }
       });
     };
     syncAuth();
@@ -242,6 +293,25 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
     };
   }, [props.isAtsPage]);
 
+  useEffect(() => {
+    if (!props.isAtsPage) return;
+    const syncAiChrome = () => {
+      const { fields, detectedFields } = getSidebarState();
+      const generating = new Set(
+        fields.filter((f) => f.status === "ai_generating").map((f) => f.id),
+      );
+      for (const meta of detectedFields) {
+        setAiFieldGenerating(meta.elementSelector, generating.has(meta.id));
+      }
+    };
+    const unsub = subscribeSidebarState(syncAiChrome);
+    syncAiChrome();
+    return () => {
+      unsub();
+      clearAllAiFieldChrome();
+    };
+  }, [props.isAtsPage]);
+
   /** Re-fetch profile and usage when the panel opens so values update after signing in elsewhere. */
   useEffect(() => {
     if (!state.atsDetected || !state.isOpen) return;
@@ -258,7 +328,7 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
         resumeFile,
         smartApplyStatus: sd.snapshot,
         accountDataLoaded: true,
-        accountSyncHint: buildAccountSyncHint(pd, sd),
+        accountSyncHint: buildAccountSyncHint(pd, sd, getSidebarState().hasAuthToken),
       });
     })();
     return () => {
@@ -291,8 +361,8 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
 
   if (!state.isVisible || !state.atsDetected) return null;
 
-  const rescanFields = async () => {
-    const fields = await scanAllPageFields(sendRuntime);
+  const rescanFields = async (options?: { revealHidden?: boolean }) => {
+    const fields = await scanAllPageFields(sendRuntime, options);
     setDetectedFields(fields);
     return fields;
   };
@@ -300,11 +370,17 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
   const runAutofill = async () => {
     let current = getSidebarState();
     if (current.isRunning) return;
+    patchSidebarState({ isRunning: true, error: null });
+    if (current.hasAuthToken === false) {
+      patchSidebarState({ isRunning: false, error: SIGN_IN_HINT });
+      return;
+    }
     if (!current.profile) {
       try {
         await loadAccountSnapshotIntoSidebar();
       } catch (error) {
         patchSidebarState({
+          isRunning: false,
           error: error instanceof Error ? error.message : "Could not load Smart Apply profile",
         });
         return;
@@ -312,9 +388,11 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
       current = getSidebarState();
       if (!current.profile) {
         patchSidebarState({
+          isRunning: false,
           error:
-            current.accountSyncHint ??
-            "Set up your Smart Apply profile before autofill.",
+            current.hasAuthToken === false
+              ? SIGN_IN_HINT
+              : current.accountSyncHint ?? "Set up your Smart Apply profile before autofill.",
         });
         return;
       }
@@ -324,6 +402,7 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
         await loadAccountSnapshotIntoSidebar();
       } catch (error) {
         patchSidebarState({
+          isRunning: false,
           error: error instanceof Error ? error.message : "Could not load resume file",
         });
         return;
@@ -334,48 +413,49 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
           current.profile?.hasResume === true
             ? "Smart Apply shows a resume, but the original PDF is not available to download (profile may be text-only). Re-upload your PDF on the JobLoom Smart Apply page, then try again."
             : "Resume file is unavailable. Re-upload resume in JobLoom and try again.";
-        patchSidebarState({ error: noBytesHint });
+        patchSidebarState({ isRunning: false, error: noBytesHint });
         return;
       }
     }
     current = getSidebarState();
     const saPre = current.smartApplyStatus;
     if (saPre && saPre.profileComplete === false) {
-      patchSidebarState({ error: "Complete your profile in JobLoom first (Smart Apply page)." });
+      patchSidebarState({
+        isRunning: false,
+        error: "Complete your profile in JobLoom first (Smart Apply page).",
+      });
       return;
     }
     if (saPre && typeof saPre.jobsRemaining === "number" && saPre.jobsRemaining <= 0) {
       patchSidebarState({
+        isRunning: false,
         error: `Daily Smart Apply limit reached. Resets at ${saPre.resetsAt ?? ""}`,
       });
       return;
     }
-    await rescanFields();
+    await rescanFields({ revealHidden: true });
     const total = getSidebarState().detectedFields.length;
     if (!total) {
-      patchSidebarState({ error: "No fillable application fields detected on this page." });
+      patchSidebarState({
+        isRunning: false,
+        error: "No fillable application fields detected on this page.",
+      });
       return;
     }
+    const aiFields = collectAiAutofillFields(getSidebarState().detectedFields);
     resetFieldStates();
     patchSidebarState({
       isOpen: true,
-      isRunning: true,
       error: null,
       progress: { completed: 0, total },
     });
+    for (const f of aiFields) {
+      updateFieldState(f.id, { status: "ai_generating", source: "ai" });
+    }
     const jobTitle = document.title.split(/[-|·]/)[0]?.trim() || "Role";
     const companyName = document.title.split(/[-|]/).pop()?.trim() || "Company";
     try {
-      const fillRes = await sendRuntime<{
-        success?: boolean;
-        fieldResults?: Array<{ id: string; status: string; reason?: string; source?: string }>;
-        openEnded?: DetectedField[];
-        error?: string;
-      }>({
-        type: "FILL_TAB_STANDARD",
-        profile: current.profile,
-        resumeFile: current.resumeFile,
-      });
+      const fillRes = await fillAllTabStandard(sendRuntime, current.profile, current.resumeFile);
       if (fillRes?.success === false) {
         patchSidebarState({
           error: typeof fillRes.error === "string" ? fillRes.error : "Autofill failed",
@@ -393,37 +473,80 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
       patchSidebarState({
         progress: { completed: total, total },
       });
-      const openEnded = (fillRes?.openEnded ?? []) as DetectedField[];
+      const openEndedFromFill = (fillRes?.openEnded ?? []) as DetectedField[];
+      const openEnded = collectAiAutofillFields([
+        ...openEndedFromFill,
+        ...getSidebarState().detectedFields,
+      ]);
       if (openEnded.length) {
-        const out = await batchAnswer({
-          questions: openEnded.map((f) => ({
-            id: f.id,
-            question: f.questionText?.trim() || f.label || "Open-ended question",
-            charLimit: f.charLimit,
-            kind: "free_text",
-          })),
-          jobTitle,
-          companyName,
-        });
-        const generated = out.answers.map((a) => ({ id: a.id, answer: a.answer }));
-        const aiRes = await sendRuntime<{
-          success?: boolean;
-          applied?: number;
-          failedIds?: string[];
-        }>({
-          type: "FILL_TAB_AI_ANSWERS",
-          answers: generated.map((r) => {
-            const f = openEnded.find((x) => x.id === r.id);
-            return {
-              id: r.id,
-              answer: r.answer,
-              question: f?.questionText?.trim() || f?.label,
-              selector: f?.elementSelector,
-              questionHash: f?.questionHash,
-              groupKey: f?.groupKey,
-            };
-          }),
-        });
+        const saNow = getSidebarState().smartApplyStatus;
+        if (saNow && typeof saNow.jobsRemaining === "number" && saNow.jobsRemaining <= 0) {
+          patchSidebarState({
+            error: `Daily Smart Apply limit reached (${saNow.jobsLimit} uses). AI answers were not generated. Resets at ${saNow.resetsAt ?? ""}.`,
+          });
+          for (const f of openEnded) {
+            updateFieldState(f.id, {
+              status: "manual_required",
+              source: "ai",
+              reason: "Daily Smart Apply limit reached",
+            });
+          }
+        } else {
+          const out = await batchAnswer({
+            questions: openEnded.map((f) => ({
+              id: f.id,
+              question:
+                pickDetectedFieldLabel(f) ||
+                f.questionText?.trim() ||
+                f.label ||
+                "Open-ended question",
+              charLimit: f.charLimit,
+              kind: "free_text",
+            })),
+            jobTitle,
+            companyName,
+          });
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 350));
+          const freshFields = await rescanFields();
+          const freshByHash = new Map(
+            freshFields.filter((f) => f.questionHash).map((f) => [f.questionHash as string, f]),
+          );
+          const generated = out.answers.map((a) => ({ id: a.id, answer: a.answer }));
+          const aiRes = await fillAllTabAiAnswers(
+            sendRuntime,
+            generated.map((r) => {
+              const f =
+                openEnded.find((x) => x.id === r.id) ??
+                freshByHash.get(
+                  openEnded.find((x) => x.id === r.id)?.questionHash ?? "",
+                );
+              const fresh =
+                freshFields.find((x) => x.id === f?.id) ??
+                (f?.questionHash ? freshByHash.get(f.questionHash) : undefined) ??
+                f;
+              const question = fresh
+                ? pickDetectedFieldLabel(fresh)
+                : f
+                  ? pickDetectedFieldLabel(f)
+                  : undefined;
+              return {
+                id: r.id,
+                answer: r.answer,
+                question,
+                selector: fresh?.elementSelector ?? f?.elementSelector,
+                questionHash: fresh?.questionHash ?? f?.questionHash,
+                groupKey: fresh?.groupKey ?? f?.groupKey,
+                forceReplace: true,
+              };
+            }),
+          );
+          const usedLlm =
+            (out.tokensUsed ?? 0) > 0 ||
+            out.answerMeta?.some((m) => m.source === "llm") === true;
+          if ((aiRes?.applied ?? 0) > 0 && usedLlm) {
+            await consumeSmartApplyUse();
+          }
+          await refreshSmartApplyStatus();
         const failedAi = new Set(aiRes?.failedIds ?? []);
         for (const f of openEnded) {
           const okOne = aiRes?.success !== false && !failedAi.has(f.id);
@@ -432,6 +555,7 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
             source: "ai",
             reason: okOne ? undefined : "Could not apply generated answer to this field",
           });
+        }
         }
       }
     } catch (error) {
@@ -476,6 +600,19 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
     });
 
     try {
+      await refreshSmartApplyStatus();
+      const saLive = getSidebarState().smartApplyStatus;
+      if (saLive && typeof saLive.jobsRemaining === "number" && saLive.jobsRemaining <= 0) {
+        updateFieldState(fieldId, {
+          status: "manual_required",
+          source: "ai",
+          reason: "Daily Smart Apply limit reached",
+        });
+        patchSidebarState({
+          error: `Daily Smart Apply limit reached. Resets at ${saLive.resetsAt ?? ""}`,
+        });
+        return;
+      }
       const out = await batchAnswer({
         questions: [
           {
@@ -497,25 +634,27 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
         });
         return;
       }
-      const aiRes = await sendRuntime<{
-        success?: boolean;
-        failedIds?: string[];
-      }>({
-        type: "FILL_TAB_AI_ANSWERS",
-        answers: [
-          {
-            id: fieldId,
-            answer,
-            question,
-            selector: detected.elementSelector,
-            questionHash: detected.questionHash,
-            groupKey: detected.groupKey,
-            forceReplace: true,
-          },
-        ],
-      });
+      const aiRes = await fillAllTabAiAnswers(sendRuntime, [
+        {
+          id: fieldId,
+          answer,
+          question,
+          selector: detected.elementSelector,
+          questionHash: detected.questionHash,
+          groupKey: detected.groupKey,
+          forceReplace: true,
+        },
+      ]);
       const failedAi = new Set(aiRes?.failedIds ?? []);
       const okOne = aiRes?.success !== false && !failedAi.has(fieldId);
+      if (okOne) {
+        const usedLlm =
+          (out.tokensUsed ?? 0) > 0 ||
+          out.answerMeta?.some((m) => m.source === "llm") === true;
+        if (usedLlm) {
+          await consumeSmartApplyUse();
+        }
+      }
       updateFieldState(fieldId, {
         status: okOne ? "filled" : "failed",
         source: "ai",
@@ -528,6 +667,7 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
         reason: error instanceof Error ? error.message : "AI generation failed",
       });
     } finally {
+      await refreshSmartApplyStatus();
       await rescanFields();
     }
   };

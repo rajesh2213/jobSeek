@@ -1,6 +1,7 @@
 import type { SmartApplyStatusSnapshot } from "../lib/api";
 import type { ApplyProfile, ResumeFilePayload } from "../lib/formFiller";
 import type { DetectedField } from "../lib/fieldDetector";
+import { shouldAutoFillWithAi } from "../lib/aiNarrativeFields";
 
 export type FieldState = {
   id: string;
@@ -151,7 +152,7 @@ export function setDetectedFields(fields: DetectedField[]): void {
     frameId: field.frameId,
     groupKey: field.groupKey,
     inputType: field.inputType,
-    isOpenEnded: field.isOpenEnded,
+    isOpenEnded: field.isOpenEnded || shouldAutoFillWithAi(field),
   }));
   const completed = state.fields.filter(
     (field) =>

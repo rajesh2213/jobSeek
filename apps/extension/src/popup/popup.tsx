@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   batchAnswer,
+  consumeSmartApplyUse,
   fetchApplyProfile,
   fetchResumeFile,
   fetchSmartApplyStatus,
@@ -382,6 +383,12 @@ function Popup() {
           }
           const applied = Number(applyRes?.applied ?? 0);
           const attempted = Number(applyRes?.attempted ?? generated.length);
+          const usedLlm =
+            (out.tokensUsed ?? 0) > 0 ||
+            out.answerMeta?.some((m) => m.source === "llm") === true;
+          if (applied > 0 && usedLlm) {
+            await consumeSmartApplyUse();
+          }
           if (attempted > 0 && applied < attempted) {
             setPhase("error");
             setError(`Applied ${applied}/${attempted} generated answers. Use Retry for remaining fields.`);

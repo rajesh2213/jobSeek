@@ -1,5 +1,6 @@
 import type { FieldConfidence, FieldType, FieldValueSource } from "./types";
 import type { ApplyProfile } from "../formFiller";
+import { looksLikeNarrativePrompt } from "../aiNarrativeFields";
 
 export interface FactualMappingResult {
   value: string | null;
@@ -28,16 +29,21 @@ export function resolveFactualField(
   },
   profile: ApplyProfile,
 ): FactualMappingResult | null {
-  const hay = [
-    field.label,
-    field.questionText,
-    field.groupLabel,
-    field.sectionLabel,
-    field.hintText,
-    ...(field.options ?? []),
-  ]
+  const focusedHay = [field.label, field.groupLabel, field.hintText, field.sectionLabel]
+    .filter(Boolean)
     .join(" ")
-    .toLowerCase();
+    .trim();
+  const questionHay = (field.questionText ?? "").trim();
+  const promptHay =
+    questionHay.length > 0 && questionHay.length <= 520
+      ? questionHay
+      : focusedHay.length >= 24
+        ? focusedHay
+        : questionHay.slice(0, 520);
+  const hay = promptHay.toLowerCase();
+
+  if (looksLikeNarrativePrompt(promptHay)) return null;
+  if (promptHay.length > 140 && /\?/.test(promptHay)) return null;
 
   if (field.fieldType === "salary" || /\b(expected salary|salary expectation|desired salary)\b/.test(hay)) {
     if (isTruthyText(profile.salaryExpectation)) {

@@ -1,4 +1,5 @@
 import type { ClassifiedField, FieldMetadata, FieldType } from "./types";
+import { looksLikeNarrativePrompt } from "../aiNarrativeFields";
 
 /**
  * Order matters: ATS containers repeat the whole form in `questionText`, so "Phone" / "Email"
@@ -106,19 +107,7 @@ function looksLikeGenericEssayPlaceholder(narrowHay: string): boolean {
  * container do not mark "Company" or "LinkedIn URL" as open-ended.
  */
 function looksLikeLongQuestion(narrowHay: string): boolean {
-  if (!narrowHay) return false;
-  if (/\?/.test(narrowHay)) {
-    if (
-      /(describe|tell us|explain|walk us through|why|how would|what (?:is your|was your|are your|would you)|elaborate|detail|what practices|what challenges|have you (?:made|worked)|share with us)/i.test(
-        narrowHay,
-      )
-    ) {
-      return true;
-    }
-  }
-  return /(describe|tell us about your experience|tell us|explain|walk us through|contribution|open source|async|remote environment|remote work|challenges have you faced|practices or approaches|postgres|founder|referrer)/i.test(
-    narrowHay,
-  );
+  return looksLikeNarrativePrompt(narrowHay);
 }
 
 /** Do not resolve title/company from the full container blob — avoids essay prompts mentioning "company". */
@@ -202,7 +191,11 @@ export function classifyField(field: FieldMetadata): ClassifiedField {
     };
   }
 
-  const textLike = inputType === "textarea" || inputType === "text" || inputType === "search";
+  const textLike =
+    inputType === "textarea" ||
+    inputType === "contenteditable" ||
+    inputType === "text" ||
+    inputType === "search";
 
   // Generic "name" field → fullName, but only when not clearly first/last/email/company/etc.
   if (
@@ -236,17 +229,23 @@ export function classifyField(field: FieldMetadata): ClassifiedField {
     }
   }
 
+  const qt = field.context.questionText ?? "";
+  const mergedForEssayProbe = `${narrowHay} ${qt}`.trim();
+
+  if (textLike && looksLikeLongQuestion(mergedForEssayProbe)) {
+    return { ...field, fieldType: "openEnded", isOpenEnded: true, classificationSource: "rule" };
+  }
+
   if (/\b(referral|referrer)\b/i.test(localDisambigHay)) {
     return { ...field, fieldType: "short_text", isOpenEnded: false, classificationSource: "rule" };
   }
+  /** Yes/no shortcuts use label/group only — `nearbyText` often includes sibling questions. */
+  const booleanHay = [localHay, field.context.groupLabel, field.context.hintText].join(" ").trim();
   if (
-    /\b(previous founder|over the age of 18|over 18|visa sponsorship|work authorization)\b/i.test(localDisambigHay)
+    /\b(previous founder|over the age of 18|over 18|visa sponsorship|work authorization)\b/i.test(booleanHay)
   ) {
     return { ...field, fieldType: "boolean", isOpenEnded: false, classificationSource: "rule" };
   }
-
-  const qt = field.context.questionText ?? "";
-  const mergedForEssayProbe = `${narrowHay} ${qt}`.trim();
 
   /**
    * Custom-source comboboxes are often `<input type="text">` with large maxlength — they must stay
@@ -267,11 +266,12 @@ export function classifyField(field: FieldMetadata): ClassifiedField {
    */
   const mergeEssayContext =
     inputType === "textarea" ||
+    inputType === "contenteditable" ||
     ((inputType === "text" || inputType === "search") &&
       (field.charLimit === undefined ||
-        field.charLimit >= 120 ||
-        (field.rows ?? 0) >= 3 ||
-        (!narrowHay.trim() && qt.trim().length >= 40) ||
+        field.charLimit >= 80 ||
+        (field.rows ?? 0) >= 2 ||
+        (!narrowHay.trim() && qt.trim().length >= 32) ||
         (looksLikeGenericEssayPlaceholder(narrowHay) &&
           looksLikeLongQuestion(mergedForEssayProbe))));
   const essayDetectionHay = mergeEssayContext ? mergedForEssayProbe : narrowHay;
@@ -288,7 +288,11 @@ export function classifyField(field: FieldMetadata): ClassifiedField {
     return { ...field, fieldType: byPattern.type, isOpenEnded: false, classificationSource: "rule" };
   }
 
-  if (inputType === "textarea") {
+  if (inputType === "textarea" || inputType === "contenteditable") {
+    const essayHay = mergeEssayContext ? mergedForEssayProbe : narrowHay;
+    if (!looksLikeHearAboutSourceHay(essayHay) && !byPattern) {
+      return { ...field, fieldType: "openEnded", isOpenEnded: true, classificationSource: "fallback" };
+    }
     return { ...field, fieldType: "long_text", isOpenEnded: false, classificationSource: "fallback" };
   }
   if (textLike) {

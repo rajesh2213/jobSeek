@@ -6,6 +6,7 @@ export const API_PATHS = {
   applyProfile: "/account/apply-profile",
   smartApplyStatus: "/account/smart-apply/status",
   smartApplyBatchAnswer: "/account/smart-apply/batch-answer",
+  smartApplyConsume: "/account/smart-apply/consume",
   smartApplyEvents: "/account/smart-apply/events",
   resumeDownload: "/account/resume/download",
   applications: "/applications",

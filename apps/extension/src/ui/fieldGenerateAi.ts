@@ -31,7 +31,7 @@ const DETERMINISTIC_PROFILE_FIELD_TYPES = new Set<FieldType>([
 
 export function isTextLikeControl(inputType?: string): boolean {
   const t = (inputType ?? "").toLowerCase();
-  return t === "textarea" || t === "text" || t === "search";
+  return t === "textarea" || t === "contenteditable" || t === "text" || t === "search";
 }
 
 /**

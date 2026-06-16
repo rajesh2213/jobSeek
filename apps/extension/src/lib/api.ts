@@ -289,6 +289,22 @@ export async function batchAnswer(params: {
   return proxied.data;
 }
 
+/** Charge one Smart Apply use after answers are successfully applied to the page. */
+export async function consumeSmartApplyUse(): Promise<void> {
+  const token = await getToken();
+  if (!token) return;
+  await proxyApiRequest({
+    path: API_PATHS.smartApplyConsume,
+    method: "POST",
+    auth: true,
+    responseType: "json",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({}),
+  });
+}
+
 export type SmartApplyEventName =
   | "resume_uploaded"
   | "extension_installed_clicked"
@@ -319,6 +335,36 @@ export async function postSmartApplyEvent(
   void base;
 }
 
+function parseResumeFileName(disposition: string, fallback?: string | null): string {
+  const star = disposition.match(/filename\*\s*=\s*UTF-8''([^;\s]+)/i);
+  if (star?.[1]) {
+    try {
+      return decodeURIComponent(star[1].trim());
+    } catch {
+      return star[1].trim();
+    }
+  }
+  const quoted = disposition.match(/filename\s*=\s*"([^"]+)"/i);
+  if (quoted?.[1]) {
+    try {
+      return decodeURIComponent(quoted[1].trim());
+    } catch {
+      return quoted[1].trim();
+    }
+  }
+  const plain = disposition.match(/filename\s*=\s*([^;\s]+)/i);
+  if (plain?.[1]) {
+    try {
+      return decodeURIComponent(plain[1].trim());
+    } catch {
+      return plain[1].trim();
+    }
+  }
+  const fromProfile = fallback?.trim();
+  if (fromProfile) return fromProfile;
+  return "resume.pdf";
+}
+
 export async function fetchResumeFile(): Promise<{
   fileName: string;
   contentType: string;
@@ -326,6 +372,13 @@ export async function fetchResumeFile(): Promise<{
 } | null> {
   const [base, token] = await Promise.all([getApiBase(), getToken()]);
   if (!token) return null;
+
+  const profilePromise = proxyApiRequest<Record<string, unknown>>({
+    path: API_PATHS.applyProfile,
+    auth: true,
+    responseType: "json",
+  }).catch(() => null);
+
   const res = await proxyApiRequest<ArrayBuffer>({
     path: API_PATHS.resumeDownload,
     auth: true,
@@ -333,10 +386,15 @@ export async function fetchResumeFile(): Promise<{
   });
   if (!res.ok) return null;
 
+  const profileRes = await profilePromise;
+  const profileFileName =
+    profileRes?.ok && profileRes.data && typeof profileRes.data.resumeFileName === "string"
+      ? profileRes.data.resumeFileName
+      : null;
+
   const contentType = res.headers?.["content-type"] ?? "application/pdf";
   const disposition = res.headers?.["content-disposition"] ?? "";
-  const fileNameMatch = disposition.match(/filename=\"?([^\";]+)\"?/i);
-  const fileName = decodeURIComponent(fileNameMatch?.[1] ?? "resume.pdf");
+  const fileName = parseResumeFileName(disposition, profileFileName);
   const bytes =
     typeof res.dataBase64 === "string" && res.dataBase64.length > 0
       ? base64ToArrayBuffer(res.dataBase64)

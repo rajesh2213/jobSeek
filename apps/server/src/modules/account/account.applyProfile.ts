@@ -1469,16 +1469,6 @@ export function registerAccountApplyProfileRoutes(server: FastifyInstance): void
       tokensUsed = result.tokensUsed;
       for (const a of llmAnswers) sourceById.set(a.id, "llm");
 
-      if (!canBypassSmartApplyDailyLimit()) {
-        await server.prisma.user.update({
-          where: { id: ctx.internalUserId },
-          data: {
-            smartApplyJobsToday: refreshed.smartApplyJobsToday + 1,
-            smartApplyResetAt: new Date(),
-          },
-        });
-      }
-
       server.log.info(
         {
           event: "long_answer_generated_count",
@@ -1503,8 +1493,7 @@ export function registerAccountApplyProfileRoutes(server: FastifyInstance): void
     const effectiveAfter = await resolveProPlan(server.prisma, ctx.internalUserId, ctx.email);
     const newLimits = getPlanLimits(effectiveAfter.plan);
     const lim = newLimits.smartApplyJobs;
-    const consumed = llmInput.length > 0 && !canBypassSmartApplyDailyLimit() ? 1 : 0;
-    const jobsRemainingToday = Math.max(0, lim - (refreshed.smartApplyJobsToday + consumed));
+    const jobsRemainingToday = Math.max(0, lim - refreshed.smartApplyJobsToday);
 
     const answerMeta = answers.map((a) => {
       const source = sourceById.get(a.id) ?? "llm";
@@ -1519,6 +1508,64 @@ export function registerAccountApplyProfileRoutes(server: FastifyInstance): void
       tokensUsed,
       jobsRemainingToday,
       jobsLimit: lim,
+    });
+  });
+
+  server.post("/account/smart-apply/consume", async (request, reply) => {
+    const authConsume = await resolveClerkUserResult(server.prisma, request.headers.authorization);
+    if (!authConsume.ok) {
+      return sendClerkAuthFailureReply(reply, authConsume.failure);
+    }
+    const { ctx } = authConsume;
+
+    const effective = await resolveProPlan(server.prisma, ctx.internalUserId, ctx.email);
+    const limits = getPlanLimits(effective.plan);
+    if (limits.smartApplyJobs === 0) {
+      return reply.status(403).send({
+        error: "Upgrade to Pro",
+        code: "PRO_REQUIRED",
+        message: "Upgrade to Pro to use Smart Apply",
+      });
+    }
+
+    await ensureSmartApplyDayReset(server.prisma, ctx.internalUserId);
+
+    const refreshed = await server.prisma.user.findUnique({
+      where: { id: ctx.internalUserId },
+      select: { smartApplyJobsToday: true },
+    });
+    if (!refreshed) {
+      return reply.status(404).send({ error: "User not found", code: "USER_NOT_FOUND" });
+    }
+
+    const cap = limits.smartApplyJobs;
+    if (!canBypassSmartApplyDailyLimit() && refreshed.smartApplyJobsToday >= cap) {
+      return reply.status(429).send({
+        error: "Daily Smart Apply limit reached",
+        code: "SMART_APPLY_LIMIT",
+        resetAt: nextUtcMidnight().toISOString(),
+      });
+    }
+
+    const updated = canBypassSmartApplyDailyLimit()
+      ? refreshed
+      : await server.prisma.user.update({
+          where: { id: ctx.internalUserId },
+          data: {
+            smartApplyJobsToday: refreshed.smartApplyJobsToday + 1,
+            smartApplyResetAt: new Date(),
+          },
+          select: { smartApplyJobsToday: true },
+        });
+
+    const jobsToday = updated.smartApplyJobsToday;
+    const jobsRemaining = Math.max(0, cap - jobsToday);
+
+    return reply.send({
+      jobsToday,
+      jobsRemaining,
+      jobsLimit: cap,
+      resetsAt: nextUtcMidnight().toISOString(),
     });
   });
 }

@@ -1,4 +1,5 @@
 import type { FieldContext, FieldMetadata } from "./types";
+import { looksLikeNarrativePrompt } from "../aiNarrativeFields";
 
 function normalizeText(v: string): string {
   return v.replace(/\s+/g, " ").trim();
@@ -81,13 +82,21 @@ function getNearbyText(el: Element): string {
     const legend = normalizeText(fieldset.querySelector("legend")?.textContent ?? "");
     if (legend) bits.push(legend);
   }
+  const container = findFieldContainer(el);
+  const heading = container.querySelector(
+    'h1, h2, h3, h4, [class*="question" i], [data-testid*="question" i], label',
+  );
+  if (heading && heading !== el && !heading.contains(el)) {
+    const ht = normalizeText(heading.textContent ?? "");
+    if (ht.length >= 8 && ht.length <= 600) bits.push(ht);
+  }
   let parent: Element | null = el.parentElement;
-  for (let i = 0; i < 2 && parent; i++) {
+  for (let i = 0; i < 5 && parent; i++) {
     const prev = normalizeText(parent.previousElementSibling?.textContent ?? "");
-    if (prev) bits.push(prev);
+    if (prev && prev.length >= 8) bits.push(prev);
     parent = parent.parentElement;
   }
-  return bits.join(" ").slice(0, 260);
+  return bits.join(" ").slice(0, 420);
 }
 
 function getLabel(el: Element): string {
@@ -98,6 +107,7 @@ function getLabel(el: Element): string {
     if (t) bits.push(t);
   };
   push(el.getAttribute("aria-label"));
+  push(el.getAttribute("data-placeholder"));
   push(el.getAttribute("placeholder"));
   push(el.getAttribute("name"));
   const id = el.getAttribute("id");
@@ -182,9 +192,10 @@ function getHintText(el: Element): string {
 export function getFieldContext(el: Element): FieldContext {
   const label = getLabel(el);
   const container = findFieldContainer(el);
+  const nearby = getNearbyText(el);
   const containerText = normalizeText(container.textContent ?? "");
-  /** Ashby/Greenhouse-style cards pack several prompts into one container — keep enough context for essays + sourcing. */
-  const questionText = containerText.slice(0, 1600);
+  /** Prefer a focused prompt over the whole card blob (Ashby packs many fields per card). */
+  const questionText = (nearby.length >= 12 ? nearby : containerText).slice(0, 1600);
   const groupLabel = getGroupLabel(el);
   const sectionLabel = getSectionLabel(container);
   const options = optionLabels(el);
@@ -210,9 +221,14 @@ function isAtsHelperContainerText(v: string): boolean {
 
 function looksLikeRealFieldLabel(v: string): boolean {
   const hay = normalizeText(v).toLowerCase();
-  return /(name|email|phone|resume|linkedin|github|portfolio|country|location|salary|experience|question|address|city|state|zip|pronouns|hear|source)/.test(
-    hay,
-  );
+  if (
+    /(name|email|phone|resume|linkedin|github|portfolio|country|location|salary|experience|question|address|city|state|zip|pronouns|hear|source)/.test(
+      hay,
+    )
+  ) {
+    return true;
+  }
+  return looksLikeNarrativePrompt(hay);
 }
 
 function isSiteChromeInput(el: Element): boolean {
@@ -267,8 +283,24 @@ function shouldSkip(el: HTMLInputElement | HTMLSelectElement | HTMLTextAreaEleme
   if (/captcha|recaptcha|h-captcha/i.test(label)) return true;
   if (isSiteChromeInput(el)) return true;
   if (isLanguageSwitcherSelect(el)) return true;
-  const helperHay = [context.questionText, context.groupLabel, context.sectionLabel].join(" ");
+  const helperHay = [context.groupLabel, context.sectionLabel, label, context.hintText].join(" ");
   const localHay = [label, el.getAttribute("placeholder"), el.getAttribute("name")].join(" ");
+  if (isAtsHelperContainerText(helperHay) && !looksLikeRealFieldLabel(localHay)) {
+    return true;
+  }
+  return false;
+}
+
+function shouldSkipContentEditable(el: HTMLElement, label: string, context: FieldContext): boolean {
+  if (el.getAttribute("contenteditable") !== "true") return true;
+  if (isSiteChromeInput(el)) return true;
+  if (el.closest("header, nav, [role='banner'], [role='navigation'], footer")) return true;
+  const r = el.getBoundingClientRect();
+  if (r.width < 48 || r.height < 16) return true;
+  const nested = el.querySelector('[contenteditable="true"]');
+  if (nested && nested !== el) return true;
+  const helperHay = [context.groupLabel, context.sectionLabel, label, context.hintText].join(" ");
+  const localHay = [label, el.getAttribute("data-placeholder"), el.getAttribute("aria-label")].join(" ");
   if (isAtsHelperContainerText(helperHay) && !looksLikeRealFieldLabel(localHay)) {
     return true;
   }
@@ -302,22 +334,62 @@ function getAllAccessibleDocuments(root: Document = document): Document[] {
 }
 
 export function extractFieldMetadata(): FieldMetadata[] {
-  const nodes = getAllAccessibleDocuments().flatMap((doc) =>
-    Array.from(doc.querySelectorAll("input, textarea, select")),
-  );
+  const idSeq = { n: 0 };
+  const nodes = getAllAccessibleDocuments().flatMap((doc) => [
+    ...Array.from(doc.querySelectorAll("input, textarea, select")),
+    ...Array.from(doc.querySelectorAll<HTMLElement>('[contenteditable="true"]')),
+  ]);
   const out: FieldMetadata[] = [];
-  let idx = 0;
+  const seenSelectors = new Set<string>();
   for (const node of nodes) {
     const input = node as HTMLInputElement;
+    if (node instanceof HTMLElement && node.getAttribute("contenteditable") === "true") {
+      const block = findFieldContainer(node);
+      const companion = block.querySelector(
+        "textarea, input:not([type='hidden']):not([type='radio']):not([type='checkbox']):not([type='file']):not([type='submit']):not([type='button'])",
+      );
+      if (companion && companion !== node && companion.getAttribute("contenteditable") !== "true") {
+        continue;
+      }
+      const context = getFieldContext(node);
+      const label = context.label;
+      if (shouldSkipContentEditable(node, label, context)) continue;
+      let id = node.getAttribute("data-jsa-id");
+      if (!id) {
+        id = `jsa-field-${idSeq.n++}`;
+        node.setAttribute("data-jsa-id", id);
+      }
+      const selector = `[data-jsa-id="${id}"]`;
+      if (seenSelectors.has(selector)) continue;
+      seenSelectors.add(selector);
+      out.push({
+        id,
+        label,
+        placeholder: normalizeText(node.getAttribute("data-placeholder") ?? ""),
+        name: normalizeText(node.getAttribute("name") ?? ""),
+        inputType: "contenteditable",
+        required: node.getAttribute("aria-required") === "true",
+        options: [],
+        nearbyText: getNearbyText(node),
+        context,
+        selector,
+        questionHash: hashQuestion([context.questionText, context.groupLabel, context.label].join(" ")),
+      });
+      continue;
+    }
+
     const context = getFieldContext(node);
     const label = context.label;
     if (shouldSkip(input, label, context)) continue;
 
     let id = node.getAttribute("data-jsa-id");
     if (!id) {
-      id = `jsa-field-${idx++}`;
+      id = `jsa-field-${idSeq.n++}`;
       node.setAttribute("data-jsa-id", id);
     }
+    const selector = `[data-jsa-id="${id}"]`;
+    if (seenSelectors.has(selector)) continue;
+    seenSelectors.add(selector);
 
     const groupKey =
       input.type === "radio" || input.type === "checkbox"

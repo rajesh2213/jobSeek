@@ -1,6 +1,6 @@
 {
   "name": "@jobseek/extension",
-  "version": "1.0.8",
+  "version": "1.0.16",
   "private": true,
   "scripts": {
     "build": "webpack --mode production",
@@ -9,7 +9,7 @@
     "check:ext": "node scripts/check-ext.mjs",
     "build:analyze": "cross-env ANALYZE=1 webpack --mode production",
     "dev": "webpack --mode development --watch",
-    "test:unit": "node --import tsx --test tests/unit/atsDetection.test.ts"
+    "test:unit": "node --import tsx --test tests/unit/atsDetection.test.ts tests/unit/aiNarrativeFields.test.ts"
   },
   "devDependencies": {
     "archiver": "^7.0.1",
