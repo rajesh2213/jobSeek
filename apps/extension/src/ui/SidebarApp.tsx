@@ -21,6 +21,7 @@ import {
 } from "./store";
 import { shouldShowGenerateWithAiButton } from "./fieldGenerateAi";
 import type { DetectedField } from "../lib/fieldDetector";
+import { scanAllPageFields } from "../lib/scanPageFields";
 import { SIDEBAR_PANEL_WIDTH_PX, SIDEBAR_TRANSITION } from "./uiMotion";
 import { isProductionExtensionBuild } from "../config";
 
@@ -201,12 +202,8 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
     if (!props.isAtsPage) return;
     const refresh = async () => {
       try {
-        const res = await sendRuntime<{ success?: boolean; fields?: DetectedField[] }>({
-          type: "SCAN_TAB_FIELDS",
-        });
-        if (res?.success !== false && Array.isArray(res.fields)) {
-          setDetectedFields(res.fields);
-        }
+        const fields = await scanAllPageFields(sendRuntime);
+        setDetectedFields(fields);
       } catch {
         // ignore
       }
@@ -219,12 +216,8 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
         if (getSidebarState().isRunning) return;
         void (async () => {
           try {
-            const res = await sendRuntime<{ success?: boolean; fields?: DetectedField[] }>({
-              type: "SCAN_TAB_FIELDS",
-            });
-            if (res?.success !== false && Array.isArray(res.fields)) {
-              setDetectedFields(res.fields);
-            }
+            const fields = await scanAllPageFields(sendRuntime);
+            setDetectedFields(fields);
           } catch {
             // ignore
           }
@@ -285,13 +278,8 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
   if (!state.isVisible || !state.atsDetected) return null;
 
   const rescanFields = async () => {
-    const res = await sendRuntime<{ success?: boolean; fields?: DetectedField[] }>({
-      type: "SCAN_TAB_FIELDS",
-    });
-    const fields = res?.fields ?? [];
-    if (res?.success !== false && Array.isArray(res.fields)) {
-      setDetectedFields(res.fields);
-    }
+    const fields = await scanAllPageFields(sendRuntime);
+    setDetectedFields(fields);
     return fields;
   };
 

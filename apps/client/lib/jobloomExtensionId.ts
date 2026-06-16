@@ -4,7 +4,7 @@
  *
  * `NEXT_PUBLIC_JOBLOOM_EXTENSION_ID` overrides (e.g. unpacked QA builds).
  */
-export const JOBLOOM_PUBLISHED_EXTENSION_ID = "daicjlikogmnhdgdglndhbllibmhfded";
+export const JOBLOOM_PUBLISHED_EXTENSION_ID = "dalcjlikogmnhdgdglndhbllibmhfded";
 
 export function resolveJobloomExtensionId(): string {
   return process.env.NEXT_PUBLIC_JOBLOOM_EXTENSION_ID?.trim() || JOBLOOM_PUBLISHED_EXTENSION_ID;

@@ -75,7 +75,11 @@ function mergeFillFieldResults(frameId: number, rows: FillFieldResultPayload[]):
   }));
 }
 
-async function scanTabFields(tabId: number) {
+async function scanTabFields(tabId: number, options?: { skipFrameIds?: number[] }) {
+  const skipFrameIds = new Set(options?.skipFrameIds ?? []);
+  // Yield so a content-script caller waiting on SCAN_TAB_FIELDS can handle per-frame SCAN_FIELDS.
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
   let frames: chrome.webNavigation.GetAllFrameResultDetails[] = [];
   try {
     frames = await chrome.webNavigation.getAllFrames({ tabId });
@@ -89,6 +93,7 @@ async function scanTabFields(tabId: number) {
   }
   const merged: DetectedFieldPayload[] = [];
   for (const { frameId, url } of frames) {
+    if (skipFrameIds.has(frameId)) continue;
     if (!url || url.startsWith("chrome-extension:")) continue;
     try {
       const res = (await chrome.tabs.sendMessage(
@@ -287,11 +292,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === "SCAN_TAB_FIELDS") {
     const tabId = (msg as { tabId?: number }).tabId ?? sender.tab?.id;
+    const skipFrameIds = (msg as { skipFrameIds?: number[] }).skipFrameIds;
     if (tabId === undefined) {
       sendResponse({ success: false, error: "No tab id", fields: [], isAtsPage: false });
       return false;
     }
-    void scanTabFields(tabId).then(sendResponse);
+    void scanTabFields(tabId, { skipFrameIds }).then(sendResponse);
     return true;
   }
 
