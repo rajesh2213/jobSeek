@@ -63,9 +63,12 @@ export function LegalFooter() {
           <Link href="/billing" className="hover:text-brand" prefetch={false}>
             Billing &amp; refunds
           </Link>
-          <Link href="/about" className="hover:text-brand" prefetch={false}>
-            About
-          </Link>
+            <Link href="/about" className="hover:text-brand" prefetch={false}>
+              About
+            </Link>
+            <Link href="/blog" className="hover:text-brand" prefetch={false}>
+              Blog
+            </Link>
           {email ? (
             <a href={`mailto:${email}`} className="hover:text-brand">
               Contact

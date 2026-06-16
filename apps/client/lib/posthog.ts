@@ -82,6 +82,13 @@ export type PosthogEventProperties = {
     query: string;
     alertEnabled: boolean;
   } & PosthogCampaignProps;
+  blog_article_viewed: {
+    article: string;
+  } & PosthogCampaignProps;
+  blog_cta_clicked: {
+    article: string;
+    location: "middle" | "bottom";
+  } & PosthogCampaignProps;
 };
 
 export type PosthogEventName = keyof PosthogEventProperties;

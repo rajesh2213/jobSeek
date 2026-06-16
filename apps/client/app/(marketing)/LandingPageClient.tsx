@@ -363,9 +363,13 @@ function SolutionSection() {
       <h2 className="mt-3 text-3xl font-semibold leading-snug sm:text-4xl">
         Fresh jobs from company career sites, centralized for faster discovery.
       </h2>
-      <p className="mt-2 max-w-3xl text-sm text-ink/70">
-        JobLoom continuously ingests roles from company career pages and trusted sources, deduplicates them, and organizes them in one place so you can discover and apply early.
-      </p>
+        <p className="mt-2 max-w-3xl text-sm text-ink/70">
+          JobLoom continuously ingests roles from company career pages and trusted sources, deduplicates them, and organizes them in one place so you can discover and apply early.{" "}
+          <Link href="/blog/why-youre-probably-finding-jobs-too-late" prefetch={false} className="font-semibold text-brand hover:underline">
+            Learn why many jobs appear on company career sites before LinkedIn
+          </Link>
+          .
+        </p>
       <div className="mt-8 space-y-4">
         {PAIN_POINTS.map((p, i) => {
           const rowStart = 0.03 + i * 0.1;

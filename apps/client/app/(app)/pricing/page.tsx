@@ -11,7 +11,11 @@ export default function PricingPage() {
           Unlock your full job search potential
         </p>
         <p className="mx-auto mt-4 max-w-2xl text-center text-base leading-relaxed text-ink-muted">
-          Unlock unlimited browsing, deeper resume insights, Smart Apply, and email alerts—outcomes still depend on your market and fit.
+          Unlock unlimited browsing, deeper resume insights, Smart Apply, and email alerts—outcomes still depend on your market and fit.{" "}
+          <Link href="/blog/why-youre-probably-finding-jobs-too-late" prefetch={false} className="font-medium text-brand hover:underline">
+            Why you&apos;re probably finding jobs too late
+          </Link>
+          .
         </p>
 
         <PricingPlansClient />

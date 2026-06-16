@@ -82,7 +82,15 @@ export default function SupportPage() {
             Support
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-ink-muted">
-            Get help with JobLoom Smart Apply and your account
+            Get help with JobLoom Smart Apply and your account. For job-search strategy, see our{" "}
+            <Link href="/blog" prefetch={false} className="font-medium text-brand hover:underline">
+              blog
+            </Link>
+            —including{" "}
+            <Link href="/blog/why-youre-probably-finding-jobs-too-late" prefetch={false} className="font-medium text-brand hover:underline">
+              why many roles appear on career sites before LinkedIn
+            </Link>
+            .
           </p>
         </header>
 

@@ -40,7 +40,11 @@ export default function AboutPage() {
           <h2 className="font-sans text-lg font-bold text-ink">What we do</h2>
           <p>
             JobLoom aggregates and surfaces job listings from company career sites and other sources we ingest. We focus on
-            making search, filtering, and day-to-day workflow easier—not on replacing employers&apos; own application systems.
+            making search, filtering, and day-to-day workflow easier—not on replacing employers&apos; own application systems.{" "}
+            <Link href="/blog/why-youre-probably-finding-jobs-too-late" prefetch={false} className="font-medium text-brand hover:underline">
+              Why You&apos;re Probably Finding Jobs Too Late
+            </Link>{" "}
+            explains how that timing advantage works.
           </p>
           <p>
             When you apply, you typically complete the process on the <strong>hiring company&apos;s website or ATS</strong>. JobLoom

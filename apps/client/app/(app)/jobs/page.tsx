@@ -87,7 +87,11 @@ export default async function JobsPage({ searchParams }: Props) {
           <Link href="/" className="font-semibold text-brand hover:underline">
             JobLoom
           </Link>{" "}
-          finds jobs directly from company career sites before they appear on many major job boards, so you can apply earlier from one search surface.
+          finds jobs directly from company career sites before they appear on many major job boards, so you can apply earlier from one search surface.{" "}
+          <Link href="/blog/why-youre-probably-finding-jobs-too-late" prefetch={false} className="font-semibold text-brand hover:underline">
+            Read why timing matters
+          </Link>
+          .
         </p>
       </section>
     </>

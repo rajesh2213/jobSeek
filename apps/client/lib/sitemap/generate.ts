@@ -61,6 +61,10 @@ export async function generateStaticEntries(now = new Date()): Promise<SitemapUr
     { url: `${base}/companies`, lastModified: now },
     { url: `${base}/features/smart-apply`, lastModified: now },
     { url: `${base}/features/application-tracker`, lastModified: now },
+    { url: `${base}/blog`, lastModified: now },
+    { url: `${base}/blog/why-youre-probably-finding-jobs-too-late`, lastModified: now },
+    { url: `${base}/blog/company-career-sites-vs-linkedin`, lastModified: now },
+    { url: `${base}/blog/how-to-find-jobs-before-linkedin`, lastModified: now },
   ];
 }
 
