@@ -9,6 +9,9 @@ import { SIDEBAR_PANEL_WIDTH_PX } from "./ui/uiMotion";
 import { getSidebarState, patchSidebarState } from "./ui/store";
 import { isLikelyAtsPage } from "./lib/atsDetection";
 import { isSmartApplyEligibleSurface } from "./lib/smartApplySurface";
+import { startContentAuthBridge } from "./lib/contentAuthBridge";
+
+startContentAuthBridge();
 
 const isTopFrame = window.self === window.top;
 

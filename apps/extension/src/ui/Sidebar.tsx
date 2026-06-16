@@ -54,6 +54,7 @@ function groupedRows(fields: FieldState[]): FieldState[] {
 
 export function Sidebar(props: {
   state: SidebarState;
+  extensionVersion?: string;
   onClose: () => void;
   onAutofill: () => void;
   onFieldClick: (fieldId: string, selector: string) => void;
@@ -195,6 +196,9 @@ export function Sidebar(props: {
             </div>
             <div style={{ fontFamily: fontSans, fontSize: 12, color: textMuted, marginTop: 8 }}>
               {props.state.progress.completed}/{props.state.progress.total} processed
+              {props.extensionVersion ? (
+                <span style={{ marginLeft: 8, opacity: 0.75 }}>v{props.extensionVersion}</span>
+              ) : null}
             </div>
           </div>
           <button

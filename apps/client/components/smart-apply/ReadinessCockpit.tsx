@@ -67,7 +67,7 @@ export function ReadinessCockpit({
         <Item
           label="Extension"
           ok={extensionConnected}
-          detail={extensionConnected ? "Connected on this browser" : "Install or reload extension"}
+          detail={extensionConnected ? "Detected on this browser" : "Install or reload extension"}
         />
         <Item label="Daily quota" ok={quotaReady} detail={quotaDetail} />
       </div>

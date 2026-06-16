@@ -210,6 +210,11 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
       await loadAccountSnapshotIntoSidebar();
     };
     void refresh();
+    const delayedRescan = window.setTimeout(() => {
+      if (getSidebarState().detectedFields.length === 0 && !getSidebarState().isRunning) {
+        void scanAllPageFields(sendRuntime).then(setDetectedFields).catch(() => undefined);
+      }
+    }, 2000);
     const observer = new MutationObserver(() => {
       window.clearTimeout((window as Window & { __jobseekRescanTimer?: number }).__jobseekRescanTimer);
       (window as Window & { __jobseekRescanTimer?: number }).__jobseekRescanTimer = window.setTimeout(() => {
@@ -225,7 +230,10 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
       }, 350);
     });
     observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
+    return () => {
+      window.clearTimeout(delayedRescan);
+      observer.disconnect();
+    };
   }, [props.isAtsPage]);
 
   /** Re-fetch profile and usage when the panel opens so values update after signing in elsewhere. */
@@ -524,6 +532,7 @@ export function SidebarApp(props: { isAtsPage: boolean }) {
       <div style={{ pointerEvents: "auto" }}>
         <Sidebar
           state={state}
+          extensionVersion={chrome.runtime.getManifest().version}
           onClose={() => patchSidebarState({ isOpen: false })}
           onAutofill={() => void runAutofill()}
           onGenerateFieldAi={(id) => void runFieldGenerateAi(id)}

@@ -1,4 +1,9 @@
 import { resolveJobloomExtensionId } from "./jobloomExtensionId";
+import {
+  isJobloomWebOrigin,
+  postAuthTokenToInstalledExtension,
+  postClearAuthToInstalledExtension,
+} from "./extensionContentBridge";
 
 export type ExtensionAuthAck = { ok?: boolean; error?: string };
 
@@ -63,11 +68,15 @@ export async function syncExtensionAuthToken(
   if (!extensionBridgeAvailable()) return false;
   const token = await getToken();
   if (!token) return false;
+  postAuthTokenToInstalledExtension(token);
   const res = await sendToExtension(extId, { type: "SET_AUTH_TOKEN", token });
-  return res?.ok === true;
+  if (res?.ok === true) return true;
+  /** Content-script bridge on JobLoom tabs stores the token for whichever extension is installed. */
+  return typeof window !== "undefined" && isJobloomWebOrigin(window.location.origin);
 }
 
 export async function clearExtensionAuth(): Promise<void> {
+  postClearAuthToInstalledExtension();
   if (!extensionBridgeAvailable()) return;
   await sendToExtension(getJobloomExtensionId(), { type: "CLEAR_AUTH_TOKEN" });
 }
