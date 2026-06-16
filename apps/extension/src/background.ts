@@ -292,7 +292,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === "SCAN_TAB_FIELDS") {
     const tabId = (msg as { tabId?: number }).tabId ?? sender.tab?.id;
-    const skipFrameIds = (msg as { skipFrameIds?: number[] }).skipFrameIds;
+    const skipFrameIdsFromMsg = (msg as { skipFrameIds?: number[] }).skipFrameIds ?? [];
+    const callerFrameId = (sender as chrome.runtime.MessageSender & { frameId?: number }).frameId;
+    const skipFrameIds = Array.from(
+      new Set([
+        ...(typeof callerFrameId === "number" ? [callerFrameId] : []),
+        ...skipFrameIdsFromMsg,
+      ]),
+    );
     if (tabId === undefined) {
       sendResponse({ success: false, error: "No tab id", fields: [], isAtsPage: false });
       return false;

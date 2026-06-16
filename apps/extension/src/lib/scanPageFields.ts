@@ -44,13 +44,24 @@ export async function scanAllPageFields(sendRuntime: RuntimeMessenger): Promise<
   const topFields = scanTopFrameFields(0);
   try {
     const tabId = await getCurrentTabId();
-    const res = await sendRuntime<ScanTabFieldsResponse>({
-      type: "SCAN_TAB_FIELDS",
-      tabId,
-      skipFrameIds: [0],
+    const timeoutMs = 2500;
+    const timeoutRes = new Promise<ScanTabFieldsResponse | null>((resolve) => {
+      setTimeout(() => resolve(null), timeoutMs);
     });
+
+    const res = await Promise.race([
+      sendRuntime<ScanTabFieldsResponse>({
+        type: "SCAN_TAB_FIELDS",
+        tabId,
+        skipFrameIds: [0],
+      }),
+      timeoutRes,
+    ]);
+
+    if (!res) return topFields;
+
     const subFrames =
-      res?.success !== false && Array.isArray(res.fields) ? res.fields : [];
+      res.success !== false && Array.isArray(res.fields) ? res.fields : [];
     return [...topFields, ...subFrames];
   } catch {
     return topFields;
