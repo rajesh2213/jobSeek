@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "JobLoom Smart Apply Assistant",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Fill job applications faster with smart autofill and AI-assisted answers on real job application pages.",
   "icons": {
     "16": "assets/icon-16.png",
@@ -42,7 +42,7 @@
   ],
   "background": {
     "service_worker": "background.js",
-    "type": "module"
+    "type": "classic"
   },
   "content_scripts": [
     {
