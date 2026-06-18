@@ -39,33 +39,40 @@ function ResetLine({ resetAt }: { resetAt: string }) {
 }
 
 /**
- * Free-tier browse meter under the desktop side rail on non-jobs routes.
- * `/jobs` uses `FreeDiscoveryQuotaStrip` (live list meta) — avoid duplicating it here.
+ * Shown at the bottom of the desktop side rail when browse quota is exhausted.
+ * `/jobs` uses `FreeDiscoveryQuotaStrip` instead.
  */
 export function SidebarBrowseQuotaCard() {
   const pathname = usePathname();
   const { isSignedIn } = useAuth();
   const { isPro, isLoaded, browseQuota } = useAccountPlan();
 
-  if (pathname.startsWith("/jobs") || !isLoaded || isPro || !isSignedIn || !browseQuota) {
+  if (
+    pathname.startsWith("/jobs") ||
+    !isLoaded ||
+    isPro ||
+    !isSignedIn ||
+    !browseQuota ||
+    browseQuota.remaining > 0
+  ) {
     return null;
   }
 
-  const shell = cn(
-    "pointer-events-auto fixed bottom-6 left-2 z-[66] hidden w-[104px] flex-col gap-2 rounded-xl border border-ink/[0.08]",
-    "bg-gradient-to-br from-white via-[#fffaf8] to-[#f3f0ea] p-2.5 shadow-md ring-1 ring-black/[0.04] lg:flex",
-    "transition-[width] duration-200 hover:w-[148px]",
-  );
-
   const { remaining, limit, resetAt } = browseQuota;
+
+  const shell = cn(
+    "pointer-events-auto hidden w-full flex-col gap-2 rounded-xl border border-ink/[0.08]",
+    "bg-gradient-to-br from-white via-[#fffaf8] to-[#f3f0ea] p-2.5 shadow-md ring-1 ring-black/[0.04] lg:flex",
+    "transition-[width] duration-200 group-hover/sidebar:w-[148px]",
+  );
 
   return (
     <Link
-      href={pricingUrl("browse_nearing")}
+      href={pricingUrl("browse_limit")}
       prefetch={false}
       onClick={() =>
         trackUpgradePromptClick({
-          trigger: "browse_nearing",
+          trigger: "browse_limit",
           surface: "inline",
           cta_type: "inline",
         })
@@ -85,6 +92,10 @@ export function SidebarBrowseQuotaCard() {
             {limit}
             <span className="text-ink/35"> remaining</span>
           </p>
+        </div>
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-wide text-ink/45">Status</p>
+          <p className="text-[10px] font-bold text-brand">Limit reached</p>
         </div>
         <div>
           <p className="text-[9px] font-semibold uppercase tracking-wide text-ink/45">Then</p>

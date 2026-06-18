@@ -335,8 +335,9 @@ function DesktopRailNav() {
       role="navigation"
       id="sidebar-tabs"
       aria-label="Sections"
-      className="fixed left-0 top-0 z-[65] hidden h-screen flex-col justify-center gap-1.5 py-10 lg:flex"
+      className="group/sidebar fixed left-0 top-0 z-[65] hidden h-screen w-[112px] flex-col py-10 lg:flex"
     >
+      <div className="flex min-h-0 flex-1 flex-col justify-center gap-1.5">
       <SidebarItem
         itemKey="jobs"
         orientation="vertical"
@@ -402,6 +403,10 @@ function DesktopRailNav() {
         onFocusItem={() => setFocusKey("applications")}
         onBlurItem={() => setFocusKey(null)}
       />
+      </div>
+      <div className="mt-auto shrink-0 px-2 pb-2 pt-3">
+        <SidebarBrowseQuotaCard />
+      </div>
     </nav>
   );
 }
@@ -570,7 +575,6 @@ export function SiteSideRailProvider({ children }: { children: ReactNode }) {
   return (
     <RailContext.Provider value={ctxValue}>
       <DesktopRailNav />
-      <SidebarBrowseQuotaCard />
       {children}
     </RailContext.Provider>
   );

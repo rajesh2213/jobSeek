@@ -20,6 +20,7 @@ export const UPGRADE_TRIGGER_COPY: Record<UpgradeTrigger, UpgradeTriggerCopy> = 
     bullets: [
       "Unlimited job browsing across search and company pages",
       "Resume match on every role — full score and gap analysis",
+      "Smart Apply Chrome extension — auto-fill ATS forms in minutes",
       "Email job alerts when new roles match your saved searches",
     ],
     pricingBanner: "You hit today's browse limit — Pro gives unlimited access.",

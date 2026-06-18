@@ -576,7 +576,14 @@ export function CompanyHubClient({
         )}
         {!isPro && listMeta.limit?.warning ? (
           <div className="mt-4 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-ink">
-            You are nearing today&apos;s limit. Upgrade for unlimited access.
+            You are nearing today&apos;s limit.{" "}
+            <Link
+              href="/pricing?from=browse_nearing"
+              className="font-semibold text-brand no-underline hover:underline"
+            >
+              Upgrade for unlimited access
+            </Link>
+            .
           </div>
         ) : null}
 

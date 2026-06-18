@@ -1,12 +1,12 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
 import { SignInButton, useAuth } from "@clerk/nextjs";
 import { trackUpgradePromptClick } from "../../lib/analytics/upgradeFunnel";
 import { useUpgradeDrawer } from "../upgrade/UpgradeDrawerProvider";
 import type { JobItem } from "../../lib/api";
 import { cn } from "../../lib/cn";
+import { FREE_DISCOVERY } from "../../lib/planLimits";
 import { motionEase } from "../../lib/motion";
 import type { AccentTone } from "../ui/types";
 import { Card } from "../ui/Card";
@@ -89,19 +89,17 @@ function LimitBlurFakeJobCard({ job }: { job: BlurJobSlot }) {
 }
 
 function LimitPreviewBlurStack({ slotCount }: { slotCount: number }) {
-  const [visibleJobs, setVisibleJobs] = useState<BlurJobSlot[]>(() =>
-    Array.from({ length: slotCount }, (_, i) => {
-      const j = FAKE_JOBS[i % FAKE_JOBS.length];
-      return {
-        id: i,
-        title: j.title,
-        company: j.company,
-        location: j.location,
-        accent: ACCENTS[i % ACCENTS.length],
-        postedLabel: POSTED_VARIANTS[i % POSTED_VARIANTS.length],
-      };
-    }),
-  );
+  const visibleJobs: BlurJobSlot[] = Array.from({ length: slotCount }, (_, i) => {
+    const j = FAKE_JOBS[i % FAKE_JOBS.length];
+    return {
+      id: i,
+      title: j.title,
+      company: j.company,
+      location: j.location,
+      accent: ACCENTS[i % ACCENTS.length],
+      postedLabel: POSTED_VARIANTS[i % POSTED_VARIANTS.length],
+    };
+  });
 
   return (
     <div
@@ -115,12 +113,6 @@ function LimitPreviewBlurStack({ slotCount }: { slotCount: number }) {
       ))}
     </div>
   );
-}
-
-function formatHm(ms: number): { h: number; m: number } {
-  const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  return { h, m };
 }
 
 function LockIconCoral({ size = 28 }: { size?: number }) {
@@ -167,84 +159,15 @@ interface Props {
   scrollRevealSubcopy?: boolean;
 }
 
-function countPostedInLast2Hours(jobs: JobItem[]): number {
-  const now = Date.now();
-  const twoH = 2 * 60 * 60 * 1000;
-  return jobs.filter((j) => {
-    /**
-     * Only count rows with a real employer-supplied publish date. Mixing in
-     * crawl timestamps would inflate the "posted in the last 2 hours" claim
-     * shown on the upgrade wall and undermine trust.
-     */
-    const isPosted =
-      j.freshness?.source === "POSTED" ||
-      (j.freshness == null && j.postedAt != null && j.postedAt !== "null");
-    if (!isPosted) return false;
-    const iso = j.freshness?.timestamp ?? j.postedAt;
-    if (!iso) return false;
-    const t = new Date(iso).getTime();
-    if (Number.isNaN(t)) return false;
-    const age = now - t;
-    return age >= 0 && age <= twoH;
-  }).length;
-}
-
-function useCountUp(target: number, durationMs: number, active: boolean): number {
-  const [value, setValue] = useState(active ? 0 : target);
-  useEffect(() => {
-    if (!active) {
-      setValue(target);
-      return;
-    }
-    let start: number | null = null;
-    let frame = 0;
-    const ease = (t: number) => 1 - (1 - t) ** 3;
-    const step = (now: number) => {
-      if (start === null) start = now;
-      const p = Math.min(1, (now - start) / durationMs);
-      setValue(Math.round(ease(p) * target));
-      if (p < 1) frame = requestAnimationFrame(step);
-    };
-    frame = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(frame);
-  }, [target, durationMs, active]);
-  return value;
-}
-
 export function LimitWallEnhanced({
-  resetAt,
-  count,
-  previewJobs,
   phase,
   scrollRevealSubcopy = true,
 }: Props) {
   const { isSignedIn } = useAuth();
   const { openUpgradeDrawer } = useUpgradeDrawer();
   const reduceMotion = useReducedMotion();
-  const countActive = !reduceMotion;
   const blurSlots = phase === "preview" ? SLOT_COUNT_PREVIEW : SLOT_COUNT_FULL;
-
-  const [{ h, m }, setHm] = useState(() => {
-    const target = new Date(resetAt).getTime();
-    return formatHm(Math.max(0, target - Date.now()));
-  });
-
-  const posted2hRaw = useMemo(() => countPostedInLast2Hours(previewJobs), [previewJobs]);
-  const posted2hTarget = useMemo(() => {
-    if (posted2hRaw > 0) return posted2hRaw;
-    return Math.max(3, Math.min(48, Math.round(Math.max(0, count) * 0.04 + 8)));
-  }, [posted2hRaw, count]);
-
-  const nHidden = useCountUp(Math.max(0, count), 1000, countActive);
-  const n2h = useCountUp(posted2hTarget, 1050, countActive);
-
-  useEffect(() => {
-    const target = new Date(resetAt).getTime();
-    const tick = () => setHm(formatHm(Math.max(0, target - Date.now())));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [resetAt]);
+  const previewRows = FREE_DISCOVERY.previewRows;
 
   const featureVariants = {
     hidden: {},
@@ -261,15 +184,12 @@ export function LimitWallEnhanced({
     },
   };
 
-  const headline =
-    phase === "preview"
-      ? "You're out of free discovery for today"
-      : "Most matches are still hidden on Free";
+  const headline = "You've reached today's browse limit";
 
   const subcopy =
     phase === "preview"
-      ? "Only a tiny preview stays visible above — the rest of the list stays blurred until you upgrade or your limit resets."
-      : "You're browsing a short slice of what exists. Pro shows the full list as it changes.";
+      ? `Only ${previewRows} preview roles stay visible above — upgrade for the full list, or wait until your quota resets.`
+      : `Upgrade for unlimited browsing, or wait until your daily quota resets.`;
 
   return (
     <div
@@ -294,7 +214,7 @@ export function LimitWallEnhanced({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-ink/38">
-              {phase === "preview" ? "Limit reached" : "Free tier"}
+              Browse limit reached
             </p>
             <h2
               className="mt-1.5 font-sans text-[1.35rem] font-bold leading-snug tracking-tight text-ink sm:text-2xl"
@@ -319,36 +239,6 @@ export function LimitWallEnhanced({
                 {subcopy}
               </p>
             )}
-
-            <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 sm:gap-6">
-              <div className="sm:col-span-1 lg:col-span-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink/45">
-                  Beyond your free view
-                </p>
-                <p className="mt-0.5 text-[10px] text-ink/40">
-                  Estimated from this search (not exact)
-                </p>
-                <p className="mt-1 text-lg font-bold tabular-nums" style={{ color: CORAL }}>
-                  {nHidden.toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink/45">
-                  Fresh in last 2 hours
-                </p>
-                <p className="mt-1 text-lg font-bold tabular-nums" style={{ color: CORAL }}>
-                  {n2h.toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink/45">
-                  Resets in
-                </p>
-                <p className="mt-1 text-lg font-bold tabular-nums" style={{ color: CORAL }}>
-                  {h}h {m}m
-                </p>
-              </div>
-            </div>
 
             <motion.ul
               className="mt-8 space-y-3 border-t border-ink/10 pt-6"
@@ -394,7 +284,6 @@ export function LimitWallEnhanced({
                   });
                   openUpgradeDrawer({
                     trigger: "browse_limit",
-                    context: { nHidden: Math.max(0, count) },
                   });
                 }}
                 className="block w-full text-center font-bold text-white transition-opacity hover:opacity-95"
@@ -406,7 +295,7 @@ export function LimitWallEnhanced({
                   fontWeight: 700,
                 }}
               >
-                See what you&apos;re missing →
+                Upgrade for unlimited browsing →
               </button>
               {!isSignedIn ? (
                 <SignInButton mode="modal">
@@ -434,7 +323,7 @@ export function LimitWallEnhanced({
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] px-5 pb-8 pt-20 sm:px-7 sm:pb-10">
           <div className="max-w-lg">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink/38">
-              More Jobs that match your search
+              More jobs that match your search
             </p>
             <p className="mt-2.5 text-sm font-medium leading-relaxed text-ink/55 sm:text-[15px]">
               Upgrade for unlimited browsing and the live list.

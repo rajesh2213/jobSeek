@@ -220,15 +220,16 @@ function FreeDiscoveryQuotaStrip({
     listMeta.capReached === true &&
     typeof listMeta.remaining === "number" &&
     listMeta.remaining <= 0;
-  /** Avoid `remaining ?? 0`: missing/null metered meta must not display as zero (looks like “quota exhausted”). */
+  const quotaExceeded =
+    cappedOut || listMeta.capReached === true || isPage1PreviewStrip;
+
+  /** Only surface the meter after the daily cap is hit — not while browsing normally. */
+  if (!quotaExceeded) return null;
+
   const remKnown =
     typeof listMeta.remaining === "number" && Number.isFinite(listMeta.remaining);
   const rem = remKnown ? Math.max(0, listMeta.remaining as number) : null;
   const resetAt = listMeta.resetAt;
-  const showPreviewBadge =
-    isPage1PreviewStrip ||
-    cappedOut ||
-    (rem !== null && rem < FREE_DISCOVERY.dailyJobs);
 
   const shell = cn(
     "inline-flex max-w-full items-stretch overflow-x-auto rounded-2xl border border-ink/[0.07] text-ink",
@@ -243,72 +244,42 @@ function FreeDiscoveryQuotaStrip({
           Free
         </p>
       </div>
-      {showPreviewBadge ? (
+      <DiscoveryMeterCell label="Browse quota left today">
+        <span className="tabular-nums text-ink">
+          {rem === null ? (
+            "—"
+          ) : (
+            <>
+              <span className="text-brand tabular-nums">{rem}</span>
+              <span className="text-ink/45"> of </span>
+              <span className="tabular-nums">{FREE_DISCOVERY.dailyJobs}</span>
+              <span className="text-ink/35"> remaining</span>
+            </>
+          )}
+        </span>
+      </DiscoveryMeterCell>
+      {quotaDivider()}
+      {cappedOut || isPage1PreviewStrip ? (
         <>
-          <DiscoveryMeterCell label="Browse quota left today">
-            <span className="tabular-nums text-ink">
-              {rem === null ? (
-                "—"
-              ) : (
-                <>
-                  <span className="text-brand tabular-nums">{rem}</span>
-                  <span className="text-ink/45"> of </span>
-                  <span className="tabular-nums">{FREE_DISCOVERY.dailyJobs}</span>
-                  <span className="text-ink/35"> remaining</span>
-                </>
-              )}
-            </span>
+          <DiscoveryMeterCell label="Status" accent>
+            Browse limit reached
           </DiscoveryMeterCell>
           {quotaDivider()}
-          <DiscoveryMeterCell label={isPage1PreviewStrip ? "Now showing" : cappedOut ? "Status" : "Then"} accent>
-            {isPage1PreviewStrip ? (
-              <>Preview ×{FREE_DISCOVERY_PREVIEW_JOB_ROWS}</>
-            ) : cappedOut ? (
-              <>Browse limit reached</>
-            ) : (
-              <>{FREE_DISCOVERY_PREVIEW_JOB_ROWS} preview</>
-            )}
-          </DiscoveryMeterCell>
-          {resetAt ? (
-            <>
-              {quotaDivider()}
-              <DiscoveryQuotaResetAtPanel resetAt={resetAt} />
-            </>
-          ) : null}
         </>
-      ) : (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:gap-x-4 sm:px-3.5 sm:pr-4">
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink/45">
-              Free views left today
-            </p>
-            <p className="font-sans text-xs font-bold tabular-nums leading-none tracking-wide text-ink">
-              {rem === null ? (
-                "—"
-              ) : (
-                <>
-                  <span className="text-brand">{rem}</span>
-                  <span className="text-ink/45"> of </span>
-                  <span>{FREE_DISCOVERY.dailyJobs}</span>
-                  <span className="text-ink/35"> remaining</span>
-                </>
-              )}
-            </p>
-          </div>
-          <div
-            className="hidden h-8 w-px bg-ink/[0.08] sm:block"
-            aria-hidden
-          />
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink/45">
-              Then
-            </p>
-            <p className="font-sans text-xs font-bold tabular-nums tracking-wide text-ink/80">
-              {FREE_DISCOVERY_PREVIEW_JOB_ROWS} preview
-            </p>
-          </div>
-        </div>
-      )}
+      ) : null}
+      <DiscoveryMeterCell label={isPage1PreviewStrip ? "Now showing" : "Then"} accent>
+        {isPage1PreviewStrip ? (
+          <>Preview ×{FREE_DISCOVERY_PREVIEW_JOB_ROWS}</>
+        ) : (
+          <>{FREE_DISCOVERY_PREVIEW_JOB_ROWS} preview</>
+        )}
+      </DiscoveryMeterCell>
+      {resetAt ? (
+        <>
+          {quotaDivider()}
+          <DiscoveryQuotaResetAtPanel resetAt={resetAt} />
+        </>
+      ) : null}
     </div>
   );
 }
@@ -1605,7 +1576,14 @@ export function JobsSearchClient({
               role="status"
               className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-ink"
             >
-              You are nearing today&apos;s limit. Upgrade for unlimited access.
+              You are nearing today&apos;s limit.{" "}
+              <Link
+                href="/pricing?from=browse_nearing"
+                className="font-semibold text-brand no-underline hover:underline"
+              >
+                Upgrade for unlimited access
+              </Link>
+              .
             </div>
           ) : null}
           {listMeta?.capReached &&
