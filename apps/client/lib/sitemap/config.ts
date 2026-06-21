@@ -47,7 +47,7 @@ export const LANDING_SECTION_BUDGET_MS = parseBoundedIntEnv(
 
 export const JOBS_SECTION_BUDGET_MS = parseBoundedIntEnv(
   process.env.SEO_SITEMAP_JOBS_BUDGET_MS,
-  45000,
+  50000,
   5000,
   120000,
 );
@@ -62,7 +62,7 @@ export const COMPANIES_SECTION_BUDGET_MS = parseBoundedIntEnv(
 /** Max job detail URLs emitted across all job sitemap partitions. */
 export const MAX_SITEMAP_JOBS = parseBoundedIntEnv(
   process.env.SEO_SITEMAP_MAX_JOBS,
-  10000,
+  40000,
   100,
   50000,
 );
@@ -77,7 +77,7 @@ export const SITEMAP_JOBS_PARTITION_SIZE = parseBoundedIntEnv(
 
 export const SITEMAP_CURSOR_FETCH_LIMIT = parseBoundedIntEnv(
   process.env.SEO_SITEMAP_CURSOR_FETCH_LIMIT,
-  500,
+  1000,
   1,
   1000,
 );

@@ -7,6 +7,8 @@ import { buildUrlsetXml } from "../../../lib/sitemap/xml";
 import { sitemapXmlResponse } from "../../../lib/sitemap/routeResponse";
 
 export const runtime = "nodejs";
+/** Cold generation walks the full indexable job feed; allow headroom over the default limit. */
+export const maxDuration = 60;
 
 type Params = { partition: string };
 
