@@ -126,8 +126,8 @@ test("capped path still emits description via structuredDataDescription fallback
 
 test("remote jobs without country still emit applicantLocationRequirements", () => {
   const job = sampleJob({
-    country: null,
-    locationCountry: null,
+    country: "",
+    locationCountry: "",
     isRemote: true,
     workType: "remote",
     postedAt: "2026-04-15T00:00:00.000Z",

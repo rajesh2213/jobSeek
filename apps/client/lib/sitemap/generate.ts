@@ -52,6 +52,28 @@ export function jobLastModified(
   return now;
 }
 
+/**
+ * Compact cache shape for job entries: id + lastModified epoch ms only.
+ *
+ * The full `SitemapUrlEntry` (absolute URL + Date) roughly doubles the
+ * serialized size. At a 40k cap the expanded array exceeds Vercel's 2MB
+ * Data Cache per-entry limit, so the write is silently skipped and every
+ * request regenerates non-deterministically (the index lists partitions
+ * that then 404). Caching the compact form keeps the full set under the
+ * limit so the index and partition routes read one consistent snapshot.
+ */
+export type CompactJobEntry = { id: string; lm: number };
+
+function expandCompactJobEntries(
+  base: string,
+  entries: CompactJobEntry[],
+): SitemapUrlEntry[] {
+  return entries.map((e) => ({
+    url: `${base}/job/${e.id}`,
+    lastModified: new Date(e.lm),
+  }));
+}
+
 export async function generateStaticEntries(now = new Date()): Promise<SitemapUrlEntry[]> {
   const base = getSiteBaseUrl();
   return [
@@ -178,11 +200,10 @@ export async function generateCompanyEntries(): Promise<{
  * Walk cursor-paginated SEO job feed (no OFFSET) up to MAX_SITEMAP_JOBS.
  */
 export async function generateJobEntries(): Promise<{
-  entries: SitemapUrlEntry[];
+  entries: CompactJobEntry[];
   degraded: boolean;
   excludedByReason: Record<string, number>;
 }> {
-  const base = getSiteBaseUrl();
   const now = new Date();
   const internalSeoSecret = process.env.INTERNAL_SEO_SECRET ?? null;
   const sitemapPruningEnabled = process.env.SEO_SITEMAP_PRUNING_ENABLED === "true";
@@ -193,7 +214,7 @@ export async function generateJobEntries(): Promise<{
     excludedByReason.set(reason, (excludedByReason.get(reason) ?? 0) + 1);
   };
 
-  const jobEntries: SitemapUrlEntry[] = [];
+  const jobEntries: CompactJobEntry[] = [];
   let degraded = false;
   let cursor: string | null = null;
 
@@ -229,8 +250,8 @@ export async function generateJobEntries(): Promise<{
           }
         }
         jobEntries.push({
-          url: `${base}/job/${job.id}`,
-          lastModified: jobLastModified(job, now),
+          id: job.id,
+          lm: jobLastModified(job, now).getTime(),
         });
         if (jobEntries.length >= MAX_SITEMAP_JOBS) break;
       }
@@ -279,7 +300,7 @@ const getCachedCompanies = unstable_cache(generateCompanyEntries, ["sitemap-comp
   revalidate: SITEMAP_REVALIDATE_SECONDS,
 });
 
-const getCachedJobs = unstable_cache(generateJobEntries, ["sitemap-jobs-v1"], {
+const getCachedJobs = unstable_cache(generateJobEntries, ["sitemap-jobs-compact-v2"], {
   revalidate: SITEMAP_REVALIDATE_SECONDS,
 });
 
@@ -295,8 +316,18 @@ export async function getCompanySitemapEntries() {
   return getCachedCompanies();
 }
 
-export async function getJobSitemapEntries() {
-  return getCachedJobs();
+export async function getJobSitemapEntries(): Promise<{
+  entries: SitemapUrlEntry[];
+  degraded: boolean;
+  excludedByReason: Record<string, number>;
+}> {
+  const base = getSiteBaseUrl();
+  const { entries, degraded, excludedByReason } = await getCachedJobs();
+  return {
+    entries: expandCompactJobEntries(base, entries),
+    degraded,
+    excludedByReason,
+  };
 }
 
 export async function buildSitemapIndexLocations(): Promise<string[]> {
