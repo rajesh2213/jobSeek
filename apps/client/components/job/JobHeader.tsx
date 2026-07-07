@@ -4,17 +4,14 @@ import { jobDetailPinLocationText } from "../../lib/jobDisplay";
 import { ApplyJobButton } from "./ApplyJobButton";
 import { AppliedToggleButton } from "./AppliedToggleButton";
 import { WorkTypeOutlinePill } from "./WorkTypeOutlinePill";
-import { buttonClassName } from "../ui/Button";
 import { FreshnessLine } from "./FreshnessIndicator";
 
 interface Props {
   job: JobItem;
   applyHref: string;
-  /** Free tier hit daily browse cap — external apply URL hidden until Pro. */
-  applyUrlLocked?: boolean;
 }
 
-export function JobHeader({ job, applyHref, applyUrlLocked }: Props) {
+export function JobHeader({ job, applyHref }: Props) {
   return (
     <header className="space-y-3">
       <div className="flex flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
@@ -52,28 +49,15 @@ export function JobHeader({ job, applyHref, applyUrlLocked }: Props) {
           </div>
         </div>
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:shrink-0 sm:items-center">
-          {applyUrlLocked ? (
-            <Link
-              href="/pricing?from=job_apply"
-              className={buttonClassName({
-                variant: "primary",
-                size: "md",
-                className: "col-span-2 w-full justify-center no-underline sm:col-span-1 sm:w-auto",
-              })}
-            >
-              Upgrade to view & apply
-            </Link>
-          ) : (
-            <ApplyJobButton
-              jobId={job.id}
-              company={job.company.name}
-              source="job_detail_header"
-              applyUrl={applyHref}
-              variant="primary"
-              size="md"
-              className="w-full justify-center sm:w-auto"
-            />
-          )}
+          <ApplyJobButton
+            jobId={job.id}
+            company={job.company.name}
+            source="job_detail_header"
+            applyUrl={applyHref}
+            variant="primary"
+            size="md"
+            className="w-full justify-center sm:w-auto"
+          />
           <AppliedToggleButton jobId={job.id} size="md" className="w-full justify-center sm:w-auto" />
         </div>
       </div>

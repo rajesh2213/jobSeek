@@ -143,7 +143,6 @@ export default async function JobDetailPage({ params }: Props) {
               <JobHeader
                 job={job}
                 applyHref={applyHref}
-                applyUrlLocked={capReached}
               />
               <ResumeMatchSection job={job} />
               {nearLimitWarning ? (
@@ -173,7 +172,7 @@ export default async function JobDetailPage({ params }: Props) {
                       You&apos;ve reached today&apos;s free browse limit.
                     </p>
                     <p className="mt-1 text-sm text-ink/70">
-                      Upgrade to read the full description and apply to this role.
+                      Upgrade to read the full description for this role.
                     </p>
                     <Link
                       href="/pricing?from=job_apply"
