@@ -8,7 +8,7 @@
     "dev:3001": "node ./scripts/ensure-routes-manifest.cjs && next dev -p 3001",
     "dev:turbo": "node ./scripts/ensure-routes-manifest.cjs && next dev --turbo",
     "build": "cd ../.. && npm run build -w @jobseek/skill-constants && cd apps/client && next build",
-    "postinstall": "prisma generate --schema=../server/prisma/schema.prisma",
+    "postinstall": "if [ -f ../server/prisma/schema.prisma ]; then prisma generate --schema=../server/prisma/schema.prisma; else echo 'Skipping prisma generate (server schema not present in this build context)'; fi",
     "start": "next start",
     "test:soft": "node --import tsx --test lib/apiBaseUrl.test.ts lib/resumeScoreSoftening.test.ts lib/resumeFitCalibration.test.ts lib/resumeFitExperience.test.ts lib/resumeFitSeniority.test.ts lib/resumeFitTitle.test.ts lib/resumeFitReliability.test.ts lib/resumeScorer.test.ts lib/jobMatchSignals.test.ts lib/recommendedJobsForCandidate.test.ts lib/seo.test.ts lib/seoJobDetail.test.ts lib/jobCanonicalRedirect.test.ts lib/jobsListingCanonicalRedirect.test.ts lib/companyIdHubRedirect.test.ts lib/jobPostingJsonLd.test.ts lib/jobLifecycle.test.ts lib/jobDetailCacheTags.test.ts"
   },
