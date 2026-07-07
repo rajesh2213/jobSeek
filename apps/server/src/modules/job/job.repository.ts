@@ -30,6 +30,8 @@ import {
   ROLE_SUGGEST_EXTRA_EXCLUDED,
 } from "./jobListing.constants.js";
 import { computeJobQualityFlags } from "../../services/qualityFlags.service.js";
+import { selectBestDescription } from "../../services/jobCanonical.service.js";
+import { computeJobContentHash } from "../../utils/jobContentHash.js";
 import {
   buildSitemapCursorWhereSql,
   decodeSitemapJobCursor,
@@ -1796,6 +1798,148 @@ export function createJobRepository(prisma: PrismaClient) {
         },
       });
       return true;
+    },
+
+    /**
+     * Merge description when existing is empty or incoming is richer. Never overwrites richer text.
+     */
+    async mergeDescriptionIfRicher(
+      id: string,
+      incomingDescription: string | undefined,
+    ): Promise<{ merged: boolean; becamePublishable: boolean }> {
+      const inc = (incomingDescription ?? "").trim();
+      if (!inc) return { merged: false, becamePublishable: false };
+      const row = await prisma.job.findUnique({
+        where: { id },
+        select: {
+          description: true,
+          source: true,
+          sourceUrl: true,
+          parsedDescription: true,
+          isPublishable: true,
+          title: true,
+          applyUrl: true,
+        },
+      });
+      if (!row) return { merged: false, becamePublishable: false };
+      const merged = selectBestDescription(row.description, incomingDescription);
+      if (!merged || merged === (row.description ?? "").trim()) {
+        return { merged: false, becamePublishable: false };
+      }
+      const flags = computeJobQualityFlags({
+        source: row.source,
+        sourceUrl: row.sourceUrl,
+        description: merged,
+        parsedDescription: row.parsedDescription,
+      });
+      const contentHash = computeJobContentHash({
+        title: row.title,
+        description: merged,
+        applyUrl: row.applyUrl ?? row.sourceUrl,
+      });
+      const wasPublishable = row.isPublishable === true;
+      await prisma.job.update({
+        where: { id },
+        data: {
+          description: merged,
+          contentHash,
+          hasNonemptyDescription: flags.hasNonemptyDescription,
+          hasUsableParsed: flags.hasUsableParsed,
+          hasValidWorkdayUrlShape: flags.hasValidWorkdayUrlShape,
+          isPublishable: flags.isPublishable,
+          requiresRepair: flags.requiresRepair,
+        },
+      });
+      logger.info(
+        {
+          event: "description_merge",
+          jobId: id,
+          wasPublishable,
+          isPublishable: flags.isPublishable,
+          mergedLength: merged.length,
+        },
+        "description_merge",
+      );
+      return {
+        merged: true,
+        becamePublishable: !wasPublishable && flags.isPublishable === true,
+      };
+    },
+
+    /**
+     * Replace root-path Workday listing URL when re-ingest provides a site-prefixed URL.
+     */
+    async mergeWorkdaySourceUrlIfPoisoned(
+      id: string,
+      incomingSourceUrl: string,
+      incomingApplyUrl: string | null | undefined,
+    ): Promise<{ merged: boolean; becamePublishable: boolean }> {
+      const row = await prisma.job.findUnique({
+        where: { id },
+        select: {
+          source: true,
+          sourceUrl: true,
+          description: true,
+          parsedDescription: true,
+          isPublishable: true,
+          title: true,
+          applyUrl: true,
+        },
+      });
+      if (!row || row.source !== "workday") {
+        return { merged: false, becamePublishable: false };
+      }
+      const flagsBefore = computeJobQualityFlags({
+        source: row.source,
+        sourceUrl: row.sourceUrl,
+        description: row.description,
+        parsedDescription: row.parsedDescription,
+      });
+      if (flagsBefore.hasValidWorkdayUrlShape) {
+        return { merged: false, becamePublishable: false };
+      }
+      const flagsAfter = computeJobQualityFlags({
+        source: row.source,
+        sourceUrl: incomingSourceUrl,
+        description: row.description,
+        parsedDescription: row.parsedDescription,
+      });
+      if (!flagsAfter.hasValidWorkdayUrlShape) {
+        return { merged: false, becamePublishable: false };
+      }
+      if (incomingSourceUrl === row.sourceUrl) {
+        return { merged: false, becamePublishable: false };
+      }
+      const wasPublishable = row.isPublishable === true;
+      const contentHash = computeJobContentHash({
+        title: row.title,
+        description: row.description,
+        applyUrl: incomingApplyUrl ?? incomingSourceUrl,
+      });
+      await prisma.job.update({
+        where: { id },
+        data: {
+          sourceUrl: incomingSourceUrl,
+          applyUrl: incomingApplyUrl ?? incomingSourceUrl,
+          contentHash,
+          hasValidWorkdayUrlShape: flagsAfter.hasValidWorkdayUrlShape,
+          isPublishable: flagsAfter.isPublishable,
+          requiresRepair: flagsAfter.requiresRepair,
+        },
+      });
+      logger.info(
+        {
+          event: "workday_source_url_merge",
+          jobId: id,
+          from: row.sourceUrl,
+          to: incomingSourceUrl,
+        },
+        "workday_source_url_merge",
+      );
+      return {
+        merged: true,
+        becamePublishable: !wasPublishable && flagsAfter.isPublishable === true,
+      };
     },
 
     async updateLastSeenBySourceUrl(sourceUrl: string, lastSeenAt: Date): Promise<void> {

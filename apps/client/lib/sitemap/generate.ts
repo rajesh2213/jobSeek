@@ -288,21 +288,45 @@ export function jobPartitionCount(totalJobs: number): number {
   return Math.ceil(totalJobs / SITEMAP_JOBS_PARTITION_SIZE);
 }
 
+export const SITEMAP_JOBS_CACHE_TAG = "sitemap-jobs-v1";
+export const SITEMAP_STATIC_CACHE_TAG = "sitemap-static-v1";
+export const SITEMAP_LANDING_CACHE_TAG = "sitemap-landing-v1";
+export const SITEMAP_COMPANIES_CACHE_TAG = "sitemap-companies-v1";
+
 const getCachedStatic = unstable_cache(generateStaticEntries, ["sitemap-static-v1"], {
   revalidate: SITEMAP_REVALIDATE_SECONDS,
+  tags: [SITEMAP_STATIC_CACHE_TAG],
 });
 
 const getCachedLanding = unstable_cache(generateLandingEntries, ["sitemap-landing-v1"], {
   revalidate: SITEMAP_REVALIDATE_SECONDS,
+  tags: [SITEMAP_LANDING_CACHE_TAG],
 });
 
 const getCachedCompanies = unstable_cache(generateCompanyEntries, ["sitemap-companies-v1"], {
   revalidate: SITEMAP_REVALIDATE_SECONDS,
+  tags: [SITEMAP_COMPANIES_CACHE_TAG],
 });
 
 const getCachedJobs = unstable_cache(generateJobEntries, ["sitemap-jobs-compact-v2"], {
   revalidate: SITEMAP_REVALIDATE_SECONDS,
+  tags: [SITEMAP_JOBS_CACHE_TAG],
 });
+
+export async function buildRobotsSitemapUrls(base: string): Promise<string[]> {
+  const { entries: jobs } = await getCachedJobs();
+  const partitions = jobPartitionCount(jobs.length);
+  const urls = [
+    `${base}/sitemap.xml`,
+    `${base}/sitemap-static.xml`,
+    `${base}/sitemap-landing.xml`,
+    `${base}/sitemap-companies.xml`,
+  ];
+  for (let p = 1; p <= partitions; p++) {
+    urls.push(`${base}/sitemap-jobs-${p}.xml`);
+  }
+  return urls;
+}
 
 export async function getStaticSitemapEntries() {
   return getCachedStatic();

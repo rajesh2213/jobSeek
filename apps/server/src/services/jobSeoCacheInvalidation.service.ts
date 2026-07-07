@@ -87,6 +87,62 @@ export async function invalidateJobDetailSeoCaches(
   await requestNextJobDetailRevalidationThrottled(redis, unique);
 }
 
+const SITEMAP_REVALIDATE_THROTTLE_SEC = Math.max(
+  60,
+  Number.parseInt(process.env.SITEMAP_REVALIDATE_THROTTLE_SECONDS ?? "120", 10) || 120,
+);
+
+function sitemapRevalidateThrottleKey(): string {
+  return "seo:sitemap-revalidate-throttle";
+}
+
+async function requestNextSitemapRevalidation(): Promise<void> {
+  const origin = clientSiteOrigin();
+  const secret = process.env.INTERNAL_SEO_SECRET?.trim();
+  if (!origin || !secret) return;
+
+  const url = `${origin}/api/internal/revalidate/sitemap`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REVALIDATE_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-internal-seo": "true",
+        "x-internal-seo-secret": secret,
+      },
+      body: JSON.stringify({ reason: "publishable_change" }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      logger.warn(
+        { event: "sitemap_revalidate_request_failed", status: res.status },
+        "sitemap_revalidate_request_failed",
+      );
+    } else {
+      logger.info({ event: "sitemap_revalidate_requested" }, "sitemap_revalidate_requested");
+    }
+  } catch (err) {
+    logger.warn({ event: "sitemap_revalidate_request_error", err }, "sitemap_revalidate_request_error");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Invalidate Next.js sitemap caches when publishable set changes (throttled). */
+export async function invalidateSitemapSeoCaches(redis: Redis): Promise<void> {
+  const throttle = await redis.set(
+    sitemapRevalidateThrottleKey(),
+    "1",
+    "EX",
+    SITEMAP_REVALIDATE_THROTTLE_SEC,
+    "NX",
+  );
+  if (throttle !== "OK") return;
+  await requestNextSitemapRevalidation();
+}
+
 /** Read-path hook: drop stale Redis and throttle on-demand ISR for one job. */
 export async function invalidateJobDetailSeoCachesOnRead(
   redis: Redis,

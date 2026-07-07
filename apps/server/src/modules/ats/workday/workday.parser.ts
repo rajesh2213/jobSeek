@@ -441,6 +441,7 @@ export function parseWorkdayJob(
     applyUrl: applyUrl ?? listingUrl,
     postedAt,
     companyId,
+    detailNeedsRecovery: raw.detailEnrichment?.needsRecovery === true,
   };
 }
 

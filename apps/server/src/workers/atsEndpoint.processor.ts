@@ -52,11 +52,14 @@ import {
 } from "../utils/dbPayloadDebug.js";
 import {
   atsFinalizeChunkedEnabled,
-  conditionalUpdateJobHashCacheHit,
   finalizeIngestChunked,
-  jobHashCacheConditionalUpdateEnabled,
 } from "../utils/jobWriteOptimization.js";
-import { recoverWorkdayPostedAtOnHashCacheHit } from "../utils/workdayPostedAtHashHitRecovery.js";
+import { computeWorkdayAdaptiveFetchTimeoutMs, computeWorkdayRemainingWorkTimeoutMs } from "../modules/ats/workday/workdayAdaptiveTimeout.js";
+import {
+  finalizeHashCacheHitAfterRecovery,
+  computePersistedContentHash,
+} from "../utils/workdayHashCacheRecovery.js";
+import { workdayNeedsDetailRecovery } from "../modules/ats/workday/workdayPoisoned.js";
 
 // Avoid back-to-back fetches when lastCrawledAt was just set.
 const MIN_MS_SINCE_LAST_CRAWL_FOR_INGEST = Math.floor(2.5 * 60 * 1000);
@@ -126,6 +129,39 @@ function atsEndpointFetchTimeoutMs(atsType?: string): number {
   const n = Number(raw ?? String(DEFAULT_ATS_FETCH_TIMEOUT_MS));
   if (!Number.isFinite(n)) return DEFAULT_ATS_FETCH_TIMEOUT_MS;
   return Math.max(30_000, Math.min(3_600_000, Math.floor(n)));
+}
+
+async function resolveWorkdayFetchTimeoutMs(
+  endpointId: string,
+  companyId: string,
+): Promise<number> {
+  const endpoint = await prisma.atsEndpoint.findUnique({
+    where: { id: endpointId },
+    select: { metadata: true },
+  });
+  const meta = endpoint?.metadata as { lastJobCount?: number } | null;
+  let estimated = meta?.lastJobCount;
+  if (!estimated || estimated <= 0) {
+    estimated = await prisma.job.count({
+      where: { companyId, source: "workday", isActive: true },
+    });
+  }
+  const timeoutMs = computeWorkdayAdaptiveFetchTimeoutMs(estimated);
+  const remainingMs = computeWorkdayRemainingWorkTimeoutMs(0, estimated);
+  const timeoutWithWork = Math.min(
+    Math.max(timeoutMs, timeoutMs + Math.floor(remainingMs * 0.25)),
+    600_000,
+  );
+  logger.info(
+    {
+      event: "workday_adaptive_timeout",
+      endpointId,
+      estimatedJobCount: estimated,
+      timeoutMs: timeoutWithWork,
+    },
+    "workday_adaptive_timeout",
+  );
+  return timeoutWithWork;
 }
 
 function heartbeatActiveWarnMs(): number {
@@ -422,7 +458,10 @@ async function start(): Promise<void> {
     }
 
     let normalizedJobs;
-    const fetchTimeoutMs = atsEndpointFetchTimeoutMs(atsType);
+    let fetchTimeoutMs =
+      atsType === "workday"
+        ? await resolveWorkdayFetchTimeoutMs(endpointId, resolvedCompanyId)
+        : atsEndpointFetchTimeoutMs(atsType);
     const fetchStartedAt = Date.now();
     try {
       const standard = createAtsCrawlerStandard(atsType);
@@ -531,34 +570,40 @@ async function start(): Promise<void> {
           try {
             const cachedHash = await redis.get(hashCacheKey);
             if (cachedHash === newContentHash) {
-              atsHashCacheHits += 1;
-              if ((atsHashCacheHits + atsHashCacheMisses) % 100 === 0) {
-                logCacheHitMetrics({
-                  name: "atsEndpoint.worker.hashCache",
-                  hits: atsHashCacheHits,
-                  misses: atsHashCacheMisses,
-                });
-              }
-              await redis.set(hashCacheKey, newContentHash, "EX", HASH_CACHE_TTL_SECONDS);
-              if (jobHashCacheConditionalUpdateEnabled()) {
-                await conditionalUpdateJobHashCacheHit(prisma, {
+              const action = await finalizeHashCacheHitAfterRecovery(prisma, redis, {
+                hashCacheKey,
+                hashCacheTtlSeconds: HASH_CACHE_TTL_SECONDS,
+                processedAt: seenAt,
+                job: {
                   sourceUrl: normalizedJob.sourceUrl,
-                  contentHash: newContentHash,
-                  processedAt: seenAt,
-                });
-              } else {
-                await prisma.job.updateMany({
-                  where: { sourceUrl: normalizedJob.sourceUrl },
-                  data: { lastProcessedAt: seenAt, contentHash: newContentHash },
-                });
-              }
-              await recoverWorkdayPostedAtOnHashCacheHit(prisma, {
-                sourceUrl: normalizedJob.sourceUrl,
-                source: normalizedJob.source,
-                candidate: normalizedJob.postedAt,
+                  source: normalizedJob.source,
+                  title: normalizedJob.title,
+                  description: normalizedJob.description,
+                  applyUrl: normalizedJob.applyUrl ?? normalizedJob.sourceUrl,
+                  candidatePostedAt: normalizedJob.postedAt,
+                },
+                inlineRepairEnabled:
+                  process.env.WORKDAY_HASH_HIT_INLINE_REPAIR?.trim() === "true",
               });
-              unchangedSkipped += 1;
-              return null;
+              if (action === "skip_ingest") {
+                atsHashCacheHits += 1;
+                if ((atsHashCacheHits + atsHashCacheMisses) % 100 === 0) {
+                  logCacheHitMetrics({
+                    name: "atsEndpoint.worker.hashCache",
+                    hits: atsHashCacheHits,
+                    misses: atsHashCacheMisses,
+                  });
+                }
+                unchangedSkipped += 1;
+                return null;
+              }
+              logger.info(
+                {
+                  event: "hash_cache_bypass_description_recovery",
+                  sourceUrl: normalizedJob.sourceUrl,
+                },
+                "hash_cache_bypass_description_recovery",
+              );
             }
             atsHashCacheMisses += 1;
             if ((atsHashCacheHits + atsHashCacheMisses) % 100 === 0) {
@@ -576,14 +621,37 @@ async function start(): Promise<void> {
               ...normalizedJob,
               companyDomain,
             },
-            { batchTouchAtMs: seenAt.getTime() },
+            { batchTouchAtMs: seenAt.getTime(), redis },
           );
           const shouldSkipParse = canonical.contentHash === newContentHash;
           if (inserted) jobsInserted += 1;
           else if (shouldSkipParse) unchangedSkipped += 1;
           else duplicatesSkipped += 1;
           try {
-            await redis.set(hashCacheKey, newContentHash, "EX", HASH_CACHE_TTL_SECONDS);
+            const skipPoisonHash = workdayNeedsDetailRecovery({
+              source: normalizedJob.source,
+              description: normalizedJob.description,
+              sourceUrl: normalizedJob.sourceUrl,
+              detailNeedsRecovery: normalizedJob.detailNeedsRecovery,
+            });
+            if (!skipPoisonHash) {
+              const persistHash = await computePersistedContentHash(prisma, normalizedJob.sourceUrl, {
+                sourceUrl: normalizedJob.sourceUrl,
+                source: normalizedJob.source,
+                title: normalizedJob.title,
+                description: normalizedJob.description,
+                applyUrl: normalizedJob.applyUrl ?? normalizedJob.sourceUrl,
+              });
+              await redis.set(hashCacheKey, persistHash, "EX", HASH_CACHE_TTL_SECONDS);
+            } else {
+              logger.info(
+                {
+                  event: "workday_hash_cache_write_skipped_needs_recovery",
+                  sourceUrl: normalizedJob.sourceUrl,
+                },
+                "workday_hash_cache_write_skipped_needs_recovery",
+              );
+            }
           } catch (err) {
             logger.warn({ event: "ats_job_hash_cache_write_failed", sourceUrl: normalizedJob.sourceUrl, err }, "ats_job_hash_cache_write_failed");
           }
@@ -737,9 +805,19 @@ async function start(): Promise<void> {
     }
 
     const crawlCompletedAt = new Date();
+    const endpointMetadata =
+      atsType === "workday"
+        ? {
+            ...((endpointRow.metadata as Record<string, unknown> | null) ?? {}),
+            lastJobCount: normalizedJobs.length,
+          }
+        : endpointRow.metadata;
     await prisma.atsEndpoint.update({
       where: { id: endpointId },
-      data: { lastCrawledAt: crawlCompletedAt },
+      data: {
+        lastCrawledAt: crawlCompletedAt,
+        ...(atsType === "workday" ? { metadata: endpointMetadata as object } : {}),
+      },
     });
 
     const totalFetched = normalizedJobs.length;

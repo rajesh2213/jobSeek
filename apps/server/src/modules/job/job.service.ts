@@ -122,8 +122,7 @@ export class JobService {
     input: NormalizedJob & { companyDomain: string },
     ingestOptions?: DedupIngestOptions,
   ): Promise<{ canonical: Job; inserted: boolean }> {
-    const batchTouchAtMs = ingestOptions?.batchTouchAtMs ?? input.batchTouchAtMs;
-    return deduplicateAndInsert(this.jobRepository, input, { batchTouchAtMs });
+    return deduplicateAndInsert(this.jobRepository, input, ingestOptions);
   }
 
   async createNormalized(

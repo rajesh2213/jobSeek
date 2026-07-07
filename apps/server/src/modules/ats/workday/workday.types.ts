@@ -54,4 +54,20 @@ export interface WorkdayJobDetailResponse {
 export interface WorkdayRawJob {
   token: WorkdayToken;
   job: WorkdayJob;
+  /** Set when inline detail enrichment ran (success or recoverable failure). */
+  detailEnrichment?: WorkdayDetailEnrichmentMeta;
 }
+
+export type WorkdayDetailEnrichmentOutcome =
+  | "success"
+  | "skipped_has_description"
+  | "skipped_no_external_path"
+  | "failed";
+
+export type WorkdayDetailEnrichmentMeta = {
+  outcome: WorkdayDetailEnrichmentOutcome;
+  failureReason?: string;
+  retryCount?: number;
+  /** True when detail could not be fetched; job should remain repairable. */
+  needsRecovery?: boolean;
+};

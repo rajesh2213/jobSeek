@@ -34,7 +34,17 @@ function workdayFetchMaxMs(): number {
 
 async function enrichWorkdayResults(jobs: WorkdayRawJob[]): Promise<WorkdayRawJob[]> {
   if (jobs.length === 0) return jobs;
-  return asyncPool(jobs, WORKDAY_DETAIL_CONCURRENCY, (raw) => enrichWorkdayRawJobWithDetail(raw));
+  const enriched = await asyncPool(jobs, WORKDAY_DETAIL_CONCURRENCY, (raw) =>
+    enrichWorkdayRawJobWithDetail(raw),
+  );
+  const needsRecovery = enriched.filter((r) => r.detailEnrichment?.needsRecovery).length;
+  if (needsRecovery > 0) {
+    logger.info(
+      { event: "workday_detail_needs_recovery", count: needsRecovery },
+      "workday_detail_needs_recovery",
+    );
+  }
+  return enriched;
 }
 
 function parseTokenFromUrl(value: string): WorkdayToken | null {

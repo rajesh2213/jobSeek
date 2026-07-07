@@ -57,9 +57,10 @@ import {
   logUpdateReturnOptimized,
 } from "../utils/dbPayloadDebug.js";
 import {
-  conditionalUpdateJobHashCacheHit,
-  jobHashCacheConditionalUpdateEnabled,
-} from "../utils/jobWriteOptimization.js";
+  finalizeHashCacheHitAfterRecovery,
+  computePersistedContentHash,
+} from "../utils/workdayHashCacheRecovery.js";
+import { workdayNeedsDetailRecovery } from "../modules/ats/workday/workdayPoisoned.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -698,39 +699,38 @@ async function start(): Promise<void> {
         try {
           const cachedHash = await redis.get(hashCacheKey);
           if (cachedHash === newContentHash) {
-            jobHashCacheHits += 1;
-            if ((jobHashCacheHits + jobHashCacheMisses) % 100 === 0) {
-              logCacheHitMetrics({
-                name: "jobWorker.processJob.hashCache",
-                hits: jobHashCacheHits,
-                misses: jobHashCacheMisses,
-              });
-            }
-            await redis.set(hashCacheKey, newContentHash, "EX", HASH_CACHE_TTL_SECONDS);
-            const processedAt = new Date();
-            let didUpdate = true;
-            if (jobHashCacheConditionalUpdateEnabled()) {
-              didUpdate = await conditionalUpdateJobHashCacheHit(prisma, {
+            const action = await finalizeHashCacheHitAfterRecovery(prisma, redis, {
+              hashCacheKey,
+              hashCacheTtlSeconds: HASH_CACHE_TTL_SECONDS,
+              processedAt: new Date(),
+              job: {
                 sourceUrl: payload.sourceUrl,
-                contentHash: newContentHash,
-                processedAt,
-              });
-            } else {
-              await prisma.job.updateMany({
-                where: { sourceUrl: payload.sourceUrl },
-                data: {
-                  lastProcessedAt: processedAt,
-                  contentHash: newContentHash,
-                } as Prisma.JobUpdateManyMutationInput,
-              });
-            }
-            logEfficiencyMetrics({
-              name: "jobWorker.processJob.cachedSkip",
-              readRows: 0,
-              updatedRows: didUpdate ? 1 : 0,
-              skippedRows: didUpdate ? 0 : 1,
+                source: payload.source,
+                title: payload.title,
+                description: payload.description,
+                applyUrl: payload.applyUrl ?? payload.sourceUrl,
+                candidatePostedAt: payload.postedAt,
+              },
+              inlineRepairEnabled:
+                process.env.WORKDAY_HASH_HIT_INLINE_REPAIR?.trim() === "true",
             });
-            return;
+            if (action === "skip_ingest") {
+              jobHashCacheHits += 1;
+              if ((jobHashCacheHits + jobHashCacheMisses) % 100 === 0) {
+                logCacheHitMetrics({
+                  name: "jobWorker.processJob.hashCache",
+                  hits: jobHashCacheHits,
+                  misses: jobHashCacheMisses,
+                });
+              }
+              logEfficiencyMetrics({
+                name: "jobWorker.processJob.cachedSkip",
+                readRows: 0,
+                updatedRows: 1,
+                skippedRows: 0,
+              });
+              return;
+            }
           }
           jobHashCacheMisses += 1;
           if ((jobHashCacheHits + jobHashCacheMisses) % 100 === 0) {
@@ -768,7 +768,7 @@ async function start(): Promise<void> {
               companyId: resolvedCompanyId,
               companyDomain,
             },
-            { batchTouchAtMs: payload.batchTouchAtMs },
+            { batchTouchAtMs: payload.batchTouchAtMs, redis },
           );
         } catch (err) {
           if (
@@ -849,7 +849,22 @@ async function start(): Promise<void> {
           updatedRows = 1;
         }
         try {
-          await redis.set(hashCacheKey, newContentHash, "EX", HASH_CACHE_TTL_SECONDS);
+          const skipPoisonHash = workdayNeedsDetailRecovery({
+            source: payload.source,
+            description: payload.description,
+            sourceUrl: payload.sourceUrl,
+            detailNeedsRecovery: payload.detailNeedsRecovery,
+          });
+          if (!skipPoisonHash) {
+            const persistHash = await computePersistedContentHash(prisma, payload.sourceUrl, {
+              sourceUrl: payload.sourceUrl,
+              source: payload.source,
+              title: payload.title,
+              description: payload.description,
+              applyUrl: payload.applyUrl ?? payload.sourceUrl,
+            });
+            await redis.set(hashCacheKey, persistHash, "EX", HASH_CACHE_TTL_SECONDS);
+          }
         } catch (err) {
           logger.warn({ event: "job_hash_cache_write_failed", sourceUrl: payload.sourceUrl, err }, "job_hash_cache_write_failed");
         }

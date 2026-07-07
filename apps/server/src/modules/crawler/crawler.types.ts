@@ -54,11 +54,12 @@ export interface NormalizedJob {
   atsJobId?: string;
   /** Optional: canonical Job id for traceability (e.g. requeue scripts, logs). */
   jobId?: string;
-  /**
-   * Queue / worker metadata: epoch ms of a prior `touchLastSeenBySourceUrls` in the same ingest batch.
+  /** Queue / worker metadata: epoch ms of a prior `touchLastSeenBySourceUrls` in the same ingest batch.
    * When `JOB_DEDUP_TOUCH_SKIP=1`, dedup may skip a redundant `updateLastSeenById`. Not persisted to DB.
    */
   batchTouchAtMs?: number;
+  /** Workday: detail enrichment failed; skip hash-cache write until repair succeeds. */
+  detailNeedsRecovery?: boolean;
   /** Structured salary from JSON-LD baseSalary, when available from the ATS HTML page. */
   structuredSalary?: { minValue: number; maxValue: number | null; currency: string };
 }

@@ -13,11 +13,14 @@ import {
   recordIngestionOutcome,
 } from "./jobMetrics.service.js";
 import { shouldSkipRedundantLastSeenAfterBatchTouch } from "../utils/jobWriteOptimization.js";
+import type { Redis } from "ioredis";
+import { invalidateSitemapSeoCaches } from "./jobSeoCacheInvalidation.service.js";
 
 export type { DedupJobInput } from "../modules/crawler/crawler.types.js";
 
 export type DedupIngestOptions = {
   batchTouchAtMs?: number;
+  redis?: Redis;
 };
 
 const URL_IDENTITY_LOG_FIRST = 200;
@@ -26,6 +29,15 @@ function shouldLogUrlIdentityCheck(): boolean {
   urlIdentityLogCount += 1;
   if (urlIdentityLogCount <= URL_IDENTITY_LOG_FIRST) return true;
   return Math.random() < 0.01;
+}
+
+async function maybeInvalidateSitemapOnPublishable(
+  ingestOptions: DedupIngestOptions | undefined,
+  becamePublishable: boolean,
+): Promise<void> {
+  if (becamePublishable && ingestOptions?.redis) {
+    await invalidateSitemapSeoCaches(ingestOptions.redis);
+  }
 }
 
 /**
@@ -102,6 +114,18 @@ export async function deduplicateAndInsert(
       existingByUrl.id,
       input.postedAt,
     );
+    const descriptionMerge = await repo.mergeDescriptionIfRicher(
+      existingByUrl.id,
+      input.description,
+    );
+    const workdayUrlMerge =
+      input.source === "workday"
+        ? await repo.mergeWorkdaySourceUrlIfPoisoned(
+            existingByUrl.id,
+            input.sourceUrl,
+            input.applyUrl ?? null,
+          )
+        : { merged: false, becamePublishable: false };
     /** True when DB row was updated; triggers canonical recompute so aggregated location stays fresh. */
     const locationMerged = await repo.mergeStructuredLocationFromReingest(
       existingByUrl.id,
@@ -113,11 +137,22 @@ export async function deduplicateAndInsert(
     );
     const skillsMerged = await repo.mergeSkillsFromReingest(existingByUrl.id, input);
     let canonical = await repo.resolveCanonicalJob(existingByUrl);
-    if (postedMerged || locationMerged || workModeMerged || skillsMerged) {
+    if (
+      postedMerged ||
+      descriptionMerge.merged ||
+      workdayUrlMerge.merged ||
+      locationMerged ||
+      workModeMerged ||
+      skillsMerged
+    ) {
       await recomputeCanonical(repo, canonical.id);
       const fresh = await repo.findByIdRaw(canonical.id);
       if (fresh) canonical = fresh;
     }
+    await maybeInvalidateSitemapOnPublishable(
+      ingestOptions,
+      descriptionMerge.becamePublishable || workdayUrlMerge.becamePublishable,
+    );
     recordIngestionOutcome("idempotent");
     logDedupMetrics();
     return { canonical, inserted: false };
@@ -212,6 +247,18 @@ export async function deduplicateAndInsert(
           existing.id,
           input.postedAt,
         );
+        const descriptionMerge = await repo.mergeDescriptionIfRicher(
+          existing.id,
+          input.description,
+        );
+        const workdayUrlMerge =
+          input.source === "workday"
+            ? await repo.mergeWorkdaySourceUrlIfPoisoned(
+                existing.id,
+                input.sourceUrl,
+                input.applyUrl ?? null,
+              )
+            : { merged: false, becamePublishable: false };
         /** True when DB row was updated; triggers canonical recompute so aggregated location stays fresh. */
         const locationMerged = await repo.mergeStructuredLocationFromReingest(
           existing.id,
@@ -220,11 +267,22 @@ export async function deduplicateAndInsert(
         const workModeMerged = await repo.mergeWorkModeFromReingest(existing.id, input);
         const skillsMerged = await repo.mergeSkillsFromReingest(existing.id, input);
         let canonicalExisting = await repo.resolveCanonicalJob(existing);
-        if (postedMerged || locationMerged || workModeMerged || skillsMerged) {
+        if (
+          postedMerged ||
+          descriptionMerge.merged ||
+          workdayUrlMerge.merged ||
+          locationMerged ||
+          workModeMerged ||
+          skillsMerged
+        ) {
           await recomputeCanonical(repo, canonicalExisting.id);
           const fresh = await repo.findByIdRaw(canonicalExisting.id);
           if (fresh) canonicalExisting = fresh;
         }
+        await maybeInvalidateSitemapOnPublishable(
+          ingestOptions,
+          descriptionMerge.becamePublishable || workdayUrlMerge.becamePublishable,
+        );
         recordIngestionOutcome("idempotent");
         logDedupMetrics();
         return { canonical: canonicalExisting, inserted: false };
