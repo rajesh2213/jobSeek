@@ -165,9 +165,21 @@ export function CompanyHubClient({
   const [relatedCompaniesState, setRelatedCompaniesState] = useState<CompanyListItem[]>(
     relatedCompanies,
   );
-  const [jobsListLoading, setJobsListLoading] = useState(
-    () => initialJobs.filter(isJobReady).length === 0,
-  );
+  const [jobsListLoading, setJobsListLoading] = useState(() => {
+    const ready = initialJobs.filter(isJobReady).length;
+    if (ready > 0) return false;
+    const knownTotal =
+      typeof initialMeta.total === "number"
+        ? initialMeta.total
+        : typeof initialMeta.totalCount === "number"
+          ? initialMeta.totalCount
+          : typeof initialCompany?.visibleJobCount === "number"
+            ? initialCompany.visibleJobCount
+            : null;
+    // Known-empty hubs should render the OG-1.1 empty state on SSR (not a forever skeleton).
+    if (knownTotal === 0) return false;
+    return true;
+  });
   const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
