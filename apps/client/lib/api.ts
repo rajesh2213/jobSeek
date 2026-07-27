@@ -36,6 +36,8 @@ export interface CompanyDetail extends CompanyListItem {
   atsBoardToken: string | null;
   atsType: string | null;
   updatedAt: string;
+  /** Any Job row ever existed for this company (OG-1.1 evergreen indexability). */
+  hasEverHadJobs?: boolean;
 }
 
 export interface CountrySuggestion {
@@ -1570,6 +1572,35 @@ export async function fetchJobById(
     return { data: payload.data, meta: payload.meta };
   }
   throw new Error(`Failed to fetch job ${id}: exhausted retries`);
+}
+
+/** OG-1.3: resolve a 301 target for a purged job id (`GET /jobs/:id/redirect`). */
+export async function fetchJobRedirectPath(
+  id: string,
+  opts?: { signal?: AbortSignal | null },
+): Promise<string | null> {
+  const url = `${API_BASE_URL}/jobs/${encodeURIComponent(id)}/redirect`;
+  const headers = new Headers();
+  if (typeof window === "undefined") {
+    const internalSeoSecret = process.env.INTERNAL_SEO_SECRET?.trim();
+    if (internalSeoSecret) {
+      headers.set("x-internal-seo", "true");
+      headers.set("x-internal-seo-secret", internalSeoSecret);
+    }
+  }
+  const res = await fetch(url, {
+    headers,
+    signal: opts?.signal ?? undefined,
+    next: { revalidate: 300 },
+  } as RequestInit & { next?: { revalidate?: number } });
+  if (res.status === 404) return null;
+  if (!res.ok) return null;
+  const body = (await res.json()) as { data?: { path?: string } };
+  const path = body.data?.path?.trim();
+  if (!path || !path.startsWith("/") || path.startsWith("//") || path.includes("://")) {
+    return null;
+  }
+  return path;
 }
 
 export type SemanticMatchMap = Record<string, { bullet: string; similarity: number }>;

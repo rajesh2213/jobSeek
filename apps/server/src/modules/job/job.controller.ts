@@ -49,6 +49,7 @@ import { isListingDegradedDbError } from "../../infrastructure/db/listingDegrade
 import { getCachedJobDetailJson, setCachedJobDetailJson, deleteCachedJobDetailJson } from "./jobDetailCache.js";
 import { isJobSeoActive } from "../../services/jobSeoLifecycle.service.js";
 import { invalidateJobDetailSeoCachesOnRead } from "../../services/jobSeoCacheInvalidation.service.js";
+import { isSafeInternalRedirectPath } from "../../services/jobRedirect.service.js";
 
 interface GetJobParams {
   id: string;
@@ -310,6 +311,29 @@ export function registerJobRoutes(
     const skills = await jobService.listSkillAggregates();
     return reply.send({ skills });
   });
+
+  server.get<{ Params: GetJobParams }>(
+    "/jobs/:id/redirect",
+    { schema: getJobParamsSchema },
+    async (
+      request: FastifyRequest<{ Params: GetJobParams }>,
+      reply: FastifyReply,
+    ) => {
+      const row = await server.prisma.jobRedirect.findUnique({
+        where: { jobId: request.params.id },
+        select: { targetPath: true },
+      });
+      if (!row || !isSafeInternalRedirectPath(row.targetPath)) {
+        return reply.status(404).send({
+          error: "Job redirect not found",
+          code: "JOB_REDIRECT_NOT_FOUND",
+        } satisfies ApiError);
+      }
+      return reply
+        .header("Cache-Control", "public, max-age=300, s-maxage=300")
+        .send({ data: { path: row.targetPath } });
+    },
+  );
 
   server.get<{ Params: GetJobParams }>(
     "/jobs/:id",

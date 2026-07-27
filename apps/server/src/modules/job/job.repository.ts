@@ -990,6 +990,15 @@ export function createJobRepository(prisma: PrismaClient) {
       return prisma.job.findUnique({ where: { id } });
     },
 
+    /** Cheap existence check for OG-1.1 `hasEverHadJobs` (any historical row). */
+    async findFirstIdByCompanyId(companyId: string): Promise<string | null> {
+      const row = await prisma.job.findFirst({
+        where: { companyId },
+        select: { id: true },
+      });
+      return row?.id ?? null;
+    },
+
     async resolveCanonicalJob(job: Job): Promise<Job> {
       if (!job.canonicalJobId) return job;
       const c = await prisma.job.findUnique({ where: { id: job.canonicalJobId } });

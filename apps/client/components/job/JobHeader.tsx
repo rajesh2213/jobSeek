@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { JobItem } from "../../lib/api";
 import { jobDetailPinLocationText } from "../../lib/jobDisplay";
+import { isJobBusinessOpen } from "../../lib/jobLifecycle";
 import { ApplyJobButton } from "./ApplyJobButton";
 import { AppliedToggleButton } from "./AppliedToggleButton";
 import { WorkTypeOutlinePill } from "./WorkTypeOutlinePill";
@@ -12,6 +13,9 @@ interface Props {
 }
 
 export function JobHeader({ job, applyHref }: Props) {
+  const businessOpen = isJobBusinessOpen(job);
+  const canApply = businessOpen && Boolean(applyHref.trim());
+
   return (
     <header className="space-y-3">
       <div className="flex flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
@@ -46,18 +50,32 @@ export function JobHeader({ job, applyHref }: Props) {
               ) : null;
             })()}
             <WorkTypeOutlinePill job={job} className="shrink-0" />
+            {!businessOpen ? (
+              <span className="rounded-md border border-ink/15 bg-ink/5 px-2 py-0.5 text-xs font-semibold text-ink/60">
+                Possibly closed
+              </span>
+            ) : null}
           </div>
         </div>
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:shrink-0 sm:items-center">
-          <ApplyJobButton
-            jobId={job.id}
-            company={job.company.name}
-            source="job_detail_header"
-            applyUrl={applyHref}
-            variant="primary"
-            size="md"
-            className="w-full justify-center sm:w-auto"
-          />
+          {canApply ? (
+            <ApplyJobButton
+              jobId={job.id}
+              company={job.company.name}
+              source="job_detail_header"
+              applyUrl={applyHref}
+              variant="primary"
+              size="md"
+              className="w-full justify-center sm:w-auto"
+            />
+          ) : (
+            <Link
+              href={`/company/${job.company.slug}`}
+              className="inline-flex w-full items-center justify-center rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white no-underline hover:bg-brand-hover sm:w-auto"
+            >
+              More at {job.company.name}
+            </Link>
+          )}
           <AppliedToggleButton jobId={job.id} size="md" className="w-full justify-center sm:w-auto" />
         </div>
       </div>

@@ -1,5 +1,5 @@
 import type { JobItem } from "./api";
-import { shouldIndexJob } from "./jobLifecycle";
+import { isJobBusinessOpen, shouldIndexJob } from "./jobLifecycle";
 import { absoluteUrl } from "./seoSite";
 
 /** ISO 3166-1 alpha-2 → ISO 4217; fallback USD when unknown. */
@@ -30,13 +30,14 @@ export function resolveJobPostingDatePosted(job: JobItem): string | undefined {
   );
 }
 
-/** True when JobPosting JSON-LD should be emitted (indexable + description + valid datePosted). */
+/** True when JobPosting JSON-LD should be emitted (indexable + business-open + description + valid datePosted). */
 export function shouldEmitJobPostingJsonLd(
   job: JobItem,
   description: string | undefined,
 ): boolean {
-  // Expired/inactive jobs remain accessible but should not be indexed by search engines.
+  // Indexable during SEO grace, but never emit JobPosting for closed/expired roles (OG-1.2).
   if (!shouldIndexJob(job)) return false;
+  if (!isJobBusinessOpen(job)) return false;
   const resolved = resolveDescriptionOrFallback(job, description);
   if (!resolved) return false;
   return resolveJobPostingDatePosted(job) != null;

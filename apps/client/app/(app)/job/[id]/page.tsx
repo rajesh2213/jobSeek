@@ -3,6 +3,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
 import { loadJobDetailPage } from "../../../../lib/jobsPageData";
 import { resolveJobAliasRedirectPath } from "../../../../lib/jobCanonicalRedirect";
+import { fetchJobRedirectPath } from "../../../../lib/api";
 import {
   buildJobPostingJsonLd,
   shouldEmitJobPostingJsonLd,
@@ -33,7 +34,7 @@ import { UserLocalResetCaption } from "../../../../components/job/UserLocalReset
 import { EmailCaptureCard } from "../../../../components/email/EmailCaptureCard";
 import { JobDetailPosthogTracker } from "../../../../components/analytics/JobDetailPosthogTracker";
 import { buildJobDetailSeo } from "../../../../lib/seoJobDetail";
-import { shouldIndexJob } from "../../../../lib/jobLifecycle";
+import { isJobInSeoGrace, shouldIndexJob } from "../../../../lib/jobLifecycle";
 
 /** Anonymous crawlers and repeat views share ISR; authenticated path stays dynamic via loader. */
 export const revalidate = 300;
@@ -42,23 +43,30 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
+/** OG-1.3: purged jobs 301 to a durable hub instead of hard 404. */
+async function resolveMissingJobRedirect(id: string): Promise<never> {
+  const redirectPath = await fetchJobRedirectPath(id);
+  if (redirectPath) permanentRedirect(redirectPath);
+  notFound();
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const fetched = await loadJobDetailPage(id);
   if (!fetched) {
-    notFound();
+    await resolveMissingJobRedirect(id);
   }
-  const aliasPath = resolveJobAliasRedirectPath(id, fetched.data.id);
+  const aliasPath = resolveJobAliasRedirectPath(id, fetched!.data.id);
   if (aliasPath) permanentRedirect(aliasPath);
 
-  const job = fetched.data;
+  const job = fetched!.data;
   const sections = refineSectionsForDisplay(resolveJobDetailSections(job));
   const structured = sectionsPlainTextForSeo(sections);
   const { title, description } = buildJobDetailSeo(job, {
     plainDescriptionForSeo: structured,
   });
   const canonical = absoluteUrl(`/job/${job.id}`);
-  // Expired/inactive jobs remain accessible but should not be indexed by search engines.
+  // SEO grace (OG-1.2): expired-but-in-grace jobs remain indexable; Apply uses business expiry.
   const indexable = shouldIndexJob(job);
   return {
     title,
@@ -83,15 +91,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function JobDetailPage({ params }: Props) {
   const { id } = await params;
   const fetched = await loadJobDetailPage(id);
-  if (!fetched?.data?.company) notFound();
+  if (!fetched?.data?.company) {
+    await resolveMissingJobRedirect(id);
+  }
 
-  const aliasPath = resolveJobAliasRedirectPath(id, fetched.data.id);
+  const aliasPath = resolveJobAliasRedirectPath(id, fetched!.data.id);
   if (aliasPath) permanentRedirect(aliasPath);
 
-  const job = fetched.data;
-  const detailCap = fetched.meta;
+  const job = fetched!.data;
+  const detailCap = fetched!.meta;
   const nearLimitWarning = Boolean(detailCap?.limit?.warning);
   const capReached = Boolean(detailCap?.capReached);
+  const inSeoGrace = isJobInSeoGrace(job);
 
   const sections = refineSectionsForDisplay(resolveJobDetailSections(job));
   const structuredText = sectionsPlainTextForSeo(sections);
@@ -144,6 +155,21 @@ export default async function JobDetailPage({ params }: Props) {
                 job={job}
                 applyHref={applyHref}
               />
+              {inSeoGrace ? (
+                <div
+                  className="rounded-xl border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm text-ink"
+                  role="status"
+                >
+                  <p className="font-semibold">This role may no longer be open.</p>
+                  <p className="mt-1 text-ink/75">
+                    Browse{" "}
+                    <Link href={`/company/${job.company.slug}`} className="font-semibold text-brand hover:underline">
+                      jobs at {job.company.name}
+                    </Link>{" "}
+                    or similar live roles below.
+                  </p>
+                </div>
+              ) : null}
               <ResumeMatchSection job={job} />
               {nearLimitWarning ? (
                 <div className="rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-ink">

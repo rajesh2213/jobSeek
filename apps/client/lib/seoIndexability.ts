@@ -18,6 +18,8 @@ export type SeoPolicyReason =
   | "noindex_disallowed_param"
   | "noindex_unknown_skill"
   | "noindex_company_broken"
+  | "noindex_company_never_had_jobs"
+  /** @deprecated Prefer `noindex_company_never_had_jobs` (kept for older telemetry). */
   | "noindex_company_no_visible_jobs"
   | "exclude_sitemap_noncanonical"
   | "exclude_sitemap_refinement"
@@ -227,8 +229,19 @@ export function decideCompanySeoPolicy(input: {
   gateEnabled: boolean;
   company: { id?: string | null; name?: string | null; slug?: string | null } | null;
   requestedSlug: string;
-  /** Publishable roles visible on the company hub (same guard as job discovery). */
+  /**
+   * Publishable roles currently visible on the company hub.
+   * Zero open roles alone must NOT noindex — evergreen company hubs stay indexable
+   * when the employer has ever posted jobs (see `hasEverHadJobs`).
+   */
   visibleJobCount?: number | null;
+  /**
+   * True when any Job row has ever existed for this company (active or historical).
+   * Explicit `false` noindexes never-hired / placeholder companies.
+   * When omitted, policy stays permissive for backward-compatible callers that already
+   * filter to hiring companies (e.g. sitemap).
+   */
+  hasEverHadJobs?: boolean | null;
 }): SeoPolicyDecision {
   if (!input.company) return noindex("noindex_company_broken");
 
@@ -238,13 +251,14 @@ export function decideCompanySeoPolicy(input: {
   if (!id || !name || !slug) return noindex("noindex_company_broken");
   if (slug !== input.requestedSlug) return noindex("noindex_company_broken");
 
-  const visible =
-    typeof input.visibleJobCount === "number" ? input.visibleJobCount : null;
-  if (visible !== null && visible < 1) {
-    return noindex("noindex_company_no_visible_jobs");
+  if (input.hasEverHadJobs === false) {
+    return noindex("noindex_company_never_had_jobs");
   }
 
-  if (!input.gateEnabled) return allow("allow_company_default");
+  // `gateEnabled` retained for telemetry/compat; quality gate no longer suppresses
+  // zero-open-role companies that have hiring history.
+  void input.gateEnabled;
+  void input.visibleJobCount;
   return allow("allow_company_default");
 }
 

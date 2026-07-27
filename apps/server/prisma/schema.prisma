@@ -229,6 +229,19 @@ model Job {
   @@index([listingFreshnessAt], map: "idx_jobs_listing_freshness_at")
 }
 
+/// Soft redirect target for purged job detail URLs (OG-1.3). Survives Job row deletion.
+model JobRedirect {
+  id          String   @id @default(uuid())
+  /// Former Job.id — used to resolve `/job/{id}` after hard delete.
+  jobId       String   @unique
+  /// Absolute path on the site, e.g. `/jobs/role/software-engineer` or `/company/acme`.
+  targetPath  String
+  companySlug String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 model SerpBatch {
   id        String      @id @default(uuid())
   query     String

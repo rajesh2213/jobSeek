@@ -1,4 +1,6 @@
 import { Worker } from "bullmq";
+import { randomUUID } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { loadRootEnv } from "../infrastructure/env/loadEnv.js";
 import { prisma } from "../infrastructure/db/prisma.js";
 import { logger } from "../utils/logger.js";
@@ -12,6 +14,10 @@ import {
 } from "../queues/jobPurge.queue.js";
 import { getIoredis, getRedisConnection } from "../queues/job.queue.js";
 import { invalidateJobDetailSeoCaches } from "../services/jobSeoCacheInvalidation.service.js";
+import {
+  resolveJobRedirectTargetPath,
+  type JobRedirectSource,
+} from "../services/jobRedirect.service.js";
 
 const DEFAULT_BATCH_SIZE = 1000;
 const DEFAULT_MAX_ROWS_PER_RUN = 5000;
@@ -36,6 +42,63 @@ async function currentDbSizeBytes(): Promise<number> {
     SELECT pg_database_size(current_database()) AS size_bytes
   `;
   return Number(rows[0]?.size_bytes ?? 0n);
+}
+
+/** OG-1.3: persist redirect targets before hard-delete so /job/{id} can 301. */
+async function writeJobRedirectsForIds(ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const jobs = await prisma.job.findMany({
+    where: { id: { in: ids } },
+    select: {
+      id: true,
+      role: true,
+      category: true,
+      locationCountry: true,
+      isRemote: true,
+      company: { select: { slug: true } },
+    },
+  });
+  if (jobs.length === 0) return 0;
+
+  const now = new Date();
+  const rows = jobs.map((job) => {
+    const source: JobRedirectSource = {
+      id: job.id,
+      role: job.role,
+      category: job.category,
+      locationCountry: job.locationCountry,
+      isRemote: job.isRemote,
+      company: job.company,
+    };
+    return {
+      id: randomUUID(),
+      jobId: job.id,
+      targetPath: resolveJobRedirectTargetPath(source),
+      companySlug: job.company?.slug ?? null,
+      createdAt: now,
+    };
+  });
+
+  // Prisma createMany skipDuplicates needs unique jobId; upsert in chunks for conflict updates.
+  let written = 0;
+  const chunkSize = 200;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    await Promise.all(
+      chunk.map((row) =>
+        prisma.jobRedirect.upsert({
+          where: { jobId: row.jobId },
+          create: row,
+          update: {
+            targetPath: row.targetPath,
+            companySlug: row.companySlug,
+          },
+        }),
+      ),
+    );
+    written += chunk.length;
+  }
+  return written;
 }
 
 async function markExpiredInactiveBatch(limit: number): Promise<string[]> {
@@ -78,22 +141,24 @@ async function duplicateDeleteBatch(dryRun: boolean, limit: number): Promise<str
     return [];
   }
 
+  const targets = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT id
+    FROM "Job"
+    WHERE "canonicalJobId" IS NOT NULL
+      AND "createdAt" < now() - (${FRESH_BUFFER_DAYS} * interval '1 day')
+      AND (
+        ("expiresAt" IS NOT NULL AND "expiresAt" < now())
+        OR "lastSeenAt" < now() - interval '14 days'
+      )
+    ORDER BY "lastSeenAt" ASC NULLS FIRST
+    LIMIT ${limit}
+  `;
+  const ids = targets.map((r) => r.id);
+  if (ids.length === 0) return [];
+  await writeJobRedirectsForIds(ids);
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
-    WITH target AS (
-      SELECT id
-      FROM "Job"
-      WHERE "canonicalJobId" IS NOT NULL
-        AND "createdAt" < now() - (${FRESH_BUFFER_DAYS} * interval '1 day')
-        AND (
-          ("expiresAt" IS NOT NULL AND "expiresAt" < now())
-          OR "lastSeenAt" < now() - interval '14 days'
-        )
-      ORDER BY "lastSeenAt" ASC NULLS FIRST
-      LIMIT ${limit}
-    )
     DELETE FROM "Job" AS j
-    USING target
-    WHERE j.id = target.id
+    WHERE j.id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}`))})
     RETURNING j.id
   `;
   return rows.map((row) => row.id);
@@ -125,28 +190,30 @@ async function canonicalDeleteBatch(dryRun: boolean, limit: number): Promise<str
     return [];
   }
 
+  const targets = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT id
+    FROM "Job"
+    WHERE "canonicalJobId" IS NULL
+      AND "createdAt" < now() - (${FRESH_BUFFER_DAYS} * interval '1 day')
+      AND (
+        ("expiresAt" IS NOT NULL AND "expiresAt" < now())
+        OR "lastSeenAt" < now() - interval '30 days'
+      )
+      AND "salaryMin" IS NULL
+      AND (
+        "parsedDescription" IS NULL
+        OR jsonb_typeof("parsedDescription") <> 'object'
+        OR "parsedDescription" = '{}'::jsonb
+      )
+    ORDER BY COALESCE("expiresAt", "lastSeenAt", "createdAt") ASC
+    LIMIT ${limit}
+  `;
+  const ids = targets.map((r) => r.id);
+  if (ids.length === 0) return [];
+  await writeJobRedirectsForIds(ids);
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
-    WITH target AS (
-      SELECT id
-      FROM "Job"
-      WHERE "canonicalJobId" IS NULL
-        AND "createdAt" < now() - (${FRESH_BUFFER_DAYS} * interval '1 day')
-        AND (
-          ("expiresAt" IS NOT NULL AND "expiresAt" < now())
-          OR "lastSeenAt" < now() - interval '30 days'
-        )
-        AND "salaryMin" IS NULL
-        AND (
-          "parsedDescription" IS NULL
-          OR jsonb_typeof("parsedDescription") <> 'object'
-          OR "parsedDescription" = '{}'::jsonb
-        )
-      ORDER BY COALESCE("expiresAt", "lastSeenAt", "createdAt") ASC
-      LIMIT ${limit}
-    )
     DELETE FROM "Job" AS j
-    USING target
-    WHERE j.id = target.id
+    WHERE j.id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}`))})
     RETURNING j.id
   `;
   return rows.map((row) => row.id);

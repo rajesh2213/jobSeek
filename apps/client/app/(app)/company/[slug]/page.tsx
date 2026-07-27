@@ -61,6 +61,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     company: { id: company.id, name: company.name, slug: company.slug },
     requestedSlug: slug,
     visibleJobCount: visible,
+    hasEverHadJobs: company.hasEverHadJobs,
   });
   if (forceNoindexAll) {
     decision = { ...decision, index: false, follow: true, sitemapEligible: false };

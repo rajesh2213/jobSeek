@@ -278,21 +278,25 @@ export class CompanyService {
         visibleJobCount: number;
         remoteJobCount: number;
         hasRemoteJobs: boolean;
+        /** True when any Job row exists for this company (active or historical). OG-1.1 */
+        hasEverHadJobs: boolean;
       })
     | null
   > {
     const company = await this.companyRepository.findBySlug(slug);
     if (!company) return null;
     const filters: JobDiscoveryFilters = { companyId: company.id };
-    const [visibleJobCount, remoteJobCount] = await Promise.all([
+    const [visibleJobCount, remoteJobCount, historicalJob] = await Promise.all([
       this.jobRepository.countCanonicalFiltered(filters),
       this.jobRepository.countCanonicalFiltered({ ...filters, isRemote: true }),
+      this.jobRepository.findFirstIdByCompanyId(company.id),
     ]);
     return {
       ...company,
       visibleJobCount,
       remoteJobCount,
       hasRemoteJobs: remoteJobCount > 0,
+      hasEverHadJobs: historicalJob != null || visibleJobCount > 0,
     };
   }
 

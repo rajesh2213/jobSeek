@@ -32,6 +32,7 @@ import { Badge } from "../ui/Badge";
 import { Button, buttonClassName } from "../ui/Button";
 import { JobCard } from "../job/JobCard";
 import { CompanyHubJobsListSkeleton, CompanyHubSkeleton } from "./CompanyHubSkeleton";
+import { EmailCaptureCard } from "../email/EmailCaptureCard";
 
 const LimitWallEnhanced = dynamic(
   () => import("../job/LimitWallEnhanced").then((m) => m.LimitWallEnhanced),
@@ -616,12 +617,47 @@ export function CompanyHubClient({
             </div>
           </div>
         ) : emptyNoRoles ? (
-          <p
-            className="mt-8 rounded-2xl border border-dashed border-ink/15 bg-surface px-6 py-12 text-center text-sm text-ink-muted"
+          <div
+            className="mt-8 space-y-6 rounded-2xl border border-dashed border-ink/15 bg-surface px-6 py-10 text-center"
             role="status"
           >
-            No open roles listed for this company yet. Check back soon or browse all jobs.
-          </p>
+            <div>
+              <p className="text-base font-semibold text-ink">No open roles right now</p>
+              <p className="mt-2 text-sm text-ink-muted">
+                {company.name} isn&apos;t listing active jobs on JobLoom at the moment. Get notified
+                when new roles appear, or browse related hiring companies and role hubs below.
+              </p>
+            </div>
+            <div className="mx-auto max-w-md text-left">
+              <EmailCaptureCard
+                source="jobs_listing"
+                title={`Get ${company.name} job alerts`}
+                subtitle="We email when similar roles open."
+                variant="compact"
+                suppressSignedInGate
+              />
+            </div>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Link
+                href="/jobs"
+                className={buttonClassName({ variant: "primary", size: "sm" })}
+              >
+                Browse all jobs
+              </Link>
+              <Link
+                href={jobsLinkEngineering}
+                className={buttonClassName({ variant: "outline", size: "sm" })}
+              >
+                Engineering roles
+              </Link>
+              <Link
+                href="/companies"
+                className={buttonClassName({ variant: "outline", size: "sm" })}
+              >
+                More companies
+              </Link>
+            </div>
+          </div>
         ) : (
           <>
             {(() => {

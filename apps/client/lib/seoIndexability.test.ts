@@ -110,16 +110,31 @@ test("company policy only noindexes obviously broken states", () => {
   assert.equal(broken.reason, "noindex_company_broken");
 });
 
-test("company policy noindexes when no publishable roles are visible", () => {
+test("company policy noindexes never-hired companies even with zero open roles", () => {
   const empty = decideCompanySeoPolicy({
     gateEnabled: false,
     company: { id: "c1", name: "Acme", slug: "acme" },
     requestedSlug: "acme",
     visibleJobCount: 0,
+    hasEverHadJobs: false,
   });
   assert.equal(empty.index, false);
-  assert.equal(empty.reason, "noindex_company_no_visible_jobs");
+  assert.equal(empty.reason, "noindex_company_never_had_jobs");
   assert.equal(empty.sitemapEligible, false);
+});
+
+test("company policy indexes historical employers with zero open roles", () => {
+  const decision = decideCompanySeoPolicy({
+    gateEnabled: true,
+    company: { id: "c1", name: "Acme", slug: "acme" },
+    requestedSlug: "acme",
+    visibleJobCount: 0,
+    hasEverHadJobs: true,
+  });
+  assert.equal(decision.index, true);
+  assert.equal(decision.follow, true);
+  assert.equal(decision.sitemapEligible, true);
+  assert.equal(decision.reason, "allow_company_default");
 });
 
 test("sitemap eligibility excludes non-canonical and refinement-heavy", () => {
