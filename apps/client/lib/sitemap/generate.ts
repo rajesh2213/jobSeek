@@ -172,10 +172,9 @@ export async function generateCompanyEntries(): Promise<{
       for (const c of res.data) {
         const visibleJobCount = c.jobCount ?? 0;
         // Sitemap company feed is hiring-filtered; treat jobCount>0 as hasEverHadJobs.
+        const maybeEver = (c as { hasEverHadJobs?: boolean }).hasEverHadJobs;
         const hasEverHadJobs =
-          typeof (c as { hasEverHadJobs?: boolean }).hasEverHadJobs === "boolean"
-            ? (c as { hasEverHadJobs: boolean }).hasEverHadJobs
-            : visibleJobCount > 0;
+          typeof maybeEver === "boolean" ? maybeEver : visibleJobCount > 0;
         let decision = decideCompanySeoPolicy({
           gateEnabled: companyGateEnabled,
           company: { id: c.id, name: c.name, slug: c.slug },
