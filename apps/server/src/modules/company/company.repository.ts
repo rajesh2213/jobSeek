@@ -504,6 +504,69 @@ export function createCompanyRepository(prisma: PrismaClient) {
         activeHiringCompanies: Number(activeRows[0]?.c ?? 0),
       };
     },
+
+    /**
+     * SEO company sitemap feed (OG company-indexability): employers that have ever
+     * had any Job row. `jobCount` is current discovery-visible openings only.
+     */
+    async findManyEverHiredForSitemap(input: {
+      limit: number;
+      offset: number;
+    }): Promise<
+      Array<{
+        id: string;
+        name: string;
+        slug: string;
+        jobCount: number;
+        updatedAt: Date;
+        _listingTotal: number;
+      }>
+    > {
+      const limit = Math.max(1, Math.min(500, Math.floor(input.limit)));
+      const offset = Math.max(0, Math.floor(input.offset));
+      const discoveryWhere = buildDiscoveryWhereSql();
+      return prisma.$queryRaw`
+        WITH company_jobs AS (
+          SELECT
+            j."companyId",
+            COUNT(*)::int AS "jobCount"
+          FROM "Job" j
+          WHERE ${discoveryWhere}
+          GROUP BY j."companyId"
+        ),
+        ever_hired AS (
+          SELECT DISTINCT j."companyId"
+          FROM "Job" j
+        ),
+        filtered AS (
+          SELECT
+            c.id,
+            c.name,
+            c.slug,
+            c."updatedAt",
+            COALESCE(cj."jobCount", 0)::int AS "jobCount",
+            COUNT(*) OVER()::int AS "_listingTotal"
+          FROM "Company" c
+          INNER JOIN ever_hired eh ON eh."companyId" = c.id
+          LEFT JOIN company_jobs cj ON cj."companyId" = c.id
+          WHERE c.slug IS NOT NULL
+            AND c.name IS NOT NULL
+            AND length(trim(c.slug)) > 0
+            AND length(trim(c.name)) > 0
+        )
+        SELECT
+          id,
+          name,
+          slug,
+          "updatedAt",
+          "jobCount",
+          "_listingTotal"
+        FROM filtered
+        ORDER BY "jobCount" DESC, slug ASC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `;
+    },
   };
 }
 

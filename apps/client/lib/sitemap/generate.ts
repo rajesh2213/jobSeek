@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
-import { fetchCompanies, fetchSeoLandingPages, fetchSeoSitemapJobs } from "../api";
+import { fetchSeoLandingPages, fetchSeoSitemapCompanies, fetchSeoSitemapJobs } from "../api";
 import { getSiteBaseUrl } from "../seoSite";
 import { normalizeRelatedSlugPath, parseSlugWithMeta } from "../slug-parser";
 import {
@@ -53,24 +53,21 @@ export function jobLastModified(
 }
 
 /**
- * Compact cache shape for job entries: id + lastModified epoch ms only.
+ * Compact cache shape for job entries: id only.
  *
- * The full `SitemapUrlEntry` (absolute URL + Date) roughly doubles the
- * serialized size. At a 40k cap the expanded array exceeds Vercel's 2MB
- * Data Cache per-entry limit, so the write is silently skipped and every
- * request regenerates non-deterministically (the index lists partitions
- * that then 404). Caching the compact form keeps the full set under the
- * limit so the index and partition routes read one consistent snapshot.
+ * Omitting lastModified from the cache payload keeps ~40k entries under
+ * Vercel's ~2MB Data Cache limit (~1.6MB). Expanded XML uses `now` as lastmod.
  */
-export type CompactJobEntry = { id: string; lm: number };
+export type CompactJobEntry = { id: string };
 
 function expandCompactJobEntries(
   base: string,
   entries: CompactJobEntry[],
+  now = new Date(),
 ): SitemapUrlEntry[] {
   return entries.map((e) => ({
     url: `${base}/job/${e.id}`,
-    lastModified: new Date(e.lm),
+    lastModified: now,
   }));
 }
 
@@ -147,8 +144,13 @@ export async function generateCompanyEntries(): Promise<{
   const companyGateEnabled = process.env.SEO_COMPANY_QUALITY_GATE_ENABLED === "true";
   const forceNoindexAll = process.env.SEO_FORCE_NOINDEX_ALL === "true";
   const disableAllNoindex = process.env.SEO_DISABLE_ALL_NOINDEX === "true";
+  const internalSeoSecret = process.env.INTERNAL_SEO_SECRET ?? null;
   const fetchCompaniesForSitemap = cache((page: number, limit: number) =>
-    fetchCompanies({ page, limit, sort: "jobs", ssrPage: "sitemap" }),
+    fetchSeoSitemapCompanies({
+      page,
+      limit,
+      internalSeoSecret,
+    }),
   );
   const companyEntries: SitemapUrlEntry[] = [];
   let degraded = false;
@@ -156,7 +158,7 @@ export async function generateCompanyEntries(): Promise<{
   try {
     const companiesStartedAt = Date.now();
     let page = 1;
-    const limit = 100;
+    const limit = 200;
     for (;;) {
       const elapsedMs = Date.now() - companiesStartedAt;
       const remainingBudgetMs = COMPANIES_SECTION_BUDGET_MS - elapsedMs;
@@ -171,33 +173,32 @@ export async function generateCompanyEntries(): Promise<{
       );
       for (const c of res.data) {
         const visibleJobCount = c.jobCount ?? 0;
-        // Sitemap company feed is hiring-filtered; treat jobCount>0 as hasEverHadJobs.
-        const maybeEver = (c as { hasEverHadJobs?: boolean }).hasEverHadJobs;
-        const hasEverHadJobs =
-          typeof maybeEver === "boolean" ? maybeEver : visibleJobCount > 0;
         let decision = decideCompanySeoPolicy({
           gateEnabled: companyGateEnabled,
           company: { id: c.id, name: c.name, slug: c.slug },
           requestedSlug: c.slug,
           visibleJobCount,
-          hasEverHadJobs,
+          hasEverHadJobs: c.hasEverHadJobs === true,
         });
         if (forceNoindexAll) decision = { ...decision, sitemapEligible: false };
         if (disableAllNoindex) decision = { ...decision, sitemapEligible: true };
         if (!decision.sitemapEligible) continue;
         companyEntries.push({
           url: `${base}/company/${c.slug}`,
-          lastModified: now,
+          lastModified: c.updatedAt ? new Date(c.updatedAt) : now,
         });
       }
-      const totalPages = res.meta.totalPages ?? 1;
-      if (!res.meta.hasMore || page >= totalPages) break;
+      if (!res.meta.hasMore || page >= res.meta.totalPages) break;
       page += 1;
       if (page > MAX_COMPANY_SITEMAP_PAGES) break;
     }
   } catch {
     degraded = true;
   }
+  console.info("[sitemap] companies_ever_hired_walk", {
+    outputCount: companyEntries.length,
+    degraded,
+  });
   return { entries: companyEntries, degraded };
 }
 
@@ -209,7 +210,6 @@ export async function generateJobEntries(): Promise<{
   degraded: boolean;
   excludedByReason: Record<string, number>;
 }> {
-  const now = new Date();
   const internalSeoSecret = process.env.INTERNAL_SEO_SECRET ?? null;
   const sitemapPruningEnabled = process.env.SEO_SITEMAP_PRUNING_ENABLED === "true";
   const forceNoindexAll = process.env.SEO_FORCE_NOINDEX_ALL === "true";
@@ -254,10 +254,7 @@ export async function generateJobEntries(): Promise<{
             continue;
           }
         }
-        jobEntries.push({
-          id: job.id,
-          lm: jobLastModified(job, now).getTime(),
-        });
+        jobEntries.push({ id: job.id });
         if (jobEntries.length >= MAX_SITEMAP_JOBS) break;
       }
 
@@ -308,12 +305,12 @@ const getCachedLanding = unstable_cache(generateLandingEntries, ["sitemap-landin
   tags: [SITEMAP_LANDING_CACHE_TAG],
 });
 
-const getCachedCompanies = unstable_cache(generateCompanyEntries, ["sitemap-companies-v1"], {
+const getCachedCompanies = unstable_cache(generateCompanyEntries, ["sitemap-companies-v2-ever"], {
   revalidate: SITEMAP_REVALIDATE_SECONDS,
   tags: [SITEMAP_COMPANIES_CACHE_TAG],
 });
 
-const getCachedJobs = unstable_cache(generateJobEntries, ["sitemap-jobs-compact-v2"], {
+const getCachedJobs = unstable_cache(generateJobEntries, ["sitemap-jobs-compact-v3-ids"], {
   revalidate: SITEMAP_REVALIDATE_SECONDS,
   tags: [SITEMAP_JOBS_CACHE_TAG],
 });

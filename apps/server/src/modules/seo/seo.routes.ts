@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { SeoService } from "./seo.service.js";
 import type { JobDiscoveryFilters, JobRepository } from "../job/job.repository.js";
+import type { CompanyRepository } from "../company/company.repository.js";
 import type { SeoAggregationsService } from "./seoAggregations.service.js";
 import { experienceSlugToLevel, locationTokenToFilter } from "./seoDimensions.js";
 
@@ -29,6 +30,7 @@ export function registerSeoRoutes(
   server: FastifyInstance,
   seo: SeoService,
   jobRepository: JobRepository,
+  companyRepository?: CompanyRepository,
 ): void {
   function isInternalSeoAuthorized(request: FastifyRequest): boolean {
     const marker = request.headers["x-internal-seo"];
@@ -126,6 +128,55 @@ export function registerSeoRoutes(
           count: rows.length,
           hasMore: nextCursor !== null,
           nextCursor,
+        },
+      });
+    },
+  );
+
+  /**
+   * Ever-hired companies for sitemap (includes 0 current open roles).
+   * Auth: same internal SEO secret as sitemap-jobs.
+   */
+  server.get(
+    "/seo/sitemap-companies",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      if (!isInternalSeoAuthorized(request)) {
+        return reply.status(401).send({
+          error: "Unauthorized",
+          code: "SEO_SITEMAP_COMPANIES_UNAUTHORIZED",
+        });
+      }
+      if (!companyRepository) {
+        return reply.status(503).send({
+          error: "Company sitemap feed unavailable",
+          code: "SEO_SITEMAP_COMPANIES_UNAVAILABLE",
+        });
+      }
+
+      const q = request.query as Record<string, unknown>;
+      const page = Math.max(1, parseIntSafe(q.page, 1));
+      const limit = Math.max(1, Math.min(500, parseIntSafe(q.limit, 200)));
+      const offset = (page - 1) * limit;
+      const rows = await companyRepository.findManyEverHiredForSitemap({ limit, offset });
+      const total = rows[0]?._listingTotal ?? 0;
+      const totalPages = Math.ceil(total / limit) || 1;
+
+      return reply.send({
+        data: rows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          jobCount: row.jobCount,
+          hasEverHadJobs: true as const,
+          updatedAt: row.updatedAt.toISOString(),
+        })),
+        meta: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasMore: offset + rows.length < total,
+          count: rows.length,
         },
       });
     },

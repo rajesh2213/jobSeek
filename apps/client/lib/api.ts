@@ -1091,6 +1091,90 @@ export async function fetchSeoSitemapJobs(options?: {
   }
 }
 
+export interface SeoSitemapCompanyRow {
+  id: string;
+  name: string;
+  slug: string;
+  jobCount: number;
+  hasEverHadJobs: boolean;
+  updatedAt: string;
+}
+
+/** Server-side: `GET /seo/sitemap-companies` — ever-hired employers for company sitemap. */
+export async function fetchSeoSitemapCompanies(options?: {
+  page?: number;
+  limit?: number;
+  internalSeoSecret?: string | null;
+  signal?: AbortSignal | null;
+}): Promise<{
+  data: SeoSitemapCompanyRow[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+    count: number;
+  };
+}> {
+  const params = new URLSearchParams();
+  if (options?.page !== undefined) params.set("page", String(options.page));
+  if (options?.limit !== undefined) params.set("limit", String(options.limit));
+  const qs = params.toString();
+  const url = `${API_BASE_URL}/seo/sitemap-companies${qs ? `?${qs}` : ""}`;
+  const headers = new Headers();
+  const secret = (options?.internalSeoSecret ?? process.env.INTERNAL_SEO_SECRET)?.trim();
+  if (secret && typeof window === "undefined") {
+    headers.set("x-internal-seo", "true");
+    headers.set("x-internal-seo-secret", secret);
+    headers.set("x-ssr-origin", "next-server");
+    headers.set("x-ssr-page", "sitemap");
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const res = await fetch(url, {
+      headers,
+      cache: "no-store",
+      signal: options?.signal ?? controller.signal,
+    });
+    clearTimeout(timeout);
+    if (res.status === 401) {
+      throw new Error("fetchSeoSitemapCompanies: unauthorized");
+    }
+    if (!res.ok) {
+      throw new Error(`fetchSeoSitemapCompanies: ${res.status}`);
+    }
+    const body = (await res.json()) as {
+      data?: SeoSitemapCompanyRow[];
+      meta?: {
+        page?: number;
+        limit?: number;
+        total?: number;
+        totalPages?: number;
+        hasMore?: boolean;
+        count?: number;
+      };
+    };
+    const page = options?.page ?? 1;
+    const limit = options?.limit ?? 200;
+    return {
+      data: body.data ?? [],
+      meta: {
+        page: body.meta?.page ?? page,
+        limit: body.meta?.limit ?? limit,
+        total: body.meta?.total ?? 0,
+        totalPages: body.meta?.totalPages ?? 1,
+        hasMore: body.meta?.hasMore === true,
+        count: body.meta?.count ?? (body.data?.length ?? 0),
+      },
+    };
+  } catch (err) {
+    clearTimeout(timeout);
+    throw err;
+  }
+}
+
 export interface SeoLandingEntry {
   slug: string;
   count: number;

@@ -47,14 +47,14 @@ export const LANDING_SECTION_BUDGET_MS = parseBoundedIntEnv(
 
 export const JOBS_SECTION_BUDGET_MS = parseBoundedIntEnv(
   process.env.SEO_SITEMAP_JOBS_BUDGET_MS,
-  50000,
+  90000,
   5000,
-  120000,
+  180000,
 );
 
 export const COMPANIES_SECTION_BUDGET_MS = parseBoundedIntEnv(
   process.env.SEO_SITEMAP_COMPANIES_BUDGET_MS,
-  18000,
+  45000,
   5000,
   120000,
 );
@@ -62,14 +62,13 @@ export const COMPANIES_SECTION_BUDGET_MS = parseBoundedIntEnv(
 /**
  * Max job detail URLs emitted across all job sitemap partitions.
  *
- * Bounded by Vercel's ~2MB Data Cache per-entry limit: the cached set uses the
- * compact `{ id, lm }` shape (~65 bytes/entry), so 25k ≈ 1.6MB stays safely
- * under the limit. Going higher requires durable/static sitemap generation
- * instead of runtime caching.
+ * Compact cache stores id-only strings (~40 bytes/entry JSON). At 40k that is
+ * ~1.6MB, under Vercel's ~2MB Data Cache per-entry limit. Prefer lastmod=now
+ * on expand rather than caching timestamps, so we can cover full inventory.
  */
 export const MAX_SITEMAP_JOBS = parseBoundedIntEnv(
   process.env.SEO_SITEMAP_MAX_JOBS,
-  25000,
+  40000,
   100,
   50000,
 );
